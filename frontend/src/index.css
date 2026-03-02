@@ -1,0 +1,142 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap');
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-sans: "Inter", system-ui, sans-serif;
+    --font-display: "Playfair Display", serif;
+
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+    --radius: 0.5rem;
+
+    --background: hsl(210, 20%, 98%);
+    --foreground: hsl(213, 40%, 14%);
+
+    --card: hsl(0, 0%, 100%);
+    --card-foreground: hsl(213, 40%, 14%);
+
+    --popover: hsl(0, 0%, 100%);
+    --popover-foreground: hsl(213, 40%, 14%);
+
+    --primary: hsl(213, 60%, 25%);
+    --primary-foreground: hsl(0, 0%, 100%);
+
+    --secondary: hsl(210, 25%, 93%);
+    --secondary-foreground: hsl(213, 40%, 14%);
+
+    --muted: hsl(210, 20%, 95%);
+    --muted-foreground: hsl(213, 15%, 50%);
+
+    --accent: hsl(42, 85%, 55%);
+    --accent-foreground: hsl(213, 40%, 14%);
+
+    --destructive: hsl(0, 72%, 51%);
+
+    --border: hsl(213, 20%, 88%);
+    --input: hsl(213, 20%, 88%);
+    --ring: hsl(213, 60%, 25%);
+
+    /* Sidebar — dark navy */
+    --sidebar: hsl(213, 45%, 18%);
+    --sidebar-foreground: hsl(210, 20%, 92%);
+    --sidebar-primary: hsl(42, 85%, 55%);
+    --sidebar-primary-foreground: hsl(213, 40%, 14%);
+    --sidebar-accent: hsl(213, 40%, 24%);
+    --sidebar-accent-foreground: hsl(210, 20%, 92%);
+    --sidebar-border: hsl(213, 35%, 25%);
+    --sidebar-ring: hsl(42, 85%, 55%);
+}
+
+.dark {
+    --background: hsl(213, 40%, 8%);
+    --foreground: hsl(210, 20%, 92%);
+
+    --card: hsl(213, 35%, 12%);
+    --card-foreground: hsl(210, 20%, 92%);
+
+    --popover: hsl(213, 35%, 12%);
+    --popover-foreground: hsl(210, 20%, 92%);
+
+    --primary: hsl(42, 85%, 55%);
+    --primary-foreground: hsl(213, 40%, 14%);
+
+    --secondary: hsl(213, 30%, 18%);
+    --secondary-foreground: hsl(210, 20%, 92%);
+
+    --muted: hsl(213, 30%, 16%);
+    --muted-foreground: hsl(213, 15%, 55%);
+
+    --accent: hsl(213, 45%, 22%);
+    --accent-foreground: hsl(210, 20%, 92%);
+
+    --destructive: hsl(0, 62.8%, 30.6%);
+
+    --border: hsl(213, 30%, 20%);
+    --input: hsl(213, 30%, 20%);
+    --ring: hsl(42, 85%, 55%);
+
+    /* Sidebar — darker navy */
+    --sidebar: hsl(213, 45%, 10%);
+    --sidebar-foreground: hsl(210, 20%, 85%);
+    --sidebar-primary: hsl(42, 85%, 55%);
+    --sidebar-primary-foreground: hsl(213, 40%, 14%);
+    --sidebar-accent: hsl(213, 40%, 16%);
+    --sidebar-accent-foreground: hsl(210, 20%, 85%);
+    --sidebar-border: hsl(213, 30%, 18%);
+    --sidebar-ring: hsl(42, 85%, 55%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .gradient-navy {
+    background: linear-gradient(135deg, hsl(213, 45%, 18%), hsl(213, 60%, 25%));
+  }
+  .gradient-gold {
+    background: linear-gradient(135deg, hsl(42, 85%, 55%), hsl(38, 92%, 50%));
+  }
+}

@@ -1,0 +1,561 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "@/api/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Download,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { toast } from "sonner";
+import { PermissionGate } from "@/components/PermissionGate";
+
+interface Supplier {
+  id: string;
+  company: string;
+  productCategory?: string;
+  country?: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  products?: string;
+  contractBuyer?: string;
+  commissionPercent?: string;
+  certifications?: string;
+  productionCapacity?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  contractValue?: string;
+  renewalDate?: string;
+  currentStatus?: string;
+  performanceScore?: string;
+  remarks?: string;
+}
+
+const EMPTY_SUPPLIER: Partial<Supplier> = {
+  company: "",
+  contactPerson: "",
+  email: "",
+  currentStatus: "Active",
+};
+
+export default function SuppliersPage() {
+  const { hasEditPermission } = useAuth();
+  const queryClient = useQueryClient();
+  const canEdit = hasEditPermission("suppliers");
+
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Partial<Supplier> | null>(null);
+  const [form, setForm] = useState<Partial<Supplier>>(EMPTY_SUPPLIER);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(
+    null,
+  );
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["suppliers", search, page],
+    queryFn: () =>
+      api
+        .get("/suppliers", { params: { search, page, limit: 20 } })
+        .then((r) => r.data),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (d: Partial<Supplier>) => api.post("/suppliers", d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      setDialogOpen(false);
+      toast.success("Supplier created");
+    },
+    onError: () => toast.error("Failed to create supplier"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, d }: { id: string; d: Partial<Supplier> }) =>
+      api.put(`/suppliers/${id}`, d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      setDialogOpen(false);
+      toast.success("Supplier updated");
+    },
+    onError: () => toast.error("Failed to update supplier"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/suppliers/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Supplier deleted");
+    },
+    onError: () => toast.error("Failed to delete supplier"),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editing?.id) {
+      updateMutation.mutate({ id: editing.id, d: form });
+    } else {
+      createMutation.mutate(form);
+    }
+  };
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY_SUPPLIER);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (s: Supplier) => {
+    setEditing(s);
+    setForm(s);
+    setDialogOpen(true);
+  };
+
+  const handleExport = async () => {
+    try {
+      const res = await api.get("/suppliers/export/csv", {
+        params: { search },
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `suppliers_export.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("CSV exported");
+    } catch {
+      toast.error("Export failed");
+    }
+  };
+
+  const suppliers = data?.data ?? [];
+  const pagination = data?.pagination;
+
+  const statusColor = (s?: string) => {
+    switch (s) {
+      case "Active":
+        return "default" as const;
+      case "Inactive":
+        return "secondary" as const;
+      case "Under Review":
+        return "outline" as const;
+      default:
+        return "outline" as const;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Suppliers</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage supplier relationships and contracts
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+          <PermissionGate permission="suppliers" editOnly>
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Supplier
+            </Button>
+          </PermissionGate>
+        </div>
+      </div>
+
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search suppliers..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          className="pl-10"
+        />
+      </div>
+
+      {isLoading ? (
+        <div className="flex h-32 items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      ) : suppliers.length === 0 ? (
+        <div className="flex h-32 items-center justify-center text-muted-foreground">
+          No suppliers found
+        </div>
+      ) : (
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Company Name</TableHead>
+                <TableHead>Product Category</TableHead>
+                <TableHead>Country</TableHead>
+                <TableHead>Contact Person</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Products</TableHead>
+                {canEdit && <TableHead className="w-24">Actions</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {suppliers.map((s: Supplier) => (
+                <TableRow key={s.id}>
+                  <TableCell className="font-medium">{s.company}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {s.productCategory}
+                  </TableCell>
+                  <TableCell>{s.country}</TableCell>
+                  <TableCell>{s.contactPerson}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {s.email}
+                  </TableCell>
+                  <TableCell>{s.phone}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {s.products}
+                  </TableCell>
+                  {canEdit && (
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEdit(s)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSupplierToDelete(s);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {pagination && pagination.pages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {pagination.page} of {pagination.pages} ({pagination.total}{" "}
+            total)
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= pagination.pages}
+              onClick={() => setPage(page + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editing?.id ? "Edit Supplier" : "Add Supplier"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Company *</Label>
+                <Input
+                  value={form.company}
+                  onChange={(e) =>
+                    setForm({ ...form, company: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contact Person</Label>
+                <Input
+                  value={form.contactPerson ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, contactPerson: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={form.email ?? ""}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input
+                  value={form.phone ?? ""}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Product Category</Label>
+                <Input
+                  value={form.productCategory ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, productCategory: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Country</Label>
+                <Input
+                  value={form.country ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, country: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Products</Label>
+                <Input
+                  value={form.products ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, products: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contract Buyer</Label>
+                <Input
+                  value={form.contractBuyer ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, contractBuyer: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Commission %</Label>
+                <Input
+                  value={form.commissionPercent ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, commissionPercent: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Current Status</Label>
+                <Select
+                  value={form.currentStatus ?? "Active"}
+                  onValueChange={(v) => setForm({ ...form, currentStatus: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                    <SelectItem value="Under Review">Under Review</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Performance Score</Label>
+                <Input
+                  value={form.performanceScore ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, performanceScore: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Certifications</Label>
+                <Input
+                  value={form.certifications ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, certifications: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Production Capacity</Label>
+                <Input
+                  value={form.productionCapacity ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, productionCapacity: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contract Start Date</Label>
+                <Input
+                  type="date"
+                  value={form.contractStartDate ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, contractStartDate: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contract End Date</Label>
+                <Input
+                  type="date"
+                  value={form.contractEndDate ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, contractEndDate: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contract Value</Label>
+                <Input
+                  value={form.contractValue ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, contractValue: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Renewal Date</Label>
+                <Input
+                  type="date"
+                  value={form.renewalDate ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, renewalDate: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Remarks</Label>
+              <Textarea
+                value={form.remarks ?? ""}
+                onChange={(e) => setForm({ ...form, remarks: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {(createMutation.isPending || updateMutation.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {editing?.id ? "Update" : "Create"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete supplier confirmation */}
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setSupplierToDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete supplier</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete{" "}
+            <span className="font-medium">
+              {supplierToDelete?.company || "this supplier"}
+            </span>
+            ? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                if (supplierToDelete) {
+                  deleteMutation.mutate(supplierToDelete.id);
+                }
+                setDeleteDialogOpen(false);
+                setSupplierToDelete(null);
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

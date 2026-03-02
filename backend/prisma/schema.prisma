@@ -1,0 +1,207 @@
+// backend/prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── AUTH & USERS ───────────────────────────────────
+
+enum Role {
+  admin
+  member
+}
+
+enum Permission {
+  buyers
+  suppliers
+  analytics
+  reports
+}
+
+enum AccessLevel {
+  read
+  edit
+}
+
+model User {
+  id             String           @id @default(uuid())
+  email          String           @unique
+  passwordHash   String           @map("password_hash")
+  fullName       String           @map("full_name")
+  isActive       Boolean          @default(true) @map("is_active")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  roles          UserRole[]
+  permissions    UserPermission[]
+  activityLogs   ActivityLog[]
+  accessRequests AccessRequest[]  @relation("requester")
+  reviewedRequests AccessRequest[] @relation("reviewer")
+  buyers         Buyer[]
+  suppliers      Supplier[]
+  reports        Report[]
+
+  @@map("users")
+}
+
+model UserRole {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  role   Role
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@map("user_roles")
+}
+
+model UserPermission {
+  id          String      @id @default(uuid())
+  userId      String      @map("user_id")
+  permission  Permission
+  accessLevel AccessLevel @default(edit) @map("access_level")
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permission])
+  @@map("user_permissions")
+}
+
+// ─── BUYERS ─────────────────────────────────────────
+
+model Buyer {
+  id                        String    @id @default(uuid())
+  company                   String
+  name                      String
+  email                     String
+  phone                     String?
+  country                   String
+  address                   String?
+  website                   String?
+  region                    String?
+  productCategoryInterest   String?   @map("product_category_interest")
+  moqRequirements           String?   @map("moq_requirements")
+  pricingRange              String?   @map("pricing_range")
+  certificationRequirements String?   @map("certification_requirements")
+  paymentTerms              String?   @map("payment_terms")
+  incoterms                 String?
+  riskRating                String?   @map("risk_rating")
+  strategicValue            String?   @map("strategic_value")
+  leadSource                String?   @map("lead_source")
+  lastContactDate           DateTime? @map("last_contact_date") @db.Date
+  dealHistory               String?   @map("deal_history")
+  notes                     String?
+  status                    String?   @default("Pending")
+  requiredProducts          Json      @default("[]") @map("required_products")
+
+  createdBy                 String?   @map("created_by")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  updatedAt                 DateTime  @updatedAt @map("updated_at")
+
+  creator                   User?     @relation(fields: [createdBy], references: [id])
+
+  @@map("buyers")
+}
+
+// ─── SUPPLIERS ──────────────────────────────────────
+
+model Supplier {
+  id                 String    @id @default(uuid())
+  company            String
+  productCategory    String?   @map("product_category")
+  country            String?
+  contactPerson      String?   @map("contact_person")
+  email              String?
+  phone              String?
+  products           String?
+  contractBuyer      String?   @map("contract_buyer")
+  commissionPercent  String?   @map("commission_percent")
+  certifications     String?
+  productionCapacity String?   @map("production_capacity")
+  contractStartDate  DateTime? @map("contract_start_date") @db.Date
+  contractEndDate    DateTime? @map("contract_end_date") @db.Date
+  contractValue      String?   @map("contract_value")
+  renewalDate        DateTime? @map("renewal_date") @db.Date
+  currentStatus      String?   @default("Active") @map("current_status")
+  performanceScore   String?   @map("performance_score")
+  remarks            String?
+
+  createdBy          String?   @map("created_by")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  creator            User?     @relation(fields: [createdBy], references: [id])
+
+  @@map("suppliers")
+}
+
+// ─── REPORTS ────────────────────────────────────────
+
+model Report {
+  id              String    @id @default(uuid())
+  productName     String    @map("product_name")
+  productImageUrl String?   @map("product_image_url")
+  buyerName       String    @map("buyer_name")
+  companyName     String    @map("company_name")
+  status          String
+  keyUpdates      String?   @map("key_updates")
+  updateDate      DateTime? @map("update_date") @db.Date
+  buyerSupplier   String    @default("Buyer") @map("buyer_supplier")
+  reportDate      DateTime  @map("report_date") @db.Date
+
+  createdBy       String?   @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  creator         User?     @relation(fields: [createdBy], references: [id])
+
+  @@map("reports")
+}
+
+// ─── ACTIVITY LOGS ──────────────────────────────────
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@map("activity_logs")
+}
+
+// ─── ACCESS REQUESTS ────────────────────────────────
+
+model AccessRequest {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  permission String
+  reason     String
+  status     String    @default("pending")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  reviewedAt DateTime? @map("reviewed_at")
+  reviewedBy String?   @map("reviewed_by")
+
+  user       User      @relation("requester", fields: [userId], references: [id])
+  reviewer   User?     @relation("reviewer", fields: [reviewedBy], references: [id])
+
+  @@map("access_requests")
+}
+
+// ─── APP SETTINGS ───────────────────────────────────
+
+model AppSetting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+
+  @@map("app_settings")
+}
