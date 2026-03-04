@@ -62,7 +62,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right login panel */}
-      <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6 lg:px-16">
+      <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-6 lg:px-16">
         <Card className="w-full max-w-md border border-slate-200/70 shadow-md">
           <CardHeader className="space-y-1 pb-6">
             <CardTitle className="text-2xl font-semibold tracking-tight">
@@ -114,11 +114,11 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Footer text */}
-      <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 text-xs font-medium text-slate-400">
-        ESTD 2005 · Élan Exports Consultancy
+        {/* Footer text */}
+        <p className="mt-6 text-xs font-medium text-slate-400">
+          ESTD 2005 · Élan Exports Consultancy
+        </p>
       </div>
     </div>
   );
