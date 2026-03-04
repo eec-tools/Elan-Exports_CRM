@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import api from "@/api/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Loader2, Mail, ExternalLink, RefreshCw, Edit, Save } from "lucide-react";
+import { Loader2, Mail, ExternalLink, RefreshCw, Edit, Save, Trash2 } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -34,6 +34,8 @@ export default function EmailTasksPage() {
     const [selectedTask, setSelectedTask] = useState<EmailTask | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [taskToDelete, setTaskToDelete] = useState<EmailTask | null>(null);
 
     const fetchTasks = async () => {
         try {
@@ -68,6 +70,24 @@ export default function EmailTasksPage() {
             toast.success("Task updated");
         } catch (error) {
             toast.error("Failed to update task");
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!taskToDelete) return;
+
+        try {
+            await api.delete(`/email-tasks/${taskToDelete.id}`);
+            setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+            if (selectedTask?.id === taskToDelete.id) {
+                setIsDialogOpen(false);
+                setSelectedTask(null);
+            }
+            toast.success("Task deleted");
+            setDeleteDialogOpen(false);
+            setTaskToDelete(null);
+        } catch (error) {
+            toast.error("Failed to delete task");
         }
     };
 
@@ -216,6 +236,17 @@ export default function EmailTasksPage() {
                                                     title="Edit Task"
                                                 >
                                                     <Edit className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setTaskToDelete(task);
+                                                        setDeleteDialogOpen(true);
+                                                    }}
+                                                    className="inline-flex items-center justify-center p-2 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                                    title="Delete Task"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </div>
                                         </td>
@@ -380,27 +411,50 @@ export default function EmailTasksPage() {
                                 </div>
                             </div>
 
-                            <div className="pt-2">
-                                <label className="text-sm font-semibold text-muted-foreground">Notes / Email Body</label>
-                                {isEditing ? (
-                                    <textarea
-                                        className="w-full mt-1.5 min-h-[120px] p-3 text-sm bg-muted/40 border rounded-md focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 resize-y"
-                                        value={selectedTask.notes || ""}
-                                        onChange={(e) => setSelectedTask({ ...selectedTask, notes: e.target.value })}
-                                        onBlur={(e) => updateTask(selectedTask.id, "notes", e.target.value)}
-                                        placeholder="Add summary notes or drop the email body here for reference..."
-                                    />
-                                ) : (
-                                    <div className="w-full mt-1.5 min-h-[120px] p-3 text-sm bg-muted/40 border rounded-md whitespace-pre-wrap">
-                                        {selectedTask.notes || "No notes"}
-                                    </div>
-                                )}
-                            </div>
                         </>
                     )}
                 </DialogContent>
             </Dialog>
 
+            {/* Delete confirmation */}
+            <Dialog
+                open={deleteDialogOpen}
+                onOpenChange={(open) => {
+                    setDeleteDialogOpen(open);
+                    if (!open) setTaskToDelete(null);
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete task</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground">
+                        Are you sure you want to delete the task{" "}
+                        {taskToDelete?.subject && (
+                            <span className="font-medium">
+                                "{taskToDelete.subject}"
+                            </span>
+                        )}
+                        ? This action cannot be undone.
+                    </p>
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setDeleteDialogOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={confirmDelete}
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
