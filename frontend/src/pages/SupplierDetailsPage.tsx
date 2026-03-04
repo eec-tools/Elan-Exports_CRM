@@ -1,7 +1,7 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
-import { useAuth } from "@/contexts/AuthContext";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,8 +100,8 @@ function InfoRow({
 export default function SupplierDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("suppliers");
+
+
   const { isUnlocked, unlockButton, passkeyDialog } =
     useSensitiveDataUnlock("supplier-details");
 
@@ -135,9 +135,9 @@ export default function SupplierDetailsPage() {
 
   const registeredSince = supplier.createdAt
     ? new Date(supplier.createdAt).toLocaleDateString("en-IN", {
-        month: "short",
-        year: "numeric",
-      })
+      month: "short",
+      year: "numeric",
+    })
     : "";
 
   return (
