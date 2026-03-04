@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -228,7 +229,14 @@ export default function SuppliersPage() {
             <TableBody>
               {suppliers.map((s: Supplier) => (
                 <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.company}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      to={`/suppliers/signed-contract/${s.id}`}
+                      className="text-primary hover:underline"
+                    >
+                      {s.company}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {s.productCategory}
                   </TableCell>
