@@ -139,6 +139,24 @@ model Supplier {
   @@map("suppliers")
 }
 
+// ─── OLD SUPPLIERS ──────────────────────────────────
+
+model OldSupplier {
+  id        String   @id @default(uuid())
+  company   String
+  country   String?
+  website   String?
+  email     String?
+  products  String?
+  notes     String?
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("old_suppliers")
+}
+
 // ─── REPORTS ────────────────────────────────────────
 
 model Report {
