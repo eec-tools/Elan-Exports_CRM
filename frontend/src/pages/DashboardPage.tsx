@@ -1,7 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Factory, FileText, UserCog, Loader2 } from "lucide-react";
+import {
+  Users,
+  Factory,
+  FileText,
+  UserCog,
+  Loader2,
+  Video,
+  HardDrive,
+  ExternalLink,
+} from "lucide-react";
 
 export default function DashboardPage() {
   const { data: stats, isLoading } = useQuery({
@@ -73,6 +82,37 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* ── Quick Links ── */}
+      <div>
+        <h2 className="text-lg font-semibold mb-3">Quick Links</h2>
+        <div className="flex gap-3 flex-wrap">
+          <a
+            href="https://meet.google.com/pqs-znoa-jwk?authuser=0"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium hover:shadow-md transition-all hover:border-red-200 hover:bg-red-50 group"
+          >
+            <div className="rounded-md bg-red-50 p-1.5 group-hover:bg-red-100 transition-colors">
+              <Video className="h-4 w-4 text-red-600" />
+            </div>
+            Google Meet
+            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+          </a>
+          <a
+            href="https://drive.google.com/drive/folders/1GfVddDUKMlzeoiQ_vFpuFptukawWnbwW"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium hover:shadow-md transition-all hover:border-blue-200 hover:bg-blue-50 group"
+          >
+            <div className="rounded-md bg-blue-50 p-1.5 group-hover:bg-blue-100 transition-colors">
+              <HardDrive className="h-4 w-4 text-blue-600" />
+            </div>
+            Google Drive
+            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+          </a>
+        </div>
       </div>
     </div>
   );
