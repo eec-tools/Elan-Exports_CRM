@@ -85,11 +85,9 @@ export async function createReport(
     // Handle image upload if multipart — productImageUrl may come from file or body
     const data = { ...req.body };
 
-    // If using multer, file may be on req.file
+    // If using multer-storage-cloudinary, file path is the secure Cloudinary URL
     if ((req as any).file) {
-      // For now, store as a base64 data URL or local path
-      // In production, upload to S3/Cloudflare R2 and store the URL
-      data.productImageUrl = `/uploads/${(req as any).file.filename}`;
+      data.productImageUrl = (req as any).file.path;
     }
 
     const report = await prisma.report.create({
@@ -135,7 +133,7 @@ export async function updateReport(
     if (data.updateDate) data.updateDate = new Date(data.updateDate);
 
     if ((req as any).file) {
-      data.productImageUrl = `/uploads/${(req as any).file.filename}`;
+      data.productImageUrl = (req as any).file.path;
     }
 
     const report = await prisma.report.update({
