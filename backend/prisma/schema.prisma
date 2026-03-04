@@ -205,3 +205,23 @@ model AppSetting {
 
   @@map("app_settings")
 }
+
+// ─── EMAIL TASK TRACKER ─────────────────────────────
+
+model EmailTracker {
+  id               String    @id @default(uuid())
+  dateReceived     DateTime  @map("date_received")
+  senderAddress    String    @map("sender_address")
+  subject          String
+  task             String?
+  productCategory  String?   @map("product_category")
+  priority         String?
+  respondent       String?
+  status           String    @default("Not Started")
+  notes            String?
+  emailLink        String?   @map("email_link")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("email_tracker")
+}

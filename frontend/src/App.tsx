@@ -13,6 +13,7 @@ import ReportsPage from "@/pages/ReportsPage";
 import MembersPage from "@/pages/MembersPage";
 import ActivityPage from "@/pages/ActivityPage";
 import AccessRequestsPage from "@/pages/AccessRequestsPage";
+import EmailTasksPage from "@/pages/EmailTasksPage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -94,6 +95,7 @@ export default function App() {
                   <Route path="members" element={<MembersPage />} />
                   <Route path="activity" element={<ActivityPage />} />
                   <Route path="access-requests" element={<AccessRequestsPage />} />
+                  <Route path="email-tasks" element={<EmailTasksPage />} />
                 </Route>
               </Route>
             </Route>

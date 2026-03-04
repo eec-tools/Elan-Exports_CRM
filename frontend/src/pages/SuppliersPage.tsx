@@ -5,7 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -166,19 +165,6 @@ export default function SuppliersPage() {
 
   const suppliers = data?.data ?? [];
   const pagination = data?.pagination;
-
-  const statusColor = (s?: string) => {
-    switch (s) {
-      case "Active":
-        return "default" as const;
-      case "Inactive":
-        return "secondary" as const;
-      case "Under Review":
-        return "outline" as const;
-      default:
-        return "outline" as const;
-    }
-  };
 
   return (
     <div className="space-y-6">

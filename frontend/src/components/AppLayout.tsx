@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   X,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -28,6 +29,7 @@ const navItems = [
   { to: "/members", label: "Members", icon: UserCog, perm: null, adminOnly: true },
   { to: "/activity", label: "Activity", icon: Activity, perm: null, adminOnly: true },
   { to: "/access-requests", label: "Access Requests", icon: ShieldCheck, perm: null, adminOnly: true },
+  { to: "/email-tasks", label: "Email Tasks", icon: Mail, perm: null, adminOnly: true },
 ];
 
 export function AppLayout() {
@@ -63,9 +65,8 @@ export function AppLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-sidebar text-sidebar-foreground transition-transform md:relative md:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-sidebar text-sidebar-foreground transition-transform md:relative md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         {/* Logo */}
         <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6">
@@ -108,10 +109,9 @@ export function AppLayout() {
                     to="/suppliers/signed-contract"
                     onClick={() => setSidebarOpen(false)}
                     className={({ isActive }) =>
-                      `ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                      `ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                       }`
                     }
                   >
@@ -121,10 +121,9 @@ export function AppLayout() {
                     to="/suppliers/old"
                     onClick={() => setSidebarOpen(false)}
                     className={({ isActive }) =>
-                      `ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/foreground"
+                      `ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/foreground"
                       }`
                     }
                   >
@@ -141,10 +140,9 @@ export function AppLayout() {
                 end={item.to === "/"}
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                   }`
                 }
               >

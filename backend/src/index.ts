@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
@@ -16,6 +17,7 @@ import activityRoutes from "./routes/activity.routes.js";
 import accessRequestsRoutes from "./routes/accessRequests.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import settingsRoutes from "./routes/settings.routes.js";
+import emailTasksRoutes from "./routes/emailTasks.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,6 +69,7 @@ app.use("/api/activity", activityRoutes);
 app.use("/api/access-requests", accessRequestsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/email-tasks", emailTasksRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {
