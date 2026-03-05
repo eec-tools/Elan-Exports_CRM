@@ -223,6 +223,7 @@ export default function SuppliersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Products</TableHead>
+                <TableHead>Remarks</TableHead>
                 {canEdit && <TableHead className="w-24">Actions</TableHead>}
               </TableRow>
             </TableHeader>
@@ -248,6 +249,9 @@ export default function SuppliersPage() {
                   <TableCell>{s.phone}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {s.products}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {s.remarks}
                   </TableCell>
                   {canEdit && (
                     <TableCell>
