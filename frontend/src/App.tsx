@@ -21,6 +21,7 @@ import ActivityPage from "@/pages/ActivityPage";
 import AccessRequestsPage from "@/pages/AccessRequestsPage";
 import EmailTasksPage from "@/pages/EmailTasksPage";
 import SupplierDetailsPage from "@/pages/SupplierDetailsPage";
+import VaultPage from "@/pages/VaultPage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -104,6 +105,7 @@ export default function App() {
                     </PermissionGate>
                   }
                 />
+                <Route path="vault" element={<VaultPage />} />
 
                 {/* Admin-only routes */}
                 <Route element={<AdminRoute />}>

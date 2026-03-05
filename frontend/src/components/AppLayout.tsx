@@ -14,6 +14,7 @@ import {
   Mail,
   ChevronLeft,
   ChevronRight,
+  Archive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -50,6 +51,13 @@ const navItems = [
     label: "Reports",
     icon: FileText,
     perm: "reports",
+    adminOnly: false,
+  },
+  {
+    to: "/vault",
+    label: "Vault",
+    icon: Archive,
+    perm: null,
     adminOnly: false,
   },
   {

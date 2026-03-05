@@ -36,14 +36,15 @@ model User {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
-  roles          UserRole[]
-  permissions    UserPermission[]
-  activityLogs   ActivityLog[]
-  accessRequests AccessRequest[]  @relation("requester")
-  reviewedRequests AccessRequest[] @relation("reviewer")
-  buyers         Buyer[]
-  suppliers      Supplier[]
-  reports        Report[]
+  roles            UserRole[]
+  permissions      UserPermission[]
+  activityLogs     ActivityLog[]
+  accessRequests   AccessRequest[]  @relation("requester")
+  reviewedRequests AccessRequest[]  @relation("reviewer")
+  buyers           Buyer[]
+  suppliers        Supplier[]
+  reports          Report[]
+  vaultDocuments   VaultDocument[]
 
   @@map("users")
 }
@@ -242,4 +243,23 @@ model EmailTracker {
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@map("email_tracker")
+}
+
+// ─── VAULT DOCUMENTS ────────────────────────────────
+
+model VaultDocument {
+  id          String   @id @default(uuid())
+  name        String
+  category    String
+  region      String   @default("Global")
+  fileUrl     String   @map("file_url")
+  publicId    String   @map("public_id")
+  fileType    String   @map("file_type")
+  uploadedBy  String?  @map("uploaded_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  uploader    User?   @relation(fields: [uploadedBy], references: [id])
+
+  @@map("vault_documents")
 }
