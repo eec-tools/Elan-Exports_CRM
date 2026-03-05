@@ -27,6 +27,98 @@ interface EmailTask {
     createdAt: string;
 }
 
+const TASK_OPTIONS = [
+    "Intro Email",
+    "Intro Email Follow-up",
+    "Info Pending from Supplier",
+    "Certs Pending from Supplier",
+    "Share Contract",
+    "Contract Clarification",
+    "Signed Contract Follow-up",
+    "Send Reminder",
+    "J&K Coordination",
+    "CH Australia Tasks",
+    "Geotex Pakistan Tasks",
+    "Supplier Sourcing",
+    "Supplier Update",
+    "Supplier inquired for business",
+    "Catalog",
+    "Commission percentage query",
+    "Sample feedback",
+    "Sample update",
+    "Price Feedback",
+    "Prices shared",
+    "Query on new sample development of peanut butter",
+    "Order follow up",
+    "Order related",
+    "Signed contract received",
+    "Payment confirmation",
+    "Shipment confirmation",
+    "Request for product specification and call meeting",
+    "Invitation to visit stall",
+    "Meeting request",
+    "Initial discussion with buyer",
+    "New Business",
+    "New inquiry for home tex",
+    "Bed & Bath Linen Inquiry",
+    "Wet Wipe Inquiry",
+    "Peanut butter order inquiry",
+    "Rice tender inquiry",
+    "Wine tender discussion",
+    "Wine Order discussion",
+    "Rugs for hotel",
+    "Flag inquiry",
+    "Africa market inquiry",
+    "Audit, Inspection coordination",
+    "Handover rice category"
+];
+
+const PRODUCT_CATEGORY_OPTIONS = [
+    "Dried Fruits",
+    "Biscuits",
+    "Chocolates",
+    "Fertiliser",
+    "Fresh Fruits & Vegetables",
+    "Ground Spices",
+    "Instant Noodle",
+    "Juices",
+    "Lentils",
+    "Oil",
+    "Nuts",
+    "Pasta",
+    "Peanut Butter",
+    "Pet Food",
+    "Rice",
+    "Sugar",
+    "Seafood",
+    "Super Foods",
+    "Apparel",
+    "Home Textiles",
+    "Condoms",
+    "Sports Wear",
+    "Sauces",
+    "Coconut product",
+    "Stationery",
+    "Hotel and Hospitals",
+    "Wine",
+    "Hotel Textile",
+    "Home Decor",
+    "Rally towel",
+    "Wet wipe",
+    "Flag",
+    "Wheat Flour"
+];
+
+const RESPONDENT_OPTIONS = [
+    "vandana",
+    "shirali",
+    "mohita",
+    "buyer",
+    "supplier",
+    "N/A",
+    "fahad madan"
+];
+
 export default function EmailTasksPage() {
     const [tasks, setTasks] = useState<EmailTask[]>([]);
     const [loading, setLoading] = useState(true);
@@ -109,10 +201,12 @@ export default function EmailTasksPage() {
     const statusColors: Record<string, string> = {
         "Not Started": "bg-gray-100 text-gray-800",
         "In Progress": "bg-yellow-100 text-yellow-800",
+        "Incomplete": "bg-red-100 text-red-800",
         "Completed": "bg-green-100 text-green-800",
     };
 
     const priorityColors: Record<string, string> = {
+        "Urgent": "text-purple-600 font-bold",
         "High": "text-red-600 font-semibold",
         "Medium": "text-orange-600 font-semibold",
         "Low": "text-green-600 font-semibold",
@@ -158,10 +252,9 @@ export default function EmailTasksPage() {
                     className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                     <option value="">All Task Types</option>
-                    <option value="Support">Support</option>
-                    <option value="Sales Inquiry">Sales Inquiry</option>
-                    <option value="General Inquiry">General Inquiry</option>
-                    <option value="Partnership">Partnership</option>
+                    {TASK_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                    ))}
                 </select>
                 <select
                     value={filterPriority}
@@ -169,6 +262,7 @@ export default function EmailTasksPage() {
                     className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                     <option value="">All Priorities</option>
+                    <option value="Urgent">Urgent</option>
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
                     <option value="Low">Low</option>
@@ -361,10 +455,9 @@ export default function EmailTasksPage() {
                                                 className="w-full mt-1.5 px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                             >
                                                 <option value="">Uncategorized</option>
-                                                <option value="Support">Support</option>
-                                                <option value="Sales Inquiry">Sales Inquiry</option>
-                                                <option value="General Inquiry">General Inquiry</option>
-                                                <option value="Partnership">Partnership</option>
+                                                {TASK_OPTIONS.map((option) => (
+                                                    <option key={option} value={option}>{option}</option>
+                                                ))}
                                             </select>
                                         ) : (
                                             <div className="mt-1.5 py-2 font-medium">
@@ -381,9 +474,10 @@ export default function EmailTasksPage() {
                                                 className={`w-full mt-1.5 px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-ring ${selectedTask.priority ? priorityColors[selectedTask.priority] : ""}`}
                                             >
                                                 <option value="">Set Priority...</option>
-                                                <option value="High" className="text-red-600">High</option>
-                                                <option value="Medium" className="text-orange-600">Medium</option>
-                                                <option value="Low" className="text-green-600">Low</option>
+                                                <option value="Urgent" className="text-purple-600 font-bold">Urgent</option>
+                                                <option value="High" className="text-red-600 font-semibold">High</option>
+                                                <option value="Medium" className="text-orange-600 font-semibold">Medium</option>
+                                                <option value="Low" className="text-green-600 font-semibold">Low</option>
                                             </select>
                                         ) : (
                                             <div className={`mt-1.5 py-2 font-medium ${selectedTask.priority ? priorityColors[selectedTask.priority] : ""}`}>
@@ -401,6 +495,7 @@ export default function EmailTasksPage() {
                                             >
                                                 <option value="Not Started">Not Started</option>
                                                 <option value="In Progress">In Progress</option>
+                                                <option value="Incomplete">Incomplete</option>
                                                 <option value="Completed">Completed</option>
                                             </select>
                                         ) : (
@@ -417,14 +512,16 @@ export default function EmailTasksPage() {
                                     <div>
                                         <label className="text-sm font-semibold text-muted-foreground">Product Category</label>
                                         {isEditing ? (
-                                            <input
-                                                type="text"
+                                            <select
                                                 value={selectedTask.productCategory || ""}
-                                                onChange={(e) => setSelectedTask({ ...selectedTask, productCategory: e.target.value })}
-                                                onBlur={(e) => updateTask(selectedTask.id, "productCategory", e.target.value)}
+                                                onChange={(e) => updateTask(selectedTask.id, "productCategory", e.target.value)}
                                                 className="w-full mt-1.5 px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                                placeholder="E.g. Bamboo Toothbrush"
-                                            />
+                                            >
+                                                <option value="">Select Category...</option>
+                                                {PRODUCT_CATEGORY_OPTIONS.map((option) => (
+                                                    <option key={option} value={option}>{option}</option>
+                                                ))}
+                                            </select>
                                         ) : (
                                             <div className="mt-1.5 py-2 font-medium">
                                                 {selectedTask.productCategory || "None"}
@@ -434,14 +531,16 @@ export default function EmailTasksPage() {
                                     <div>
                                         <label className="text-sm font-semibold text-muted-foreground">Assigned Respondent</label>
                                         {isEditing ? (
-                                            <input
-                                                type="text"
+                                            <select
                                                 value={selectedTask.respondent || ""}
-                                                onChange={(e) => setSelectedTask({ ...selectedTask, respondent: e.target.value })}
-                                                onBlur={(e) => updateTask(selectedTask.id, "respondent", e.target.value)}
+                                                onChange={(e) => updateTask(selectedTask.id, "respondent", e.target.value)}
                                                 className="w-full mt-1.5 px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                                                placeholder="Assign to..."
-                                            />
+                                            >
+                                                <option value="">Unassigned</option>
+                                                {RESPONDENT_OPTIONS.map((option) => (
+                                                    <option key={option} value={option}>{option}</option>
+                                                ))}
+                                            </select>
                                         ) : (
                                             <div className="mt-1.5 py-2 font-medium">
                                                 {selectedTask.respondent || "Unassigned"}
