@@ -36,6 +36,8 @@ export default function EmailTasksPage() {
     const [isEditing, setIsEditing] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [taskToDelete, setTaskToDelete] = useState<EmailTask | null>(null);
+    const [filterTask, setFilterTask] = useState("");
+    const [filterPriority, setFilterPriority] = useState("");
 
     const fetchTasks = async () => {
         try {
@@ -116,6 +118,12 @@ export default function EmailTasksPage() {
         "Low": "text-green-600 font-semibold",
     };
 
+    const filteredTasks = tasks.filter((t) => {
+        if (filterTask && t.task !== filterTask) return false;
+        if (filterPriority && t.priority !== filterPriority) return false;
+        return true;
+    });
+
     if (loading) {
         return (
             <div className="flex h-full items-center justify-center">
@@ -143,6 +151,38 @@ export default function EmailTasksPage() {
                 </button>
             </div>
 
+            <div className="flex items-center gap-3">
+                <select
+                    value={filterTask}
+                    onChange={(e) => setFilterTask(e.target.value)}
+                    className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                    <option value="">All Task Types</option>
+                    <option value="Support">Support</option>
+                    <option value="Sales Inquiry">Sales Inquiry</option>
+                    <option value="General Inquiry">General Inquiry</option>
+                    <option value="Partnership">Partnership</option>
+                </select>
+                <select
+                    value={filterPriority}
+                    onChange={(e) => setFilterPriority(e.target.value)}
+                    className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                    <option value="">All Priorities</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+                {(filterTask || filterPriority) && (
+                    <button
+                        onClick={() => { setFilterTask(""); setFilterPriority(""); }}
+                        className="text-sm text-muted-foreground hover:text-foreground underline"
+                    >
+                        Clear filters
+                    </button>
+                )}
+            </div>
+
             <div className="rounded-md border bg-card">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
@@ -160,17 +200,17 @@ export default function EmailTasksPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                            {tasks.length === 0 ? (
+                            {filteredTasks.length === 0 ? (
                                 <tr>
                                     <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <Mail className="h-8 w-8 opacity-20" />
-                                            <p>No email tasks found.</p>
+                                            <p>{tasks.length === 0 ? "No email tasks found." : "No tasks match the selected filters."}</p>
                                         </div>
                                     </td>
                                 </tr>
                             ) : (
-                                tasks.map((task) => (
+                                filteredTasks.map((task) => (
                                     <tr
                                         key={task.id}
                                         className="hover:bg-muted/30 transition-colors cursor-pointer"
