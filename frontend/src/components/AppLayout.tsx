@@ -83,7 +83,7 @@ const navItems = [
   },
   {
     to: "/email-tasks",
-    label: "Email Tasks",
+    label: "Task Tracker",
     icon: Mail,
     perm: null,
     adminOnly: true,

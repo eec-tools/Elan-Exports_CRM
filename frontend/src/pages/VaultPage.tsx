@@ -271,6 +271,22 @@ export default function VaultPage() {
 
   // ─── Upload handlers ─────────────────────────────────
 
+  function handleFileSelect(file: File | null) {
+    if (file) {
+      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "") || file.name;
+      setUploadForm((prev) => {
+        const prevExtracted = uploadFile
+          ? uploadFile.name.replace(/\.[^/.]+$/, "") || uploadFile.name
+          : "";
+        if (!prev.name || prev.name === prevExtracted) {
+          return { ...prev, name: nameWithoutExt };
+        }
+        return prev;
+      });
+    }
+    setUploadFile(file);
+  }
+
   function handleUploadSubmit() {
     if (!uploadFile) {
       toast.error("Please select a file");
@@ -292,7 +308,7 @@ export default function VaultPage() {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) setUploadFile(file);
+    if (file) handleFileSelect(file);
   }
 
   // ─── Edit handlers ───────────────────────────────────
@@ -565,7 +581,7 @@ export default function VaultPage() {
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.gif,.webp,.zip"
               />
               {uploadFile ? (
@@ -578,7 +594,7 @@ export default function VaultPage() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setUploadFile(null);
+                      handleFileSelect(null);
                     }}
                     className="ml-1 text-muted-foreground hover:text-foreground"
                   >
