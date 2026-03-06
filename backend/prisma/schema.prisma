@@ -20,6 +20,8 @@ enum Permission {
   suppliers
   analytics
   reports
+  vault
+  task_tracker
 }
 
 enum AccessLevel {

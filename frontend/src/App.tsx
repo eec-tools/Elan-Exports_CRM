@@ -105,7 +105,23 @@ export default function App() {
                     </PermissionGate>
                   }
                 />
-                <Route path="vault" element={<VaultPage />} />
+                <Route
+                  path="vault"
+                  element={
+                    <PermissionGate permission="vault">
+                      <VaultPage />
+                    </PermissionGate>
+                  }
+                />
+
+                <Route
+                  path="email-tasks"
+                  element={
+                    <PermissionGate permission="task_tracker">
+                      <EmailTasksPage />
+                    </PermissionGate>
+                  }
+                />
 
                 {/* Admin-only routes */}
                 <Route element={<AdminRoute />}>
@@ -115,7 +131,6 @@ export default function App() {
                     path="access-requests"
                     element={<AccessRequestsPage />}
                   />
-                  <Route path="email-tasks" element={<EmailTasksPage />} />
                 </Route>
               </Route>
             </Route>

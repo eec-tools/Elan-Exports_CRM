@@ -57,7 +57,7 @@ const navItems = [
     to: "/vault",
     label: "Vault",
     icon: Archive,
-    perm: null,
+    perm: "vault",
     adminOnly: false,
   },
   {
@@ -85,13 +85,13 @@ const navItems = [
     to: "/email-tasks",
     label: "Task Tracker",
     icon: Mail,
-    perm: null,
-    adminOnly: true,
+    perm: "task_tracker",
+    adminOnly: false,
   },
 ];
 
 export function AppLayout() {
-  const { user, logout, isAdmin, hasPermission } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -169,12 +169,6 @@ export function AppLayout() {
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {visibleNav.map((item) => {
             // Accessible = no perm required, OR admin, OR has the permission
-            const accessible =
-              !item.perm || isAdmin || hasPermission(item.perm);
-
-            if (!accessible) {
-              return null;
-            }
 
             if (item.label === "Suppliers") {
               return (

@@ -40,7 +40,14 @@ interface Member {
   permissions: { permission: string; accessLevel: string }[];
 }
 
-const PERMISSIONS = ["buyers", "suppliers", "analytics", "reports"];
+const PERMISSIONS = [
+  "buyers",
+  "suppliers",
+  "analytics",
+  "reports",
+  "vault",
+  "task_tracker",
+];
 
 export default function MembersPage() {
   const queryClient = useQueryClient();
