@@ -1,6 +1,9 @@
 import { Response } from "express";
+import { Permission } from "@prisma/client";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
+
+const VALID_PERMISSIONS = new Set<string>(Object.values(Permission));
 
 /**
  * GET /api/access-requests
@@ -79,37 +82,50 @@ export async function reviewAccessRequest(
       return;
     }
 
-    const updated = await prisma.accessRequest.update({
-      where: { id },
-      data: {
-        status,
-        reviewedAt: new Date(),
-        reviewedBy: req.user!.id,
-      },
-    });
-
-    // If approved, actually grant the permission
-    if (status === "approved") {
-      const permValue = request.permission as any;
-      await prisma.userPermission.upsert({
-        where: {
-          userId_permission: {
-            userId: request.userId,
-            permission: permValue,
-          },
-        },
-        update: {},
-        create: {
-          userId: request.userId,
-          permission: permValue,
-          accessLevel: "edit",
+    // Use a transaction so status update + permission grant succeed or fail together
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedRequest = await tx.accessRequest.update({
+        where: { id },
+        data: {
+          status,
+          reviewedAt: new Date(),
+          reviewedBy: req.user!.id,
         },
       });
-    }
+
+      // If approved, actually grant the permission
+      if (status === "approved") {
+        const permValue = request.permission;
+
+        if (!VALID_PERMISSIONS.has(permValue)) {
+          throw new Error(
+            `Invalid permission value: "${permValue}". Valid values: ${[...VALID_PERMISSIONS].join(", ")}`,
+          );
+        }
+
+        await tx.userPermission.upsert({
+          where: {
+            userId_permission: {
+              userId: request.userId,
+              permission: permValue as Permission,
+            },
+          },
+          update: {},
+          create: {
+            userId: request.userId,
+            permission: permValue as Permission,
+            accessLevel: "edit",
+          },
+        });
+      }
+
+      return updatedRequest;
+    });
 
     res.json(updated);
-  } catch (err) {
-    console.error("Review access request error:", err);
-    res.status(500).json({ error: "Internal server error" });
+  } catch (err: any) {
+    console.error("Review access request error:", err?.message);
+    res.status(500).json({ error: err?.message || "Internal server error" });
   }
 }
+

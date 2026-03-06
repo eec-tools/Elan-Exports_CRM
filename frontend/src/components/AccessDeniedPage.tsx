@@ -18,6 +18,9 @@ const permissionMap: Record<string, string> = {
   "/buyers": "buyers",
   "/suppliers": "suppliers",
   "/reports": "reports",
+  "/analytics": "analytics",
+  "/vault": "vault",
+  "/email-tasks": "task_tracker",
 };
 
 export function AccessDeniedPage() {

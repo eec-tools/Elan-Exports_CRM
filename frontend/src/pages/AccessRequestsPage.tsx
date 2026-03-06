@@ -244,6 +244,8 @@ export default function AccessRequestsPage() {
                   <SelectItem value="suppliers">Suppliers</SelectItem>
                   <SelectItem value="analytics">Analytics</SelectItem>
                   <SelectItem value="reports">Reports</SelectItem>
+                  <SelectItem value="vault">Vault</SelectItem>
+                  <SelectItem value="task_tracker">Task Tracker</SelectItem>
                 </SelectContent>
               </Select>
             </div>
