@@ -144,7 +144,7 @@ export async function updateMember(
         passwordHash,
         roles: {
           deleteMany: {},
-          create: { role: role || existing.roles[0]?.role || "member" },
+          create: { role: role || "member" },
         },
         permissions: {
           deleteMany: {},

@@ -161,14 +161,14 @@ export async function editDocument(
     const { id } = req.params;
     const { name, category, region } = req.body;
 
-    const existing = await prisma.vaultDocument.findUnique({ where: { id } });
+    const existing = await prisma.vaultDocument.findUnique({ where: { id: id as string } });
     if (!existing) {
       res.status(404).json({ error: "Document not found" });
       return;
     }
 
     const updated = await prisma.vaultDocument.update({
-      where: { id },
+      where: { id: id as string },
       data: {
         ...(name && { name }),
         ...(category && { category }),
@@ -194,7 +194,7 @@ export async function deleteDocument(
   try {
     const { id } = req.params;
 
-    const existing = await prisma.vaultDocument.findUnique({ where: { id } });
+    const existing = await prisma.vaultDocument.findUnique({ where: { id: id as string } });
     if (!existing) {
       res.status(404).json({ error: "Document not found" });
       return;
@@ -209,7 +209,7 @@ export async function deleteDocument(
       // File may already be removed from Cloudinary; continue
     }
 
-    await prisma.vaultDocument.delete({ where: { id } });
+    await prisma.vaultDocument.delete({ where: { id: id as string } });
 
     res.json({ message: "Document deleted successfully" });
   } catch (err) {

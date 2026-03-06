@@ -20,6 +20,7 @@ import MembersPage from "@/pages/MembersPage";
 import ActivityPage from "@/pages/ActivityPage";
 import AccessRequestsPage from "@/pages/AccessRequestsPage";
 import EmailTasksPage from "@/pages/EmailTasksPage";
+import DailyTasksPage from "@/pages/DailyTasksPage";
 import SupplierDetailsPage from "@/pages/SupplierDetailsPage";
 import VaultPage from "@/pages/VaultPage";
 import { Loader2 } from "lucide-react";
@@ -119,6 +120,15 @@ export default function App() {
                   element={
                     <PermissionGate permission="task_tracker">
                       <EmailTasksPage />
+                    </PermissionGate>
+                  }
+                />
+
+                <Route
+                  path="daily-tasks"
+                  element={
+                    <PermissionGate permission="task_tracker">
+                      <DailyTasksPage />
                     </PermissionGate>
                   }
                 />

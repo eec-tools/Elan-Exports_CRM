@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Archive,
+  CalendarCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -83,8 +84,15 @@ const navItems = [
   },
   {
     to: "/email-tasks",
-    label: "Task Tracker",
+    label: "Email Tracker",
     icon: Mail,
+    perm: "task_tracker",
+    adminOnly: false,
+  },
+  {
+    to: "/daily-tasks",
+    label: "Daily Tasks",
+    icon: CalendarCheck,
     perm: "task_tracker",
     adminOnly: false,
   },
@@ -124,9 +132,8 @@ export function AppLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 md:relative ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        } ${sidebarCollapsed ? "w-16" : "w-64"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 md:relative ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          } ${sidebarCollapsed ? "w-16" : "w-64"}`}
       >
         {/* Logo */}
         <div
@@ -185,10 +192,9 @@ export function AppLayout() {
                         to="/suppliers/signed-contract"
                         onClick={() => setSidebarOpen(false)}
                         className={({ isActive }) =>
-                          `ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                            isActive
-                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                          `ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${isActive
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                           }`
                         }
                       >
@@ -198,10 +204,9 @@ export function AppLayout() {
                         to="/suppliers/old"
                         onClick={() => setSidebarOpen(false)}
                         className={({ isActive }) =>
-                          `ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                            isActive
-                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/foreground"
+                          `ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${isActive
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent/foreground"
                           }`
                         }
                       >
@@ -220,12 +225,10 @@ export function AppLayout() {
                 end={item.to === "/"}
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                    sidebarCollapsed ? "justify-center" : ""
-                  } ${
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${sidebarCollapsed ? "justify-center" : ""
+                  } ${isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                   }`
                 }
                 title={sidebarCollapsed ? item.label : undefined}

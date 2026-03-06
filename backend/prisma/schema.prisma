@@ -265,3 +265,23 @@ model VaultDocument {
 
   @@map("vault_documents")
 }
+
+// ─── DAILY TASK TRACKER ─────────────────────────────
+
+model DailyTask {
+  id        String    @id @default(uuid())
+  date      DateTime  @db.Date
+  taskText  String    @map("task_text")
+  company   String?
+  priority  String?
+  owner     String?
+  status    String    @default("Not Started")
+  deadline  DateTime? @db.Date
+  notes     String?
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("daily_tasks")
+}
+
