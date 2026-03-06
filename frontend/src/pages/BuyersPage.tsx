@@ -7,7 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -254,34 +259,57 @@ export default function BuyersPage() {
           No buyers found
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border border-neutral-300 dark:border-neutral-700 overflow-hidden">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Company</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Country</TableHead>
-                <TableHead>Status</TableHead>
-                {canEdit && <TableHead className="w-24">Actions</TableHead>}
+            <TableHeader className="bg-muted/40">
+              <TableRow className="border-b border-neutral-300 dark:border-neutral-700">
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Company
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Contact
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Email
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Country
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Status
+                </TableHead>
+                {canEdit && (
+                  <TableHead className="w-24 border-r border-neutral-300 dark:border-neutral-700">
+                    Actions
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {buyers.map((buyer: Buyer) => (
-                <TableRow key={buyer.id}>
-                  <TableCell className="font-medium">{buyer.company}</TableCell>
-                  <TableCell>{buyer.name}</TableCell>
-                  <TableCell className="text-muted-foreground">
+                <TableRow
+                  key={buyer.id}
+                  className="border-b border-neutral-300 dark:border-neutral-700 last:border-0 hover:bg-muted/30"
+                >
+                  <TableCell className="font-medium border-r border-neutral-300 dark:border-neutral-700">
+                    {buyer.company}
+                  </TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
+                    {buyer.name}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {buyer.email}
                   </TableCell>
-                  <TableCell>{buyer.country}</TableCell>
-                  <TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
+                    {buyer.country}
+                  </TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                     <Badge variant={statusColor(buyer.status)}>
                       {buyer.status}
                     </Badge>
                   </TableCell>
                   {canEdit && (
-                    <TableCell>
+                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                       <div className="flex gap-1">
                         <Button
                           variant="ghost"

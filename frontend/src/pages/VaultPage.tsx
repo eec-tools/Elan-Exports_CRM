@@ -430,14 +430,22 @@ export default function VaultPage() {
       </div>
 
       {/* Document list / table */}
-      <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="rounded-xl border border-neutral-300 dark:border-neutral-700 bg-card overflow-hidden">
         {/* Table header */}
-        <div className="grid grid-cols-[minmax(0,1fr)_160px_160px_200px_80px] items-center border-b bg-muted/40 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <span>Document</span>
-          <span>Category</span>
-          <span>Region</span>
-          <span>Last Updated</span>
-          <span className="text-right">Actions</span>
+        <div className="grid grid-cols-[minmax(0,1fr)_160px_160px_200px_80px] items-stretch border-b bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="px-4 py-2.5 border-r border-neutral-300 dark:border-neutral-700">
+            Document
+          </span>
+          <span className="px-4 py-2.5 border-r border-neutral-300 dark:border-neutral-700">
+            Category
+          </span>
+          <span className="px-4 py-2.5 border-r border-neutral-300 dark:border-neutral-700">
+            Region
+          </span>
+          <span className="px-4 py-2.5 border-r border-neutral-300 dark:border-neutral-700">
+            Last Updated
+          </span>
+          <span className="px-4 py-2.5 text-right">Actions</span>
         </div>
 
         {docsLoading ? (
@@ -472,10 +480,10 @@ export default function VaultPage() {
               return (
                 <div
                   key={doc.id}
-                  className="grid grid-cols-[minmax(0,1fr)_160px_160px_200px_80px] items-center px-4 py-3 hover:bg-muted/30 transition-colors group"
+                  className="grid grid-cols-[minmax(0,1fr)_160px_160px_200px_80px] items-stretch border-b hover:bg-muted/30 transition-colors group last:border-0"
                 >
                   {/* Name + type icon */}
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 px-4 py-3 border-r border-neutral-300 dark:border-neutral-700">
                     <div className={`shrink-0 rounded-lg p-2 ${bg}`}>
                       <FileTypeIcon
                         fileType={doc.fileType}
@@ -502,7 +510,7 @@ export default function VaultPage() {
                   </div>
 
                   {/* Category */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 px-4 py-3 border-r border-neutral-300 dark:border-neutral-700">
                     <CatIcon className={`h-3.5 w-3.5 shrink-0 ${color}`} />
                     <span className={`text-sm font-medium ${color}`}>
                       {doc.category}
@@ -510,17 +518,17 @@ export default function VaultPage() {
                   </div>
 
                   {/* Region */}
-                  <span className="text-sm text-muted-foreground">
+                  <span className="flex items-center px-4 py-3 text-sm text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {doc.region}
                   </span>
 
                   {/* Date */}
-                  <span className="text-xs text-muted-foreground">
+                  <span className="flex items-center px-4 py-3 text-xs text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {formatDate(doc.updatedAt)}
                   </span>
 
                   {/* Actions */}
-                  <div className="flex items-center justify-end gap-1">
+                  <div className="flex items-center justify-end gap-1 px-4 py-3">
                     {isAdmin && (
                       <>
                         <Button

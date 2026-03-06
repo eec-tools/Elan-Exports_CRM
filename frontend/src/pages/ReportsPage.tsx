@@ -76,11 +76,9 @@ interface Report {
   reportDate: string;
 }
 
-const API_BASE =
-  (import.meta.env.VITE_API_URL || "http://localhost:3001/api").replace(
-    /\/api$/,
-    "",
-  );
+const API_BASE = (
+  import.meta.env.VITE_API_URL || "http://localhost:3001/api"
+).replace(/\/api$/, "");
 
 const resolveImageUrl = (url?: string | null) => {
   if (!url) return "";
@@ -427,7 +425,9 @@ export default function ReportsPage() {
 
       autoTable(doc, {
         startY,
-        head: [["Product", "Supplier Company Name", "Brief Summary", "Key Updates"]],
+        head: [
+          ["Product", "Supplier Company Name", "Brief Summary", "Key Updates"],
+        ],
         body: reports.map((r) => [
           "",
           r.companyName,
@@ -452,10 +452,7 @@ export default function ReportsPage() {
 
             if (img) {
               const cellW = hookData.cell.width - cellPad * 2;
-              const ratio = Math.min(
-                cellW / img.width,
-                imgHeight / img.height,
-              );
+              const ratio = Math.min(cellW / img.width, imgHeight / img.height);
               const w = img.width * ratio;
               const h = img.height * ratio;
               doc.addImage(img, "JPEG", cellX, currentY, w, h);
@@ -463,14 +460,16 @@ export default function ReportsPage() {
               // Overlay product name label
               const labelY = currentY + h - 6;
               doc.setFillColor(255, 255, 255);
-              doc.rect(cellX, labelY - 5, hookData.cell.width - 2 * cellPad, 7, "F");
+              doc.rect(
+                cellX,
+                labelY - 5,
+                hookData.cell.width - 2 * cellPad,
+                7,
+                "F",
+              );
               doc.setTextColor(0, 0, 0);
               doc.setFontSize(8);
-              doc.text(
-                item.productName.toUpperCase(),
-                cellX + 2,
-                labelY,
-              );
+              doc.text(item.productName.toUpperCase(), cellX + 2, labelY);
 
               currentY = cellY + h + 2;
             }
@@ -576,20 +575,36 @@ export default function ReportsPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+      <div className="overflow-hidden rounded-lg border border-neutral-300 dark:border-neutral-700 bg-card shadow-sm">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="w-[180px]">Product</TableHead>
-                <TableHead>Buyer Name</TableHead>
-                        <TableHead>Supplier Company Name</TableHead>
-                <TableHead>Brief Summary</TableHead>
-                <TableHead className="w-[300px]">Key Updates</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Date</TableHead>
+              <TableRow className="bg-muted/30 border-b border-neutral-300 dark:border-neutral-700">
+                <TableHead className="w-[180px] border-r border-neutral-300 dark:border-neutral-700">
+                  Product
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Buyer Name
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Supplier Company Name
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Brief Summary
+                </TableHead>
+                <TableHead className="w-[300px] border-r border-neutral-300 dark:border-neutral-700">
+                  Key Updates
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Action
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Date
+                </TableHead>
                 {canEditReports && (
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right border-r border-neutral-300 dark:border-neutral-700">
+                    Actions
+                  </TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -614,8 +629,11 @@ export default function ReportsPage() {
                 </TableRow>
               ) : (
                 items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
+                  <TableRow
+                    key={item.id}
+                    className="border-b border-neutral-300 dark:border-neutral-700 last:border-0 hover:bg-muted/30"
+                  >
+                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                       <div className="space-y-1">
                         {item.productImageUrl && (
                           <img
@@ -629,18 +647,18 @@ export default function ReportsPage() {
                         </p>
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium border-r border-neutral-300 dark:border-neutral-700">
                       {item.buyerName}
                     </TableCell>
-                    <TableCell className="text-sm whitespace-pre-line">
+                    <TableCell className="text-sm whitespace-pre-line border-r border-neutral-300 dark:border-neutral-700">
                       {item.companyName}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                       <span className="text-sm font-medium text-primary">
                         {item.status}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                       <div className="max-w-[300px] space-y-1 text-sm">
                         {item.updateDate && (
                           <p className="font-semibold text-primary">
@@ -652,14 +670,14 @@ export default function ReportsPage() {
                         </p>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                       <Badge variant="secondary">{item.buyerSupplier}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell className="text-sm border-r border-neutral-300 dark:border-neutral-700">
                       {format(new Date(item.reportDate), "dd MMM yyyy")}
                     </TableCell>
                     {canEditReports && (
-                      <TableCell className="text-right">
+                      <TableCell className="text-right border-r border-neutral-300 dark:border-neutral-700">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
@@ -747,10 +765,7 @@ export default function ReportsPage() {
                       <FormItem>
                         <FormLabel>Product</FormLabel>
                         <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g. Terry Towels"
-                          />
+                          <Input {...field} placeholder="e.g. Terry Towels" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1048,4 +1063,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

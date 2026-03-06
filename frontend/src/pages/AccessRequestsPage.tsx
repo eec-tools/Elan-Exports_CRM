@@ -121,22 +121,39 @@ export default function AccessRequestsPage() {
           No access requests
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border border-neutral-300 dark:border-neutral-700 overflow-hidden">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Permission</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-                {isAdmin && <TableHead className="w-28">Actions</TableHead>}
+            <TableHeader className="bg-muted/40">
+              <TableRow className="border-b border-neutral-300 dark:border-neutral-700">
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  User
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Permission
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Reason
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Status
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Date
+                </TableHead>
+                {isAdmin && (
+                  <TableHead className="w-28 border-r border-neutral-300 dark:border-neutral-700">
+                    Actions
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {requests.map((r: AccessRequest) => (
-                <TableRow key={r.id}>
-                  <TableCell>
+                <TableRow
+                  key={r.id}
+                  className="border-b border-neutral-300 dark:border-neutral-700 last:border-0 hover:bg-muted/30"
+                >
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                     <div>
                       <p className="font-medium text-sm">{r.user?.fullName}</p>
                       <p className="text-xs text-muted-foreground">
@@ -144,15 +161,15 @@ export default function AccessRequestsPage() {
                       </p>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                     <Badge variant="outline" className="capitalize">
                       {r.permission}
                     </Badge>
                   </TableCell>
-                  <TableCell className="max-w-xs truncate text-sm">
+                  <TableCell className="max-w-xs truncate text-sm border-r border-neutral-300 dark:border-neutral-700">
                     {r.reason}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                     <Badge
                       variant={statusColor(r.status)}
                       className="capitalize"
@@ -160,11 +177,11 @@ export default function AccessRequestsPage() {
                       {r.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
+                  <TableCell className="text-muted-foreground text-sm border-r border-neutral-300 dark:border-neutral-700">
                     {format(new Date(r.createdAt), "MMM d, yyyy")}
                   </TableCell>
                   {isAdmin && (
-                    <TableCell>
+                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                       {r.status === "pending" && (
                         <div className="flex gap-1">
                           <Button

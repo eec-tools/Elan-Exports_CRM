@@ -228,26 +228,43 @@ export default function MembersPage() {
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border border-neutral-300 dark:border-neutral-700 overflow-hidden">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Permissions</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-36">Actions</TableHead>
+            <TableHeader className="bg-muted/40">
+              <TableRow className="border-b border-neutral-300 dark:border-neutral-700">
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Name
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Email
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Role
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Permissions
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Status
+                </TableHead>
+                <TableHead className="w-36 border-r border-neutral-300 dark:border-neutral-700">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {members.map((m: Member) => (
-                <TableRow key={m.id}>
-                  <TableCell className="font-medium">{m.fullName}</TableCell>
-                  <TableCell className="text-muted-foreground">
+                <TableRow
+                  key={m.id}
+                  className="border-b border-neutral-300 dark:border-neutral-700 last:border-0 hover:bg-muted/30"
+                >
+                  <TableCell className="font-medium border-r border-neutral-300 dark:border-neutral-700">
+                    {m.fullName}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {m.email}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                     <Badge
                       variant={
                         m.roles.includes("admin") ? "default" : "secondary"
@@ -256,7 +273,7 @@ export default function MembersPage() {
                       {m.roles.includes("admin") ? "Admin" : "Member"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                     <div className="flex flex-wrap gap-1">
                       {m.permissions.map((p) => (
                         <Badge
@@ -270,7 +287,7 @@ export default function MembersPage() {
                       ))}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                     <div className="flex items-center gap-2">
                       <Switch
                         checked={m.isActive}
@@ -285,7 +302,7 @@ export default function MembersPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
@@ -449,8 +466,8 @@ export default function MembersPage() {
                 <span>Send credentials to email</span>
               </label>
               <p className="text-xs text-muted-foreground">
-                If selected, the login credentials will be emailed to the
-                member after you {editingMember ? "update" : "create"} them.
+                If selected, the login credentials will be emailed to the member
+                after you {editingMember ? "update" : "create"} them.
               </p>
             </div>
             <div className="flex justify-end gap-2">

@@ -194,25 +194,48 @@ export default function OldSuppliersPage() {
           No suppliers found
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border border-neutral-300 dark:border-neutral-700 overflow-hidden">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Company Name</TableHead>
-                <TableHead>Country</TableHead>
-                <TableHead>Website</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Products</TableHead>
-                <TableHead>Notes</TableHead>
-                {canEdit && <TableHead className="w-24">Actions</TableHead>}
+            <TableHeader className="bg-muted/40">
+              <TableRow className="border-b border-neutral-300 dark:border-neutral-700">
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Company Name
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Country
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Website
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Email
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Products
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Notes
+                </TableHead>
+                {canEdit && (
+                  <TableHead className="w-24 border-r border-neutral-300 dark:border-neutral-700">
+                    Actions
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {suppliers.map((s: Supplier) => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.company}</TableCell>
-                  <TableCell>{s.country}</TableCell>
-                  <TableCell className="text-muted-foreground">
+                <TableRow
+                  key={s.id}
+                  className="border-b border-neutral-300 dark:border-neutral-700 last:border-0 hover:bg-muted/30"
+                >
+                  <TableCell className="font-medium border-r border-neutral-300 dark:border-neutral-700">
+                    {s.company}
+                  </TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
+                    {s.country}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {s.website ? (
                       <a
                         href={
@@ -228,17 +251,17 @@ export default function OldSuppliersPage() {
                       </a>
                     ) : null}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {s.email}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {s.products}
                   </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                  <TableCell className="text-muted-foreground max-w-[200px] truncate border-r border-neutral-300 dark:border-neutral-700">
                     {s.notes}
                   </TableCell>
                   {canEdit && (
-                    <TableCell>
+                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                       <div className="flex gap-1">
                         <Button
                           variant="ghost"

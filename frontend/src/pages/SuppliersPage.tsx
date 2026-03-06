@@ -212,25 +212,48 @@ export default function SuppliersPage() {
           No suppliers found
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border border-neutral-300 dark:border-neutral-700 overflow-hidden">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Company Name</TableHead>
-                <TableHead>Product Category</TableHead>
-                <TableHead>Country</TableHead>
-                <TableHead>Contact Person</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Products</TableHead>
-                <TableHead>Remarks</TableHead>
-                {canEdit && <TableHead className="w-24">Actions</TableHead>}
+            <TableHeader className="bg-muted/40">
+              <TableRow className="border-b border-neutral-300 dark:border-neutral-700">
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Company Name
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Product Category
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Country
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Contact Person
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Email
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Phone
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Products
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Remarks
+                </TableHead>
+                {canEdit && (
+                  <TableHead className="w-24 border-r border-neutral-300 dark:border-neutral-700">
+                    Actions
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {suppliers.map((s: Supplier) => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">
+                <TableRow
+                  key={s.id}
+                  className="border-b border-neutral-300 dark:border-neutral-700 last:border-0 hover:bg-muted/30"
+                >
+                  <TableCell className="font-medium border-r border-neutral-300 dark:border-neutral-700">
                     <Link
                       to={`/suppliers/signed-contract/${s.id}`}
                       className="text-primary hover:underline"
@@ -238,23 +261,29 @@ export default function SuppliersPage() {
                       {s.company}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {s.productCategory}
                   </TableCell>
-                  <TableCell>{s.country}</TableCell>
-                  <TableCell>{s.contactPerson}</TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
+                    {s.country}
+                  </TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
+                    {s.contactPerson}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {s.email}
                   </TableCell>
-                  <TableCell>{s.phone}</TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
+                    {s.phone}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {s.products}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {s.remarks}
                   </TableCell>
                   {canEdit && (
-                    <TableCell>
+                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                       <div className="flex gap-1">
                         <Button
                           variant="ghost"
