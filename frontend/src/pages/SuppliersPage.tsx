@@ -37,6 +37,8 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Upload,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -90,6 +92,8 @@ export default function SuppliersPage() {
     null,
   );
 
+  const [catalogFile, setCatalogFile] = useState<File | null>(null);
+
   const { data, isLoading } = useQuery({
     queryKey: ["suppliers", search, page],
     queryFn: () =>
@@ -130,24 +134,51 @@ export default function SuppliersPage() {
     onError: () => toast.error("Failed to delete supplier"),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const uploadCatalogMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await api.post("/suppliers/upload", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data;
+    },
+    onError: () => toast.error("Failed to upload product catalog"),
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    let catalogUrl = form.productCatalogShared;
+
+    if (catalogFile) {
+      try {
+        const uploadRes = await uploadCatalogMutation.mutateAsync(catalogFile);
+        catalogUrl = uploadRes.url;
+      } catch {
+        return; // error already handled by onError in mutation
+      }
+    }
+
+    const payload = { ...form, productCatalogShared: catalogUrl };
+
     if (editing?.id) {
-      updateMutation.mutate({ id: editing.id, d: form });
+      updateMutation.mutate({ id: editing.id, d: payload });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(payload);
     }
   };
 
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_SUPPLIER);
+    setCatalogFile(null);
     setDialogOpen(true);
   };
 
   const openEdit = (s: Supplier) => {
     setEditing(s);
     setForm(s);
+    setCatalogFile(null);
     setDialogOpen(true);
   };
 
@@ -375,7 +406,7 @@ export default function SuppliersPage() {
               <div className="space-y-2">
                 <Label>Email</Label>
                 <Input
-                  type="email"
+                  type="text"
                   value={form.email ?? ""}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
@@ -469,6 +500,61 @@ export default function SuppliersPage() {
                 />
               </div>
               <div className="space-y-2">
+                <Label>Product Catalog (PDF)</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    id="catalog-upload"
+                    onChange={(e) => setCatalogFile(e.target.files?.[0] || null)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("catalog-upload")?.click()}
+                    className="w-full justify-start truncate"
+                  >
+                    <Upload className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {catalogFile
+                        ? catalogFile.name
+                        : form.productCatalogShared
+                        ? "Change catalog file"
+                        : "Upload product catalog (PDF)"}
+                    </span>
+                  </Button>
+                  {(catalogFile || form.productCatalogShared) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() => {
+                        setCatalogFile(null);
+                        setForm({ ...form, productCatalogShared: "" });
+                        const el = document.getElementById("catalog-upload") as HTMLInputElement;
+                        if (el) el.value = "";
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {form.productCatalogShared && !catalogFile && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    <a
+                      href={form.productCatalogShared}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      View current catalog file
+                    </a>
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
                 <Label>Current Status</Label>
                 <Select
                   value={form.currentStatus ?? "Active"}
@@ -555,7 +641,7 @@ export default function SuppliersPage() {
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
-                {(createMutation.isPending || updateMutation.isPending) && (
+                {(createMutation.isPending || updateMutation.isPending || uploadCatalogMutation.isPending) && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 {editing?.id ? "Update" : "Create"}

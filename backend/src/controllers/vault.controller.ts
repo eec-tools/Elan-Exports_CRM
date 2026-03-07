@@ -16,11 +16,27 @@ cloudinary.config({
 // ─── Multer + Cloudinary storage ────────────────────
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: async (_req: Express.Request, file: Express.Multer.File) => ({
-    folder: "elan-vault",
-    resource_type: "auto",
-    public_id: `vault_${Date.now()}_${file.originalname.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "")}`,
-  }),
+  params: async (_req: Express.Request, file: Express.Multer.File) => {
+    let resource_type = "auto";
+    let isRaw = false;
+    if (
+      file.mimetype === "application/pdf" ||
+      file.originalname.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|csv|zip)$/)
+    ) {
+      resource_type = "raw";
+      isRaw = true;
+    }
+
+    const extMatch = file.originalname.match(/\.[^/.]+$/);
+    const ext = isRaw && extMatch ? extMatch[0] : "";
+    const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
+
+    return {
+      folder: "elan-vault",
+      resource_type,
+      public_id: `vault_${Date.now()}_${baseName}${ext}`,
+    };
+  },
 } as any);
 
 export const upload = multer({

@@ -57,6 +57,17 @@ interface Supplier {
   createdAt?: string;
 }
 
+function getCatalogViewUrl(url?: string) {
+  if (!url) return url;
+  // Normalise to raw/upload (fix URLs stored with image/upload)
+  let fixed = url.replace("/image/upload/", "/raw/upload/");
+  // Add fl_inline so browser opens PDF inline instead of downloading
+  if (!fixed.includes("fl_inline")) {
+    fixed = fixed.replace("/raw/upload/", "/raw/upload/fl_inline/");
+  }
+  return fixed;
+}
+
 function statusColor(status?: string) {
   switch (status?.toLowerCase()) {
     case "active":
@@ -333,7 +344,20 @@ export default function SupplierDetailsPage() {
             <InfoRow
               icon={FileText}
               label="Product Catalog Shared"
-              value={supplier.productCatalogShared}
+              value={
+                supplier.productCatalogShared ? (
+                  <a
+                    href={getCatalogViewUrl(supplier.productCatalogShared)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline flex items-center gap-1"
+                  >
+                    View Catalog
+                  </a>
+                ) : (
+                  "—"
+                )
+              }
             />
             <InfoRow
               icon={Factory}

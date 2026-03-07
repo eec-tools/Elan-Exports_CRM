@@ -2,6 +2,46 @@ import { Request, Response } from "express";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
+import { v2 as cloudinary } from "cloudinary";
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+
+// ─── Cloudinary config ──────────────────────────────
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (_req: Express.Request, file: Express.Multer.File) => {
+    let resource_type = "auto";
+    let isRaw = false;
+    if (
+      file.mimetype === "application/pdf" ||
+      file.originalname.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|csv|zip)$/)
+    ) {
+      resource_type = "raw";
+      isRaw = true;
+    }
+    
+    const extMatch = file.originalname.match(/\.[^/.]+$/);
+    const ext = isRaw && extMatch ? extMatch[0] : "";
+    const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
+
+    return {
+      folder: "elan-suppliers",
+      resource_type,
+      public_id: `supplier_catalog_${Date.now()}_${baseName}${ext}`,
+    };
+  },
+} as any);
+
+export const uploadSupplierFile = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+});
 
 /**
  * GET /api/suppliers
@@ -132,9 +172,11 @@ export async function updateSupplier(
       return;
     }
 
+    const { id, createdBy, createdAt, updatedAt, creator, ...updateData } = req.body;
+
     const supplier = await prisma.supplier.update({
       where: { id: req.params.id },
-      data: req.body,
+      data: updateData,
     });
 
     await logActivity(req.user!.id, "update", "suppliers", supplier.id, {
@@ -271,6 +313,31 @@ export async function exportSuppliersCsv(
     res.send(csvContent);
   } catch (err) {
     console.error("Export suppliers error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * POST /api/suppliers/upload
+ */
+export async function uploadCatalog(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const file = req.file as any;
+    if (!file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    let fileUrl: string = file.path || file.secure_url || file.url;
+    
+    // Add fl_attachment if we don't want it to download, but for PDFs raw resources don't support fl_inline directly.
+    // They are served directly via Cloudinary CDN. The browser handles PDF display based on Content-Disposition (which Cloudinary sets correctly for raw).
+
+    res.json({ url: fileUrl });
+  } catch (err) {
+    console.error("Upload catalog error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 }
