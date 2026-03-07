@@ -240,9 +240,6 @@ export default function SuppliersPage() {
                   Contract Buyer
                 </TableHead>
                 <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Commission %
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
                   Certifications
                 </TableHead>
                 <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
@@ -283,9 +280,6 @@ export default function SuppliersPage() {
                   </TableCell>
                   <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                     {s.contractBuyer}
-                  </TableCell>
-                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                    {s.commissionPercent}
                   </TableCell>
                   <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700 max-w-[180px] truncate">
                     {s.certifications}
