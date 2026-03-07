@@ -18,49 +18,43 @@ import {
   MapPin,
   User,
   Building2,
-  CalendarDays,
   DollarSign,
-  Star,
   FileText,
   ShieldCheck,
   Factory,
   Award,
+  Globe,
+  Package,
+  Tag,
+  Users,
 } from "lucide-react";
 
 interface Supplier {
   id: string;
   company: string;
-  productCategory?: string;
+  lidlFactoryId?: string;
+  commissionPercent?: string;
+  contractBuyer?: string;
+  approvedConfirmPercent?: string;
+  products?: string;
   country?: string;
   contactPerson?: string;
-  email?: string;
   phone?: string;
-  products?: string;
-  contractBuyer?: string;
-  commissionPercent?: string;
-  certifications?: string;
+  companyAddress?: string;
+  email?: string;
+  website?: string;
+  productCatalogShared?: string;
   productionCapacity?: string;
-  contractStartDate?: string;
-  contractEndDate?: string;
-  contractValue?: string;
-  renewalDate?: string;
-  currentStatus?: string;
-  performanceScore?: string;
+  factoryVideosShared?: string;
+  warehouseVideosShared?: string;
+  exportingCountries?: string;
+  samplePolicy?: string;
+  certifications?: string;
+  workingWithOurBrands?: string;
+  otherBrands?: string;
   remarks?: string;
+  currentStatus?: string;
   createdAt?: string;
-}
-
-function formatDate(dateStr?: string) {
-  if (!dateStr) return "—";
-  try {
-    return new Date(dateStr).toLocaleDateString("en-IN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return dateStr;
-  }
 }
 
 function statusColor(status?: string) {
@@ -210,8 +204,14 @@ export default function SupplierDetailsPage() {
               value={supplier.contactPerson}
             />
             <InfoRow icon={Mail} label="Email Address" value={supplier.email} />
-            <InfoRow icon={MapPin} label="Country" value={supplier.country} />
             <InfoRow icon={Phone} label="Phone" value={supplier.phone} />
+            <InfoRow icon={MapPin} label="Country" value={supplier.country} />
+            <InfoRow
+              icon={Building2}
+              label="Company Address"
+              value={supplier.companyAddress}
+            />
+            <InfoRow icon={Globe} label="Website" value={supplier.website} />
             <InfoRow
               icon={Factory}
               label="Production Capacity"
@@ -256,92 +256,58 @@ export default function SupplierDetailsPage() {
             />
             <InfoRow
               icon={DollarSign}
-              label="Contract Value"
+              label="Approved Confirm %"
               value={
                 <SensitiveValue
-                  value={supplier.contractValue}
+                  value={supplier.approvedConfirmPercent}
                   isUnlocked={isUnlocked}
                 />
               }
             />
             <InfoRow
-              icon={CalendarDays}
-              label="Contract Start"
-              value={
-                <SensitiveValue
-                  value={formatDate(supplier.contractStartDate)}
-                  isUnlocked={isUnlocked}
-                />
-              }
-            />
-            <InfoRow
-              icon={CalendarDays}
-              label="Contract End"
-              value={
-                <SensitiveValue
-                  value={formatDate(supplier.contractEndDate)}
-                  isUnlocked={isUnlocked}
-                />
-              }
-            />
-            <InfoRow
-              icon={CalendarDays}
-              label="Renewal Date"
-              value={
-                <SensitiveValue
-                  value={formatDate(supplier.renewalDate)}
-                  isUnlocked={isUnlocked}
-                />
-              }
+              icon={Tag}
+              label="Lidl Factory ID"
+              value={supplier.lidlFactoryId}
             />
           </CardContent>
         </Card>
 
-        {/* ── Products & Category ── */}
+        {/* ── Products & Reach ── */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Products & Category
+              <Package className="h-4 w-4" />
+              Products & Reach
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {supplier.productCategory && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1.5">
-                  Product Categories
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {supplier.productCategory.split(",").map((cat, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs">
-                      {cat.trim()}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            <Separator />
             <div>
               <p className="text-xs text-muted-foreground mb-1">Products</p>
-              <p className="text-sm">{supplier.products || "—"}</p>
+              <p className="text-sm whitespace-pre-wrap">{supplier.products || "—"}</p>
             </div>
+            <Separator />
+            <InfoRow
+              icon={Globe}
+              label="Exporting Countries"
+              value={supplier.exportingCountries}
+            />
+            <InfoRow
+              icon={FileText}
+              label="Sample Policy"
+              value={supplier.samplePolicy}
+            />
           </CardContent>
         </Card>
 
-        {/* ── Performance & Status ── */}
+        {/* ── Engagement ── */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" />
-              Performance & Status
+              <Users className="h-4 w-4" />
+              Engagement
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <InfoRow
-              icon={Star}
-              label="Performance Score"
-              value={supplier.performanceScore}
-            />
             <InfoRow
               icon={ShieldCheck}
               label="Current Status"
@@ -353,6 +319,31 @@ export default function SupplierDetailsPage() {
                   {supplier.currentStatus || "Active"}
                 </Badge>
               }
+            />
+            <InfoRow
+              icon={Users}
+              label="Working With Our Brands"
+              value={supplier.workingWithOurBrands}
+            />
+            <InfoRow
+              icon={Building2}
+              label="Other Brands"
+              value={supplier.otherBrands}
+            />
+            <InfoRow
+              icon={FileText}
+              label="Product Catalog Shared"
+              value={supplier.productCatalogShared}
+            />
+            <InfoRow
+              icon={Factory}
+              label="Factory Videos Shared"
+              value={supplier.factoryVideosShared}
+            />
+            <InfoRow
+              icon={Factory}
+              label="Warehouse Videos Shared"
+              value={supplier.warehouseVideosShared}
             />
           </CardContent>
         </Card>

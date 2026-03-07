@@ -113,31 +113,36 @@ model Buyer {
 // ─── SUPPLIERS ──────────────────────────────────────
 
 model Supplier {
-  id                 String    @id @default(uuid())
-  company            String
-  productCategory    String?   @map("product_category")
-  country            String?
-  contactPerson      String?   @map("contact_person")
-  email              String?
-  phone              String?
-  products           String?
-  contractBuyer      String?   @map("contract_buyer")
-  commissionPercent  String?   @map("commission_percent")
-  certifications     String?
-  productionCapacity String?   @map("production_capacity")
-  contractStartDate  DateTime? @map("contract_start_date") @db.Date
-  contractEndDate    DateTime? @map("contract_end_date") @db.Date
-  contractValue      String?   @map("contract_value")
-  renewalDate        DateTime? @map("renewal_date") @db.Date
-  currentStatus      String?   @default("Active") @map("current_status")
-  performanceScore   String?   @map("performance_score")
-  remarks            String?
+  id                     String   @id @default(uuid())
+  company                String
+  lidlFactoryId          String?  @map("lidl_factory_id")
+  commissionPercent      String?  @map("commission_percent")
+  contractBuyer          String?  @map("contract_buyer")
+  approvedConfirmPercent String?  @map("approved_confirm_percent")
+  products               String?
+  country                String?
+  contactPerson          String?  @map("contact_person")
+  phone                  String?
+  companyAddress         String?  @map("company_address")
+  email                  String?
+  website                String?
+  productCatalogShared   String?  @map("product_catalog_shared")
+  productionCapacity     String?  @map("production_capacity")
+  factoryVideosShared    String?  @map("factory_videos_shared")
+  warehouseVideosShared  String?  @map("warehouse_videos_shared")
+  exportingCountries     String?  @map("exporting_countries")
+  samplePolicy           String?  @map("sample_policy")
+  certifications         String?
+  workingWithOurBrands   String?  @map("working_with_our_brands")
+  otherBrands            String?  @map("other_brands")
+  remarks                String?
+  currentStatus          String?  @default("Active") @map("current_status")
 
-  createdBy          String?   @map("created_by")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  createdBy              String?  @map("created_by")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
 
-  creator            User?     @relation(fields: [createdBy], references: [id])
+  creator                User?    @relation(fields: [createdBy], references: [id])
 
   @@map("suppliers")
 }

@@ -44,23 +44,28 @@ import { PermissionGate } from "@/components/PermissionGate";
 interface Supplier {
   id: string;
   company: string;
-  productCategory?: string;
+  lidlFactoryId?: string;
+  commissionPercent?: string;
+  contractBuyer?: string;
+  approvedConfirmPercent?: string;
+  products?: string;
   country?: string;
   contactPerson?: string;
-  email?: string;
   phone?: string;
-  products?: string;
-  contractBuyer?: string;
-  commissionPercent?: string;
-  certifications?: string;
+  companyAddress?: string;
+  email?: string;
+  website?: string;
+  productCatalogShared?: string;
   productionCapacity?: string;
-  contractStartDate?: string;
-  contractEndDate?: string;
-  contractValue?: string;
-  renewalDate?: string;
-  currentStatus?: string;
-  performanceScore?: string;
+  factoryVideosShared?: string;
+  warehouseVideosShared?: string;
+  exportingCountries?: string;
+  samplePolicy?: string;
+  certifications?: string;
+  workingWithOurBrands?: string;
+  otherBrands?: string;
   remarks?: string;
+  currentStatus?: string;
 }
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
@@ -220,9 +225,6 @@ export default function SuppliersPage() {
                   Company Name
                 </TableHead>
                 <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Product Category
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
                   Country
                 </TableHead>
                 <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
@@ -232,10 +234,16 @@ export default function SuppliersPage() {
                   Email
                 </TableHead>
                 <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Phone
+                  Products
                 </TableHead>
                 <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Products
+                  Contract Buyer
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Commission %
+                </TableHead>
+                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
+                  Certifications
                 </TableHead>
                 <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
                   Remarks
@@ -261,9 +269,6 @@ export default function SuppliersPage() {
                       {s.company}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
-                    {s.productCategory}
-                  </TableCell>
                   <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
                     {s.country}
                   </TableCell>
@@ -273,13 +278,19 @@ export default function SuppliersPage() {
                   <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
                     {s.email}
                   </TableCell>
-                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                    {s.phone}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700 max-w-[200px] truncate">
                     {s.products}
                   </TableCell>
-                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
+                    {s.contractBuyer}
+                  </TableCell>
+                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
+                    {s.commissionPercent}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700 max-w-[180px] truncate">
+                    {s.certifications}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700 max-w-[200px] truncate">
                     {s.remarks}
                   </TableCell>
                   {canEdit && (
@@ -383,15 +394,6 @@ export default function SuppliersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Product Category</Label>
-                <Input
-                  value={form.productCategory ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, productCategory: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
                 <Label>Country</Label>
                 <Input
                   value={form.country ?? ""}
@@ -401,11 +403,11 @@ export default function SuppliersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Products</Label>
+                <Label>Website</Label>
                 <Input
-                  value={form.products ?? ""}
+                  value={form.website ?? ""}
                   onChange={(e) =>
-                    setForm({ ...form, products: e.target.value })
+                    setForm({ ...form, website: e.target.value })
                   }
                 />
               </div>
@@ -428,27 +430,20 @@ export default function SuppliersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Current Status</Label>
-                <Select
-                  value={form.currentStatus ?? "Active"}
-                  onValueChange={(v) => setForm({ ...form, currentStatus: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Inactive">Inactive</SelectItem>
-                    <SelectItem value="Under Review">Under Review</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Approved Confirm %</Label>
+                <Input
+                  value={form.approvedConfirmPercent ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, approvedConfirmPercent: e.target.value })
+                  }
+                />
               </div>
               <div className="space-y-2">
-                <Label>Performance Score</Label>
+                <Label>Lidl Factory ID</Label>
                 <Input
-                  value={form.performanceScore ?? ""}
+                  value={form.lidlFactoryId ?? ""}
                   onChange={(e) =>
-                    setForm({ ...form, performanceScore: e.target.value })
+                    setForm({ ...form, lidlFactoryId: e.target.value })
                   }
                 />
               </div>
@@ -471,44 +466,80 @@ export default function SuppliersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Contract Start Date</Label>
+                <Label>Sample Policy</Label>
                 <Input
-                  type="date"
-                  value={form.contractStartDate ?? ""}
+                  value={form.samplePolicy ?? ""}
                   onChange={(e) =>
-                    setForm({ ...form, contractStartDate: e.target.value })
+                    setForm({ ...form, samplePolicy: e.target.value })
                   }
                 />
               </div>
               <div className="space-y-2">
-                <Label>Contract End Date</Label>
-                <Input
-                  type="date"
-                  value={form.contractEndDate ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, contractEndDate: e.target.value })
-                  }
-                />
+                <Label>Current Status</Label>
+                <Select
+                  value={form.currentStatus ?? "Active"}
+                  onValueChange={(v) => setForm({ ...form, currentStatus: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                    <SelectItem value="Under Review">Under Review</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Contract Value</Label>
-                <Input
-                  value={form.contractValue ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, contractValue: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Renewal Date</Label>
-                <Input
-                  type="date"
-                  value={form.renewalDate ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, renewalDate: e.target.value })
-                  }
-                />
-              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Company Address</Label>
+              <Textarea
+                value={form.companyAddress ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, companyAddress: e.target.value })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Products</Label>
+              <Textarea
+                value={form.products ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, products: e.target.value })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Exporting Countries</Label>
+              <Textarea
+                value={form.exportingCountries ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, exportingCountries: e.target.value })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Working With Our Brands</Label>
+              <Textarea
+                value={form.workingWithOurBrands ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, workingWithOurBrands: e.target.value })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Other Brands</Label>
+              <Textarea
+                value={form.otherBrands ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, otherBrands: e.target.value })
+                }
+                rows={2}
+              />
             </div>
             <div className="space-y-2">
               <Label>Remarks</Label>
