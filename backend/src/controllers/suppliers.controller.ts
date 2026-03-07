@@ -25,7 +25,7 @@ const storage = new CloudinaryStorage({
       resource_type = "raw";
       isRaw = true;
     }
-    
+
     const extMatch = file.originalname.match(/\.[^/.]+$/);
     const ext = isRaw && extMatch ? extMatch[0] : "";
     const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
@@ -331,7 +331,7 @@ export async function uploadCatalog(
       return;
     }
     let fileUrl: string = file.path || file.secure_url || file.url;
-    
+
     // Add fl_attachment if we don't want it to download, but for PDFs raw resources don't support fl_inline directly.
     // They are served directly via Cloudinary CDN. The browser handles PDF display based on Content-Disposition (which Cloudinary sets correctly for raw).
 

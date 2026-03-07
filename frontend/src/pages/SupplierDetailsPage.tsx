@@ -81,11 +81,12 @@ interface Supplier {
 
 function getCatalogViewUrl(url?: string) {
   if (!url) return url;
-  // Normalise to raw/upload (fix URLs stored with image/upload)
-  let fixed = url.replace("/image/upload/", "/raw/upload/");
-  // Add fl_inline so browser opens PDF inline instead of downloading
-  if (!fixed.includes("fl_inline")) {
-    fixed = fixed.replace("/raw/upload/", "/raw/upload/fl_inline/");
+
+  // Ensure we don't accidentally pass fl_inline which Cloudinary rejects on raw resources
+  let fixed = url.replace("/fl_inline", "");
+  // Standardise to raw/upload for PDFs if they happen to end up as image type erroneously
+  if (fixed.includes("/image/upload/") && fixed.toLowerCase().endsWith(".pdf")) {
+    fixed = fixed.replace("/image/upload/", "/raw/upload/");
   }
   return fixed;
 }
@@ -616,8 +617,8 @@ export default function SupplierDetailsPage() {
                       {catalogFile
                         ? catalogFile.name
                         : form.productCatalogShared
-                        ? "Change catalog file"
-                        : "Upload product catalog (PDF)"}
+                          ? "Change catalog file"
+                          : "Upload product catalog (PDF)"}
                     </span>
                   </Button>
                   {catalogFile && (
