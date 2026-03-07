@@ -524,15 +524,15 @@ export default function SuppliersPage() {
                         : "Upload product catalog (PDF)"}
                     </span>
                   </Button>
-                  {(catalogFile || form.productCatalogShared) && (
+                  {catalogFile && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="shrink-0"
+                      className="shrink-0 text-muted-foreground"
+                      title="Cancel selected file"
                       onClick={() => {
                         setCatalogFile(null);
-                        setForm({ ...form, productCatalogShared: "" });
                         const el = document.getElementById("catalog-upload") as HTMLInputElement;
                         if (el) el.value = "";
                       }}
@@ -542,16 +542,25 @@ export default function SuppliersPage() {
                   )}
                 </div>
                 {form.productCatalogShared && !catalogFile && (
-                  <p className="text-xs text-muted-foreground truncate">
-                    <a
-                      href={form.productCatalogShared}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                  <div className="flex items-center justify-between text-xs mt-1.5">
+                    <p className="text-muted-foreground truncate">
+                      <a
+                        href={form.productCatalogShared}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        View current catalog file
+                      </a>
+                    </p>
+                    <button
+                      type="button"
+                      className="text-destructive hover:underline font-medium"
+                      onClick={() => setForm({ ...form, productCatalogShared: "" })}
                     >
-                      View current catalog file
-                    </a>
-                  </p>
+                      Remove current PDF
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="space-y-2">

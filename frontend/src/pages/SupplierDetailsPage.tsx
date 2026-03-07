@@ -1,8 +1,27 @@
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PermissionGate } from "@/components/PermissionGate";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -27,6 +46,9 @@ import {
   Package,
   Tag,
   Users,
+  Pencil,
+  Upload,
+  X,
 } from "lucide-react";
 
 interface Supplier {
@@ -106,6 +128,10 @@ export default function SupplierDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  const queryClient = useQueryClient();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState<Partial<Supplier>>({});
+  const [catalogFile, setCatalogFile] = useState<File | null>(null);
 
   const { isUnlocked, unlockButton, passkeyDialog } =
     useSensitiveDataUnlock("supplier-details");
@@ -114,6 +140,30 @@ export default function SupplierDetailsPage() {
     queryKey: ["supplier", id],
     queryFn: () => api.get(`/suppliers/${id}`).then((r) => r.data),
     enabled: !!id,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, d }: { id: string; d: Partial<Supplier> }) =>
+      api.put(`/suppliers/${id}`, d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supplier", id] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      setDialogOpen(false);
+      toast.success("Supplier updated");
+    },
+    onError: () => toast.error("Failed to update supplier"),
+  });
+
+  const uploadCatalogMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await api.post("/suppliers/upload", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data;
+    },
+    onError: () => toast.error("Failed to upload catalog file"),
   });
 
   if (isLoading) {
@@ -144,6 +194,34 @@ export default function SupplierDetailsPage() {
       year: "numeric",
     })
     : "";
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.company) return;
+
+    let catalogUrl = form.productCatalogShared;
+
+    if (catalogFile) {
+      try {
+        const uploadRes = await uploadCatalogMutation.mutateAsync(catalogFile);
+        catalogUrl = uploadRes.url;
+      } catch {
+        return; // error already handled by onError in mutation
+      }
+    }
+
+    const payload = { ...form, productCatalogShared: catalogUrl };
+
+    if (supplier?.id) {
+      updateMutation.mutate({ id: supplier.id, d: payload });
+    }
+  };
+
+  const openEdit = () => {
+    setForm(supplier || {});
+    setCatalogFile(null);
+    setDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -185,6 +263,12 @@ export default function SupplierDetailsPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {unlockButton}
+          <PermissionGate permission="suppliers" editOnly>
+            <Button variant="outline" size="sm" onClick={openEdit}>
+              <Pencil className="mr-1.5 h-4 w-4" />
+              Edit
+            </Button>
+          </PermissionGate>
           <Button
             variant="outline"
             size="sm"
@@ -387,6 +471,290 @@ export default function SupplierDetailsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Edit Dialog ── */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Supplier</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Company *</Label>
+                <Input
+                  value={form.company || ""}
+                  onChange={(e) =>
+                    setForm({ ...form, company: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contact Person</Label>
+                <Input
+                  value={form.contactPerson ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, contactPerson: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="text"
+                  value={form.email ?? ""}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input
+                  value={form.phone ?? ""}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Country</Label>
+                <Input
+                  value={form.country ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, country: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Website</Label>
+                <Input
+                  value={form.website ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, website: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contract Buyer</Label>
+                <Input
+                  value={form.contractBuyer ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, contractBuyer: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Commission %</Label>
+                <Input
+                  value={form.commissionPercent ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, commissionPercent: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Approved Confirm %</Label>
+                <Input
+                  value={form.approvedConfirmPercent ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, approvedConfirmPercent: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Lidl Factory ID</Label>
+                <Input
+                  value={form.lidlFactoryId ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, lidlFactoryId: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Certifications</Label>
+                <Input
+                  value={form.certifications ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, certifications: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Production Capacity</Label>
+                <Input
+                  value={form.productionCapacity ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, productionCapacity: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Sample Policy</Label>
+                <Input
+                  value={form.samplePolicy ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, samplePolicy: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Product Catalog (PDF)</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    id="catalog-upload"
+                    onChange={(e) => setCatalogFile(e.target.files?.[0] || null)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("catalog-upload")?.click()}
+                    className="w-full justify-start truncate"
+                  >
+                    <Upload className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {catalogFile
+                        ? catalogFile.name
+                        : form.productCatalogShared
+                        ? "Change catalog file"
+                        : "Upload product catalog (PDF)"}
+                    </span>
+                  </Button>
+                  {catalogFile && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-muted-foreground"
+                      title="Cancel selected file"
+                      onClick={() => {
+                        setCatalogFile(null);
+                        const el = document.getElementById("catalog-upload") as HTMLInputElement;
+                        if (el) el.value = "";
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {form.productCatalogShared && !catalogFile && (
+                  <div className="flex items-center justify-between text-xs mt-1.5">
+                    <p className="text-muted-foreground truncate">
+                      <a
+                        href={form.productCatalogShared}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        View current catalog file
+                      </a>
+                    </p>
+                    <button
+                      type="button"
+                      className="text-destructive hover:underline font-medium"
+                      onClick={() => setForm({ ...form, productCatalogShared: "" })}
+                    >
+                      Remove current PDF
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Current Status</Label>
+                <Select
+                  value={form.currentStatus ?? "Active"}
+                  onValueChange={(v) => setForm({ ...form, currentStatus: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                    <SelectItem value="Under Review">Under Review</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Company Address</Label>
+              <Textarea
+                value={form.companyAddress ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, companyAddress: e.target.value })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Products</Label>
+              <Textarea
+                value={form.products ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, products: e.target.value })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Exporting Countries</Label>
+              <Textarea
+                value={form.exportingCountries ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, exportingCountries: e.target.value })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Working With Our Brands</Label>
+              <Textarea
+                value={form.workingWithOurBrands ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, workingWithOurBrands: e.target.value })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Other Brands</Label>
+              <Textarea
+                value={form.otherBrands ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, otherBrands: e.target.value })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Remarks</Label>
+              <Textarea
+                value={form.remarks ?? ""}
+                onChange={(e) => setForm({ ...form, remarks: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateMutation.isPending || uploadCatalogMutation.isPending}
+              >
+                {(updateMutation.isPending || uploadCatalogMutation.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Update
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
