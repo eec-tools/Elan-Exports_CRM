@@ -1,21 +1,43 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
+import { logActivity } from "../services/activityLogger.js";
+import { AuthRequest } from "../types/index.js";
 
 const prisma = new PrismaClient();
 
-export const getEmailTasks = async (req: Request, res: Response) => {
+export const getEmailTasks = async (req: AuthRequest, res: Response) => {
     try {
-        const tasks = await prisma.emailTracker.findMany({
-            orderBy: { dateReceived: "desc" },
+        const { page = "1", limit = "20" } = req.query as Record<string, string>;
+
+        const pageNum = Math.max(1, parseInt(page));
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+        const skip = (pageNum - 1) * limitNum;
+
+        const [tasks, total] = await Promise.all([
+            prisma.emailTracker.findMany({
+                skip,
+                take: limitNum,
+                orderBy: { dateReceived: "desc" },
+            }),
+            prisma.emailTracker.count(),
+        ]);
+
+        res.json({
+            data: tasks,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total,
+                pages: Math.ceil(total / limitNum),
+            },
         });
-        res.json(tasks);
     } catch (error) {
         console.error("Error fetching email tasks:", error);
         res.status(500).json({ error: "Failed to fetch email tasks" });
     }
 };
 
-export const getEmailTaskStats = async (req: Request, res: Response) => {
+export const getEmailTaskStats = async (req: AuthRequest, res: Response) => {
     try {
         const total = await prisma.emailTracker.count();
         const newTasks = await prisma.emailTracker.count({ where: { status: "Not Started" } });
@@ -29,7 +51,7 @@ export const getEmailTaskStats = async (req: Request, res: Response) => {
     }
 };
 
-export const updateEmailTask = async (req: Request, res: Response) => {
+export const updateEmailTask = async (req: AuthRequest, res: Response) => {
     const id = req.params.id as string;
     const { status, respondent, priority, task, productCategory, notes } = req.body;
 
@@ -45,6 +67,15 @@ export const updateEmailTask = async (req: Request, res: Response) => {
                 notes,
             },
         });
+
+        await logActivity(req.user?.id, "update", "email_tasks", updatedTask.id, {
+            status,
+            respondent,
+            priority,
+            task,
+            productCategory,
+        });
+
         res.json(updatedTask);
     } catch (error) {
         console.error("Error updating email task:", error);
@@ -52,13 +83,16 @@ export const updateEmailTask = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteEmailTask = async (req: Request, res: Response) => {
+export const deleteEmailTask = async (req: AuthRequest, res: Response) => {
     const id = req.params.id as string;
 
     try {
         await prisma.emailTracker.delete({
             where: { id },
         });
+
+        await logActivity(req.user?.id, "delete", "email_tasks", id, {});
+
         res.json({ success: true });
     } catch (error) {
         console.error("Error deleting email task:", error);

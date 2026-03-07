@@ -10,6 +10,8 @@ import {
   Edit,
   Save,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   Dialog,
@@ -33,6 +35,13 @@ interface EmailTask {
   notes: string | null;
   emailLink: string | null;
   createdAt: string;
+}
+
+interface PaginationData {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
 }
 
 const TASK_OPTIONS = [
@@ -130,6 +139,8 @@ const RESPONDENT_OPTIONS = [
 
 export default function EmailTasksPage() {
   const [tasks, setTasks] = useState<EmailTask[]>([]);
+  const [pagination, setPagination] = useState<PaginationData | null>(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTask, setSelectedTask] = useState<EmailTask | null>(null);
@@ -144,8 +155,10 @@ export default function EmailTasksPage() {
 
   const fetchTasks = async () => {
     try {
-      const res = await api.get("/email-tasks");
-      setTasks(res.data);
+      setLoading(true);
+      const res = await api.get("/email-tasks", { params: { page, limit: 20 } });
+      setTasks(res.data.data);
+      setPagination(res.data.pagination);
     } catch {
       toast.error("Failed to load email tasks");
     } finally {
@@ -156,7 +169,7 @@ export default function EmailTasksPage() {
 
   useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [page]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -492,6 +505,32 @@ export default function EmailTasksPage() {
           </table>
         </div>
       </div>
+
+      {pagination && pagination.pages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <p className="text-sm text-muted-foreground">
+            Page {pagination.page} of {pagination.pages} ({pagination.total} total)
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= pagination.pages}
+              onClick={() => setPage(page + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl">

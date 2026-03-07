@@ -38,6 +38,14 @@ export default function ActivityPage() {
     return "outline" as const;
   };
 
+  const formatEntityType = (type: string) => {
+    if (!type) return "Unknown";
+    return type
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -85,12 +93,12 @@ export default function ActivityPage() {
                       {log.action}
                     </Badge>
                   </TableCell>
-                  <TableCell className="capitalize">{log.entityType}</TableCell>
+                  <TableCell>{formatEntityType(log.entityType)}</TableCell>
                   <TableCell className="max-w-xs truncate text-muted-foreground text-sm">
                     {log.details
                       ? Object.entries(log.details as Record<string, unknown>)
-                          .map(([k, v]) => `${k}: ${v}`)
-                          .join(", ")
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(", ")
                       : "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">

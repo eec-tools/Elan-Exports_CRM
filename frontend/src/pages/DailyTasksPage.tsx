@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "@/api/client";
 import { toast } from "sonner";
-import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -21,6 +21,13 @@ interface DailyTask {
     status: string;
     deadline: string | null;
     notes: string | null;
+}
+
+interface PaginationData {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
 }
 
 const PRIORITY_OPTIONS = ["Urgent", "High", "Medium", "Low"];
@@ -51,6 +58,8 @@ const getStatusColor = (s: string) => {
 
 export default function DailyTasksPage() {
     const [tasks, setTasks] = useState<DailyTask[]>([]);
+    const [pagination, setPagination] = useState<PaginationData | null>(null);
+    const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -71,8 +80,10 @@ export default function DailyTasksPage() {
 
     const fetchTasks = async () => {
         try {
-            const res = await api.get("/daily-tasks");
-            setTasks(res.data);
+            setLoading(true);
+            const res = await api.get("/daily-tasks", { params: { page, limit: 20 } });
+            setTasks(res.data.data);
+            setPagination(res.data.pagination);
         } catch (error) {
             toast.error("Failed to load daily tasks");
         } finally {
@@ -83,7 +94,7 @@ export default function DailyTasksPage() {
 
     useEffect(() => {
         fetchTasks();
-    }, []);
+    }, [page]);
 
     const handleRefresh = () => {
         setRefreshing(true);
@@ -503,6 +514,32 @@ export default function DailyTasksPage() {
                     </tbody>
                 </table>
             </div>
+
+            {pagination && pagination.pages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                    <p className="text-sm text-muted-foreground">
+                        Page {pagination.page} of {pagination.pages} ({pagination.total} total)
+                    </p>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={page <= 1}
+                            onClick={() => setPage(page - 1)}
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={page >= pagination.pages}
+                            onClick={() => setPage(page + 1)}
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* Delete confirmation */}
             <Dialog
