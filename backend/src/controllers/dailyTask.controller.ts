@@ -7,19 +7,55 @@ const prisma = new PrismaClient();
 
 export const getTasks = async (req: AuthRequest, res: Response) => {
     try {
-        const { page = "1", limit = "20" } = req.query as Record<string, string>;
+        const {
+            page = "1",
+            limit = "20",
+            taskText,
+            priority,
+            status,
+            owner,
+            company,
+            dateFrom,
+            dateTo
+        } = req.query as Record<string, string>;
 
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
 
+        const where: any = {};
+        if (taskText) where.taskText = { contains: taskText, mode: "insensitive" };
+        if (priority) where.priority = priority;
+        if (status) where.status = status;
+        if (company) where.company = { contains: company, mode: "insensitive" };
+        if (owner) {
+            if (owner === "Unassigned") {
+                where.OR = [
+                    { owner: null },
+                    { owner: "" }
+                ];
+            } else {
+                where.owner = { contains: owner, mode: "insensitive" };
+            }
+        }
+        if (dateFrom || dateTo) {
+            where.date = {};
+            if (dateFrom) where.date.gte = new Date(dateFrom);
+            if (dateTo) {
+                const endToDate = new Date(dateTo);
+                endToDate.setHours(23, 59, 59, 999);
+                where.date.lte = endToDate;
+            }
+        }
+
         const [tasks, total] = await Promise.all([
             prisma.dailyTask.findMany({
+                where,
                 skip,
                 take: limitNum,
                 orderBy: [{ date: "desc" }, { createdAt: "desc" }],
             }),
-            prisma.dailyTask.count(),
+            prisma.dailyTask.count({ where }),
         ]);
 
         res.json({

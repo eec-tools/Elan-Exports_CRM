@@ -7,19 +7,42 @@ const prisma = new PrismaClient();
 
 export const getEmailTasks = async (req: AuthRequest, res: Response) => {
     try {
-        const { page = "1", limit = "20" } = req.query as Record<string, string>;
+        const {
+            page = "1",
+            limit = "20",
+            task,
+            priority,
+            status,
+            respondent
+        } = req.query as Record<string, string>;
 
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
 
+        const where: any = {};
+        if (task) where.task = task;
+        if (priority) where.priority = priority;
+        if (status) where.status = status;
+        if (respondent) {
+            if (respondent === "Unassigned") {
+                where.OR = [
+                    { respondent: null },
+                    { respondent: "" }
+                ];
+            } else {
+                where.respondent = { contains: respondent, mode: "insensitive" };
+            }
+        }
+
         const [tasks, total] = await Promise.all([
             prisma.emailTracker.findMany({
+                where,
                 skip,
                 take: limitNum,
                 orderBy: { dateReceived: "desc" },
             }),
-            prisma.emailTracker.count(),
+            prisma.emailTracker.count({ where }),
         ]);
 
         res.json({

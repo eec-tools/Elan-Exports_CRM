@@ -9,7 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { startOfDay, endOfDay, format } from "date-fns";
+import { format } from "date-fns";
 
 interface DailyTask {
     id: string;
@@ -81,7 +81,17 @@ export default function DailyTasksPage() {
     const fetchTasks = async () => {
         try {
             setLoading(true);
-            const res = await api.get("/daily-tasks", { params: { page, limit: 20 } });
+            const res = await api.get("/daily-tasks", {
+                params: {
+                    page,
+                    limit: 20,
+                    priority: filterPriority || undefined,
+                    status: filterStatus || undefined,
+                    owner: filterOwner || undefined,
+                    dateFrom: filterDateFrom || undefined,
+                    dateTo: filterDateTo || undefined,
+                }
+            });
             setTasks(res.data.data);
             setPagination(res.data.pagination);
         } catch (error) {
@@ -94,7 +104,7 @@ export default function DailyTasksPage() {
 
     useEffect(() => {
         fetchTasks();
-    }, [page]);
+    }, [page, filterPriority, filterStatus, filterOwner, filterDateFrom, filterDateTo]);
 
     const handleRefresh = () => {
         setRefreshing(true);
@@ -205,23 +215,8 @@ export default function DailyTasksPage() {
         setFilterOwner("");
         setFilterDateFrom("");
         setFilterDateTo("");
+        setPage(1);
     }
-
-    const filteredTasks = tasks.filter(task => {
-        if (filterPriority && task.priority !== filterPriority) return false;
-        if (filterStatus && task.status !== filterStatus) return false;
-        if (filterOwner && task.owner !== filterOwner) return false;
-
-        if (filterDateFrom || filterDateTo) {
-            if (!task.date) return false;
-            const taskDate = new Date(task.date);
-
-            if (filterDateFrom && taskDate < startOfDay(new Date(filterDateFrom))) return false;
-            if (filterDateTo && taskDate > endOfDay(new Date(filterDateTo))) return false;
-        }
-
-        return true;
-    });
 
     if (loading) {
         return (
@@ -265,7 +260,7 @@ export default function DailyTasksPage() {
                     type="date"
                     className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     value={filterDateFrom}
-                    onChange={e => setFilterDateFrom(e.target.value)}
+                    onChange={e => { setFilterDateFrom(e.target.value); setPage(1); }}
                     placeholder="From Date"
                 />
                 <span className="text-muted-foreground text-sm">to</span>
@@ -273,13 +268,13 @@ export default function DailyTasksPage() {
                     type="date"
                     className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     value={filterDateTo}
-                    onChange={e => setFilterDateTo(e.target.value)}
+                    onChange={e => { setFilterDateTo(e.target.value); setPage(1); }}
                     placeholder="To Date"
                 />
                 <select
                     className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     value={filterPriority}
-                    onChange={e => setFilterPriority(e.target.value)}
+                    onChange={e => { setFilterPriority(e.target.value); setPage(1); }}
                 >
                     <option value="">All Priorities</option>
                     {PRIORITY_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
@@ -287,7 +282,7 @@ export default function DailyTasksPage() {
                 <select
                     className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     value={filterStatus}
-                    onChange={e => setFilterStatus(e.target.value)}
+                    onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
                 >
                     <option value="">All Statuses</option>
                     {STATUS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
@@ -295,7 +290,7 @@ export default function DailyTasksPage() {
                 <select
                     className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     value={filterOwner}
-                    onChange={e => setFilterOwner(e.target.value)}
+                    onChange={e => { setFilterOwner(e.target.value); setPage(1); }}
                 >
                     <option value="">All Owners</option>
                     {OWNER_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
@@ -326,14 +321,14 @@ export default function DailyTasksPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredTasks.length === 0 ? (
+                        {tasks.length === 0 ? (
                             <tr>
                                 <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
-                                    {tasks.length === 0 ? 'No tasks yet. Click "Add Row" to start.' : 'No tasks match the active filters.'}
+                                    No tasks match the active filters, or there are no tasks yet.
                                 </td>
                             </tr>
                         ) : (
-                            filteredTasks.map((task) => (
+                            tasks.map((task) => (
                                 <tr key={task.id} className="hover:bg-gray-50 border-b group">
                                     {/* DATE */}
                                     <td

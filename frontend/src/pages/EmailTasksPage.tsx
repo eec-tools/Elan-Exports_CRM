@@ -156,7 +156,16 @@ export default function EmailTasksPage() {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/email-tasks", { params: { page, limit: 20 } });
+      const res = await api.get("/email-tasks", {
+        params: {
+          page,
+          limit: 20,
+          task: filterTask || undefined,
+          priority: filterPriority || undefined,
+          status: filterStatus || undefined,
+          respondent: filterRespondent || undefined
+        }
+      });
       setTasks(res.data.data);
       setPagination(res.data.pagination);
     } catch {
@@ -169,7 +178,7 @@ export default function EmailTasksPage() {
 
   useEffect(() => {
     fetchTasks();
-  }, [page]);
+  }, [page, filterTask, filterPriority, filterStatus, filterRespondent]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -236,30 +245,6 @@ export default function EmailTasksPage() {
     Low: "text-green-600 font-semibold",
   };
 
-  const filteredTasks = tasks.filter((t) => {
-    if (filterTask && t.task?.toLowerCase() !== filterTask.toLowerCase())
-      return false;
-    if (
-      filterPriority &&
-      t.priority?.toLowerCase() !== filterPriority.toLowerCase()
-    )
-      return false;
-    if (filterStatus && t.status?.toLowerCase() !== filterStatus.toLowerCase())
-      return false;
-    if (filterRespondent) {
-      if (filterRespondent === "Unassigned") {
-        if (t.respondent && t.respondent.trim() !== "") return false;
-      } else {
-        if (
-          !t.respondent ||
-          !t.respondent.toLowerCase().includes(filterRespondent.toLowerCase())
-        )
-          return false;
-      }
-    }
-    return true;
-  });
-
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -292,7 +277,7 @@ export default function EmailTasksPage() {
       <div className="flex items-center gap-3">
         <select
           value={filterTask}
-          onChange={(e) => setFilterTask(e.target.value)}
+          onChange={(e) => { setFilterTask(e.target.value); setPage(1); }}
           className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">All Task Types</option>
@@ -304,7 +289,7 @@ export default function EmailTasksPage() {
         </select>
         <select
           value={filterPriority}
-          onChange={(e) => setFilterPriority(e.target.value)}
+          onChange={(e) => { setFilterPriority(e.target.value); setPage(1); }}
           className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">All Priorities</option>
@@ -315,7 +300,7 @@ export default function EmailTasksPage() {
         </select>
         <select
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
+          onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
           className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">All Statuses</option>
@@ -326,7 +311,7 @@ export default function EmailTasksPage() {
         </select>
         <select
           value={filterRespondent}
-          onChange={(e) => setFilterRespondent(e.target.value)}
+          onChange={(e) => { setFilterRespondent(e.target.value); setPage(1); }}
           className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">All Respondents</option>
@@ -344,6 +329,7 @@ export default function EmailTasksPage() {
               setFilterPriority("");
               setFilterStatus("");
               setFilterRespondent("");
+              setPage(1);
             }}
             className="text-sm text-muted-foreground hover:text-foreground underline"
           >
@@ -385,7 +371,7 @@ export default function EmailTasksPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredTasks.length === 0 ? (
+              {tasks.length === 0 ? (
                 <tr>
                   <td
                     colSpan={9}
@@ -394,15 +380,13 @@ export default function EmailTasksPage() {
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Mail className="h-8 w-8 opacity-20" />
                       <p>
-                        {tasks.length === 0
-                          ? "No email tasks found."
-                          : "No tasks match the selected filters."}
+                        No tasks match the selected filters.
                       </p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                filteredTasks.map((task) => (
+                tasks.map((task) => (
                   <tr
                     key={task.id}
                     className="hover:bg-muted/30 transition-colors cursor-pointer"
