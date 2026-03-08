@@ -142,7 +142,7 @@ export function AppLayout() {
           <img
             src={logo}
             alt="Élan Exports Consultancy"
-            className="h-10 w-auto"
+            className="h-10 w-10 rounded-full object-cover"
           />
           {!sidebarCollapsed && (
             <span className="text-lg font-bold tracking-tight">
