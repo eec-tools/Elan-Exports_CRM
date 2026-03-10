@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "@/api/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
   Loader2,
-  Mail,
   ExternalLink,
   RefreshCw,
   Edit,
@@ -12,15 +11,29 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  Filter,
+  MailOpen,
+  LayoutGrid,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  UserX,
+  Search,
+  X,
+  Flag,
+  ListTodo,
+  Tag,
+  UserSquare2
 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 interface EmailTask {
   id: string;
@@ -148,10 +161,13 @@ export default function EmailTasksPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<EmailTask | null>(null);
+
+  // Filters
   const [filterTask, setFilterTask] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterRespondent, setFilterRespondent] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchTasks = async () => {
     try {
@@ -194,7 +210,7 @@ export default function EmailTasksPage() {
       if (selectedTask && selectedTask.id === id) {
         setSelectedTask((prev) => (prev ? { ...prev, [field]: value } : prev));
       }
-      toast.success("Task updated");
+      toast.success("Task updated successfully", { duration: 2000 });
     } catch {
       toast.error("Failed to update task");
     }
@@ -202,7 +218,6 @@ export default function EmailTasksPage() {
 
   const confirmDelete = async () => {
     if (!taskToDelete) return;
-
     try {
       await api.delete(`/email-tasks/${taskToDelete.id}`);
       setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
@@ -220,7 +235,7 @@ export default function EmailTasksPage() {
 
   const handleRowClick = (task: EmailTask) => {
     setSelectedTask(task);
-    setIsEditing(false); // Default to view mode
+    setIsEditing(false);
     setIsDialogOpen(true);
   };
 
@@ -231,232 +246,279 @@ export default function EmailTasksPage() {
     setIsDialogOpen(true);
   };
 
-  const statusColors: Record<string, string> = {
-    "Not Started": "bg-gray-100 text-gray-800",
-    "In Progress": "bg-yellow-100 text-yellow-800",
-    Incomplete: "bg-red-100 text-red-800",
-    Completed: "bg-green-100 text-green-800",
+  const statusStyles = (status: string) => {
+    switch (status) {
+      case "Completed":
+        return "bg-emerald-100 text-emerald-700 border-emerald-200";
+      case "In Progress":
+        return "bg-amber-100 text-amber-700 border-amber-200";
+      case "Incomplete":
+        return "bg-rose-100 text-rose-700 border-rose-200";
+      case "Not Started":
+      default:
+        return "bg-slate-100 text-slate-600 border-slate-200";
+    }
   };
 
-  const priorityColors: Record<string, string> = {
-    Urgent: "text-purple-600 font-bold",
-    High: "text-red-600 font-semibold",
-    Medium: "text-orange-600 font-semibold",
-    Low: "text-green-600 font-semibold",
+  const priorityStyles = (priority: string | null) => {
+    switch (priority) {
+      case "Urgent":
+        return "text-rose-600 font-bold bg-rose-50 border-rose-100";
+      case "High":
+        return "text-orange-600 font-semibold bg-orange-50 border-orange-100";
+      case "Medium":
+        return "text-amber-600 font-medium bg-amber-50 border-amber-100";
+      case "Low":
+        return "text-emerald-600 font-medium bg-emerald-50 border-emerald-100";
+      default:
+        return "text-slate-500 font-medium bg-slate-50 border-slate-100";
+    }
   };
 
-  if (loading) {
+  const stats = useMemo(() => {
+    return {
+      total: tasks.length,
+      highPriority: tasks.filter(t => t.priority === "Urgent" || t.priority === "High").length,
+      unassigned: tasks.filter(t => !t.respondent || t.respondent.toLowerCase() === "unassigned").length,
+      pending: tasks.filter(t => t.status === "In Progress" || t.status === "Not Started").length,
+    };
+  }, [tasks]);
+
+  const filteredTasks = tasks.filter(t => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (t.subject && t.subject.toLowerCase().includes(q)) ||
+      (t.senderAddress && t.senderAddress.toLowerCase().includes(q))
+    );
+  });
+
+  const hasActiveFilters = filterTask || filterPriority || filterStatus || filterRespondent || searchQuery;
+
+  if (loading && tasks.length === 0) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full min-h-0 gap-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Task Tracker</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage incoming email requests and assignments.
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <MailOpen className="h-6 w-6 text-emerald-500" />
+            Email Task Tracker
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Manage incoming email requests, prioritize tasks, and assign team members.
           </p>
         </div>
-        <button
+        <Button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+          variant="outline"
+          className="gap-2 bg-white hover:bg-slate-50 text-slate-700 shadow-sm border-slate-200 transition-all h-9"
         >
-          <RefreshCw
-            className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-emerald-500" : "text-slate-400"}`} />
+          {refreshing ? "Syncing..." : "Refresh Inbox"}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-5">
+        {[
+          { icon: <LayoutGrid className="h-5 w-5 text-blue-600" />, label: "Tasks Loaded", value: stats.total, bg: "bg-blue-50" },
+          { icon: <AlertCircle className="h-5 w-5 text-rose-600" />, label: "High/Urgent", value: stats.highPriority, bg: "bg-rose-50" },
+          { icon: <Clock className="h-5 w-5 text-amber-600" />, label: "Pending Execution", value: stats.pending, bg: "bg-amber-50" },
+          { icon: <UserX className="h-5 w-5 text-slate-600" />, label: "Unassigned", value: stats.unassigned, bg: "bg-slate-100" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
+            <div className={`rounded-lg p-2.5 ${s.bg}`}>{s.icon}</div>
+            <div>
+              <p className="text-xs text-slate-500 font-medium">{s.label}</p>
+              <p className="text-xl font-bold text-slate-800">{s.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-5 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 px-2 text-slate-400 border-r border-slate-100 pr-4 mr-1 hidden sm:flex">
+          <Filter className="h-4 w-4" />
+          <span className="text-sm font-semibold text-slate-600">Filters</span>
+        </div>
+        
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Search subjects or senders..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-9 border-slate-200 bg-slate-50 focus:bg-white text-sm"
           />
-          Refresh
-        </button>
-      </div>
+        </div>
 
-      <div className="flex items-center gap-3">
-        <select
-          value={filterTask}
-          onChange={(e) => { setFilterTask(e.target.value); setPage(1); }}
-          className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="">All Task Types</option>
-          {TASK_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterPriority}
-          onChange={(e) => { setFilterPriority(e.target.value); setPage(1); }}
-          className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="">All Priorities</option>
-          <option value="Urgent">Urgent</option>
-          <option value="High">High</option>
-          <option value="Medium">Medium</option>
-          <option value="Low">Low</option>
-        </select>
-        <select
-          value={filterStatus}
-          onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-          className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="">All Statuses</option>
-          <option value="Not Started">Not Started</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Incomplete">Incomplete</option>
-          <option value="Completed">Completed</option>
-        </select>
-        <select
-          value={filterRespondent}
-          onChange={(e) => { setFilterRespondent(e.target.value); setPage(1); }}
-          className="px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="">All Respondents</option>
-          <option value="Unassigned">Unassigned</option>
-          {RESPONDENT_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-        {(filterTask || filterPriority || filterStatus || filterRespondent) && (
-          <button
-            onClick={() => {
-              setFilterTask("");
-              setFilterPriority("");
-              setFilterStatus("");
-              setFilterRespondent("");
-              setPage(1);
-            }}
-            className="text-sm text-muted-foreground hover:text-foreground underline"
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={filterTask}
+            onChange={(e) => { setFilterTask(e.target.value); setPage(1); }}
+            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[140px]"
           >
-            Clear filters
-          </button>
-        )}
+            <option value="">All Task Types</option>
+            {TASK_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+
+          <select
+            value={filterPriority}
+            onChange={(e) => { setFilterPriority(e.target.value); setPage(1); }}
+            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[130px]"
+          >
+            <option value="">All Priorities</option>
+            {["Urgent", "High", "Medium", "Low"].map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+
+          <select
+            value={filterStatus}
+            onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[130px]"
+          >
+            <option value="">All Statuses</option>
+            {["Not Started", "In Progress", "Incomplete", "Completed"].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+
+          <select
+            value={filterRespondent}
+            onChange={(e) => { setFilterRespondent(e.target.value); setPage(1); }}
+            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[140px]"
+          >
+            <option value="">All Respondents</option>
+            <option value="Unassigned">Unassigned</option>
+            {RESPONDENT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFilterTask(""); setFilterPriority(""); setFilterStatus(""); setFilterRespondent(""); setSearchQuery(""); setPage(1);
+              }}
+              className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 h-9 px-2 gap-1"
+            >
+              <X className="h-4 w-4" /> Clear
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="rounded-md border border-neutral-300 dark:border-neutral-700 bg-card">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs border-b border-neutral-300 dark:border-neutral-700">
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="overflow-x-auto flex-1">
+          <table className="w-full text-sm text-left relative">
+            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-10 shadow-[0_1px_0_0_#e2e8f0]">
               <tr>
-                <th className="px-4 py-3 font-medium border-r border-neutral-300 dark:border-neutral-700">
-                  Date
-                </th>
-                <th className="px-4 py-3 font-medium border-r border-neutral-300 dark:border-neutral-700">
-                  Sender
-                </th>
-                <th className="px-4 py-3 font-medium max-w-[200px] border-r border-neutral-300 dark:border-neutral-700">
-                  Subject
-                </th>
-                <th className="px-4 py-3 font-medium border-r border-neutral-300 dark:border-neutral-700">
-                  Task
-                </th>
-                <th className="px-4 py-3 font-medium border-r border-neutral-300 dark:border-neutral-700">
-                  Priority
-                </th>
-                <th className="px-4 py-3 font-medium border-r border-neutral-300 dark:border-neutral-700">
-                  Respondent
-                </th>
-                <th className="px-4 py-3 font-medium border-r border-neutral-300 dark:border-neutral-700">
-                  Notes
-                </th>
-                <th className="px-4 py-3 font-medium border-r border-neutral-300 dark:border-neutral-700">
-                  Status
-                </th>
-                <th className="px-4 py-3 font-medium text-right">Actions</th>
+                {["Date", "Sender", "Subject / Task", "Assignment", "Status", "Actions"].map((h, i) => (
+                  <th key={h} className={`px-5 py-3.5 font-semibold ${i === 5 ? "text-right" : ""}`}>
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {tasks.length === 0 ? (
+            <tbody className="divide-y divide-slate-100">
+              {filteredTasks.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={9}
-                    className="px-4 py-8 text-center text-muted-foreground"
-                  >
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <Mail className="h-8 w-8 opacity-20" />
-                      <p>
-                        No tasks match the selected filters.
+                  <td colSpan={6} className="px-5 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
+                        <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                      </div>
+                      <p className="text-slate-600 font-medium text-base">You're all caught up!</p>
+                      <p className="text-slate-400 text-sm max-w-[250px]">
+                        {hasActiveFilters ? "No tasks match your current filter criteria." : "There are no email tasks currently taking up your inbox space."}
                       </p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                tasks.map((task) => (
+                filteredTasks.map((task) => (
                   <tr
                     key={task.id}
-                    className="hover:bg-muted/30 transition-colors cursor-pointer"
+                    className="hover:bg-emerald-50/40 transition-colors cursor-pointer group"
                     onClick={() => handleRowClick(task)}
                   >
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
-                      {format(new Date(task.dateReceived), "MMM d, h:mm a")}
+                    <td className="px-5 py-3.5 whitespace-nowrap align-top">
+                      <p className="text-slate-900 font-medium">{format(new Date(task.dateReceived), "MMM d")}</p>
+                      <p className="text-xs text-slate-400">{format(new Date(task.dateReceived), "h:mm a")}</p>
                     </td>
-                    <td className="px-4 py-3 font-medium border-r border-neutral-300 dark:border-neutral-700">
-                      {task.senderAddress}
-                    </td>
-                    <td className="px-4 py-3 border-r border-neutral-300 dark:border-neutral-700">
-                      <div className="line-clamp-2" title={task.subject}>
-                        {task.subject}
+
+                    <td className="px-5 py-3.5 align-top">
+                      <div className="flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
+                          {task.senderAddress.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-slate-700 font-medium truncate max-w-[180px]" title={task.senderAddress}>
+                          {task.senderAddress}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 border-r border-neutral-300 dark:border-neutral-700">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs font-medium border px-2 py-0.5 rounded-full w-fit bg-secondary/50">
-                          {task.task || "Uncategorized"}
-                        </span>
+
+                    <td className="px-5 py-3.5 align-top max-w-[300px]">
+                      <p className="text-slate-900 font-medium line-clamp-2 mb-1.5 group-hover:text-emerald-700 transition-colors" title={task.subject}>
+                        {task.subject}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {task.task ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium border px-1.5 py-0.5 rounded-md bg-slate-50 border-slate-200 text-slate-600">
+                            <ListTodo className="h-3 w-3 text-slate-400" />
+                            {task.task}
+                          </span>
+                        ) : (
+                           <span className="inline-flex items-center gap-1 text-[11px] font-medium border px-1.5 py-0.5 rounded-md bg-rose-50 border-rose-100 text-rose-600">
+                            Uncategorized
+                          </span>
+                        )}
                         {task.productCategory && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium border px-1.5 py-0.5 rounded-md bg-slate-50 border-slate-200 text-slate-500">
+                            <Tag className="h-3 w-3 text-slate-400" />
                             {task.productCategory}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 border-r border-neutral-300 dark:border-neutral-700">
-                      <span
-                        className={
-                          task.priority
-                            ? priorityColors[task.priority]
-                            : "text-muted-foreground"
-                        }
-                      >
-                        {task.priority || "None"}
-                      </span>
+
+                    <td className="px-5 py-3.5 align-top">
+                      <div className="flex flex-col gap-2 items-start">
+                        {task.respondent ? (
+                          <div className="flex items-center gap-1.5 text-slate-700 text-sm font-medium bg-slate-100 px-2 py-1 rounded-md">
+                            <UserSquare2 className="h-3.5 w-3.5 text-slate-400" />
+                            {task.respondent}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-sm italic py-1">Unassigned</span>
+                        )}
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${priorityStyles(task.priority)}`}>
+                          <Flag className="h-3 w-3" />
+                          {task.priority || "No Priority"}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 border-r border-neutral-300 dark:border-neutral-700">
-                      <span className="text-muted-foreground">
-                        {task.respondent || "Unassigned"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 border-r border-neutral-300 dark:border-neutral-700">
-                      <span
-                        className="line-clamp-1 text-muted-foreground"
-                        title={task.notes || ""}
-                      >
-                        {task.notes || "No notes"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 border-r border-neutral-300 dark:border-neutral-700">
-                      <span
-                        className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[task.status] || "bg-secondary text-secondary-foreground"}`}
-                      >
+
+                    <td className="px-5 py-3.5 align-top">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusStyles(task.status)}`}>
+                        {task.status === "Completed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                        {task.status === "In Progress" && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
                         {task.status}
                       </span>
                     </td>
-                    <td
-                      className="px-4 py-3 text-right"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-end gap-1">
+
+                    <td className="px-5 py-3.5 align-top text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {task.emailLink && (
                           <a
                             href={task.emailLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center p-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-colors"
                             title="Open Email"
                           >
                             <ExternalLink className="h-4 w-4" />
@@ -464,7 +526,7 @@ export default function EmailTasksPage() {
                         )}
                         <button
                           onClick={(e) => handleEditClick(task, e)}
-                          className="inline-flex items-center justify-center p-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-primary transition-colors"
+                          className="p-1.5 rounded-md hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition-colors"
                           title="Edit Task"
                         >
                           <Edit className="h-4 w-4" />
@@ -475,7 +537,7 @@ export default function EmailTasksPage() {
                             setTaskToDelete(task);
                             setDeleteDialogOpen(true);
                           }}
-                          className="inline-flex items-center justify-center p-2 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          className="p-1.5 rounded-md hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
                           title="Delete Task"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -488,192 +550,106 @@ export default function EmailTasksPage() {
             </tbody>
           </table>
         </div>
+        
+        {pagination && pagination.pages > 1 && (
+          <div className="bg-slate-50 border-t border-slate-200 p-3 flex items-center justify-between">
+            <p className="text-sm text-slate-500 font-medium px-2">
+              Showing page <span className="text-slate-900">{pagination.page}</span> of <span className="text-slate-900">{pagination.pages}</span> <span className="text-slate-400">({pagination.total} total)</span>
+            </p>
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)} className="h-8 w-8 p-0 bg-white shadow-sm border-slate-200 text-slate-600">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= pagination.pages} onClick={() => setPage(page + 1)} className="h-8 w-8 p-0 bg-white shadow-sm border-slate-200 text-slate-600">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {pagination && pagination.pages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <p className="text-sm text-muted-foreground">
-            Page {pagination.page} of {pagination.pages} ({pagination.total} total)
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= pagination.pages}
-              onClick={() => setPage(page + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden bg-white rounded-xl shadow-2xl border-none">
           {selectedTask && (
             <>
-              <DialogHeader>
-                <div className="flex items-center justify-between pb-2 border-b gap-4">
-                  <DialogTitle className="text-xl">
+              <div className="bg-slate-50 p-5 px-6 border-b border-slate-100 flex items-start justify-between">
+                <div>
+                  <DialogTitle className="text-lg font-bold text-slate-900 pr-4 leading-tight">
                     {selectedTask.subject}
                   </DialogTitle>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      variant={isEditing ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setIsEditing(!isEditing)}
-                      className="gap-2"
-                    >
-                      {isEditing ? (
-                        <>
-                          <Save className="h-4 w-4" />
-                          Done Editing
-                        </>
-                      ) : (
-                        <>
-                          <Edit className="h-4 w-4" />
-                          Edit Task
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                    <span>From: <span className="font-medium text-slate-700">{selectedTask.senderAddress}</span></span>
+                    <span className="text-slate-300">•</span>
+                    <span>Received: {format(new Date(selectedTask.dateReceived), "MMM d, yyyy 'at' h:mm a")}</span>
+                  </p>
                 </div>
-                <DialogDescription className="pt-2 flex justify-between items-start">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-foreground">
-                        From:
-                      </span>
-                      <span>{selectedTask.senderAddress}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-foreground">
-                        Date:
-                      </span>
-                      <span>
-                        {format(
-                          new Date(selectedTask.dateReceived),
-                          "PPP 'at' p",
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                  {selectedTask.emailLink && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      className="gap-2"
-                    >
-                      <a
-                        href={selectedTask.emailLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        Open in Gmail
+                <div className="flex gap-2 flex-shrink-0">
+                   {selectedTask.emailLink && (
+                    <Button variant="outline" size="sm" asChild className="h-8 text-xs bg-white shadow-sm border-slate-200 hover:bg-slate-50 text-slate-600 hidden sm:flex">
+                      <a href={selectedTask.emailLink} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Open Email
                       </a>
                     </Button>
                   )}
-                </DialogDescription>
-              </DialogHeader>
+                  <Button
+                    variant={isEditing ? "default" : "secondary"}
+                    size="sm"
+                    onClick={() => setIsEditing(!isEditing)}
+                    className={`h-8 text-xs transition-all shadow-sm ${isEditing ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-white border hover:bg-slate-50 text-slate-700"}`}
+                  >
+                    {isEditing ? <><Save className="h-3.5 w-3.5 mr-1.5" /> Done Editing</> : <><Edit className="h-3.5 w-3.5 mr-1.5" /> Edit Task</>}
+                  </Button>
+                </div>
+              </div>
 
-              <div className="grid grid-cols-2 gap-6 py-4">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-semibold text-muted-foreground">
-                      Task Type
-                    </label>
+              <div className="p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Category / Task Type</label>
                     {isEditing ? (
                       <select
                         value={selectedTask.task || ""}
-                        onChange={(e) =>
-                          updateTask(selectedTask.id, "task", e.target.value)
-                        }
-                        className="w-full mt-1.5 px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                        onChange={(e) => updateTask(selectedTask.id, "task", e.target.value)}
+                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm"
                       >
                         <option value="">Uncategorized</option>
-                        {TASK_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
+                        {TASK_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     ) : (
-                      <div className="mt-1.5 py-2 font-medium">
+                      <div className="h-9 flex items-center px-3 bg-slate-50 rounded-md text-sm text-slate-800 border border-slate-100">
                         {selectedTask.task || "Uncategorized"}
                       </div>
                     )}
                   </div>
-                  <div>
-                    <label className="text-sm font-semibold text-muted-foreground">
-                      Priority
-                    </label>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Priority Level</label>
                     {isEditing ? (
                       <select
                         value={selectedTask.priority || ""}
-                        onChange={(e) =>
-                          updateTask(
-                            selectedTask.id,
-                            "priority",
-                            e.target.value,
-                          )
-                        }
-                        className={`w-full mt-1.5 px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-ring ${selectedTask.priority ? priorityColors[selectedTask.priority] : ""}`}
+                        onChange={(e) => updateTask(selectedTask.id, "priority", e.target.value)}
+                        className={`h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm ${selectedTask.priority === "Urgent" ? "text-rose-600 font-bold" : ""}`}
                       >
                         <option value="">Set Priority...</option>
-                        <option
-                          value="Urgent"
-                          className="text-purple-600 font-bold"
-                        >
-                          Urgent
-                        </option>
-                        <option
-                          value="High"
-                          className="text-red-600 font-semibold"
-                        >
-                          High
-                        </option>
-                        <option
-                          value="Medium"
-                          className="text-orange-600 font-semibold"
-                        >
-                          Medium
-                        </option>
-                        <option
-                          value="Low"
-                          className="text-green-600 font-semibold"
-                        >
-                          Low
-                        </option>
+                        <option value="Urgent" className="text-rose-600 font-bold">Urgent</option>
+                        <option value="High" className="text-orange-600 font-semibold">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
                       </select>
                     ) : (
-                      <div
-                        className={`mt-1.5 py-2 font-medium ${selectedTask.priority ? priorityColors[selectedTask.priority] : ""}`}
-                      >
+                      <div className={`h-9 flex w-max items-center px-3 rounded-md text-sm border ${priorityStyles(selectedTask.priority)}`}>
                         {selectedTask.priority || "None"}
                       </div>
                     )}
                   </div>
-                  <div>
-                    <label className="text-sm font-semibold text-muted-foreground">
-                      Status
-                    </label>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</label>
                     {isEditing ? (
                       <select
                         value={selectedTask.status}
-                        onChange={(e) =>
-                          updateTask(selectedTask.id, "status", e.target.value)
-                        }
-                        className={`w-full mt-1.5 px-3 py-2 border rounded-md outline-none focus:ring-2 focus:ring-ring ${statusColors[selectedTask.status] || "bg-secondary text-secondary-foreground"}`}
+                        onChange={(e) => updateTask(selectedTask.id, "status", e.target.value)}
+                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm"
                       >
                         <option value="Not Started">Not Started</option>
                         <option value="In Progress">In Progress</option>
@@ -681,73 +657,61 @@ export default function EmailTasksPage() {
                         <option value="Completed">Completed</option>
                       </select>
                     ) : (
-                      <div className="mt-1.5 py-2">
-                        <span
-                          className={`px-2 py-1 rounded-full text-sm font-medium ${statusColors[selectedTask.status] || "bg-secondary text-secondary-foreground"}`}
-                        >
-                          {selectedTask.status}
-                        </span>
+                      <div className={`h-9 flex w-max items-center px-3 rounded-md text-sm font-semibold border ${statusStyles(selectedTask.status)}`}>
+                        {selectedTask.status}
                       </div>
                     )}
                   </div>
-                </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-semibold text-muted-foreground">
-                      Product Category
-                    </label>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Product Line</label>
                     {isEditing ? (
                       <select
                         value={selectedTask.productCategory || ""}
-                        onChange={(e) =>
-                          updateTask(
-                            selectedTask.id,
-                            "productCategory",
-                            e.target.value,
-                          )
-                        }
-                        className="w-full mt-1.5 px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                        onChange={(e) => updateTask(selectedTask.id, "productCategory", e.target.value)}
+                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm"
                       >
                         <option value="">Select Category...</option>
-                        {PRODUCT_CATEGORY_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
+                        {PRODUCT_CATEGORY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     ) : (
-                      <div className="mt-1.5 py-2 font-medium">
-                        {selectedTask.productCategory || "None"}
+                      <div className="h-9 flex items-center px-3 bg-slate-50 rounded-md text-sm text-slate-800 border border-slate-100">
+                        {selectedTask.productCategory || "None specified"}
                       </div>
                     )}
                   </div>
-                  <div>
-                    <label className="text-sm font-semibold text-muted-foreground">
-                      Assigned Respondent
-                    </label>
+
+                  <div className="flex flex-col gap-1.5 sm:col-span-2 border-t border-slate-100 pt-5 mt-1">
+                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Assigned To</label>
                     {isEditing ? (
                       <select
                         value={selectedTask.respondent || ""}
-                        onChange={(e) =>
-                          updateTask(
-                            selectedTask.id,
-                            "respondent",
-                            e.target.value,
-                          )
-                        }
-                        className="w-full mt-1.5 px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                        onChange={(e) => updateTask(selectedTask.id, "respondent", e.target.value)}
+                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm w-full sm:w-1/2"
                       >
                         <option value="">Unassigned</option>
-                        {RESPONDENT_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
+                        {RESPONDENT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     ) : (
-                      <div className="mt-1.5 py-2 font-medium">
+                      <div className="h-9 flex w-max items-center px-3 bg-blue-50 text-blue-700 rounded-md text-sm font-medium border border-blue-100">
+                        <UserSquare2 className="h-4 w-4 mr-2 opacity-70"/>
                         {selectedTask.respondent || "Unassigned"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Internal Notes</label>
+                    {isEditing ? (
+                      <Textarea
+                        value={selectedTask.notes || ""}
+                        onChange={(e) => updateTask(selectedTask.id, "notes", e.target.value)}
+                        className="min-h-[100px] text-sm border-slate-200 bg-white placeholder:text-slate-400 focus:ring-emerald-500/50 shadow-sm resize-y"
+                        placeholder="Add some notes about this task..."
+                      />
+                    ) : (
+                      <div className="min-h-[100px] bg-slate-50 p-4 rounded-lg text-sm text-slate-700 border border-slate-100 whitespace-pre-wrap leading-relaxed">
+                        {selectedTask.notes || <span className="text-slate-400 italic">No notes added yet.</span>}
                       </div>
                     )}
                   </div>
@@ -758,35 +722,26 @@ export default function EmailTasksPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
-      <Dialog
-        open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          setDeleteDialogOpen(open);
-          if (!open) setTaskToDelete(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete task</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete the task{" "}
-            {taskToDelete?.subject && (
-              <span className="font-medium">"{taskToDelete.subject}"</span>
-            )}
-            ? This action cannot be undone.
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) setTaskToDelete(null); }}>
+        <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+              <AlertCircle className="h-6 w-6 text-rose-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900">Delete Email Task</DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">This action cannot be undone.</DialogDescription>
+            </div>
+          </div>
+          <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-md border border-slate-100 mb-6 font-medium line-clamp-2">
+            "{taskToDelete?.subject}"
           </p>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={confirmDelete}>
-              Delete
+            <Button variant="destructive" onClick={confirmDelete} className="bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200">
+              Yes, delete task
             </Button>
           </div>
         </DialogContent>

@@ -24,8 +24,6 @@ import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
 import logo from "@/assets/elanexportslogo.png";
 
-// perm: which permission gates this page (null = always accessible)
-// adminOnly: completely hidden from non-admins
 const navItems = [
   {
     to: "/",
@@ -104,7 +102,6 @@ const navItems = [
     perm: "task_tracker",
     adminOnly: false,
   },
-
 ];
 
 export function AppLayout() {
@@ -126,52 +123,53 @@ export function AppLayout() {
       .toUpperCase()
       .slice(0, 2) ?? "?";
 
-  // Admin sees everything. Members see only non-adminOnly items.
   const visibleNav = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-slate-50/50">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm md:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Changed to a soft white theme */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 md:relative ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-          } ${sidebarCollapsed ? "w-16" : "w-64"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-white text-slate-600 border-r border-slate-200 transition-all duration-300 md:relative shadow-xl shadow-slate-200/50 md:shadow-none ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          } ${sidebarCollapsed ? "w-20" : "w-64"}`}
       >
         {/* Logo */}
         <div
-          className={`relative flex h-16 items-center border-b border-sidebar-border ${sidebarCollapsed ? "justify-center px-3" : "gap-3 px-6"}`}
+          className={`relative flex h-16 items-center border-b border-slate-100 bg-white z-10 ${sidebarCollapsed ? "justify-center px-2" : "gap-3 px-5"}`}
         >
           <img
             src={logo}
             alt="Élan Exports Consultancy"
-            className="h-10 w-10 rounded-full object-cover"
+            className="h-9 w-9 rounded-full object-cover shadow-sm border border-slate-50"
           />
           {!sidebarCollapsed && (
-            <span className="text-lg font-bold tracking-tight">
-              Élan Exports CRM
+            <span className="text-[17px] font-bold tracking-tight text-slate-800 flex-1 min-w-0 truncate">
+              Élan Exports
             </span>
           )}
           <Button
             variant="ghost"
             size="icon"
-            className={`text-sidebar-foreground hover:bg-sidebar-accent md:hidden ${sidebarCollapsed ? "hidden" : "ml-auto"}`}
+            className={`text-slate-500 hover:bg-slate-100 hover:text-slate-900 md:hidden h-8 w-8 rounded-md ${sidebarCollapsed ? "hidden" : "ml-auto"}`}
             onClick={() => setSidebarOpen(false)}
           >
             <X className="h-5 w-5" />
           </Button>
-          {/* Desktop collapse toggle */}
+          
+          {/* Desktop collapse toggle - Softer style */}
           <Button
             variant="ghost"
             size="icon"
-            className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 z-50 h-6 w-6 rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground hover:bg-sidebar-accent"
+            className="hidden md:flex absolute -right-3.5 top-1/2 -translate-y-1/2 z-50 h-7 w-7 rounded-full border border-slate-200 bg-white text-slate-400 hover:text-slate-700 hover:bg-slate-50 hover:scale-110 transition-all shadow-sm group"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
             {sidebarCollapsed ? (
               <ChevronRight className="h-4 w-4" />
@@ -182,47 +180,65 @@ export function AppLayout() {
         </div>
 
         {/* Nav links */}
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-4 custom-scrollbar-light">
           {visibleNav.map((item) => {
-            // Accessible = no perm required, OR admin, OR has the permission
-
             if (item.label === "Suppliers") {
               return (
-                <div key="suppliers-group" className="space-y-1">
+                <div key="suppliers-group" className="mt-4 mb-2">
                   <div
-                    className={`flex items-center gap-3 px-3 py-2 text-xs font-semibold uppercase text-sidebar-foreground/60 ${sidebarCollapsed ? "justify-center" : ""}`}
+                    className={`flex items-center gap-3 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1 ${sidebarCollapsed ? "justify-center px-0" : ""}`}
+                    title={sidebarCollapsed ? "SUPPLIERS" : undefined}
                   >
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    {!sidebarCollapsed && <span>Suppliers</span>}
+                    {!sidebarCollapsed && <span>Suppliers Area</span>}
+                    {sidebarCollapsed && <Factory className="h-4 w-4 text-slate-400" />}
                   </div>
-                  {!sidebarCollapsed && (
-                    <>
+                  <div className="space-y-1">
                       <NavLink
                         to="/suppliers/signed-contract"
                         onClick={() => setSidebarOpen(false)}
                         className={({ isActive }) =>
-                          `ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                          `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
+                          } ${isActive
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                           }`
                         }
+                        title={sidebarCollapsed ? "Signed Contracts" : undefined}
                       >
-                        Signed Contract Suppliers
+                         {({ isActive }) => (
+                            <>
+                              {isActive && !sidebarCollapsed && (
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-emerald-500 rounded-r-md" />
+                              )}
+                              <Factory className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-600' : 'text-slate-400 group-hover:text-emerald-600 transition-colors'}`} />
+                              {!sidebarCollapsed && <span className="truncate">Signed Contracts</span>}
+                            </>
+                         )}
                       </NavLink>
                       <NavLink
                         to="/suppliers/old"
                         onClick={() => setSidebarOpen(false)}
                         className={({ isActive }) =>
-                          `ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent/foreground"
+                          `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
+                          } ${isActive
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                           }`
                         }
+                        title={sidebarCollapsed ? "Old Supplier Data" : undefined}
                       >
-                        Old Supplier Data
+                        {({ isActive }) => (
+                            <>
+                              {isActive && !sidebarCollapsed && (
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-emerald-500 rounded-r-md" />
+                              )}
+                              <Archive className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-600' : 'text-slate-400 group-hover:text-emerald-600 transition-colors'}`} />
+                              {!sidebarCollapsed && <span className="truncate">Old Supplier Data</span>}
+                            </>
+                         )}
                       </NavLink>
-                    </>
-                  )}
+                  </div>
+                   {!sidebarCollapsed && <Separator className="bg-slate-100 my-4 w-[calc(100%-1.5rem)] mx-auto" />}
                 </div>
               );
             }
@@ -234,41 +250,46 @@ export function AppLayout() {
                 end={item.to === "/"}
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${sidebarCollapsed ? "justify-center" : ""
+                  `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
                   } ${isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                   }`
                 }
                 title={sidebarCollapsed ? item.label : undefined}
               >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {!sidebarCollapsed && item.label}
+                  {({ isActive }) => (
+                      <>
+                        {isActive && !sidebarCollapsed && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-emerald-500 rounded-r-md" />
+                        )}
+                        <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-600' : 'text-slate-400 group-hover:text-emerald-600 transition-colors'}`} />
+                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      </>
+                   )}
               </NavLink>
             );
           })}
         </nav>
 
-        <Separator className="bg-sidebar-border" />
-
-        {/* User section */}
-        <div className="p-3">
+        {/* User section - Softer styling */}
+        <div className="p-3 border-t border-slate-100 bg-slate-50/50">
           <div
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 ${sidebarCollapsed ? "justify-center" : ""}`}
+            className={`flex items-center gap-3 rounded-xl px-2 py-2 transition-colors ${sidebarCollapsed ? "justify-center" : "hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200"}`}
           >
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs">
+            <Avatar className={`h-9 w-9 border border-slate-200 shrink-0 shadow-sm ${sidebarCollapsed ? 'mx-auto' : ''}`}>
+              <AvatarFallback className="bg-white text-emerald-700 text-xs font-bold">
                 {initials}
               </AvatarFallback>
             </Avatar>
             {!sidebarCollapsed && (
               <>
-                <div className="flex-1 truncate">
-                  <p className="text-sm font-medium truncate text-sidebar-foreground">
+                <div className="flex-1 min-w-0 pr-1">
+                  <p className="text-[13px] font-semibold truncate text-slate-700 leading-tight">
                     {user?.fullName}
                   </p>
-                  <p className="text-xs truncate text-sidebar-foreground/50">
-                    {user?.email}
+                  <p className="text-[11px] font-medium truncate text-slate-400 mt-0.5">
+                    {isAdmin ? "Administrator" : "Team Member"}
                   </p>
                 </div>
                 <Button
@@ -276,9 +297,9 @@ export function AppLayout() {
                   size="icon"
                   onClick={handleLogout}
                   title="Logout"
-                  className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  className="h-8 w-8 shrink-0 text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors group"
                 >
-                  <LogOut className="h-4 w-4" />
+                  <LogOut className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
                 </Button>
               </>
             )}
@@ -288,7 +309,7 @@ export function AppLayout() {
                 size="icon"
                 onClick={handleLogout}
                 title="Logout"
-                className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                className="absolute inset-x-2 bottom-3 mx-auto h-9 w-9 text-slate-500 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors opacity-0 hover:opacity-100 flex items-center justify-center z-20 bg-white shadow-sm border border-slate-100"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -298,24 +319,47 @@ export function AppLayout() {
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
         {/* Top bar (mobile) */}
-        <header className="flex h-14 items-center border-b px-4 md:hidden">
+        <header className="flex h-16 items-center border-b border-slate-200 bg-white px-4 md:hidden shrink-0 shadow-sm z-30">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setSidebarOpen(true)}
+            className="text-slate-600 hover:bg-slate-100 mr-2"
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <span className="ml-3 text-lg font-bold">Élan ExportsCRM</span>
+          <img
+            src={logo}
+            alt="Logo"
+            className="h-8 w-8 rounded-full object-cover mr-3 border border-slate-100"
+          />
+          <span className="text-[17px] font-bold text-slate-900 tracking-tight">Élan Exports</span>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative">
           <Outlet />
         </main>
       </div>
+
+      {/* Global Sidebar Scrollbar Styles - Lighter aesthetic */}
+      <style>{`
+        .custom-scrollbar-light::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar-light::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar-light::-webkit-scrollbar-thumb {
+          background-color: rgba(148, 163, 184, 0.2); /* slate-400 with opacity */
+          border-radius: 20px;
+        }
+        .custom-scrollbar-light:hover::-webkit-scrollbar-thumb {
+          background-color: rgba(148, 163, 184, 0.4);
+        }
+      `}</style>
     </div>
   );
 }

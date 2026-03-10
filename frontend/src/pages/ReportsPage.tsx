@@ -7,20 +7,11 @@ import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -30,13 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
 import {
   Form,
   FormControl,
@@ -53,12 +38,20 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Upload,
   CalendarIcon,
+  Filter,
+  FileText,
+  AlertCircle,
+  X,
+  Building2,
+  PackageSearch,
+  CheckCircle2,
+  Clock,
+  LayoutGrid,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import logoUrl from "@/assets/elanexportslogo.png";
@@ -87,11 +80,11 @@ const resolveImageUrl = (url?: string | null) => {
 };
 
 const BUYER_COLORS: [number, number, number][] = [
-  [204, 153, 204], // lavender
-  [255, 204, 204], // light red
-  [204, 229, 255], // light blue
-  [204, 255, 229], // light green
-  [255, 229, 204], // light orange
+  [204, 153, 204], 
+  [255, 204, 204], 
+  [204, 229, 255], 
+  [204, 255, 229], 
+  [255, 229, 204], 
 ];
 
 const getBuyerColor = (buyerName: string) => {
@@ -116,7 +109,7 @@ const reportSchema = z.object({
 
 type ReportFormValues = z.infer<typeof reportSchema>;
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
 
 export default function ReportsPage() {
   const { hasEditPermission } = useAuth();
@@ -211,7 +204,7 @@ export default function ReportsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      toast.success(editingId ? "Report updated" : "Report created");
+      toast.success(editingId ? "Report updated successfully" : "Report created successfully");
       setDialogOpen(false);
       setEditingId(null);
       setImageFile(null);
@@ -316,7 +309,7 @@ export default function ReportsPage() {
         data[i] = gray;
         data[i + 1] = gray;
         data[i + 2] = gray;
-        data[i + 3] = data[i + 3] * 0.2; // reduce opacity
+        data[i + 3] = data[i + 3] * 0.2; 
       }
 
       ctx.putImageData(imageData, 0, 0);
@@ -335,7 +328,7 @@ export default function ReportsPage() {
 
   const downloadPdf = async () => {
     if (!items.length) {
-      toast.error("No reports to download");
+      toast.error("No reports to download in the current view.");
       return;
     }
 
@@ -364,7 +357,6 @@ export default function ReportsPage() {
       "dd MMM yyyy, HH:mm",
     )}`;
 
-    // Group by buyer name
     const grouped: Record<string, Report[]> = {};
     for (const r of items) {
       const key = r.buyerName || "Unknown Buyer";
@@ -382,7 +374,6 @@ export default function ReportsPage() {
       }
       firstSection = false;
 
-      // Watermark in page center
       if (logoImage) {
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
@@ -400,15 +391,12 @@ export default function ReportsPage() {
       }
 
       const [r, g, b] = getBuyerColor(buyer);
-
       const pageWidth = doc.internal.pageSize.getWidth();
 
-      // Top-right generated timestamp
       doc.setFontSize(8);
       doc.setTextColor(80, 80, 80);
       doc.text(generatedLabel, pageWidth - 10, 8, { align: "right" });
 
-      // Buyer header bar
       doc.setFillColor(r, g, b);
       doc.rect(10, 10, 277, 12, "F");
       doc.setTextColor(0, 0, 0);
@@ -416,9 +404,7 @@ export default function ReportsPage() {
       doc.text(`Buyer - ${buyer}`, 14, 18);
 
       doc.setFontSize(10);
-
       const startY = 26;
-
       const imgHeight = 22;
       const cellPad = 1.5;
       const minProductCellHeight = imgHeight + 2 * cellPad + 6;
@@ -457,7 +443,6 @@ export default function ReportsPage() {
               const h = img.height * ratio;
               doc.addImage(img, "JPEG", cellX, currentY, w, h);
 
-              // Overlay product name label
               const labelY = currentY + h - 6;
               doc.setFillColor(255, 255, 255);
               doc.rect(
@@ -474,7 +459,6 @@ export default function ReportsPage() {
               currentY = cellY + h + 2;
             }
 
-            // If no image, still write product name text
             if (!img) {
               doc.setFontSize(8);
               doc.setTextColor(0, 0, 0);
@@ -491,241 +475,284 @@ export default function ReportsPage() {
     toast.success("PDF downloaded");
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "completed":
+      case "approved":
+      case "shipped":
+        return "bg-emerald-100 text-emerald-700 border-emerald-200";
+      case "in progress":
+      case "pending":
+      case "reviewing":
+        return "bg-amber-100 text-amber-700 border-amber-200";
+      case "rejected":
+      case "cancelled":
+      case "delayed":
+        return "bg-rose-100 text-rose-700 border-rose-200";
+      default:
+        return "bg-blue-50 text-blue-700 border-blue-200";
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col h-full min-h-0 gap-0">
+      {/* ── Dashboard Header ── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-slate-100">
         <div>
-          <h1 className="text-2xl font-display font-bold text-foreground">
-            Reports
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <FileText className="h-6 w-6 text-emerald-500" />
+            Operations Reports
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {data?.total ?? 0} total reports
+          <p className="text-sm text-slate-500 mt-0.5">
+            Log updates and export multi-buyer PDF briefing documents.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={downloadPdf}>
-            <Download className="mr-1 h-4 w-4" />
-            Download PDF
+          <Button variant="outline" onClick={downloadPdf} className="gap-2 bg-white hover:bg-slate-50 text-slate-700 shadow-sm border-slate-200 h-9">
+            <Download className="h-4 w-4" />
+            Export PDF
           </Button>
           {canEditReports && (
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="mr-1 h-4 w-4" />
+            <Button onClick={openCreate} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-9">
+              <Plus className="h-4 w-4" />
               New Report
             </Button>
           )}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search reports..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-muted-foreground">From</span>
-            <Input
-              type="date"
-              className="h-9 w-40"
-              value={filterFrom ? format(filterFrom, "yyyy-MM-dd") : ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                setFilterFrom(v ? new Date(v) : undefined);
-                setPage(1);
-              }}
-            />
+      {/* ── Summary & Filter Strip ── */}
+      <div className="py-5 flex flex-col xl:flex-row gap-4">
+          <div className="shrink-0 flex gap-4">
+             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm min-w-[200px] flex items-center gap-3">
+                 <div className="rounded-lg p-2.5 bg-blue-50">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                 </div>
+                 <div>
+                    <p className="text-xs text-slate-500 font-medium">Total Tracked Reports</p>
+                    <p className="text-xl font-bold text-slate-800">{data?.total ?? 0}</p>
+                 </div>
+             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-muted-foreground">To</span>
-            <Input
-              type="date"
-              className="h-9 w-40"
-              value={filterTo ? format(filterTo, "yyyy-MM-dd") : ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                setFilterTo(v ? new Date(v) : undefined);
-                setPage(1);
-              }}
-            />
+
+          <div className="flex-1 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 px-2 text-slate-400 border-r border-slate-100 pr-4 mr-1 hidden sm:flex">
+              <Filter className="h-4 w-4" />
+              <span className="text-sm font-semibold text-slate-600">Filters</span>
+            </div>
+
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="Search products, buyers, companies..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                className="pl-9 h-9 bg-slate-50 border-slate-200 focus:bg-white focus:ring-emerald-500/20 focus:border-emerald-500 text-sm"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 shrink-0 border-l border-slate-100 pl-4 ml-1">
+                <CalendarIcon className="h-4 w-4 text-slate-400 hidden sm:block" />
+                <Input
+                  type="date"
+                  className="h-9 w-36 bg-slate-50 border-slate-200 text-sm focus:bg-white focus:ring-emerald-500/20"
+                  value={filterFrom ? format(filterFrom, "yyyy-MM-dd") : ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFilterFrom(v ? new Date(v) : undefined);
+                    setPage(1);
+                  }}
+                  title="From Date"
+                />
+                <span className="text-slate-400 text-xs">—</span>
+                <Input
+                  type="date"
+                  className="h-9 w-36 bg-slate-50 border-slate-200 text-sm focus:bg-white focus:ring-emerald-500/20"
+                  value={filterTo ? format(filterTo, "yyyy-MM-dd") : ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFilterTo(v ? new Date(v) : undefined);
+                    setPage(1);
+                  }}
+                  title="To Date"
+                />
+            </div>
+
+            {(search || filterFrom || filterTo) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearch("");
+                  setFilterFrom(undefined);
+                  setFilterTo(undefined);
+                  setPage(1);
+                }}
+                className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 h-9 px-2 gap-1 ml-auto shrink-0"
+              >
+                <X className="h-4 w-4" /> Clear
+              </Button>
+            )}
           </div>
-          {(filterFrom || filterTo) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setFilterFrom(undefined);
-                setFilterTo(undefined);
-                setPage(1);
-              }}
-            >
-              Clear
-            </Button>
-          )}
-        </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-lg border border-neutral-300 dark:border-neutral-700 bg-card shadow-sm">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30 border-b border-neutral-300 dark:border-neutral-700">
-                <TableHead className="w-[180px] border-r border-neutral-300 dark:border-neutral-700">
-                  Product
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Buyer Name
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Supplier Company Name
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Brief Summary
-                </TableHead>
-                <TableHead className="w-[300px] border-r border-neutral-300 dark:border-neutral-700">
-                  Key Updates
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Action
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Date
-                </TableHead>
-                {canEditReports && (
-                  <TableHead className="text-right border-r border-neutral-300 dark:border-neutral-700">
-                    Actions
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+      {/* ── Main Data Table ── */}
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col mb-4">
+        <div className="overflow-auto flex-1 relative">
+          <table className="w-full text-sm text-left border-collapse min-w-max">
+            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
+              <tr>
+                <th className="px-5 py-3.5 font-semibold w-[220px]">Product / Spec</th>
+                <th className="px-5 py-3.5 font-semibold w-[200px]">Buyer & Supplier</th>
+                <th className="px-5 py-3.5 font-semibold w-[220px]">Status Summary</th>
+                <th className="px-5 py-3.5 font-semibold max-w-[300px]">Key Updates</th>
+                <th className="px-5 py-3.5 font-semibold w-[100px]">Role</th>
+                <th className="px-5 py-3.5 font-semibold w-[120px]">Report Date</th>
+                {canEditReports && <th className="px-5 py-3.5 font-semibold text-right w-[90px]">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="py-12 text-center text-muted-foreground"
-                  >
-                    Loading...
-                  </TableCell>
-                </TableRow>
+                <tr>
+                   <td colSpan={canEditReports ? 7 : 6} className="h-32 text-center">
+                     <div className="flex justify-center">
+                       <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                     </div>
+                   </td>
+                </tr>
               ) : !items.length ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="py-12 text-center text-muted-foreground"
-                  >
-                    No reports found
-                  </TableCell>
-                </TableRow>
+                <tr>
+                  <td colSpan={canEditReports ? 7 : 6} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
+                        <FileText className="h-6 w-6 text-slate-300" />
+                      </div>
+                      <p className="text-slate-600 font-medium text-base">No reports found</p>
+                      <p className="text-slate-400 text-sm max-w-[250px]">
+                        {(search || filterFrom || filterTo) ? "Try adjusting your search or filters." : "Create a new report to get started."}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
               ) : (
                 items.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="border-b border-neutral-300 dark:border-neutral-700 last:border-0 hover:bg-muted/30"
-                  >
-                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                      <div className="space-y-1">
-                        {item.productImageUrl && (
-                          <img
-                            src={resolveImageUrl(item.productImageUrl)}
-                            alt={item.productName}
-                            className="h-20 w-28 rounded border object-cover"
-                          />
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group align-top">
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col gap-2">
+                        {item.productImageUrl ? (
+                          <div className="h-16 w-16 overflow-hidden rounded-md border border-slate-200 bg-slate-50 shrink-0">
+                             <img
+                                src={resolveImageUrl(item.productImageUrl)}
+                                alt={item.productName}
+                                className="h-full w-full object-cover"
+                             />
+                          </div>
+                        ) : (
+                          <div className="h-16 w-16 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0">
+                             <LayoutGrid className="h-6 w-6 text-slate-300" />
+                          </div>
                         )}
-                        <p className="text-xs font-medium uppercase text-primary">
+                        <p className="text-[13px] font-bold uppercase tracking-tight text-slate-800 break-words line-clamp-2 pr-2">
                           {item.productName}
                         </p>
                       </div>
-                    </TableCell>
-                    <TableCell className="font-medium border-r border-neutral-300 dark:border-neutral-700">
-                      {item.buyerName}
-                    </TableCell>
-                    <TableCell className="text-sm whitespace-pre-line border-r border-neutral-300 dark:border-neutral-700">
-                      {item.companyName}
-                    </TableCell>
-                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                      <span className="text-sm font-medium text-primary">
-                        {item.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                      <div className="max-w-[300px] space-y-1 text-sm">
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col gap-2">
+                         <div>
+                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-0.5">BUYER</span>
+                            <span className="font-semibold text-slate-900 truncate block">{item.buyerName}</span>
+                         </div>
+                         <div>
+                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-0.5 mt-1">SUPPLIER</span>
+                            <span className="text-slate-600 text-[13px] font-medium flex items-center gap-1.5 truncate">
+                               <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
+                               <span className="truncate">{item.companyName}</span>
+                            </span>
+                         </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col gap-2 relative h-full">
+                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider border w-fit ${getStatusColor(item.status)}`}>
+                             {item.status || "Unknown"}
+                         </span>
+                         <span className="text-[13px] text-slate-600 font-medium leading-relaxed line-clamp-3">
+                            {/* We re-use 'status' in the backend as a brief summary string based on the old schema */} 
+                            {item.status} 
+                         </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 max-w-[300px]">
+                      <div className="space-y-1">
                         {item.updateDate && (
-                          <p className="font-semibold text-primary">
-                            {format(new Date(item.updateDate), "dd MMM yyyy")}:
-                          </p>
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                             <Clock className="h-3.5 w-3.5 text-emerald-500" />
+                             <span className="text-xs font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                               {format(new Date(item.updateDate), "dd MMM yyyy")}
+                             </span>
+                          </div>
                         )}
-                        <p className="whitespace-pre-line text-muted-foreground">
-                          {item.keyUpdates || "—"}
+                        <p className="text-[13px] text-slate-600 leading-relaxed whitespace-pre-line line-clamp-4">
+                          {item.keyUpdates || <span className="text-slate-400 italic">No updates provided</span>}
                         </p>
                       </div>
-                    </TableCell>
-                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                      <Badge variant="secondary">{item.buyerSupplier}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm border-r border-neutral-300 dark:border-neutral-700">
+                    </td>
+                    <td className="px-5 py-4">
+                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold border truncate ${item.buyerSupplier.toLowerCase() === 'buyer' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>
+                          {item.buyerSupplier}
+                       </span>
+                    </td>
+                    <td className="px-5 py-4 text-[13px] font-medium text-slate-600">
                       {format(new Date(item.reportDate), "dd MMM yyyy")}
-                    </TableCell>
+                    </td>
                     {canEditReports && (
-                      <TableCell className="text-right border-r border-neutral-300 dark:border-neutral-700">
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="px-5 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
                             onClick={() => openEdit(item)}
+                            title="Edit Report"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                             onClick={() => {
                               setReportToDelete(item);
                               setDeleteDialogOpen(true);
                             }}
+                            title="Delete Report"
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      </TableCell>
+                      </td>
                     )}
-                  </TableRow>
+                  </tr>
                 ))
               )}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-sm text-muted-foreground">
-              Page {page} of {totalPages}
+          <div className="bg-slate-50 border-t border-slate-200 p-3 flex items-center justify-between">
+            <p className="text-sm text-slate-500 font-medium px-2">
+              Showing page <span className="text-slate-900">{page}</span> of <span className="text-slate-900">{totalPages}</span>
             </p>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-              >
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)} className="h-8 w-8 p-0 bg-white shadow-sm border-slate-200 text-slate-600 hover:bg-slate-100">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-              >
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="h-8 w-8 p-0 bg-white shadow-sm border-slate-200 text-slate-600 hover:bg-slate-100">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -733,7 +760,7 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {/* Create/Edit dialog */}
+      {/* ── Add / Edit Report Modal ── */}
       {canEditReports && (
         <Dialog
           open={dialogOpen}
@@ -746,319 +773,251 @@ export default function ReportsPage() {
             }
           }}
         >
-          <DialogContent className="max-h-[90vh] max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {editingId ? "Edit Report" : "Create Report"}
-              </DialogTitle>
-            </DialogHeader>
-            <ScrollArea className="max-h-[70vh] pr-4">
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit((v) => saveMutation.mutate(v))}
-                  className="space-y-4 p-1"
-                >
-                  <FormField
-                    control={form.control}
-                    name="product_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Product</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="e.g. Terry Towels" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto p-0 bg-white rounded-xl shadow-2xl border-none custom-scrollbar-light">
+             {/* Header */}
+             <div className="bg-slate-50 p-6 border-b border-slate-100 flex items-center gap-4 sticky top-0 z-10">
+                 <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 border border-emerald-200">
+                     <FileText className="h-5 w-5 text-emerald-600" />
+                 </div>
+                 <div>
+                     <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
+                       {editingId ? "Edit Report Entry" : "Create New Report"}
+                     </DialogTitle>
+                     <DialogDescription className="text-slate-500 mt-1">
+                       {editingId ? "Update details for this report." : "Fill out the information below to log a new status report."}
+                     </DialogDescription>
+                 </div>
+             </div>
 
-                  <FormField
-                    control={form.control}
-                    name="product_image_url"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Product Image</FormLabel>
-                        <div className="space-y-2">
-                          {field.value && (
-                            <img
-                              src={field.value}
-                              alt="Product"
-                              className="h-24 w-32 rounded-md border object-cover"
-                            />
-                          )}
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              asChild
-                              disabled={uploadingImage}
-                            >
-                              <label className="cursor-pointer">
-                                <Upload className="mr-1 h-4 w-4" />
-                                {uploadingImage
-                                  ? "Uploading..."
-                                  : "Upload Image"}
+            <div className="p-6">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit((v) => saveMutation.mutate(v))} className="space-y-6">
+                  
+                  {/* Visual Product Card Group */}
+                  <div className="flex flex-col sm:flex-row gap-6 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+                     <div className="shrink-0 space-y-3 flex flex-col items-center">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Product Image</Label>
+                        <div className="relative group rounded-xl border-2 border-dashed border-slate-300 bg-white h-32 w-32 flex items-center justify-center overflow-hidden hover:border-emerald-500 transition-colors">
+                            {imageFile ? (
+                               <img src={URL.createObjectURL(imageFile)} alt="Preview" className="h-full w-full object-cover" />
+                            ) : form.getValues("product_image_url") ? (
+                               <img src={resolveImageUrl(form.getValues("product_image_url"))} alt="Current" className="h-full w-full object-cover" />
+                            ) : (
+                               <div className="flex flex-col items-center text-slate-400 p-2 text-center">
+                                  <PackageSearch className="h-8 w-8 mb-2 opacity-50" />
+                                  <span className="text-[10px] uppercase font-bold tracking-wider">No Image</span>
+                               </div>
+                            )}
+                            <label className="absolute inset-0 bg-slate-900/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                <span className="text-white text-xs font-bold">{uploadingImage ? "Wait..." : "Change"}</span>
                                 <input
                                   type="file"
                                   accept="image/*"
                                   className="hidden"
+                                  disabled={uploadingImage}
                                   onChange={handleImagePick}
                                 />
-                              </label>
-                            </Button>
-                            {field.value && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  field.onChange(null);
-                                  setImageFile(null);
-                                }}
-                              >
-                                Remove
-                              </Button>
-                            )}
-                          </div>
+                            </label>
                         </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="buyer_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Buyer Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g. Lidl Asia Office"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="company_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Supplier Company Name(s)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            rows={3}
-                            placeholder="One company per line, e.g.&#10;*Aarnea Foods LLP, India&#10;*Shubham Nutri Foods, India"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Brief Summary</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            rows={3}
-                            placeholder="Short summary of the report, e.g. Supplier information and product catalogue shared with J&K"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="report_date"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground",
-                                )}
-                              >
-                                {field.value
-                                  ? format(field.value, "PPP")
-                                  : "Pick a date"}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              initialFocus
+                     </div>
+                     <div className="flex-1 space-y-4 pt-1">
+                        <FormField
+                          control={form.control}
+                          name="product_name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-slate-700">Product Specification Name *</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="e.g. 100% Cotton Terry Towels" className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20" />
+                              </FormControl>
+                              <FormMessage className="text-rose-500" />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                           <FormField
+                              control={form.control}
+                              name="report_date"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-slate-700">Report Date *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="date"
+                                      className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                                      value={format(field.value, "yyyy-MM-dd")}
+                                      onChange={(e) => field.onChange(new Date(e.target.value))}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
                             />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="update_date"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Update Date (Key Updates date)</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground",
-                                )}
-                              >
-                                {field.value
-                                  ? format(field.value, "PPP")
-                                  : "Pick a date"}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value ?? undefined}
-                              onSelect={field.onChange}
-                              initialFocus
+                            <FormField
+                              control={form.control}
+                              name="buyer_supplier"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-slate-700">Actor Role *</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="bg-white border-slate-200 focus:ring-emerald-500/20">
+                                        <SelectValue placeholder="Select role" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="Buyer">Buyer</SelectItem>
+                                      <SelectItem value="Supplier">Supplier</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
                             />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                        </div>
+                     </div>
+                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name="key_updates"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Key Updates</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            value={field.value ?? ""}
-                            rows={4}
-                            placeholder="Enter key updates..."
+                  {/* Partner Details Grid */}
+                  <div className="grid sm:grid-cols-2 gap-5 mt-6">
+                      <FormField
+                        control={form.control}
+                        name="buyer_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">Buyer Name *</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="e.g. John Doe" className="border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="company_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-slate-700">Supplier/Factory Name *</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="e.g. Acme Textiles Ltd." className="border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="sm:col-span-2">
+                          <FormField
+                            control={form.control}
+                            name="status"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-slate-700">Brief Status Summary *</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="e.g. Samples Sent, Pending Review" className="border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
                           />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      </div>
+                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name="buyer_supplier"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Action (Buyer / Supplier)</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Buyer">Buyer</SelectItem>
-                            <SelectItem value="Supplier">Supplier</SelectItem>
-                            <SelectItem value="Buyer/Supplier">
-                              Buyer / Supplier
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {/* Detailed Updates */}
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Log Detailed Updates</h3>
+                      <div className="grid sm:grid-cols-[200px_1fr] gap-4">
+                         <FormField
+                            control={form.control}
+                            name="update_date"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-slate-700">Update Date</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="date"
+                                    className="border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20 bg-slate-50"
+                                    value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                                    onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="key_updates"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-slate-700">Key Update Notes</FormLabel>
+                                <FormControl>
+                                  <Textarea 
+                                     {...field} 
+                                     value={field.value || ""} 
+                                     placeholder="Describe the latest communications, requirements, or next steps here..." 
+                                     className="min-h-[120px] resize-y border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                      </div>
+                  </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={saveMutation.isPending}
-                  >
-                    {saveMutation.isPending
-                      ? "Saving..."
-                      : editingId
-                        ? "Update Report"
-                        : "Create Report"}
-                  </Button>
+                  <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 mt-6">
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={saveMutation.isPending || uploadingImage} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm min-w-[140px]">
+                      {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                      {editingId ? "Save Changes" : "Create Report"}
+                    </Button>
+                  </div>
                 </form>
               </Form>
-            </ScrollArea>
+            </div>
           </DialogContent>
         </Dialog>
       )}
 
-      {/* Delete confirmation */}
-      <Dialog
-        open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          setDeleteDialogOpen(open);
-          if (!open) setReportToDelete(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete report</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete the report for{" "}
-            <span className="font-medium">
-              {reportToDelete?.productName || "this product"}
-            </span>
-            ? This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                if (reportToDelete) {
-                  deleteMutation.mutate(reportToDelete.id);
-                }
-              }}
-            >
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
+      {/* ── Delete Confirmation Modal ── */}
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) setReportToDelete(null); }}>
+          <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+              <div className="flex items-center gap-4 mb-6">
+                  <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                      <AlertCircle className="h-6 w-6 text-rose-600" />
+                  </div>
+                  <div>
+                      <DialogTitle className="text-lg font-bold text-slate-900">Delete Report</DialogTitle>
+                      <DialogDescription className="text-slate-500 mt-1">This record will be permanently deleted.</DialogDescription>
+                  </div>
+              </div>
+              {reportToDelete && (
+                  <div className="bg-slate-50 p-3 rounded-md border border-slate-100 mb-6 space-y-1">
+                      <p className="text-sm text-slate-700 font-medium truncate">Product: <span className="font-bold">{reportToDelete.productName}</span></p>
+                      <p className="text-xs text-slate-500 truncate">Buyer: {reportToDelete.buyerName}</p>
+                  </div>
+              )}
+              <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+                      Cancel
+                  </Button>
+                  <Button 
+                     variant="destructive" 
+                     className="bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200"
+                     onClick={() => {
+                      if (reportToDelete) {
+                        deleteMutation.mutate(reportToDelete.id);
+                      }
+                    }}
+                    disabled={deleteMutation.isPending}
+                   >
+                     {deleteMutation.isPending ? "Deleting..." : "Yes, delete"}
+                  </Button>
+              </div>
+          </DialogContent>
       </Dialog>
     </div>
   );

@@ -4,22 +4,13 @@ import api from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -27,8 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Loader2, Pencil, UserCheck, UserX } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, UserCheck, UserX, UserRound, Users, ShieldAlert, CheckCircle2, ShieldHalf, Shield, KeyRound, Mail } from "lucide-react";
 import { toast } from "sonner";
+
 
 interface Member {
   id: string;
@@ -69,6 +61,9 @@ export default function MembersPage() {
     queryFn: () => api.get("/members").then((r) => r.data),
   });
 
+  const activeMembersCount = members.filter((m: Member) => m.isActive).length;
+  const adminMembersCount = members.filter((m: Member) => m.roles.includes("admin")).length;
+
   const createMutation = useMutation({
     mutationFn: async ({
       data,
@@ -92,7 +87,7 @@ export default function MembersPage() {
       setDialogOpen(false);
       setEditingMember(null);
       setSendOnSubmit(false);
-      toast.success("Member created");
+      toast.success("Member created successfully");
     },
     onError: (err: any) =>
       toast.error(err.response?.data?.error || "Failed to create member"),
@@ -103,7 +98,7 @@ export default function MembersPage() {
       api.put(`/members/${id}/status`, { isActive }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["members"] });
-      toast.success("Status updated");
+      toast.success("Member status updated");
     },
     onError: (err: any) =>
       toast.error(err.response?.data?.error || "Failed to update status"),
@@ -114,6 +109,7 @@ export default function MembersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["members"] });
       toast.success("Member deleted");
+      setDeleteDialogOpen(false);
     },
     onError: (err: any) =>
       toast.error(err.response?.data?.error || "Failed to delete member"),
@@ -142,7 +138,7 @@ export default function MembersPage() {
       setDialogOpen(false);
       setEditingMember(null);
       setSendOnSubmit(false);
-      toast.success("Member updated");
+      toast.success("Member updated successfully");
     },
     onError: (err: any) =>
       toast.error(err.response?.data?.error || "Failed to update member"),
@@ -205,154 +201,205 @@ export default function MembersPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full min-h-0 gap-0">
+      {/* ── Dashboard Header ── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-slate-100">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Members</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage team members and permissions
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Users className="h-6 w-6 text-emerald-500" />
+            Team Members
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Manage your organization's members, roles, and granular access permissions.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditingMember(null);
-            setNewEmail("");
-            setNewName("");
-            setNewPassword("");
-            setNewRole("member");
-            setNewPerms([]);
-            setSendOnSubmit(false);
-            setDialogOpen(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Member
-        </Button>
+        <div className="flex items-center gap-2">
+           <Button
+             onClick={() => {
+               setEditingMember(null);
+               setNewEmail("");
+               setNewName("");
+               setNewPassword("");
+               setNewRole("member");
+               setNewPerms([]);
+               setSendOnSubmit(false);
+               setDialogOpen(true);
+             }}
+             className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-9"
+           >
+             <Plus className="h-4 w-4" />
+             Add Member
+           </Button>
+        </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex h-32 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      ) : (
-        <div className="rounded-lg border border-neutral-300 dark:border-neutral-700 overflow-hidden">
-          <Table>
-            <TableHeader className="bg-muted/40">
-              <TableRow className="border-b border-neutral-300 dark:border-neutral-700">
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Name
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Email
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Role
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Permissions
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Status
-                </TableHead>
-                <TableHead className="w-36 border-r border-neutral-300 dark:border-neutral-700">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map((m: Member) => (
-                <TableRow
-                  key={m.id}
-                  className="border-b border-neutral-300 dark:border-neutral-700 last:border-0 hover:bg-muted/30"
-                >
-                  <TableCell className="font-medium border-r border-neutral-300 dark:border-neutral-700">
-                    {m.fullName}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
-                    {m.email}
-                  </TableCell>
-                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                    <Badge
-                      variant={
-                        m.roles.includes("admin") ? "default" : "secondary"
-                      }
-                    >
-                      {m.roles.includes("admin") ? "Admin" : "Member"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                    <div className="flex flex-wrap gap-1">
-                      {m.permissions.map((p) => (
-                        <Badge
-                          key={p.permission}
-                          variant="outline"
-                          className="text-xs"
-                        >
-                          {p.permission}
-                          {p.accessLevel === "read" ? " 👁" : " ✏️"}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={m.isActive}
-                        onCheckedChange={(checked) =>
-                          statusMutation.mutate({ id: m.id, isActive: checked })
-                        }
-                      />
-                      {m.isActive ? (
-                        <UserCheck className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <UserX className="h-4 w-4 text-red-500" />
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Edit member"
-                        onClick={() => {
-                          setEditingMember(m);
-                          setNewEmail(m.email);
-                          setNewName(m.fullName);
-                          setNewPassword("");
-                          setNewRole(
-                            m.roles.includes("admin") ? "admin" : "member",
-                          );
-                          setNewPerms(m.permissions || []);
-                          setSendOnSubmit(false);
-                          setDialogOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          if (m.isActive) {
-                            toast.error("Deactivate the member first");
-                            return;
-                          }
-                          setMemberToDelete(m);
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      {/* ── Summary Cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-5">
+         <div className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-4 shadow-sm">
+            <div className="rounded-lg p-3 bg-blue-50 text-blue-600"><Users className="h-5 w-5" /></div>
+            <div>
+               <p className="text-xs text-slate-500 font-medium">Total Staff</p>
+               <p className="text-xl font-bold text-slate-800">{members.length}</p>
+            </div>
+         </div>
+         <div className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-4 shadow-sm">
+            <div className="rounded-lg p-3 bg-emerald-50 text-emerald-600"><UserCheck className="h-5 w-5" /></div>
+            <div>
+               <p className="text-xs text-slate-500 font-medium">Active Accounts</p>
+               <p className="text-xl font-bold text-slate-800">{activeMembersCount}</p>
+            </div>
+         </div>
+         <div className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-4 shadow-sm">
+            <div className="rounded-lg p-3 bg-amber-50 text-amber-600"><ShieldHalf className="h-5 w-5" /></div>
+            <div>
+               <p className="text-xs text-slate-500 font-medium">Administrators</p>
+               <p className="text-xl font-bold text-slate-800">{adminMembersCount}</p>
+            </div>
+         </div>
+      </div>
 
+      {/* ── Main Data Table ── */}
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col mb-4">
+         <div className="overflow-auto flex-1 relative">
+            <table className="w-full text-sm text-left border-collapse min-w-max">
+               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
+                  <tr>
+                     <th className="px-5 py-3.5 font-semibold">Member Identity</th>
+                     <th className="px-5 py-3.5 font-semibold">Role</th>
+                     <th className="px-5 py-3.5 font-semibold max-w-[300px]">Active Permissions</th>
+                     <th className="px-5 py-3.5 font-semibold w-[140px]">Account Status</th>
+                     <th className="px-5 py-3.5 font-semibold text-right w-[120px]">Actions</th>
+                  </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {isLoading ? (
+                     <tr>
+                        <td colSpan={5} className="h-32 text-center">
+                           <div className="flex justify-center">
+                              <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                           </div>
+                        </td>
+                     </tr>
+                  ) : members.length === 0 ? (
+                     <tr>
+                        <td colSpan={5} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                           <div className="flex flex-col items-center justify-center gap-3">
+                              <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                                 <Users className="h-6 w-6 text-slate-300" />
+                              </div>
+                              <p className="text-slate-600 font-medium">No members found</p>
+                           </div>
+                        </td>
+                     </tr>
+                  ) : (
+                     members.map((m: Member) => (
+                        <tr key={m.id} className="hover:bg-slate-50/80 transition-colors group align-middle">
+                           <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                 <div className="h-9 w-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                                    <UserRound className="h-4 w-4 text-slate-400" />
+                                 </div>
+                                 <div className="flex flex-col">
+                                    <span className="font-bold text-slate-900 leading-tight">{m.fullName}</span>
+                                    <div className="flex items-center gap-1.5 mt-0.5 text-[13px] text-slate-500">
+                                       <Mail className="h-3.5 w-3.5 opacity-70" />
+                                       {m.email}
+                                    </div>
+                                 </div>
+                              </div>
+                           </td>
+                           <td className="px-5 py-4">
+                              {m.roles.includes("admin") ? (
+                                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
+                                    <Shield className="h-3 w-3 mr-1.5" />
+                                    Admin
+                                 </span>
+                              ) : (
+                                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border bg-slate-100 text-slate-700 border-slate-200">
+                                    <UserRound className="h-3 w-3 mr-1.5 hidden" />
+                                    Member
+                                 </span>
+                              )}
+                           </td>
+                           <td className="px-5 py-4 max-w-[300px]">
+                              <div className="flex flex-wrap gap-1.5">
+                                 {m.roles.includes("admin") ? (
+                                    <span className="text-xs text-slate-400 italic">Full System Access</span>
+                                 ) : m.permissions.length === 0 ? (
+                                    <span className="text-xs text-slate-400 italic">No permissions assigned</span>
+                                 ) : (
+                                    m.permissions.map((p) => (
+                                       <span key={p.permission} className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-semibold capitalize ${p.accessLevel === 'edit' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                                          {p.permission}
+                                          {p.accessLevel === "read" ? <span className="ml-1 text-slate-400">R</span> : <span className="ml-1 text-emerald-500">W</span>}
+                                       </span>
+                                    ))
+                                 )}
+                              </div>
+                           </td>
+                           <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                 <Switch
+                                    checked={m.isActive}
+                                    className="data-[state=checked]:bg-emerald-500"
+                                    onCheckedChange={(checked) => statusMutation.mutate({ id: m.id, isActive: checked })}
+                                 />
+                                 {m.isActive ? (
+                                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                                       <UserCheck className="h-3.5 w-3.5" /> Active
+                                    </span>
+                                 ) : (
+                                    <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                                       <UserX className="h-3.5 w-3.5" /> Inactive
+                                    </span>
+                                 )}
+                              </div>
+                           </td>
+                           <td className="px-5 py-4 text-right">
+                              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                    onClick={() => {
+                                       setEditingMember(m);
+                                       setNewEmail(m.email);
+                                       setNewName(m.fullName);
+                                       setNewPassword("");
+                                       setNewRole(m.roles.includes("admin") ? "admin" : "member");
+                                       setNewPerms(m.permissions || []);
+                                       setSendOnSubmit(false);
+                                       setDialogOpen(true);
+                                    }}
+                                 >
+                                    <Pencil className="h-4 w-4" />
+                                 </Button>
+                                 <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                    onClick={() => {
+                                       if (m.isActive) {
+                                          toast.error("Please deactivate the member before deleting.");
+                                          return;
+                                       }
+                                       setMemberToDelete(m);
+                                       setDeleteDialogOpen(true);
+                                    }}
+                                 >
+                                    <Trash2 className="h-4 w-4" />
+                                 </Button>
+                              </div>
+                           </td>
+                        </tr>
+                     ))
+                  )}
+               </tbody>
+            </table>
+         </div>
+      </div>
+
+      {/* ── Add / Edit Member Modal ── */}
       <Dialog
         open={dialogOpen}
         onOpenChange={(open) => {
@@ -363,143 +410,170 @@ export default function MembersPage() {
           }
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingMember ? "Edit Member" : "Add Member"}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Full Name *</Label>
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email *</Label>
-              <Input
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Password *</Label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required={!editingMember}
-                minLength={6}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Role</Label>
-              <Select value={newRole} onValueChange={setNewRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="member">Member</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {newRole === "member" && (
-              <div className="space-y-3">
-                <Label>Permissions</Label>
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-muted-foreground"
-                      checked={PERMISSIONS.every((perm) =>
-                        newPerms.some((p) => p.permission === perm),
-                      )}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setNewPerms(
-                            PERMISSIONS.map((perm) => ({
-                              permission: perm,
-                              accessLevel: "edit" as const,
-                            })),
-                          );
-                        } else {
-                          setNewPerms([]);
-                        }
-                      }}
-                    />
-                    <span>Select All</span>
-                  </label>
-                </div>
-                {PERMISSIONS.map((perm) => {
-                  const active = newPerms.find((p) => p.permission === perm);
-                  return (
-                    <div key={perm} className="flex items-center gap-3">
-                      <Switch
-                        checked={!!active}
-                        onCheckedChange={() => togglePerm(perm)}
-                      />
-                      <span className="text-sm capitalize flex-1">{perm}</span>
-                      {active && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => togglePermLevel(perm)}
-                        >
-                          {active.accessLevel === "edit"
-                            ? "Edit ✏️"
-                            : "Read 👁"}
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-muted-foreground"
-                  checked={sendOnSubmit}
-                  onChange={(e) => setSendOnSubmit(e.target.checked)}
-                />
-                <span>Send credentials to email</span>
-              </label>
-              <p className="text-xs text-muted-foreground">
-                If selected, the login credentials will be emailed to the member
-                after you {editingMember ? "update" : "create"} them.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
-                {(createMutation.isPending || updateMutation.isPending) && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                {editingMember ? "Update" : "Create"}
-              </Button>
-            </div>
-          </form>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto p-0 bg-white rounded-xl shadow-2xl border-none custom-scrollbar-light">
+           <div className="bg-slate-50 p-6 border-b border-slate-100 flex items-center gap-4 sticky top-0 z-10">
+               <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 border border-emerald-200">
+                   {editingMember ? <KeyRound className="h-5 w-5 text-emerald-600" /> : <UserRound className="h-5 w-5 text-emerald-600" />}
+               </div>
+               <div>
+                   <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
+                     {editingMember ? "Edit Team Member" : "Register Team Member"}
+                   </DialogTitle>
+                   <DialogDescription className="text-slate-500 mt-1">
+                     Configure access and authentication details.
+                   </DialogDescription>
+               </div>
+           </div>
+
+           <div className="p-6">
+               <form onSubmit={handleSubmit} className="space-y-6">
+                   <div className="grid gap-4 sm:grid-cols-2">
+                       <div className="space-y-1.5">
+                         <Label className="text-slate-700 font-semibold">Full Name *</Label>
+                         <Input
+                           value={newName}
+                           onChange={(e) => setNewName(e.target.value)}
+                           className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                           required
+                         />
+                       </div>
+                       <div className="space-y-1.5">
+                         <Label className="text-slate-700 font-semibold">Email Address *</Label>
+                         <Input
+                           type="email"
+                           value={newEmail}
+                           onChange={(e) => setNewEmail(e.target.value)}
+                           className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                           required
+                         />
+                       </div>
+                       <div className="space-y-1.5">
+                         <Label className="text-slate-700 font-semibold">
+                            {editingMember ? "Update Password (Optional)" : "Initial Password *"}
+                         </Label>
+                         <Input
+                           type="password"
+                           value={newPassword}
+                           onChange={(e) => setNewPassword(e.target.value)}
+                           className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                           required={!editingMember}
+                           minLength={6}
+                         />
+                       </div>
+                       <div className="space-y-1.5">
+                         <Label className="text-slate-700 font-semibold">Account Role</Label>
+                         <Select value={newRole} onValueChange={setNewRole}>
+                           <SelectTrigger className="bg-white border-slate-200 focus:ring-emerald-500/20">
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="admin">Administrator</SelectItem>
+                             <SelectItem value="member">Restricted Member</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+                   </div>
+
+                   {/* Granular Permissions (Only for members) */}
+                   {newRole === "member" && (
+                     <div className="space-y-4 pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-between">
+                           <Label className="text-sm border-none font-bold uppercase tracking-wider text-slate-400">Granular Access Controls</Label>
+                           <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 cursor-pointer hover:text-emerald-600 transition-colors">
+                             <input
+                               type="checkbox"
+                               className="accent-emerald-500 h-4 w-4 rounded border-slate-300"
+                               checked={PERMISSIONS.every((perm) =>
+                                 newPerms.some((p) => p.permission === perm),
+                               )}
+                               onChange={(e) => {
+                                 if (e.target.checked) {
+                                   setNewPerms(
+                                     PERMISSIONS.map((perm) => ({
+                                       permission: perm,
+                                       accessLevel: "edit" as const,
+                                     })),
+                                   );
+                                 } else {
+                                   setNewPerms([]);
+                                 }
+                               }}
+                             />
+                             {PERMISSIONS.every((perm) => newPerms.some((p) => p.permission === perm)) ? "Deselect All" : "Select All"}
+                           </label>
+                        </div>
+                        <div className="grid sm:grid-cols-2 gap-3 bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                           {PERMISSIONS.map((perm) => {
+                             const active = newPerms.find((p) => p.permission === perm);
+                             return (
+                               <div key={perm} className="flex items-center gap-3 bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm">
+                                 <Switch
+                                   checked={!!active}
+                                   className="data-[state=checked]:bg-emerald-500 shrink-0"
+                                   onCheckedChange={() => togglePerm(perm)}
+                                 />
+                                 <span className="text-[13px] font-semibold tracking-tight capitalize text-slate-800 flex-1">{perm.replace('_', ' ')}</span>
+                                 
+                                 {active && (
+                                   <Button
+                                     type="button"
+                                     variant="ghost"
+                                     size="sm"
+                                     className={`h-7 px-2 text-[11px] font-bold uppercase tracking-widest ${active.accessLevel === 'edit' ? 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
+                                     onClick={() => togglePermLevel(perm)}
+                                   >
+                                     {active.accessLevel === "edit" ? "Edit" : "Read Only"}
+                                   </Button>
+                                 )}
+                               </div>
+                             );
+                           })}
+                        </div>
+                     </div>
+                   )}
+
+                   <div className="pt-4 border-t border-slate-100 flex items-start gap-3 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/50">
+                       <input
+                         type="checkbox"
+                         id="sendEmailCheck"
+                         className="accent-indigo-600 h-4 w-4 rounded border-indigo-300 mt-0.5 cursor-pointer"
+                         checked={sendOnSubmit}
+                         onChange={(e) => setSendOnSubmit(e.target.checked)}
+                       />
+                       <label htmlFor="sendEmailCheck" className="cursor-pointer">
+                           <span className="block text-sm font-bold text-indigo-900 tracking-tight">Send welcome credentials</span>
+                           <span className="block text-xs text-indigo-700/70 mt-0.5">
+                               Automatically email the {editingMember ? "updated" : "new"} login credentials directly to this user. Requires a password input.
+                           </span>
+                       </label>
+                   </div>
+
+                   <div className="flex justify-end gap-3 pt-4">
+                     <Button
+                       type="button"
+                       variant="outline"
+                       onClick={() => setDialogOpen(false)}
+                       className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                     >
+                       Cancel
+                     </Button>
+                     <Button
+                       type="submit"
+                       disabled={createMutation.isPending || updateMutation.isPending}
+                       className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm min-w-[120px]"
+                     >
+                       {createMutation.isPending || updateMutation.isPending ? (
+                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                       ) : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                       {editingMember ? "Save Changes" : "Create Account"}
+                     </Button>
+                   </div>
+               </form>
+           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Delete member confirmation */}
+      {/* ── Delete Confirmation Modal ── */}
       <Dialog
         open={deleteDialogOpen}
         onOpenChange={(open) => {
@@ -507,39 +581,52 @@ export default function MembersPage() {
           if (!open) setMemberToDelete(null);
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete member</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete{" "}
-            <span className="font-medium">
-              {memberToDelete?.fullName || "this member"}
-            </span>
-            ? This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                if (memberToDelete) {
-                  deleteMutation.mutate(memberToDelete.id);
-                }
-                setDeleteDialogOpen(false);
-                setMemberToDelete(null);
-              }}
-            >
-              Delete
-            </Button>
-          </div>
+        <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+            <div className="flex items-center gap-4 mb-6">
+                 <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                     <ShieldAlert className="h-6 w-6 text-rose-600" />
+                 </div>
+                 <div>
+                     <DialogTitle className="text-lg font-bold text-slate-900">Revoke Identity</DialogTitle>
+                     <DialogDescription className="text-slate-500 mt-1">This will permanently delete this member.</DialogDescription>
+                 </div>
+            </div>
+            
+            {memberToDelete && (
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-6 flex items-center gap-3">
+                   <div className="h-10 w-10 rounded-full bg-white border border-slate-200 flex items-center justify-center">
+                       <UserX className="h-5 w-5 text-slate-400" />
+                   </div>
+                   <div>
+                       <span className="font-bold text-slate-900 block">{memberToDelete.fullName}</span>
+                       <span className="text-xs text-slate-500">{memberToDelete.email}</span>
+                   </div>
+                </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+               <Button
+                 type="button"
+                 variant="outline"
+                 onClick={() => setDeleteDialogOpen(false)}
+                 className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+               >
+                 Cancel
+               </Button>
+               <Button
+                 type="button"
+                 variant="destructive"
+                 disabled={deleteMutation.isPending}
+                 className="bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200"
+                 onClick={() => {
+                   if (memberToDelete) {
+                     deleteMutation.mutate(memberToDelete.id);
+                   }
+                 }}
+               >
+                 {deleteMutation.isPending ? "Removing..." : "Yes, remove member"}
+               </Button>
+            </div>
         </DialogContent>
       </Dialog>
     </div>
