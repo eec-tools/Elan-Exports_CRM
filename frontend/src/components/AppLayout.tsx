@@ -49,6 +49,13 @@ const navItems = [
     adminOnly: false,
   },
   {
+    to: "/deals",
+    label: "Deals",
+    icon: TrendingUp,
+    perm: null,
+    adminOnly: false,
+  },
+  {
     to: "/reports",
     label: "Reports",
     icon: FileText,
@@ -97,13 +104,7 @@ const navItems = [
     perm: "task_tracker",
     adminOnly: false,
   },
-  {
-    to: "/deals",
-    label: "Deals",
-    icon: TrendingUp,
-    perm: null,
-    adminOnly: false,
-  },
+
 ];
 
 export function AppLayout() {
