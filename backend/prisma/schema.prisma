@@ -47,6 +47,7 @@ model User {
   suppliers        Supplier[]
   reports          Report[]
   vaultDocuments   VaultDocument[]
+  deals            Deal[]
 
   @@map("users")
 }
@@ -290,3 +291,30 @@ model DailyTask {
   @@map("daily_tasks")
 }
 
+// ─── DEALS ──────────────────────────────────────────
+
+model Deal {
+  id              String   @id @default(uuid())
+  title           String
+  buyer           String?
+  supplier        String?
+  product         String?
+  hsCode          String?  @map("hs_code")
+  volume          String?
+  price           Float?
+  expectedRevenue Float?   @map("expected_revenue")
+  margin          Float?   @default(15)
+  stage           String   @default("LEAD")
+  probability     Float?   @default(20)
+  category        String?
+  riskScore       String?  @default("Medium") @map("risk_score")
+  notes           String?
+
+  createdBy       String?  @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  creator         User?    @relation(fields: [createdBy], references: [id])
+
+  @@map("deals")
+}

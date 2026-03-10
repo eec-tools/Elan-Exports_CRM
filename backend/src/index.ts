@@ -21,6 +21,7 @@ import settingsRoutes from "./routes/settings.routes.js";
 import emailTasksRoutes from "./routes/emailTasks.routes.js";
 import vaultRoutes from "./routes/vault.routes.js";
 import dailyTaskRoutes from "./routes/dailyTask.routes.js";
+import dealsRoutes from "./routes/deals.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,6 +77,7 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/email-tasks", emailTasksRoutes);
 app.use("/api/vault", vaultRoutes);
 app.use("/api/daily-tasks", dailyTaskRoutes);
+app.use("/api/deals", dealsRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

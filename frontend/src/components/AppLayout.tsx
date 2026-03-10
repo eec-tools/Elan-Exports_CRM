@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Archive,
   CalendarCheck,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -94,6 +95,13 @@ const navItems = [
     label: "Daily Tasks",
     icon: CalendarCheck,
     perm: "task_tracker",
+    adminOnly: false,
+  },
+  {
+    to: "/deals",
+    label: "Deals",
+    icon: TrendingUp,
+    perm: null,
     adminOnly: false,
   },
 ];
