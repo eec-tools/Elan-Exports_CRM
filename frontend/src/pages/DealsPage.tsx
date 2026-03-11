@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001/api";
 
 // ─── Types ────────────────────────────────────────────────────
 interface Deal {
@@ -130,7 +130,7 @@ export default function DealsPage() {
   async function fetchDeals() {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/deals`, { headers: authHeader() });
+      const res = await fetch(`${API_BASE}/deals`, { headers: authHeader() });
       const data = await res.json();
       setDeals(Array.isArray(data) ? data : []);
     } catch {
@@ -143,7 +143,7 @@ export default function DealsPage() {
   useEffect(() => {
     fetchDeals();
     // Fetch buyer & supplier names for dropdowns
-    fetch(`${API_BASE}/api/buyers?limit=200`, { headers: authHeader() })
+    fetch(`${API_BASE}/buyers?limit=200`, { headers: authHeader() })
       .then((r) => r.json())
       .then((d) => {
         const names: string[] = Array.isArray(d.data)
@@ -152,7 +152,7 @@ export default function DealsPage() {
         setBuyerOptions([...new Set(names)].sort());
       })
       .catch(() => {});
-    fetch(`${API_BASE}/api/suppliers?limit=200`, { headers: authHeader() })
+    fetch(`${API_BASE}/suppliers?limit=200`, { headers: authHeader() })
       .then((r) => r.json())
       .then((d) => {
         const names: string[] = Array.isArray(d.data)
@@ -186,7 +186,7 @@ export default function DealsPage() {
     }
     setSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/api/deals`, {
+      const res = await fetch(`${API_BASE}/deals`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify(form),
@@ -208,7 +208,7 @@ export default function DealsPage() {
     if (!selectedDeal) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/api/deals/${selectedDeal.id}`, {
+      const res = await fetch(`${API_BASE}/deals/${selectedDeal.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify(editForm),
@@ -229,7 +229,7 @@ export default function DealsPage() {
   // ─── Stage move ──────────────────────────────────────────────
   async function moveStage(dealId: string, newStage: string) {
     try {
-      const res = await fetch(`${API_BASE}/api/deals/${dealId}`, {
+      const res = await fetch(`${API_BASE}/deals/${dealId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ stage: newStage }),
@@ -247,7 +247,7 @@ export default function DealsPage() {
   async function handleDelete(deal: Deal) {
     setDeleting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/deals/${deal.id}`, {
+      const res = await fetch(`${API_BASE}/deals/${deal.id}`, {
         method: "DELETE",
         headers: authHeader(),
       });
