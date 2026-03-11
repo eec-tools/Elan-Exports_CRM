@@ -212,6 +212,11 @@ export async function deleteMember(
       return;
     }
 
+    // Delete related records that have FK constraints before deleting the user
+    await prisma.accessRequest.deleteMany({
+      where: { OR: [{ userId: id }, { reviewedBy: id }] },
+    });
+
     await prisma.user.delete({ where: { id } });
 
     await logActivity(req.user!.id, "delete", "members", id, {
