@@ -249,7 +249,7 @@ export default function EmailTasksPage() {
   const statusStyles = (status: string) => {
     switch (status) {
       case "Completed":
-        return "bg-emerald-100 text-emerald-700 border-emerald-200";
+        return "bg-brand-100 text-brand-700 border-brand-200";
       case "In Progress":
         return "bg-amber-100 text-amber-700 border-amber-200";
       case "Incomplete":
@@ -269,7 +269,7 @@ export default function EmailTasksPage() {
       case "Medium":
         return "text-amber-600 font-medium bg-amber-50 border-amber-100";
       case "Low":
-        return "text-emerald-600 font-medium bg-emerald-50 border-emerald-100";
+        return "text-brand-600 font-medium bg-brand-50 border-brand-100";
       default:
         return "text-slate-500 font-medium bg-slate-50 border-slate-100";
     }
@@ -298,7 +298,7 @@ export default function EmailTasksPage() {
   if (loading && tasks.length === 0) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-brand-500" />
       </div>
     );
   }
@@ -308,7 +308,7 @@ export default function EmailTasksPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <MailOpen className="h-6 w-6 text-emerald-500" />
+            <MailOpen className="h-6 w-6 text-brand-500" />
             Email Task Tracker
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -321,7 +321,7 @@ export default function EmailTasksPage() {
           variant="outline"
           className="gap-2 bg-white hover:bg-slate-50 text-slate-700 shadow-sm border-slate-200 transition-all h-9"
         >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-emerald-500" : "text-slate-400"}`} />
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-brand-500" : "text-slate-400"}`} />
           {refreshing ? "Syncing..." : "Refresh Inbox"}
         </Button>
       </div>
@@ -363,7 +363,7 @@ export default function EmailTasksPage() {
           <select
             value={filterTask}
             onChange={(e) => { setFilterTask(e.target.value); setPage(1); }}
-            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[140px]"
+            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-700 min-w-[140px]"
           >
             <option value="">All Task Types</option>
             {TASK_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -372,7 +372,7 @@ export default function EmailTasksPage() {
           <select
             value={filterPriority}
             onChange={(e) => { setFilterPriority(e.target.value); setPage(1); }}
-            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[130px]"
+            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-700 min-w-[130px]"
           >
             <option value="">All Priorities</option>
             {["Urgent", "High", "Medium", "Low"].map(p => <option key={p} value={p}>{p}</option>)}
@@ -381,7 +381,7 @@ export default function EmailTasksPage() {
           <select
             value={filterStatus}
             onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[130px]"
+            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-700 min-w-[130px]"
           >
             <option value="">All Statuses</option>
             {["Not Started", "In Progress", "Incomplete", "Completed"].map(s => <option key={s} value={s}>{s}</option>)}
@@ -390,7 +390,7 @@ export default function EmailTasksPage() {
           <select
             value={filterRespondent}
             onChange={(e) => { setFilterRespondent(e.target.value); setPage(1); }}
-            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[140px]"
+            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-700 min-w-[140px]"
           >
             <option value="">All Respondents</option>
             <option value="Unassigned">Unassigned</option>
@@ -430,7 +430,7 @@ export default function EmailTasksPage() {
                   <td colSpan={6} className="px-5 py-16 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
-                        <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                        <CheckCircle2 className="h-6 w-6 text-brand-400" />
                       </div>
                       <p className="text-slate-600 font-medium text-base">You're all caught up!</p>
                       <p className="text-slate-400 text-sm max-w-[250px]">
@@ -443,7 +443,7 @@ export default function EmailTasksPage() {
                 filteredTasks.map((task) => (
                   <tr
                     key={task.id}
-                    className="hover:bg-emerald-50/40 transition-colors cursor-pointer group"
+                    className="hover:bg-brand-50/40 transition-colors cursor-pointer group"
                     onClick={() => handleRowClick(task)}
                   >
                     <td className="px-5 py-3.5 whitespace-nowrap align-top">
@@ -463,7 +463,7 @@ export default function EmailTasksPage() {
                     </td>
 
                     <td className="px-5 py-3.5 align-top max-w-[300px]">
-                      <p className="text-slate-900 font-medium line-clamp-2 mb-1.5 group-hover:text-emerald-700 transition-colors" title={task.subject}>
+                      <p className="text-slate-900 font-medium line-clamp-2 mb-1.5 group-hover:text-brand-700 transition-colors" title={task.subject}>
                         {task.subject}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
@@ -526,7 +526,7 @@ export default function EmailTasksPage() {
                         )}
                         <button
                           onClick={(e) => handleEditClick(task, e)}
-                          className="p-1.5 rounded-md hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition-colors"
+                          className="p-1.5 rounded-md hover:bg-brand-50 text-slate-400 hover:text-brand-600 transition-colors"
                           title="Edit Task"
                         >
                           <Edit className="h-4 w-4" />
@@ -595,7 +595,7 @@ export default function EmailTasksPage() {
                     variant={isEditing ? "default" : "secondary"}
                     size="sm"
                     onClick={() => setIsEditing(!isEditing)}
-                    className={`h-8 text-xs transition-all shadow-sm ${isEditing ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-white border hover:bg-slate-50 text-slate-700"}`}
+                    className={`h-8 text-xs transition-all shadow-sm ${isEditing ? "bg-brand-600 hover:bg-brand-700 text-white" : "bg-white border hover:bg-slate-50 text-slate-700"}`}
                   >
                     {isEditing ? <><Save className="h-3.5 w-3.5 mr-1.5" /> Done Editing</> : <><Edit className="h-3.5 w-3.5 mr-1.5" /> Edit Task</>}
                   </Button>
@@ -610,7 +610,7 @@ export default function EmailTasksPage() {
                       <select
                         value={selectedTask.task || ""}
                         onChange={(e) => updateTask(selectedTask.id, "task", e.target.value)}
-                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm"
+                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm"
                       >
                         <option value="">Uncategorized</option>
                         {TASK_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -628,7 +628,7 @@ export default function EmailTasksPage() {
                       <select
                         value={selectedTask.priority || ""}
                         onChange={(e) => updateTask(selectedTask.id, "priority", e.target.value)}
-                        className={`h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm ${selectedTask.priority === "Urgent" ? "text-rose-600 font-bold" : ""}`}
+                        className={`h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm ${selectedTask.priority === "Urgent" ? "text-rose-600 font-bold" : ""}`}
                       >
                         <option value="">Set Priority...</option>
                         <option value="Urgent" className="text-rose-600 font-bold">Urgent</option>
@@ -649,7 +649,7 @@ export default function EmailTasksPage() {
                       <select
                         value={selectedTask.status}
                         onChange={(e) => updateTask(selectedTask.id, "status", e.target.value)}
-                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm"
+                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm"
                       >
                         <option value="Not Started">Not Started</option>
                         <option value="In Progress">In Progress</option>
@@ -669,7 +669,7 @@ export default function EmailTasksPage() {
                       <select
                         value={selectedTask.productCategory || ""}
                         onChange={(e) => updateTask(selectedTask.id, "productCategory", e.target.value)}
-                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm"
+                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm"
                       >
                         <option value="">Select Category...</option>
                         {PRODUCT_CATEGORY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -687,7 +687,7 @@ export default function EmailTasksPage() {
                       <select
                         value={selectedTask.respondent || ""}
                         onChange={(e) => updateTask(selectedTask.id, "respondent", e.target.value)}
-                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm w-full sm:w-1/2"
+                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm w-full sm:w-1/2"
                       >
                         <option value="">Unassigned</option>
                         {RESPONDENT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -706,7 +706,7 @@ export default function EmailTasksPage() {
                       <Textarea
                         value={selectedTask.notes || ""}
                         onChange={(e) => updateTask(selectedTask.id, "notes", e.target.value)}
-                        className="min-h-[100px] text-sm border-slate-200 bg-white placeholder:text-slate-400 focus:ring-emerald-500/50 shadow-sm resize-y"
+                        className="min-h-[100px] text-sm border-slate-200 bg-white placeholder:text-slate-400 focus:ring-brand-500/50 shadow-sm resize-y"
                         placeholder="Add some notes about this task..."
                       />
                     ) : (

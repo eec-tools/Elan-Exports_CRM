@@ -38,8 +38,8 @@ export default function DashboardPage() {
       title: "Total Suppliers",
       value: stats?.totalSuppliers ?? 0,
       icon: Factory,
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
+      color: "text-brand-600",
+      bg: "bg-brand-50",
     },
     {
       title: "Total Reports",

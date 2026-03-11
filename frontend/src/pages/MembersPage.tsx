@@ -206,7 +206,7 @@ export default function MembersPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-slate-100">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Users className="h-6 w-6 text-emerald-500" />
+            <Users className="h-6 w-6 text-brand-500" />
             Team Members
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -225,7 +225,7 @@ export default function MembersPage() {
                setSendOnSubmit(false);
                setDialogOpen(true);
              }}
-             className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-9"
+             className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9"
            >
              <Plus className="h-4 w-4" />
              Add Member
@@ -243,7 +243,7 @@ export default function MembersPage() {
             </div>
          </div>
          <div className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-4 shadow-sm">
-            <div className="rounded-lg p-3 bg-emerald-50 text-emerald-600"><UserCheck className="h-5 w-5" /></div>
+            <div className="rounded-lg p-3 bg-brand-50 text-brand-600"><UserCheck className="h-5 w-5" /></div>
             <div>
                <p className="text-xs text-slate-500 font-medium">Active Accounts</p>
                <p className="text-xl font-bold text-slate-800">{activeMembersCount}</p>
@@ -276,7 +276,7 @@ export default function MembersPage() {
                      <tr>
                         <td colSpan={5} className="h-32 text-center">
                            <div className="flex justify-center">
-                              <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                              <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                            </div>
                         </td>
                      </tr>
@@ -329,9 +329,9 @@ export default function MembersPage() {
                                     <span className="text-xs text-slate-400 italic">No permissions assigned</span>
                                  ) : (
                                     m.permissions.map((p) => (
-                                       <span key={p.permission} className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-semibold capitalize ${p.accessLevel === 'edit' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                                       <span key={p.permission} className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-semibold capitalize ${p.accessLevel === 'edit' ? 'bg-brand-50 text-brand-700 border-brand-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                                           {p.permission}
-                                          {p.accessLevel === "read" ? <span className="ml-1 text-slate-400">R</span> : <span className="ml-1 text-emerald-500">W</span>}
+                                          {p.accessLevel === "read" ? <span className="ml-1 text-slate-400">R</span> : <span className="ml-1 text-brand-500">W</span>}
                                        </span>
                                     ))
                                  )}
@@ -341,11 +341,11 @@ export default function MembersPage() {
                               <div className="flex items-center gap-3">
                                  <Switch
                                     checked={m.isActive}
-                                    className="data-[state=checked]:bg-emerald-500"
+                                    className="data-[state=checked]:bg-brand-500"
                                     onCheckedChange={(checked) => statusMutation.mutate({ id: m.id, isActive: checked })}
                                  />
                                  {m.isActive ? (
-                                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                                    <span className="text-xs font-bold text-brand-600 flex items-center gap-1">
                                        <UserCheck className="h-3.5 w-3.5" /> Active
                                     </span>
                                  ) : (
@@ -360,7 +360,7 @@ export default function MembersPage() {
                                  <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                    className="h-8 w-8 text-slate-400 hover:text-brand-600 hover:bg-brand-50"
                                     onClick={() => {
                                        setEditingMember(m);
                                        setNewEmail(m.email);
@@ -412,8 +412,8 @@ export default function MembersPage() {
       >
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto p-0 bg-white rounded-xl shadow-2xl border-none custom-scrollbar-light">
            <div className="bg-slate-50 p-6 border-b border-slate-100 flex items-center gap-4 sticky top-0 z-10">
-               <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 border border-emerald-200">
-                   {editingMember ? <KeyRound className="h-5 w-5 text-emerald-600" /> : <UserRound className="h-5 w-5 text-emerald-600" />}
+               <div className="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center shrink-0 border border-brand-200">
+                   {editingMember ? <KeyRound className="h-5 w-5 text-brand-600" /> : <UserRound className="h-5 w-5 text-brand-600" />}
                </div>
                <div>
                    <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
@@ -433,7 +433,7 @@ export default function MembersPage() {
                          <Input
                            value={newName}
                            onChange={(e) => setNewName(e.target.value)}
-                           className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                           className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                            required
                          />
                        </div>
@@ -443,7 +443,7 @@ export default function MembersPage() {
                            type="email"
                            value={newEmail}
                            onChange={(e) => setNewEmail(e.target.value)}
-                           className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                           className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                            required
                          />
                        </div>
@@ -455,7 +455,7 @@ export default function MembersPage() {
                            type="password"
                            value={newPassword}
                            onChange={(e) => setNewPassword(e.target.value)}
-                           className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                           className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                            required={!editingMember}
                            minLength={6}
                          />
@@ -463,7 +463,7 @@ export default function MembersPage() {
                        <div className="space-y-1.5">
                          <Label className="text-slate-700 font-semibold">Account Role</Label>
                          <Select value={newRole} onValueChange={setNewRole}>
-                           <SelectTrigger className="bg-white border-slate-200 focus:ring-emerald-500/20">
+                           <SelectTrigger className="bg-white border-slate-200 focus:ring-brand-500/20">
                              <SelectValue />
                            </SelectTrigger>
                            <SelectContent>
@@ -479,10 +479,10 @@ export default function MembersPage() {
                      <div className="space-y-4 pt-4 border-t border-slate-100">
                         <div className="flex items-center justify-between">
                            <Label className="text-sm border-none font-bold uppercase tracking-wider text-slate-400">Granular Access Controls</Label>
-                           <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 cursor-pointer hover:text-emerald-600 transition-colors">
+                           <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 cursor-pointer hover:text-brand-600 transition-colors">
                              <input
                                type="checkbox"
-                               className="accent-emerald-500 h-4 w-4 rounded border-slate-300"
+                               className="accent-brand-500 h-4 w-4 rounded border-slate-300"
                                checked={PERMISSIONS.every((perm) =>
                                  newPerms.some((p) => p.permission === perm),
                                )}
@@ -509,7 +509,7 @@ export default function MembersPage() {
                                <div key={perm} className="flex items-center gap-3 bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm">
                                  <Switch
                                    checked={!!active}
-                                   className="data-[state=checked]:bg-emerald-500 shrink-0"
+                                   className="data-[state=checked]:bg-brand-500 shrink-0"
                                    onCheckedChange={() => togglePerm(perm)}
                                  />
                                  <span className="text-[13px] font-semibold tracking-tight capitalize text-slate-800 flex-1">{perm.replace('_', ' ')}</span>
@@ -519,7 +519,7 @@ export default function MembersPage() {
                                      type="button"
                                      variant="ghost"
                                      size="sm"
-                                     className={`h-7 px-2 text-[11px] font-bold uppercase tracking-widest ${active.accessLevel === 'edit' ? 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
+                                     className={`h-7 px-2 text-[11px] font-bold uppercase tracking-widest ${active.accessLevel === 'edit' ? 'text-brand-600 hover:text-brand-700 hover:bg-brand-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
                                      onClick={() => togglePermLevel(perm)}
                                    >
                                      {active.accessLevel === "edit" ? "Edit" : "Read Only"}
@@ -560,7 +560,7 @@ export default function MembersPage() {
                      <Button
                        type="submit"
                        disabled={createMutation.isPending || updateMutation.isPending}
-                       className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm min-w-[120px]"
+                       className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm min-w-[120px]"
                      >
                        {createMutation.isPending || updateMutation.isPending ? (
                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />

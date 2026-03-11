@@ -45,7 +45,7 @@ const priorityStyles = (p: string | null) => {
         case "Urgent": return "text-rose-600 font-bold bg-rose-50 border-rose-100";
         case "High": return "text-orange-600 font-semibold bg-orange-50 border-orange-100";
         case "Medium": return "text-amber-600 font-medium bg-amber-50 border-amber-100";
-        case "Low": return "text-emerald-600 font-medium bg-emerald-50 border-emerald-100";
+        case "Low": return "text-brand-600 font-medium bg-brand-50 border-brand-100";
         default: return "text-slate-500 font-medium bg-slate-50 border-slate-100";
     }
 };
@@ -53,7 +53,7 @@ const priorityStyles = (p: string | null) => {
 const statusStyles = (s: string) => {
     switch (s?.toLowerCase()) {
         case "inprogress": return "text-amber-700 bg-amber-100 border-amber-200";
-        case "completed": return "text-emerald-700 bg-emerald-100 border-emerald-200";
+        case "completed": return "text-brand-700 bg-brand-100 border-brand-200";
         case "closed": return "text-slate-700 bg-slate-200 border-slate-300";
         case "not started":
         default: return "text-slate-600 bg-slate-100 border-slate-200 text-[11px]";
@@ -234,7 +234,7 @@ export default function DailyTasksPage() {
     if (loading && tasks.length === 0) {
         return (
             <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                <Loader2 className="h-8 w-8 animate-spin text-brand-500" />
             </div>
         );
     }
@@ -245,7 +245,7 @@ export default function DailyTasksPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                        <CheckSquare className="h-6 w-6 text-emerald-500" />
+                        <CheckSquare className="h-6 w-6 text-brand-500" />
                         Daily Task Tracker
                     </h1>
                     <p className="text-sm text-slate-500 mt-0.5">
@@ -253,11 +253,11 @@ export default function DailyTasksPage() {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={handleAddRow} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-9">
+                    <Button onClick={handleAddRow} className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9">
                         <Plus className="h-4 w-4" /> Add Row
                     </Button>
                     <Button onClick={handleRefresh} disabled={refreshing} variant="outline" className="gap-2 bg-white hover:bg-slate-50 text-slate-700 shadow-sm border-slate-200 h-9">
-                        <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-emerald-500" : "text-slate-400"}`} />
+                        <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-brand-500" : "text-slate-400"}`} />
                         {refreshing ? "Syncing..." : "Refresh"}
                     </Button>
                 </div>
@@ -269,7 +269,7 @@ export default function DailyTasksPage() {
                     { icon: <LayoutGrid className="h-5 w-5 text-blue-600" />, label: "Tasks Match", value: stats.total, bg: "bg-blue-50" },
                     { icon: <AlertCircle className="h-5 w-5 text-rose-600" />, label: "High/Urgent (Page)", value: stats.highPriority, bg: "bg-rose-50" },
                     { icon: <Clock className="h-5 w-5 text-amber-600" />, label: "In Progress (Page)", value: stats.inProgress, bg: "bg-amber-50" },
-                    { icon: <CheckCircle2 className="h-5 w-5 text-emerald-600" />, label: "Completed (Page)", value: stats.completed, bg: "bg-emerald-50" },
+                    { icon: <CheckCircle2 className="h-5 w-5 text-brand-600" />, label: "Completed (Page)", value: stats.completed, bg: "bg-brand-50" },
                 ].map((s) => (
                     <div key={s.label} className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
                         <div className={`rounded-lg p-2.5 ${s.bg}`}>{s.icon}</div>
@@ -309,7 +309,7 @@ export default function DailyTasksPage() {
                     </div>
 
                     <select
-                        className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[130px]"
+                        className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-700 min-w-[130px]"
                         value={filterPriority}
                         onChange={e => { setFilterPriority(e.target.value); setPage(1); }}
                     >
@@ -318,7 +318,7 @@ export default function DailyTasksPage() {
                     </select>
 
                     <select
-                        className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[130px]"
+                        className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-700 min-w-[130px]"
                         value={filterStatus}
                         onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
                     >
@@ -327,7 +327,7 @@ export default function DailyTasksPage() {
                     </select>
 
                     <select
-                        className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-700 min-w-[130px]"
+                        className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-700 min-w-[130px]"
                         value={filterOwner}
                         onChange={e => { setFilterOwner(e.target.value); setPage(1); }}
                     >
@@ -371,7 +371,7 @@ export default function DailyTasksPage() {
                                     <td colSpan={9} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                                         <div className="flex flex-col items-center justify-center gap-3">
                                             <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
-                                                <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                                                <CheckCircle2 className="h-6 w-6 text-brand-400" />
                                             </div>
                                             <p className="text-slate-600 font-medium text-base">You're all caught up!</p>
                                             <p className="text-slate-400 text-sm max-w-[250px]">
@@ -392,7 +392,7 @@ export default function DailyTasksPage() {
                                                 <input
                                                     autoFocus
                                                     type="date"
-                                                    className="absolute inset-0 w-full h-full px-4 outline-none ring-2 ring-emerald-500 ring-inset z-10 bg-white shadow-sm"
+                                                    className="absolute inset-0 w-full h-full px-4 outline-none ring-2 ring-brand-500 ring-inset z-10 bg-white shadow-sm"
                                                     value={editValue}
                                                     onChange={(e) => setEditValue(e.target.value)}
                                                     onBlur={saveEdit}
@@ -414,7 +414,7 @@ export default function DailyTasksPage() {
                                                 <input
                                                     autoFocus
                                                     type="text"
-                                                    className="absolute inset-0 w-full h-full px-4 outline-none ring-2 ring-emerald-500 ring-inset z-10 bg-white shadow-sm"
+                                                    className="absolute inset-0 w-full h-full px-4 outline-none ring-2 ring-brand-500 ring-inset z-10 bg-white shadow-sm"
                                                     value={editValue}
                                                     onChange={(e) => setEditValue(e.target.value)}
                                                     onBlur={saveEdit}
@@ -435,7 +435,7 @@ export default function DailyTasksPage() {
                                             {editingCell?.id === task.id && editingCell?.field === "company" ? (
                                                 <select
                                                     autoFocus
-                                                    className="absolute inset-0 w-full h-full px-3 outline-none ring-2 ring-emerald-500 ring-inset z-10 bg-white shadow-sm cursor-pointer"
+                                                    className="absolute inset-0 w-full h-full px-3 outline-none ring-2 ring-brand-500 ring-inset z-10 bg-white shadow-sm cursor-pointer"
                                                     value={editValue}
                                                     onChange={(e) => {
                                                         setEditValue(e.target.value);
@@ -466,7 +466,7 @@ export default function DailyTasksPage() {
                                             {editingCell?.id === task.id && editingCell?.field === "priority" ? (
                                                 <select
                                                     autoFocus
-                                                    className="absolute inset-0 w-full h-full px-3 outline-none ring-2 ring-emerald-500 ring-inset z-10 bg-white shadow-sm cursor-pointer"
+                                                    className="absolute inset-0 w-full h-full px-3 outline-none ring-2 ring-brand-500 ring-inset z-10 bg-white shadow-sm cursor-pointer"
                                                     value={editValue}
                                                     onChange={(e) => {
                                                         setEditValue(e.target.value);
@@ -495,7 +495,7 @@ export default function DailyTasksPage() {
                                             {editingCell?.id === task.id && editingCell?.field === "owner" ? (
                                                 <select
                                                     autoFocus
-                                                    className="absolute inset-0 w-full h-full px-3 outline-none ring-2 ring-emerald-500 ring-inset z-10 bg-white shadow-sm cursor-pointer"
+                                                    className="absolute inset-0 w-full h-full px-3 outline-none ring-2 ring-brand-500 ring-inset z-10 bg-white shadow-sm cursor-pointer"
                                                     value={editValue}
                                                     onChange={(e) => {
                                                         setEditValue(e.target.value);
@@ -526,7 +526,7 @@ export default function DailyTasksPage() {
                                             {editingCell?.id === task.id && editingCell?.field === "status" ? (
                                                 <select
                                                     autoFocus
-                                                    className="absolute inset-0 w-full h-full px-3 outline-none ring-2 ring-emerald-500 ring-inset z-10 bg-white shadow-sm cursor-pointer"
+                                                    className="absolute inset-0 w-full h-full px-3 outline-none ring-2 ring-brand-500 ring-inset z-10 bg-white shadow-sm cursor-pointer"
                                                     value={editValue}
                                                     onChange={(e) => {
                                                         setEditValue(e.target.value);
@@ -556,7 +556,7 @@ export default function DailyTasksPage() {
                                                 <input
                                                     autoFocus
                                                     type="date"
-                                                    className="absolute inset-0 w-full h-full px-4 outline-none ring-2 ring-emerald-500 ring-inset z-10 bg-white shadow-sm"
+                                                    className="absolute inset-0 w-full h-full px-4 outline-none ring-2 ring-brand-500 ring-inset z-10 bg-white shadow-sm"
                                                     value={editValue}
                                                     onChange={(e) => setEditValue(e.target.value)}
                                                     onBlur={saveEdit}
@@ -578,7 +578,7 @@ export default function DailyTasksPage() {
                                                 <input
                                                     autoFocus
                                                     type="text"
-                                                    className="absolute inset-0 w-full h-full px-4 outline-none ring-2 ring-emerald-500 ring-inset z-10 bg-white shadow-sm"
+                                                    className="absolute inset-0 w-full h-full px-4 outline-none ring-2 ring-brand-500 ring-inset z-10 bg-white shadow-sm"
                                                     value={editValue}
                                                     onChange={(e) => setEditValue(e.target.value)}
                                                     onBlur={saveEdit}

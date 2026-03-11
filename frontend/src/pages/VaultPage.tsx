@@ -96,8 +96,8 @@ const CATEGORY_META: Record<
     Icon: BarChart2,
   },
   "FTA Database": {
-    color: "text-emerald-500",
-    bg: "bg-emerald-100",
+    color: "text-brand-500",
+    bg: "bg-brand-100",
     Icon: Database,
   },
 };

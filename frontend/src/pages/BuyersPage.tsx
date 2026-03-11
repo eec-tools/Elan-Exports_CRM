@@ -196,7 +196,7 @@ export default function BuyersPage() {
   const statusStyles = (status?: string) => {
     switch (status?.toLowerCase()) {
       case "active":
-        return "text-emerald-700 bg-emerald-100 border-emerald-200";
+        return "text-brand-700 bg-brand-100 border-brand-200";
       case "pending":
         return "text-amber-700 bg-amber-100 border-amber-200";
       case "suspended":
@@ -221,7 +221,7 @@ export default function BuyersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Users className="h-6 w-6 text-emerald-500" />
+            <Users className="h-6 w-6 text-brand-500" />
             Buyer Directory
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -233,7 +233,7 @@ export default function BuyersPage() {
             <Download className="h-4 w-4" /> Export CSV
           </Button>
           <PermissionGate permission="buyers" editOnly>
-            <Button onClick={openCreate} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-9">
+            <Button onClick={openCreate} className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9">
               <Plus className="h-4 w-4" /> Add Buyer
             </Button>
           </PermissionGate>
@@ -244,7 +244,7 @@ export default function BuyersPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-5">
         {[
           { icon: <Users className="h-5 w-5 text-blue-600" />, label: "Total Buyers", value: stats?.total ?? 0, bg: "bg-blue-50" },
-          { icon: <CheckCircle2 className="h-5 w-5 text-emerald-600" />, label: "Active", value: stats?.active ?? 0, bg: "bg-emerald-50" },
+          { icon: <CheckCircle2 className="h-5 w-5 text-brand-600" />, label: "Active", value: stats?.active ?? 0, bg: "bg-brand-50" },
           { icon: <Loader2 className="h-5 w-5 text-amber-600" />, label: "Pending", value: stats?.pending ?? 0, bg: "bg-amber-50" },
           { icon: <PauseCircle className="h-5 w-5 text-rose-600" />, label: "Suspended", value: stats?.suspended ?? 0, bg: "bg-rose-50" },
         ].map((s) => (
@@ -275,7 +275,7 @@ export default function BuyersPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="pl-9 h-9 bg-slate-50 border-slate-200 focus:bg-white focus:ring-emerald-500/20 focus:border-emerald-500 text-sm"
+              className="pl-9 h-9 bg-slate-50 border-slate-200 focus:bg-white focus:ring-brand-500/20 focus:border-brand-500 text-sm"
             />
           </div>
 
@@ -283,7 +283,7 @@ export default function BuyersPage() {
             value={statusFilter}
             onValueChange={(v) => { setStatusFilter(v); setPage(1); }}
           >
-            <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-emerald-500/20 min-w-[140px]">
+            <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
               <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
             <SelectContent>
@@ -325,7 +325,7 @@ export default function BuyersPage() {
                  <tr>
                  <td colSpan={canEdit ? 5 : 4} className="h-32 text-center">
                    <div className="flex justify-center">
-                     <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                     <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                    </div>
                  </td>
                </tr>
@@ -363,7 +363,7 @@ export default function BuyersPage() {
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center gap-1.5 text-slate-600 text-[13px] truncate">
                            <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                           <a href={`mailto:${buyer.email}`} className="hover:text-emerald-600 truncate">{buyer.email}</a>
+                           <a href={`mailto:${buyer.email}`} className="hover:text-brand-600 truncate">{buyer.email}</a>
                         </div>
                         {buyer.phone && (
                            <div className="text-slate-500 text-[13px] pl-5 truncate">
@@ -391,7 +391,7 @@ export default function BuyersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                            className="h-8 w-8 text-slate-400 hover:text-brand-600 hover:bg-brand-50"
                             onClick={() => openEdit(buyer)}
                             title="Edit Buyer"
                           >
@@ -441,8 +441,8 @@ export default function BuyersPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6 bg-white rounded-xl shadow-2xl border-none custom-scrollbar-light">
           <div className="flex items-center gap-4 mb-2">
-             <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 border border-emerald-200">
-                 <Building2 className="h-5 w-5 text-emerald-600" />
+             <div className="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center shrink-0 border border-brand-200">
+                 <Building2 className="h-5 w-5 text-brand-600" />
              </div>
              <div>
                  <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
@@ -463,7 +463,7 @@ export default function BuyersPage() {
                     <Label className="text-slate-700">Company Name *</Label>
                     <Input
                       autoFocus
-                      className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                      className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                       value={form.company}
                       onChange={(e) => setForm({ ...form, company: e.target.value })}
                       required
@@ -472,7 +472,7 @@ export default function BuyersPage() {
                   <div className="space-y-1.5">
                     <Label className="text-slate-700">Contact Person *</Label>
                     <Input
-                      className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                      className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       required
@@ -482,7 +482,7 @@ export default function BuyersPage() {
                     <Label className="text-slate-700">Email Address *</Label>
                     <Input
                       type="email"
-                      className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                      className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       required
@@ -491,7 +491,7 @@ export default function BuyersPage() {
                   <div className="space-y-1.5">
                     <Label className="text-slate-700">Phone</Label>
                     <Input
-                      className="bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                      className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                       value={form.phone ?? ""}
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}
                     />
@@ -504,7 +504,7 @@ export default function BuyersPage() {
                  <div className="space-y-1.5">
                   <Label className="text-slate-700">Country *</Label>
                   <Input
-                    className="border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                    className="border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                     value={form.country}
                     onChange={(e) => setForm({ ...form, country: e.target.value })}
                     required
@@ -516,7 +516,7 @@ export default function BuyersPage() {
                     value={form.region ?? ""}
                     onValueChange={(v) => setForm({ ...form, region: v })}
                   >
-                    <SelectTrigger className="border-slate-200 focus:ring-emerald-500/20">
+                    <SelectTrigger className="border-slate-200 focus:ring-brand-500/20">
                       <SelectValue placeholder="Select region" />
                     </SelectTrigger>
                     <SelectContent>
@@ -535,7 +535,7 @@ export default function BuyersPage() {
                     value={form.status ?? "Pending"}
                     onValueChange={(v) => setForm({ ...form, status: v })}
                   >
-                    <SelectTrigger className="border-slate-200 focus:ring-emerald-500/20">
+                    <SelectTrigger className="border-slate-200 focus:ring-brand-500/20">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -556,7 +556,7 @@ export default function BuyersPage() {
                     value={form.riskRating ?? ""}
                     onValueChange={(v) => setForm({ ...form, riskRating: v })}
                   >
-                    <SelectTrigger className="border-slate-200 focus:ring-emerald-500/20">
+                    <SelectTrigger className="border-slate-200 focus:ring-brand-500/20">
                       <SelectValue placeholder="Select risk" />
                     </SelectTrigger>
                     <SelectContent>
@@ -572,7 +572,7 @@ export default function BuyersPage() {
                     value={form.strategicValue ?? ""}
                     onValueChange={(v) => setForm({ ...form, strategicValue: v })}
                   >
-                    <SelectTrigger className="border-slate-200 focus:ring-emerald-500/20">
+                    <SelectTrigger className="border-slate-200 focus:ring-brand-500/20">
                       <SelectValue placeholder="Select value" />
                     </SelectTrigger>
                     <SelectContent>
@@ -585,7 +585,7 @@ export default function BuyersPage() {
                 <div className="space-y-1.5">
                   <Label className="text-slate-700">Lead Source</Label>
                   <Input
-                    className="border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                    className="border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                     placeholder="e.g. Trade Show, Referral"
                     value={form.leadSource ?? ""}
                     onChange={(e) => setForm({ ...form, leadSource: e.target.value }) }
@@ -597,7 +597,7 @@ export default function BuyersPage() {
                     value={form.incoterms ?? ""}
                     onValueChange={(v) => setForm({ ...form, incoterms: v })}
                   >
-                    <SelectTrigger className="border-slate-200 focus:ring-emerald-500/20">
+                    <SelectTrigger className="border-slate-200 focus:ring-brand-500/20">
                       <SelectValue placeholder="Select incoterm" />
                     </SelectTrigger>
                     <SelectContent>
@@ -612,7 +612,7 @@ export default function BuyersPage() {
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label className="text-slate-700">Payment Terms</Label>
                   <Input
-                    className="border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                    className="border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                     placeholder="e.g. 50% Advance, 50% LC"
                     value={form.paymentTerms ?? ""}
                     onChange={(e) => setForm({ ...form, paymentTerms: e.target.value }) }
@@ -623,7 +623,7 @@ export default function BuyersPage() {
             <div className="space-y-1.5">
               <Label className="text-slate-700">Additional Notes</Label>
               <Textarea
-                className="border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                className="border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                 placeholder="Any special requirements, past history, or observations..."
                 value={form.notes ?? ""}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -642,7 +642,7 @@ export default function BuyersPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 {createMutation.isPending || updateMutation.isPending ? (

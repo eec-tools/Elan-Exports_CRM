@@ -199,7 +199,7 @@ export function AppLayout() {
                         className={({ isActive }) =>
                           `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
                           } ${isActive
-                            ? "bg-emerald-50 text-emerald-700"
+                            ? "bg-brand-50 text-brand-700"
                             : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                           }`
                         }
@@ -208,9 +208,9 @@ export function AppLayout() {
                          {({ isActive }) => (
                             <>
                               {isActive && !sidebarCollapsed && (
-                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-emerald-500 rounded-r-md" />
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
                               )}
-                              <Factory className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-600' : 'text-slate-400 group-hover:text-emerald-600 transition-colors'}`} />
+                              <Factory className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
                               {!sidebarCollapsed && <span className="truncate">Signed Contracts</span>}
                             </>
                          )}
@@ -221,7 +221,7 @@ export function AppLayout() {
                         className={({ isActive }) =>
                           `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
                           } ${isActive
-                            ? "bg-emerald-50 text-emerald-700"
+                            ? "bg-brand-50 text-brand-700"
                             : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                           }`
                         }
@@ -230,9 +230,9 @@ export function AppLayout() {
                         {({ isActive }) => (
                             <>
                               {isActive && !sidebarCollapsed && (
-                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-emerald-500 rounded-r-md" />
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
                               )}
-                              <Archive className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-600' : 'text-slate-400 group-hover:text-emerald-600 transition-colors'}`} />
+                              <Archive className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
                               {!sidebarCollapsed && <span className="truncate">Old Supplier Data</span>}
                             </>
                          )}
@@ -252,7 +252,7 @@ export function AppLayout() {
                 className={({ isActive }) =>
                   `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
                   } ${isActive
-                    ? "bg-emerald-50 text-emerald-700"
+                    ? "bg-brand-50 text-brand-700"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                   }`
                 }
@@ -261,9 +261,9 @@ export function AppLayout() {
                   {({ isActive }) => (
                       <>
                         {isActive && !sidebarCollapsed && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-emerald-500 rounded-r-md" />
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
                         )}
-                        <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-600' : 'text-slate-400 group-hover:text-emerald-600 transition-colors'}`} />
+                        <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
                         {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                       </>
                    )}
@@ -278,7 +278,7 @@ export function AppLayout() {
             className={`flex items-center gap-3 rounded-xl px-2 py-2 transition-colors ${sidebarCollapsed ? "justify-center" : "hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200"}`}
           >
             <Avatar className={`h-9 w-9 border border-slate-200 shrink-0 shadow-sm ${sidebarCollapsed ? 'mx-auto' : ''}`}>
-              <AvatarFallback className="bg-white text-emerald-700 text-xs font-bold">
+              <AvatarFallback className="bg-white text-brand-700 text-xs font-bold">
                 {initials}
               </AvatarFallback>
             </Avatar>

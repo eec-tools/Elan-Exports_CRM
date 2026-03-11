@@ -94,7 +94,7 @@ function getCatalogViewUrl(url?: string) {
 function statusColor(status?: string) {
   switch (status?.toLowerCase()) {
     case "active":
-      return "bg-emerald-500/15 text-emerald-700 border-emerald-500/25";
+      return "bg-brand-500/15 text-brand-700 border-brand-500/25";
     case "inactive":
       return "bg-red-500/15 text-red-700 border-red-500/25";
     case "under review":

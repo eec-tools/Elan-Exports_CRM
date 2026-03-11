@@ -87,7 +87,7 @@ export default function AccessRequestsPage() {
   const getStatusStyles = (s: string) => {
     switch (s.toLowerCase()) {
       case "approved":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+        return "bg-brand-50 text-brand-700 border-brand-200";
       case "rejected":
         return "bg-rose-50 text-rose-700 border-rose-200";
       default:
@@ -109,7 +109,7 @@ export default function AccessRequestsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-slate-100 mb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <KeyRound className="h-6 w-6 text-emerald-500" />
+            <KeyRound className="h-6 w-6 text-brand-500" />
             Access Controls
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -125,7 +125,7 @@ export default function AccessRequestsPage() {
               setReason("");
               setDialogOpen(true);
             }}
-            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-9"
+            className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9"
           >
             <Plus className="h-4 w-4" />
             New Request
@@ -144,8 +144,8 @@ export default function AccessRequestsPage() {
             </div>
          </div>
          <div className="rounded-xl border border-slate-200 bg-white p-4 flex items-center gap-4 shadow-sm relative overflow-hidden group">
-            <div className="absolute inset-y-0 left-0 w-1 bg-emerald-500 group-hover:w-1.5 transition-all"></div>
-            <div className="rounded-lg p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 ml-1"><ShieldCheck className="h-5 w-5" /></div>
+            <div className="absolute inset-y-0 left-0 w-1 bg-brand-500 group-hover:w-1.5 transition-all"></div>
+            <div className="rounded-lg p-3 bg-brand-50 border border-brand-100 text-brand-600 ml-1"><ShieldCheck className="h-5 w-5" /></div>
             <div>
                <p className="text-xs text-slate-500 font-medium">Approved Requests</p>
                <p className="text-xl font-bold text-slate-800">{approvedCount}</p>
@@ -182,7 +182,7 @@ export default function AccessRequestsPage() {
                      <tr>
                         <td colSpan={isAdmin ? 6 : 5} className="h-32 text-center">
                            <div className="flex justify-center">
-                              <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                              <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                            </div>
                         </td>
                      </tr>
@@ -246,7 +246,7 @@ export default function AccessRequestsPage() {
                                           <Button
                                              variant="ghost"
                                              size="icon"
-                                             className="h-8 w-8 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                             className="h-8 w-8 text-slate-400 hover:text-brand-600 hover:bg-brand-50"
                                              onClick={() => reviewMutation.mutate({ id: r.id, status: "approved" })}
                                              title="Approve access"
                                           >
@@ -311,7 +311,7 @@ export default function AccessRequestsPage() {
                 <div className="space-y-1.5">
                   <Label className="text-slate-700 font-semibold">Target Permission/Area</Label>
                   <Select value={permission} onValueChange={setPermission}>
-                    <SelectTrigger className="bg-white border-slate-200 focus:ring-emerald-500/20">
+                    <SelectTrigger className="bg-white border-slate-200 focus:ring-brand-500/20">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -331,7 +331,7 @@ export default function AccessRequestsPage() {
                     onChange={(e) => setReason(e.target.value)}
                     required
                     rows={4}
-                    className="bg-white border-slate-200 focus:ring-emerald-500/20 resize-y min-h-[100px]"
+                    className="bg-white border-slate-200 focus:ring-brand-500/20 resize-y min-h-[100px]"
                     placeholder="Briefly explain why you require clearance for this toolset..."
                   />
                 </div>
@@ -348,7 +348,7 @@ export default function AccessRequestsPage() {
                   <Button
                      type="submit" 
                      disabled={createMutation.isPending}
-                     className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm min-w-[120px]"
+                     className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm min-w-[120px]"
                   >
                     {createMutation.isPending && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

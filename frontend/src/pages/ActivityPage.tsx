@@ -22,7 +22,7 @@ export default function ActivityPage() {
   const getActionStyles = (action: string) => {
     const act = action.toLowerCase();
     if (act.includes("create") || act.includes("activate")) {
-       return "bg-emerald-50 text-emerald-700 border-emerald-200";
+       return "bg-brand-50 text-brand-700 border-brand-200";
     }
     if (act.includes("update")) {
        return "bg-blue-50 text-blue-700 border-blue-200";
@@ -50,7 +50,7 @@ export default function ActivityPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-slate-100 mb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Activity className="h-6 w-6 text-emerald-500" />
+            <Activity className="h-6 w-6 text-brand-500" />
             System Activity Logs
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -77,7 +77,7 @@ export default function ActivityPage() {
                 <tr>
                    <td colSpan={5} className="h-32 text-center">
                      <div className="flex justify-center">
-                       <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                       <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                      </div>
                    </td>
                 </tr>
