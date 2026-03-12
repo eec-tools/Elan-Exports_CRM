@@ -11,8 +11,22 @@ export function errorHandler(
 ): void {
   console.error("Unhandled error:", err);
 
-  res.status(500).json({
-    error: "Internal server error",
-    ...(process.env.NODE_ENV !== "production" && { message: err.message }),
+  // Handle CORS errors specifically
+  if (err.message === "Not allowed by CORS") {
+    return res.status(403).json({
+      error: "CORS policy violation",
+      message: "Origin not allowed",
+    });
+  }
+
+  // Handle specific error types
+  const statusCode = (err as any).statusCode || 500;
+
+  res.status(statusCode).json({
+    error: statusCode === 500 ? "Internal server error" : err.message,
+    ...(process.env.NODE_ENV !== "production" && {
+      message: err.message,
+      stack: err.stack
+    }),
   });
 }

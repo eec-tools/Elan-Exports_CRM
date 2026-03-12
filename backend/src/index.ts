@@ -32,31 +32,60 @@ const PORT = process.env.PORT || 3001;
 
 // ─── Global Middleware ──────────────────────────────
 
+// Trust proxy for rate limiting behind reverse proxies (Render, Heroku, etc.)
+app.set("trust proxy", 1);
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  next();
+});
+
+// CORS configuration
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(",").map((url) => url.trim())
+  : [];
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. curl, Postman)
+      // Allow requests with no origin (e.g. curl, Postman, mobile apps)
       if (!origin) return callback(null, true);
+
       // In development, allow any localhost port
-      if (/^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
-      // In production, check against FRONTEND_URL
-      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL)
+      if (process.env.NODE_ENV !== "production" && /^http:\/\/localhost:\d+$/.test(origin)) {
         return callback(null, true);
+      }
+
+      // Check against allowed origins
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.warn(`CORS blocked origin: ${origin}`);
       callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Content-Range", "X-Content-Range"],
+    maxAge: 600, // 10 minutes
   }),
 );
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
+// Rate limiting - stricter in production
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+  max: process.env.NODE_ENV === "production" ? 100 : 200,
   standardHeaders: true,
   legacyHeaders: false,
+  message: "Too many requests from this IP, please try again later.",
 });
 app.use("/api/", limiter);
 
@@ -81,9 +110,28 @@ app.use("/api/daily-tasks", dailyTaskRoutes);
 app.use("/api/deals", dealsRoutes);
 app.use("/api/compliance", complianceRoutes);
 
-// Health check
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+// Health check with detailed status
+app.get("/api/health", async (_req, res) => {
+  const health = {
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+    uptime: process.uptime(),
+    cors: {
+      allowedOrigins: allowedOrigins.length > 0 ? allowedOrigins : ["localhost only"],
+    },
+  };
+
+  // Check database connection
+  try {
+    await import("./config/db.js").then((db) => db.default.$queryRaw`SELECT 1`);
+    (health as any).database = "connected";
+  } catch (error) {
+    (health as any).database = "disconnected";
+    (health as any).status = "degraded";
+  }
+
+  res.json(health);
 });
 
 // ─── Error Handler ──────────────────────────────────
@@ -92,9 +140,39 @@ app.use(errorHandler);
 
 // ─── Start Server ───────────────────────────────────
 
+// Validate required environment variables
+function validateEnvironment() {
+  const required = ["DATABASE_URL", "JWT_SECRET"];
+  const missing = required.filter((key) => !process.env[key]);
+
+  if (missing.length > 0) {
+    console.error(`❌ Missing required environment variables: ${missing.join(", ")}`);
+    process.exit(1);
+  }
+
+  if (process.env.NODE_ENV === "production" && !process.env.FRONTEND_URL) {
+    console.warn("⚠️  Warning: FRONTEND_URL not set in production. CORS may not work correctly.");
+  }
+}
+
+validateEnvironment();
+
 app.listen(PORT, () => {
   console.log(`🚀 Élan Exports CRM API running on http://localhost:${PORT}`);
   console.log(`📚 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`🔒 Allowed origins: ${allowedOrigins.join(", ") || "localhost only"}`);
+});
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("SIGTERM signal received: closing HTTP server");
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT signal received: closing HTTP server");
+  process.exit(0);
 });
 
 export default app;

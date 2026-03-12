@@ -21,6 +21,10 @@ api.interceptors.response.use(
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";
+    } else if (err.response?.status === 403) {
+      console.error("CORS or permission error:", err.response.data);
+    } else if (!err.response) {
+      console.error("Network error - backend may be down:", err.message);
     }
     return Promise.reject(err);
   },
