@@ -8,15 +8,16 @@ export function errorHandler(
   _req: Request,
   res: Response,
   _next: NextFunction,
-): void {
+) {
   console.error("Unhandled error:", err);
 
   // Handle CORS errors specifically
   if (err.message === "Not allowed by CORS") {
-    return res.status(403).json({
+    res.status(403).json({
       error: "CORS policy violation",
       message: "Origin not allowed",
     });
+    return;
   }
 
   // Handle specific error types
