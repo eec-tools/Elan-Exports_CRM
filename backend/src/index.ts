@@ -55,13 +55,18 @@ app.use(
       // Allow requests with no origin (e.g. curl, Postman, mobile apps)
       if (!origin) return callback(null, true);
 
-      // In development, allow any localhost port
-      if (process.env.NODE_ENV !== "production" && /^http:\/\/localhost:\d+$/.test(origin)) {
+      // Always allow localhost for development (any port)
+      if (/^http:\/\/localhost:\d+$/.test(origin)) {
         return callback(null, true);
       }
 
       // Check against allowed origins
       if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow Vercel preview deployments (*.vercel.app)
+      if (/^https:\/\/.*\.vercel\.app$/.test(origin)) {
         return callback(null, true);
       }
 
