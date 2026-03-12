@@ -17,6 +17,7 @@ import {
   Archive,
   CalendarCheck,
   TrendingUp,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -50,6 +51,13 @@ const navItems = [
     to: "/deals",
     label: "Deals",
     icon: TrendingUp,
+    perm: null,
+    adminOnly: false,
+  },
+  {
+    to: "/compliance",
+    label: "Compliance",
+    icon: ClipboardCheck,
     perm: null,
     adminOnly: false,
   },

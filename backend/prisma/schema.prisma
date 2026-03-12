@@ -314,7 +314,32 @@ model Deal {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  creator         User?    @relation(fields: [createdBy], references: [id])
+  creator              User?                 @relation(fields: [createdBy], references: [id])
+  complianceDocuments  ComplianceDocument[]
 
   @@map("deals")
+}
+
+// ─── COMPLIANCE ──────────────────────────────────────
+
+enum ComplianceStatus {
+  RECEIVED
+  PENDING
+  MISSING
+}
+
+model ComplianceDocument {
+  id        String           @id @default(uuid())
+  dealId    String           @map("deal_id")
+  docType   String           @map("doc_type")
+  status    ComplianceStatus @default(MISSING)
+  dueDate   DateTime?        @map("due_date") @db.Date
+  notes     String?
+
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  deal      Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@map("compliance_documents")
 }

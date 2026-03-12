@@ -24,6 +24,7 @@ import DailyTasksPage from "@/pages/DailyTasksPage";
 import SupplierDetailsPage from "@/pages/SupplierDetailsPage";
 import VaultPage from "@/pages/VaultPage";
 import DealsPage from "@/pages/DealsPage";
+import CompliancePage from "@/pages/CompliancePage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -134,6 +135,7 @@ export default function App() {
                   }
                 />
                 <Route path="deals" element={<DealsPage />} />
+                <Route path="compliance" element={<CompliancePage />} />
 
                 {/* Admin-only routes */}
                 <Route element={<AdminRoute />}>
