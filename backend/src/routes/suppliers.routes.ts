@@ -8,6 +8,7 @@ import {
   exportSuppliersCsv,
   uploadCatalog,
   uploadSupplierFile,
+  getSupplierStats,
 } from "../controllers/suppliers.controller.js";
 import {
   authenticate,
@@ -20,6 +21,7 @@ const router = Router();
 router.use(authenticate, requirePermission("suppliers"));
 
 router.get("/", listSuppliers);
+router.get("/stats", getSupplierStats);
 router.get("/export/csv", exportSuppliersCsv);
 router.get("/:id", getSupplier);
 

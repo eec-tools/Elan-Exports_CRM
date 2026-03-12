@@ -10,17 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -39,6 +31,12 @@ import {
   ChevronRight,
   Upload,
   X,
+  Filter,
+  Building2,
+  AlertCircle,
+  FileCheck2,
+  CheckCircle2,
+  PauseCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -83,6 +81,7 @@ export default function SuppliersPage() {
   const canEdit = hasEditPermission("suppliers");
 
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<Supplier> | null>(null);
@@ -95,11 +94,18 @@ export default function SuppliersPage() {
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["suppliers", search, page],
+    queryKey: ["suppliers", search, statusFilter, page],
     queryFn: () =>
       api
-        .get("/suppliers", { params: { search, page, limit: 20 } })
+        .get("/suppliers", {
+          params: { search, status: statusFilter !== "all" ? statusFilter : undefined, page, limit: 20 },
+        })
         .then((r) => r.data),
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ["supplier-stats"],
+    queryFn: () => api.get("/suppliers/stats").then((r) => r.data),
   });
 
   const createMutation = useMutation({
@@ -203,186 +209,253 @@ export default function SuppliersPage() {
   const suppliers = data?.data ?? [];
   const pagination = data?.pagination;
 
+  const statusStyles = (status?: string) => {
+    switch (status?.toLowerCase()) {
+      case "active":
+        return "text-brand-700 bg-brand-100 border-brand-200";
+      case "signed":
+        return "text-indigo-700 bg-indigo-100 border-indigo-200";
+      case "under review":
+        return "text-amber-700 bg-amber-100 border-amber-200";
+      case "inactive":
+        return "text-rose-700 bg-rose-100 border-rose-200";
+      default:
+        return "text-slate-600 bg-slate-100 border-slate-200";
+    }
+  };
+
+  const StatusIcon = ({ status, className }: { status?: string, className?: string }) => {
+    switch (status?.toLowerCase()) {
+      case "active": return <CheckCircle2 className={className} />;
+      case "signed": return <FileCheck2 className={className} />;
+      case "under review": return <Loader2 className={className} />;
+      case "inactive": return <PauseCircle className={className} />;
+      default: return null;
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full min-h-0 gap-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Suppliers</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Building2 className="h-6 w-6 text-brand-500" />
+            Supplier Directory
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
             Manage supplier relationships and contracts
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
+          <Button variant="outline" onClick={handleExport} className="gap-2 bg-white hover:bg-slate-50 text-slate-700 shadow-sm border-slate-200 h-9">
+            <Download className="h-4 w-4" /> Export CSV
           </Button>
           <PermissionGate permission="suppliers" editOnly>
-            <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Supplier
+            <Button onClick={openCreate} className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9">
+              <Plus className="h-4 w-4" /> Add Supplier
             </Button>
           </PermissionGate>
         </div>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search suppliers..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          className="pl-10"
-        />
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 py-5">
+        {[
+          { icon: <Building2 className="h-5 w-5 text-blue-600" />, label: "Total Suppliers", value: stats?.total ?? 0, bg: "bg-blue-50" },
+          { icon: <FileCheck2 className="h-5 w-5 text-indigo-600" />, label: "Signed", value: stats?.signed ?? 0, bg: "bg-indigo-50" },
+          { icon: <CheckCircle2 className="h-5 w-5 text-brand-600" />, label: "Active", value: stats?.active ?? 0, bg: "bg-brand-50" },
+          { icon: <Loader2 className="h-5 w-5 text-amber-600" />, label: "Under Review", value: stats?.underReview ?? 0, bg: "bg-amber-50" },
+          { icon: <PauseCircle className="h-5 w-5 text-rose-600" />, label: "Inactive", value: stats?.inactive ?? 0, bg: "bg-rose-50" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
+            <div className={`rounded-lg p-2.5 ${s.bg}`}>{s.icon}</div>
+            <div>
+              <p className="text-xs text-slate-500 font-medium">{s.label}</p>
+              <p className="text-xl font-bold text-slate-800">{s.value}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {isLoading ? (
-        <div className="flex h-32 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin" />
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-5 flex flex-wrap items-center gap-3">
+        <div className="items-center gap-2 px-2 text-slate-400 border-r border-slate-100 pr-4 mr-1 hidden md:flex">
+          <Filter className="h-4 w-4" />
+          <span className="text-sm font-semibold text-slate-600">Filters</span>
         </div>
-      ) : suppliers.length === 0 ? (
-        <div className="flex h-32 items-center justify-center text-muted-foreground">
-          No suppliers found
-        </div>
-      ) : (
-        <div className="rounded-lg border border-neutral-300 dark:border-neutral-700 overflow-hidden">
-          <Table>
-            <TableHeader className="bg-muted/40">
-              <TableRow className="border-b border-neutral-300 dark:border-neutral-700">
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Company Name
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Country
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Contact Person
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Email
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Products
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Contract Buyer
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Certifications
-                </TableHead>
-                <TableHead className="border-r border-neutral-300 dark:border-neutral-700">
-                  Remarks
-                </TableHead>
-                {canEdit && (
-                  <TableHead className="w-24 border-r border-neutral-300 dark:border-neutral-700">
-                    Actions
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {suppliers.map((s: Supplier) => (
-                <TableRow
-                  key={s.id}
-                  className="border-b border-neutral-300 dark:border-neutral-700 last:border-0 hover:bg-muted/30"
-                >
-                  <TableCell className="font-medium border-r border-neutral-300 dark:border-neutral-700">
-                    <Link
-                      to={`/suppliers/signed-contract/${s.id}`}
-                      className="text-primary hover:underline"
-                    >
-                      {s.company}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                    {s.country}
-                  </TableCell>
-                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                    {s.contactPerson}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700">
-                    {s.email}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700 max-w-[200px] truncate">
-                    {s.products}
-                  </TableCell>
-                  <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                    {s.contractBuyer}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700 max-w-[180px] truncate">
-                    {s.certifications}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground border-r border-neutral-300 dark:border-neutral-700 max-w-[200px] truncate">
-                    {s.remarks}
-                  </TableCell>
-                  {canEdit && (
-                    <TableCell className="border-r border-neutral-300 dark:border-neutral-700">
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(s)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setSupplierToDelete(s);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
 
-      {pagination && pagination.pages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Page {pagination.page} of {pagination.pages} ({pagination.total}{" "}
-            total)
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= pagination.pages}
-              onClick={() => setPage(page + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+        <div className="flex flex-wrap items-center gap-2 flex-1">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              placeholder="Search suppliers..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="pl-9 h-9 bg-slate-50 border-slate-200 focus:bg-white focus:ring-brand-500/20 focus:border-brand-500 text-sm"
+            />
           </div>
+
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => { setStatusFilter(v); setPage(1); }}
+          >
+            <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="Signed">Signed</SelectItem>
+              <SelectItem value="Active">Active</SelectItem>
+              <SelectItem value="Under Review">Under Review</SelectItem>
+              <SelectItem value="Inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {(search || statusFilter !== "all") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setSearch(""); setStatusFilter("all"); setPage(1); }}
+              className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 h-9 px-2 gap-1 ml-auto"
+            >
+              <X className="h-4 w-4" /> Clear
+            </Button>
+          )}
         </div>
-      )}
+      </div>
+
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="overflow-auto flex-1 relative">
+          <table className="w-full text-sm text-left border-collapse min-w-max">
+            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
+              <tr>
+                <th className="px-5 py-3.5 font-semibold">Company Name</th>
+                <th className="px-5 py-3.5 font-semibold">Country</th>
+                <th className="px-5 py-3.5 font-semibold">Contact Person</th>
+                <th className="px-5 py-3.5 font-semibold">Email</th>
+                <th className="px-5 py-3.5 font-semibold">Products</th>
+                <th className="px-5 py-3.5 font-semibold">Contract Buyer</th>
+                <th className="px-5 py-3.5 font-semibold">Certifications</th>
+                <th className="px-5 py-3.5 font-semibold">Remarks</th>
+                <th className="px-5 py-3.5 font-semibold">Status</th>
+                {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {isLoading && suppliers.length === 0 ? (
+                 <tr>
+                 <td colSpan={canEdit ? 10 : 9} className="h-32 text-center">
+                   <div className="flex justify-center">
+                     <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
+                   </div>
+                 </td>
+               </tr>
+              ) : suppliers.length === 0 ? (
+                <tr>
+                  <td colSpan={canEdit ? 10 : 9} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
+                        <Building2 className="h-6 w-6 text-slate-300" />
+                      </div>
+                      <p className="text-slate-600 font-medium text-base">No suppliers found</p>
+                      <p className="text-slate-400 text-sm max-w-[250px]">
+                        {(search || statusFilter !== "all") ? "Try adjusting your search or filters." : "You have not added any suppliers yet."}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                suppliers.map((s: Supplier) => (
+                  <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
+                    <td className="px-5 py-3.5 border-r border-slate-100 font-medium">
+                      <Link
+                        to={`/suppliers/signed-contract/${s.id}`}
+                        className="text-brand-600 hover:text-brand-700 hover:underline"
+                      >
+                        {s.company}
+                      </Link>
+                    </td>
+                    <td className="px-5 py-3.5 border-r border-slate-100">{s.country}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100">{s.contactPerson}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.email}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.products}>{s.products}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100">{s.contractBuyer}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[180px] truncate" title={s.certifications}>{s.certifications}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.remarks}>{s.remarks}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusStyles(s.currentStatus)} capitalize`}>
+                          <StatusIcon status={s.currentStatus} className="h-3 w-3 mr-1.5" />
+                          {s.currentStatus || "Active"}
+                      </span>
+                    </td>
+                    {canEdit && (
+                      <td className="px-5 py-3.5 text-right font-medium">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-brand-600 hover:bg-brand-50"
+                            onClick={() => openEdit(s)}
+                            title="Edit Supplier"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                            onClick={() => {
+                              setSupplierToDelete(s);
+                              setDeleteDialogOpen(true);
+                            }}
+                            title="Delete Supplier"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {pagination && pagination.pages > 1 && (
+          <div className="bg-slate-50 border-t border-slate-200 p-3 flex items-center justify-between">
+            <p className="text-sm text-slate-500 font-medium px-2">
+              Showing page <span className="text-slate-900">{pagination.page}</span> of <span className="text-slate-900">{pagination.pages}</span> <span className="text-slate-400">({pagination.total} suppliers)</span>
+            </p>
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)} className="h-8 w-8 p-0 bg-white shadow-sm border-slate-200 text-slate-600 hover:bg-slate-100">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= pagination.pages} onClick={() => setPage(page + 1)} className="h-8 w-8 p-0 bg-white shadow-sm border-slate-200 text-slate-600 hover:bg-slate-100">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editing?.id ? "Edit Supplier" : "Add Supplier"}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6 bg-white rounded-xl shadow-2xl border-none custom-scrollbar-light">
+          <div className="flex items-center gap-4 mb-2">
+             <div className="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center shrink-0 border border-brand-200">
+                 <Building2 className="h-5 w-5 text-brand-600" />
+             </div>
+             <div>
+                 <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
+                   {editing?.id ? "Edit Supplier" : "Register New Supplier"}
+                 </DialogTitle>
+                 <DialogDescription className="text-slate-500 mt-1">
+                   Fill in the details below to {editing?.id ? "update the" : "create a new"} supplier record.
+                 </DialogDescription>
+             </div>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Company *</Label>
@@ -573,6 +646,7 @@ export default function SuppliersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="Signed">Signed</SelectItem>
                     <SelectItem value="Active">Active</SelectItem>
                     <SelectItem value="Inactive">Inactive</SelectItem>
                     <SelectItem value="Under Review">Under Review</SelectItem>
@@ -638,22 +712,24 @@ export default function SuppliersPage() {
                 rows={3}
               />
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
               <Button
                 type="button"
                 variant="outline"
+                className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                 onClick={() => setDialogOpen(false)}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
+                className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 {(createMutation.isPending || updateMutation.isPending || uploadCatalogMutation.isPending) && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                {editing?.id ? "Update" : "Create"}
+                {editing?.id ? "Update Supplier" : "Create Supplier"}
               </Button>
             </div>
           </form>
@@ -668,38 +744,38 @@ export default function SuppliersPage() {
           if (!open) setSupplierToDelete(null);
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete supplier</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete{" "}
-            <span className="font-medium">
-              {supplierToDelete?.company || "this supplier"}
-            </span>
-            ? This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                if (supplierToDelete) {
-                  deleteMutation.mutate(supplierToDelete.id);
-                }
-                setDeleteDialogOpen(false);
-                setSupplierToDelete(null);
-              }}
-            >
-              Delete
-            </Button>
+        <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+          <div className="flex items-center gap-4 mb-6">
+              <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                  <AlertCircle className="h-6 w-6 text-rose-600" />
+              </div>
+              <div>
+                  <DialogTitle className="text-lg font-bold text-slate-900">Delete Supplier</DialogTitle>
+                  <DialogDescription className="text-slate-500 mt-1">This will permanently remove the record.</DialogDescription>
+              </div>
+          </div>
+          {supplierToDelete?.company && (
+              <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-md border border-slate-100 mb-6 font-medium">
+                  Company: <span className="font-bold">{supplierToDelete.company}</span>
+              </p>
+          )}
+          <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+                  Cancel
+              </Button>
+              <Button 
+                 variant="destructive" 
+                 className="bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200"
+                 onClick={() => {
+                  if (supplierToDelete) {
+                    deleteMutation.mutate(supplierToDelete.id);
+                  }
+                  setDeleteDialogOpen(false);
+                  setSupplierToDelete(null);
+                }}
+               >
+                  Yes, delete supplier
+              </Button>
           </div>
         </DialogContent>
       </Dialog>
