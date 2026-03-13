@@ -17,7 +17,7 @@
 - [ ] `VITE_API_URL` points to Render backend
 - [ ] Build command: `cd frontend && npm run build`
 - [ ] Output directory: `frontend/dist`
-- [ ] Node version: 20.x
+- [ ] Node version : 20.x
 
 ### Database (Neon)
 - [ ] Connection pooling enabled
