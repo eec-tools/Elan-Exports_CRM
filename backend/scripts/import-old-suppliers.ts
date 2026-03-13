@@ -16,54 +16,18 @@ const sql = neon(process.env.DATABASE_URL!);
 // Matching is case-insensitive and ignores extra spaces.
 // ─────────────────────────────────────────────────────────────────────────────
 const COLUMN_ALIASES: Record<string, string[]> = {
-  company: [
-    "Company Name",
-    "Company",
-    "Supplier Name",
-    "Supplier",
-    "Organization",
-  ],
-  country: [
-    "Country",
-    "Country Name",
-    "Location",
-    "Region",
-  ],
-  website: [
-    "Website",
-    "Website Address",
-    "Web",
-    "URL",
-    "Web Address",
-    "Homepage",
-  ],
-  email: [
-    "Email",
-    "Email Id",
-    "Email Address",
-    "E-mail",
-    "E-mail Address",
-    "Contact Email",
-  ],
-  products: [
-    "Products",
-    "Product name",
-    "Product Name",
-    "Product",
-    "Products dealing with",
-    "Items",
-    "Goods",
-  ],
-  notes: [
-    "Notes",
-    "Note",
-    "Remark",
-    "Remarks",
-    "Comments",
-    "COMMENTS",
-    "Comment",
-    "Additional Notes",
-  ],
+  company: ["Company Name", "Company", "Supplier Name", "Supplier", "Organization"],
+  productCategory: ["Product Category", "Category"],
+  product: ["Product", "Product Name", "Products", "Products dealing with", "Items"],
+  country: ["Country", "Country Name", "Location", "Region"],
+  accountManager: ["Account Manager", "Manager"],
+  currentStatus: ["Current Status", "Status"],
+  certifications: ["Certifications", "Certification"],
+  latestQuotation: ["Latest Quotation", "Quotation"],
+  reasonInactive: ["Reason Inactive", "Reason"],
+  dateMarkedInactive: ["Date Marked Inactive", "Date Inactive"],
+  reactivationPotential: ["Reactivation Potential", "Potential"],
+  notes: ["Notes", "Note", "Remark", "Remarks", "Comments", "COMMENTS"],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,7 +66,7 @@ async function parseCSV(
 
   await new Promise<void>((resolve, reject) => {
     fs.createReadStream(filePath)
-      .pipe(csv())
+      .pipe(csv({ skipLines: 1 }))
       .on("headers", (headers: string[]) => {
         detectedColumns = detectColumns(headers);
 
@@ -164,32 +128,50 @@ async function importSuppliers(
       INSERT INTO old_suppliers (
         id,
         company,
+        product_category,
+        product,
         country,
-        website,
-        email,
-        products,
+        account_manager,
+        current_status,
+        certifications,
+        latest_quotation,
+        reason_inactive,
+        date_marked_inactive,
+        reactivation_potential,
         notes,
         created_by,
         updated_at
       ) VALUES (
         ${id},
         ${row.company},
+        ${row.productCategory},
+        ${row.product},
         ${row.country},
-        ${row.website},
-        ${row.email},
-        ${row.products},
+        ${row.accountManager},
+        ${row.currentStatus},
+        ${row.certifications},
+        ${row.latestQuotation},
+        ${row.reasonInactive},
+        ${row.dateMarkedInactive},
+        ${row.reactivationPotential},
         ${row.notes},
         ${process.env.CREATED_BY_USER_ID ?? null},
         CURRENT_TIMESTAMP
       )
       ON CONFLICT (id) DO UPDATE SET
-        company    = EXCLUDED.company,
-        country    = EXCLUDED.country,
-        website    = EXCLUDED.website,
-        email      = EXCLUDED.email,
-        products   = EXCLUDED.products,
-        notes      = EXCLUDED.notes,
-        updated_at = CURRENT_TIMESTAMP
+        company                = EXCLUDED.company,
+        product_category       = EXCLUDED.product_category,
+        product                = EXCLUDED.product,
+        country                = EXCLUDED.country,
+        account_manager        = EXCLUDED.account_manager,
+        current_status         = EXCLUDED.current_status,
+        certifications         = EXCLUDED.certifications,
+        latest_quotation       = EXCLUDED.latest_quotation,
+        reason_inactive        = EXCLUDED.reason_inactive,
+        date_marked_inactive   = EXCLUDED.date_marked_inactive,
+        reactivation_potential = EXCLUDED.reactivation_potential,
+        notes                  = EXCLUDED.notes,
+        updated_at             = CURRENT_TIMESTAMP
     `;
 
     console.log(`  ✅  [${id}] ${row.company}`);

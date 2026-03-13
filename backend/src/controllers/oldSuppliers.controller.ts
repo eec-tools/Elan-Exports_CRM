@@ -26,10 +26,11 @@ export async function listOldSuppliers(
     if (search) {
       where.OR = [
         { company: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
         { country: { contains: search, mode: "insensitive" } },
-        { products: { contains: search, mode: "insensitive" } },
-        { website: { contains: search, mode: "insensitive" } },
+        { productCategory: { contains: search, mode: "insensitive" } },
+        { product: { contains: search, mode: "insensitive" } },
+        { accountManager: { contains: search, mode: "insensitive" } },
+        { currentStatus: { contains: search, mode: "insensitive" } },
       ];
     }
 
@@ -90,16 +91,17 @@ export async function createOldSupplier(
   res: Response,
 ): Promise<void> {
   try {
-    const { company, country, website, email, products, notes } = req.body;
+    const {
+      company, productCategory, product, country, accountManager,
+      currentStatus, certifications, latestQuotation, reasonInactive,
+      dateMarkedInactive, reactivationPotential, notes
+    } = req.body;
 
     const supplier = await prisma.oldSupplier.create({
       data: {
-        company,
-        country,
-        website,
-        email,
-        products,
-        notes,
+        company, productCategory, product, country, accountManager,
+        currentStatus, certifications, latestQuotation, reasonInactive,
+        dateMarkedInactive, reactivationPotential, notes,
         createdBy: req.user!.id,
       },
     });
@@ -132,11 +134,19 @@ export async function updateOldSupplier(
       return;
     }
 
-    const { company, country, website, email, products, notes } = req.body;
+    const {
+      company, productCategory, product, country, accountManager,
+      currentStatus, certifications, latestQuotation, reasonInactive,
+      dateMarkedInactive, reactivationPotential, notes
+    } = req.body;
 
     const supplier = await prisma.oldSupplier.update({
       where: { id: req.params.id },
-      data: { company, country, website, email, products, notes },
+      data: {
+        company, productCategory, product, country, accountManager,
+        currentStatus, certifications, latestQuotation, reasonInactive,
+        dateMarkedInactive, reactivationPotential, notes
+      },
     });
 
     await logActivity(req.user!.id, "update", "old_suppliers", supplier.id, {
@@ -194,8 +204,11 @@ export async function exportOldSuppliersCsv(
     if (search) {
       where.OR = [
         { company: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
         { country: { contains: search, mode: "insensitive" } },
+        { productCategory: { contains: search, mode: "insensitive" } },
+        { product: { contains: search, mode: "insensitive" } },
+        { accountManager: { contains: search, mode: "insensitive" } },
+        { currentStatus: { contains: search, mode: "insensitive" } },
       ];
     }
 
@@ -206,20 +219,32 @@ export async function exportOldSuppliersCsv(
 
     const headers = [
       "Company Name",
+      "Product Category",
+      "Product",
       "Country",
-      "Website",
-      "Email",
-      "Products",
+      "Account Manager",
+      "Current Status",
+      "Certifications",
+      "Latest Quotation",
+      "Reason Inactive",
+      "Date Marked Inactive",
+      "Reactivation Potential",
       "Notes",
-      "Created At",
+      "Created At"
     ];
 
     const rows = suppliers.map((s) => [
       s.company,
+      s.productCategory || "",
+      s.product || "",
       s.country || "",
-      s.website || "",
-      s.email || "",
-      s.products || "",
+      s.accountManager || "",
+      s.currentStatus || "",
+      s.certifications || "",
+      s.latestQuotation || "",
+      s.reasonInactive || "",
+      s.dateMarkedInactive || "",
+      s.reactivationPotential || "",
       s.notes || "",
       s.createdAt.toISOString().split("T")[0],
     ]);

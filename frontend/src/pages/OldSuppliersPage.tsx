@@ -32,19 +32,31 @@ import { PermissionGate } from "@/components/PermissionGate";
 interface Supplier {
   id: string;
   company: string;
+  productCategory?: string;
+  product?: string;
   country?: string;
-  website?: string;
-  email?: string;
-  products?: string;
+  accountManager?: string;
+  currentStatus?: string;
+  certifications?: string;
+  latestQuotation?: string;
+  reasonInactive?: string;
+  dateMarkedInactive?: string;
+  reactivationPotential?: string;
   notes?: string;
 }
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
   company: "",
+  productCategory: "",
+  product: "",
   country: "",
-  website: "",
-  email: "",
-  products: "",
+  accountManager: "",
+  currentStatus: "",
+  certifications: "",
+  latestQuotation: "",
+  reasonInactive: "",
+  dateMarkedInactive: "",
+  reactivationPotential: "",
   notes: "",
 };
 
@@ -207,10 +219,14 @@ export default function OldSuppliersPage() {
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
               <tr>
                 <th className="px-5 py-3.5 font-semibold">Company Name</th>
+                <th className="px-5 py-3.5 font-semibold">Product Category</th>
+                <th className="px-5 py-3.5 font-semibold">Product</th>
                 <th className="px-5 py-3.5 font-semibold">Country</th>
-                <th className="px-5 py-3.5 font-semibold">Website</th>
-                <th className="px-5 py-3.5 font-semibold">Email</th>
-                <th className="px-5 py-3.5 font-semibold">Products</th>
+                <th className="px-5 py-3.5 font-semibold">Account Manager</th>
+                <th className="px-5 py-3.5 font-semibold">Current Status</th>
+                <th className="px-5 py-3.5 font-semibold">Certifications</th>
+                <th className="px-5 py-3.5 font-semibold">Reason Inactive</th>
+                <th className="px-5 py-3.5 font-semibold">Reactivation Potential</th>
                 <th className="px-5 py-3.5 font-semibold">Notes</th>
                 {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
               </tr>
@@ -218,7 +234,7 @@ export default function OldSuppliersPage() {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading && suppliers.length === 0 ? (
                  <tr>
-                 <td colSpan={canEdit ? 7 : 6} className="h-32 text-center">
+                 <td colSpan={canEdit ? 11 : 10} className="h-32 text-center">
                    <div className="flex justify-center">
                      <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                    </div>
@@ -226,7 +242,7 @@ export default function OldSuppliersPage() {
                </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 7 : 6} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                  <td colSpan={canEdit ? 11 : 10} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                         <Building2 className="h-6 w-6 text-slate-300" />
@@ -241,28 +257,15 @@ export default function OldSuppliersPage() {
               ) : (
                 suppliers.map((s: Supplier) => (
                   <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-5 py-3.5 border-r border-slate-100 font-medium">
-                      {s.company}
-                    </td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 font-medium">{s.company}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500" title={s.productCategory}>{s.productCategory}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.product}>{s.product}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100">{s.country}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">
-                      {s.website ? (
-                        <a
-                          href={
-                            s.website.startsWith("http")
-                              ? s.website
-                              : `https://${s.website}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:text-brand-600 hover:underline"
-                        >
-                          {s.website}
-                        </a>
-                      ) : null}
-                    </td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.email}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.products}>{s.products}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.accountManager}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.currentStatus}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.certifications}>{s.certifications}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reasonInactive}>{s.reasonInactive}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reactivationPotential}>{s.reactivationPotential}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.notes}>{s.notes}</td>
                     {canEdit && (
                       <td className="px-5 py-3.5 text-right font-medium">
@@ -343,6 +346,24 @@ export default function OldSuppliersPage() {
                 />
               </div>
               <div className="space-y-2">
+                <Label>Product Category</Label>
+                <Input
+                  value={form.productCategory ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, productCategory: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Product</Label>
+                <Input
+                  value={form.product ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, product: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>Country</Label>
                 <Input
                   value={form.country ?? ""}
@@ -352,29 +373,65 @@ export default function OldSuppliersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Website</Label>
+                <Label>Account Manager</Label>
                 <Input
-                  value={form.website ?? ""}
+                  value={form.accountManager ?? ""}
                   onChange={(e) =>
-                    setForm({ ...form, website: e.target.value })
+                    setForm({ ...form, accountManager: e.target.value })
                   }
-                  placeholder="https://example.com"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label>Current Status</Label>
                 <Input
-                  type="email"
-                  value={form.email ?? ""}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  value={form.currentStatus ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, currentStatus: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Certifications</Label>
+                <Input
+                  value={form.certifications ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, certifications: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Latest Quotation</Label>
+                <Input
+                  value={form.latestQuotation ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, latestQuotation: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Reason Inactive</Label>
+                <Input
+                  value={form.reasonInactive ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, reasonInactive: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Date Marked Inactive</Label>
+                <Input
+                  value={form.dateMarkedInactive ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, dateMarkedInactive: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <Label>Products</Label>
+                <Label>Reactivation Potential</Label>
                 <Input
-                  value={form.products ?? ""}
+                  value={form.reactivationPotential ?? ""}
                   onChange={(e) =>
-                    setForm({ ...form, products: e.target.value })
+                    setForm({ ...form, reactivationPotential: e.target.value })
                   }
                 />
               </div>
