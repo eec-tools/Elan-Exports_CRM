@@ -274,4 +274,37 @@ export async function uploadCatalog(req, res) {
         res.status(500).json({ error: "Internal server error" });
     }
 }
+/**
+ * GET /api/suppliers/stats
+ */
+export async function getSupplierStats(req, res) {
+    try {
+        const suppliers = await prisma.supplier.findMany({
+            select: { currentStatus: true },
+        });
+        const stats = {
+            total: suppliers.length,
+            active: 0,
+            inactive: 0,
+            underReview: 0,
+            signed: 0,
+        };
+        for (const s of suppliers) {
+            const status = s.currentStatus?.toLowerCase();
+            if (status === "active")
+                stats.active++;
+            else if (status === "inactive")
+                stats.inactive++;
+            else if (status === "under review")
+                stats.underReview++;
+            else if (status === "signed")
+                stats.signed++;
+        }
+        res.json(stats);
+    }
+    catch (err) {
+        console.error("Get supplier stats error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
 //# sourceMappingURL=suppliers.controller.js.map

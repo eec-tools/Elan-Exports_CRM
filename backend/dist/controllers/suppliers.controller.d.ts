@@ -30,4 +30,8 @@ export declare function exportSuppliersCsv(req: AuthRequest, res: Response): Pro
  * POST /api/suppliers/upload
  */
 export declare function uploadCatalog(req: Request, res: Response): Promise<void>;
+/**
+ * GET /api/suppliers/stats
+ */
+export declare function getSupplierStats(req: AuthRequest, res: Response): Promise<void>;
 //# sourceMappingURL=suppliers.controller.d.ts.map

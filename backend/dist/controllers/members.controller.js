@@ -174,6 +174,10 @@ export async function deleteMember(req, res) {
             res.status(400).json({ error: "Deactivate the member before deleting" });
             return;
         }
+        // Delete related records that have FK constraints before deleting the user
+        await prisma.accessRequest.deleteMany({
+            where: { OR: [{ userId: id }, { reviewedBy: id }] },
+        });
         await prisma.user.delete({ where: { id } });
         await logActivity(req.user.id, "delete", "members", id, {
             email: user.email,
