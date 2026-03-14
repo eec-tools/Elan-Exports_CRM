@@ -66,6 +66,7 @@ interface Supplier {
   otherBrands?: string;
   remarks?: string;
   currentStatus?: string;
+  documents?: { name: string; url: string }[];
 }
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
@@ -92,6 +93,7 @@ export default function SuppliersPage() {
   );
 
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["suppliers", search, statusFilter, page],
@@ -165,7 +167,20 @@ export default function SuppliersPage() {
       }
     }
 
-    const payload = { ...form, productCatalogShared: catalogUrl };
+    const finalDocuments = [...(form.documents || [])];
+
+    if (documentFiles.length > 0) {
+      for (const file of documentFiles) {
+        try {
+          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+          finalDocuments.push({ name: file.name, url: uploadRes.url });
+        } catch {
+          return; // error handled by onError in mutation
+        }
+      }
+    }
+
+    const payload = { ...form, productCatalogShared: catalogUrl, documents: finalDocuments };
 
     if (editing?.id) {
       updateMutation.mutate({ id: editing.id, d: payload });
@@ -178,6 +193,7 @@ export default function SuppliersPage() {
     setEditing(null);
     setForm(EMPTY_SUPPLIER);
     setCatalogFile(null);
+    setDocumentFiles([]);
     setDialogOpen(true);
   };
 
@@ -185,6 +201,7 @@ export default function SuppliersPage() {
     setEditing(s);
     setForm(s);
     setCatalogFile(null);
+    setDocumentFiles([]);
     setDialogOpen(true);
   };
 
@@ -635,6 +652,78 @@ export default function SuppliersPage() {
                     </button>
                   </div>
                 )}
+              </div>
+              <div className="space-y-2">
+                <Label>Upload Documents</Label>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    multiple
+                    className="hidden"
+                    id="documents-upload"
+                    onChange={(e) => {
+                       if (e.target.files) {
+                         setDocumentFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
+                       }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("documents-upload")?.click()}
+                    className="w-full justify-start truncate"
+                  >
+                    <Upload className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="truncate">Add Document PDFs</span>
+                  </Button>
+
+                  {/* Stored Documents */}
+                  {form.documents && form.documents.length > 0 && (
+                    <div className="flex flex-col gap-1 mt-2">
+                      {form.documents.map((doc, idx) => (
+                         <div key={`stored-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm">
+                           <a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">
+                             {doc.name}
+                           </a>
+                           <button
+                             type="button"
+                             className="text-slate-400 hover:text-rose-600 shrink-0"
+                             onClick={() => {
+                               const updated = [...form.documents!];
+                               updated.splice(idx, 1);
+                               setForm({ ...form, documents: updated });
+                             }}
+                           >
+                             <X className="h-4 w-4" />
+                           </button>
+                         </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* New Files Pending Upload */}
+                  {documentFiles.length > 0 && (
+                    <div className="flex flex-col gap-1 mt-1">
+                      {documentFiles.map((f, idx) => (
+                         <div key={`pending-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm">
+                           <span className="truncate text-slate-700 text-xs flex-1 mr-2">
+                             {f.name} (Pending)
+                           </span>
+                           <button
+                             type="button"
+                             className="text-slate-400 hover:text-rose-600 shrink-0"
+                             onClick={() => {
+                               setDocumentFiles((prev) => prev.filter((_, i) => i !== idx));
+                             }}
+                           >
+                             <X className="h-4 w-4" />
+                           </button>
+                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Current Status</Label>

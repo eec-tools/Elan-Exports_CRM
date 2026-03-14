@@ -138,6 +138,7 @@ model Supplier {
   otherBrands            String?  @map("other_brands")
   remarks                String?
   currentStatus          String?  @default("Active") @map("current_status")
+  documents              Json     @default("[]")
 
   createdBy              String?  @map("created_by")
   createdAt              DateTime @default(now()) @map("created_at")

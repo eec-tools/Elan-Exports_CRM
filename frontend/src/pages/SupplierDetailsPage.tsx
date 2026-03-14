@@ -49,6 +49,7 @@ import {
   Pencil,
   Upload,
   X,
+  Trash2,
 } from "lucide-react";
 
 interface Supplier {
@@ -77,6 +78,7 @@ interface Supplier {
   remarks?: string;
   currentStatus?: string;
   createdAt?: string;
+  documents?: { name: string; url: string }[];
 }
 
 function getCatalogViewUrl(url?: string) {
@@ -133,6 +135,8 @@ export default function SupplierDetailsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<Partial<Supplier>>({});
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
 
   const { isUnlocked, unlockButton, passkeyDialog } =
     useSensitiveDataUnlock("supplier-details");
@@ -166,6 +170,34 @@ export default function SupplierDetailsPage() {
     },
     onError: () => toast.error("Failed to upload catalog file"),
   });
+
+  const uploadDocuments = async (files: FileList) => {
+    if (!files || files.length === 0) return;
+    setUploadingDocs(true);
+    try {
+      const finalDocuments = [...(supplier?.documents || [])];
+      for (const file of Array.from(files)) {
+        const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+        finalDocuments.push({ name: file.name, url: uploadRes.url });
+      }
+      
+      // Save it immediately
+      if (supplier?.id) {
+        updateMutation.mutate({ id: supplier.id, d: { documents: finalDocuments } });
+      }
+    } catch {
+      toast.error("Failed to upload some documents");
+    } finally {
+      setUploadingDocs(false);
+    }
+  };
+
+  const handleDeleteDocument = (index: number) => {
+    if (!supplier?.documents || !supplier?.id) return;
+    const finalDocuments = [...supplier.documents];
+    finalDocuments.splice(index, 1);
+    updateMutation.mutate({ id: supplier.id, d: { documents: finalDocuments } });
+  };
 
   if (isLoading) {
     return (
@@ -211,7 +243,20 @@ export default function SupplierDetailsPage() {
       }
     }
 
-    const payload = { ...form, productCatalogShared: catalogUrl };
+    const finalDocuments = [...(form.documents || [])];
+
+    if (documentFiles.length > 0) {
+      for (const file of documentFiles) {
+        try {
+          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+          finalDocuments.push({ name: file.name, url: uploadRes.url });
+        } catch {
+          return; // error handled by onError in mutation
+        }
+      }
+    }
+
+    const payload = { ...form, productCatalogShared: catalogUrl, documents: finalDocuments };
 
     if (supplier?.id) {
       updateMutation.mutate({ id: supplier.id, d: payload });
@@ -221,6 +266,7 @@ export default function SupplierDetailsPage() {
   const openEdit = () => {
     setForm(supplier || {});
     setCatalogFile(null);
+    setDocumentFiles([]);
     setDialogOpen(true);
   };
 
@@ -458,6 +504,79 @@ export default function SupplierDetailsPage() {
         </Card>
       </div>
 
+      {/* ── Certifications & Documents ── */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            Certifications & Documents
+          </CardTitle>
+          <PermissionGate permission="suppliers" editOnly>
+            <div>
+              <input
+                type="file"
+                accept="application/pdf"
+                multiple
+                className="hidden"
+                id="cert-upload"
+                onChange={(e) => {
+                   if (e.target.files) uploadDocuments(e.target.files);
+                   e.target.value = "";
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-brand-600 hover:text-brand-700 hover:bg-brand-50"
+                onClick={() => document.getElementById("cert-upload")?.click()}
+                disabled={uploadingDocs}
+              >
+                {uploadingDocs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                Upload New
+              </Button>
+            </div>
+          </PermissionGate>
+        </CardHeader>
+        <CardContent>
+           {(!supplier.documents || supplier.documents.length === 0) && !uploadingDocs ? (
+             <p className="text-sm text-muted-foreground">No documents uploaded yet</p>
+           ) : (
+             <div className="flex flex-col gap-2">
+               {supplier.documents?.map((doc, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-lg group">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded bg-white flex items-center justify-center border border-slate-200 shadow-sm shrink-0">
+                        <FileText className="h-4 w-4 text-rose-500" />
+                      </div>
+                      <a href={getCatalogViewUrl(doc.url)} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-slate-700 hover:text-brand-600 hover:underline line-clamp-1">
+                        {doc.name}
+                      </a>
+                    </div>
+                    <PermissionGate permission="suppliers" editOnly>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        onClick={() => handleDeleteDocument(idx)}
+                        disabled={updateMutation.isPending}
+                        title="Delete Document"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </PermissionGate>
+                  </div>
+               ))}
+               {uploadingDocs && (
+                  <div className="flex items-center gap-2 p-3 text-sm text-slate-500 bg-slate-50 border border-slate-100 rounded-lg">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading documents...
+                  </div>
+               )}
+             </div>
+           )}
+        </CardContent>
+      </Card>
+
       {/* ── Remarks ── */}
       {supplier.remarks && (
         <Card>
@@ -659,6 +778,78 @@ export default function SupplierDetailsPage() {
                     </button>
                   </div>
                 )}
+              </div>
+              <div className="space-y-2">
+                <Label>Upload Documents</Label>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    multiple
+                    className="hidden"
+                    id="documents-upload-edit"
+                    onChange={(e) => {
+                       if (e.target.files) {
+                         setDocumentFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
+                       }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("documents-upload-edit")?.click()}
+                    className="w-full justify-start truncate"
+                  >
+                    <Upload className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="truncate">Add Document PDFs</span>
+                  </Button>
+
+                  {/* Stored Documents */}
+                  {form.documents && form.documents.length > 0 && (
+                    <div className="flex flex-col gap-1 mt-2">
+                      {form.documents.map((doc, idx) => (
+                         <div key={`stored-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm">
+                           <a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">
+                             {doc.name}
+                           </a>
+                           <button
+                             type="button"
+                             className="text-slate-400 hover:text-rose-600 shrink-0"
+                             onClick={() => {
+                               const updated = [...form.documents!];
+                               updated.splice(idx, 1);
+                               setForm({ ...form, documents: updated });
+                             }}
+                           >
+                             <X className="h-4 w-4" />
+                           </button>
+                         </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* New Files Pending Upload */}
+                  {documentFiles.length > 0 && (
+                    <div className="flex flex-col gap-1 mt-1">
+                      {documentFiles.map((f, idx) => (
+                         <div key={`pending-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm">
+                           <span className="truncate text-slate-700 text-xs flex-1 mr-2">
+                             {f.name} (Pending)
+                           </span>
+                           <button
+                             type="button"
+                             className="text-slate-400 hover:text-rose-600 shrink-0"
+                             onClick={() => {
+                               setDocumentFiles((prev) => prev.filter((_, i) => i !== idx));
+                             }}
+                           >
+                             <X className="h-4 w-4" />
+                           </button>
+                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Current Status</Label>
