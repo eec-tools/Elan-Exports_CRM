@@ -13,7 +13,7 @@ async function safe(fn, fallback) {
  */
 export async function getDashboardStats(_req, res) {
     try {
-        const [totalBuyers, totalSuppliers, activeUsers, totalReports, totalDeals, totalVaultDocs, pendingTasks, dealsByStage, pipelineRevenue, recentDeals,] = await Promise.all([
+        const [totalBuyers, totalSuppliers, activeUsers, totalReports, totalDeals, totalVaultDocs, pendingTasks, dealsByStage, pipelineRevenue, recentDeals, tasksGrouped,] = await Promise.all([
             safe(() => prisma.buyer.count(), 0),
             safe(() => prisma.supplier.count(), 0),
             safe(() => prisma.user.count({ where: { isActive: true } }), 0),
@@ -41,6 +41,11 @@ export async function getDashboardStats(_req, res) {
                     createdAt: true,
                 },
             }), []),
+            safe(() => prisma.dailyTask.groupBy({
+                by: ["owner", "status"],
+                _count: { id: true },
+                where: { owner: { not: null } },
+            }), []),
         ]);
         const STAGE_ORDER = [
             "LEAD", "RFQ", "SAMPLE", "NEGOTIATION", "CONTRACT", "CLOSED_WON", "CLOSED_LOST",
@@ -55,6 +60,35 @@ export async function getDashboardStats(_req, res) {
             };
         }).filter((s) => s.count > 0);
         const revenue = pipelineRevenue?._sum?.expectedRevenue ?? 0;
+        // Process Task Analytics
+        const rawTasks = tasksGrouped;
+        const taskAnalyticsMap = {};
+        for (const item of rawTasks) {
+            if (!item.owner)
+                continue;
+            const owner = item.owner;
+            const status = (item.status || "").toLowerCase();
+            const count = item._count.id;
+            if (!taskAnalyticsMap[owner]) {
+                taskAnalyticsMap[owner] = { pending: 0, inProgress: 0, completed: 0, closed: 0, total: 0 };
+            }
+            taskAnalyticsMap[owner].total += count;
+            if (status === "inprogress") {
+                taskAnalyticsMap[owner].inProgress += count;
+            }
+            else if (status === "completed") {
+                taskAnalyticsMap[owner].completed += count;
+            }
+            else if (status === "closed") {
+                taskAnalyticsMap[owner].closed += count;
+            }
+            else {
+                taskAnalyticsMap[owner].pending += count; // handles "not started" and any other unrecognized ones mapped to pending
+            }
+        }
+        const taskAnalytics = Object.entries(taskAnalyticsMap)
+            .map(([owner, stats]) => ({ owner, ...stats }))
+            .sort((a, b) => b.total - a.total); // Sort by total tasks descending
         res.json({
             totalBuyers,
             totalSuppliers,
@@ -66,6 +100,7 @@ export async function getDashboardStats(_req, res) {
             totalPipelineRevenue: revenue,
             pipeline,
             recentDeals,
+            taskAnalytics,
         });
     }
     catch (err) {
