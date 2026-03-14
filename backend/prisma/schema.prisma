@@ -139,6 +139,7 @@ model Supplier {
   remarks                String?
   currentStatus          String?  @default("Active") @map("current_status")
   documents              Json     @default("[]")
+  contractDocument       Json?    @map("contract_document")
 
   createdBy              String?  @map("created_by")
   createdAt              DateTime @default(now()) @map("created_at")

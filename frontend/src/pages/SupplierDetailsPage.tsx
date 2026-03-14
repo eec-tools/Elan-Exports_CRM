@@ -79,6 +79,7 @@ interface Supplier {
   currentStatus?: string;
   createdAt?: string;
   documents?: { name: string; url: string }[];
+  contractDocument?: { name: string; url: string } | null;
 }
 
 function getCatalogViewUrl(url?: string) {
@@ -137,6 +138,7 @@ export default function SupplierDetailsPage() {
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [uploadingContract, setUploadingContract] = useState(false);
 
   const { isUnlocked, unlockButton, passkeyDialog } =
     useSensitiveDataUnlock("supplier-details");
@@ -197,6 +199,27 @@ export default function SupplierDetailsPage() {
     const finalDocuments = [...supplier.documents];
     finalDocuments.splice(index, 1);
     updateMutation.mutate({ id: supplier.id, d: { documents: finalDocuments } });
+  };
+
+  const uploadContractDocument = async (file: File) => {
+    if (!file) return;
+    setUploadingContract(true);
+    try {
+      const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+      const newContract = { name: file.name, url: uploadRes.url };
+      if (supplier?.id) {
+        updateMutation.mutate({ id: supplier.id, d: { contractDocument: newContract } });
+      }
+    } catch {
+      toast.error("Failed to upload contract document");
+    } finally {
+      setUploadingContract(false);
+    }
+  };
+
+  const handleDeleteContract = () => {
+    if (!supplier?.id) return;
+    updateMutation.mutate({ id: supplier.id, d: { contractDocument: null } });
   };
 
   if (isLoading) {
@@ -411,6 +434,58 @@ export default function SupplierDetailsPage() {
               label="Lidl Factory ID"
               value={supplier.lidlFactoryId}
             />
+
+            <Separator className="my-3" />
+            <div>
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-2">
+                <FileText className="h-3.5 w-3.5" />
+                Contract Document
+              </p>
+              {!isUnlocked ? (
+                <p className="text-sm font-medium text-slate-800">•••••••••••••••••••••</p>
+              ) : supplier.contractDocument ? (
+                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-blue-500" />
+                    <a
+                      href={getCatalogViewUrl(supplier.contractDocument.url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium text-blue-600 hover:underline line-clamp-1"
+                    >
+                      {supplier.contractDocument.name}
+                    </a>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full shrink-0 ml-2"
+                    onClick={handleDeleteContract}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 mt-1">
+                  <Input
+                    type="file"
+                    className="h-9 text-sm text-slate-500 max-w-[250px]
+                    file:mr-4 file:py-1 file:px-3
+                    file:rounded-md file:border-0
+                    file:text-xs file:font-semibold
+                    file:bg-brand-50 file:text-brand-700
+                    hover:file:bg-brand-100 cursor-pointer"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        uploadContractDocument(e.target.files[0]);
+                      }
+                    }}
+                    disabled={uploadingContract}
+                  />
+                  {uploadingContract && <Loader2 className="h-4 w-4 animate-spin text-brand-500" />}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 

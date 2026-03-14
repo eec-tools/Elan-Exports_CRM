@@ -67,6 +67,7 @@ interface Supplier {
   remarks?: string;
   currentStatus?: string;
   documents?: { name: string; url: string }[];
+  contractDocument?: { name: string; url: string } | null;
 }
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
