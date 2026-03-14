@@ -305,27 +305,24 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* ── Deal Pipeline, Task Analytics & Recent Deals ──────────────── */}
-      <div className="grid gap-4 lg:grid-cols-5">
+      {/* ── Deal Pipeline & Recent Deals ──────────────── */}
+      <div className="grid gap-4 lg:grid-cols-5 items-start">
 
-        {/* Left Column: Pipeline & Tasks */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
-          
-          {/* Pipeline */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-              <div className="flex items-center gap-2">
-                <div className="rounded-md bg-violet-50 p-1.5">
-                  <BarChart3 className="h-4 w-4 text-violet-600" />
-                </div>
-                <h2 className="text-sm font-semibold text-slate-800">Deal Pipeline</h2>
+        {/* Pipeline */}
+        <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div className="flex items-center gap-2">
+              <div className="rounded-md bg-violet-50 p-1.5">
+                <BarChart3 className="h-4 w-4 text-violet-600" />
               </div>
-              <Link to="/deals" className="text-xs text-brand-600 hover:underline font-medium">
-                View all
-              </Link>
+              <h2 className="text-sm font-semibold text-slate-800">Deal Pipeline</h2>
             </div>
+            <Link to="/deals" className="text-xs text-brand-600 hover:underline font-medium">
+              View all
+            </Link>
+          </div>
 
-          <div className="p-5 space-y-3">
+          <div className="p-5 space-y-3 overflow-y-auto">
             {s.pipeline && s.pipeline.length > 0 ? (
               s.pipeline.map((p) => {
                 const meta = STAGE_META[p.stage] ?? { label: p.stage, color: "text-slate-600", bar: "bg-slate-400" };
@@ -349,7 +346,7 @@ export default function DashboardPage() {
                 );
               })
             ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="flex flex-col items-center justify-center py-8 text-center h-full">
                 <TrendingUp className="h-8 w-8 text-slate-200 mb-2" />
                 <p className="text-sm text-slate-400">No deals yet</p>
                 <Link to="/deals" className="mt-2 text-xs text-brand-600 hover:underline">
@@ -360,71 +357,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Task Analytics */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <div className="flex items-center gap-2">
-              <div className="rounded-md bg-amber-50 p-1.5">
-                <CheckSquare className="h-4 w-4 text-amber-600" />
-              </div>
-              <h2 className="text-sm font-semibold text-slate-800">Task Analytics</h2>
-            </div>
-            <Link to="/daily-tasks" className="text-xs text-brand-600 hover:underline font-medium">
-              View all
-            </Link>
-          </div>
-
-          <div className="p-5 space-y-4">
-            {s.taskAnalytics && s.taskAnalytics.length > 0 ? (
-              s.taskAnalytics.map((ta) => {
-                const totalPct = Math.round((ta.total / maxTaskCount) * 100);
-                const completedPct = ta.total > 0 ? Math.round((ta.completed / ta.total) * 100) : 0;
-                const inProgressPct = ta.total > 0 ? Math.round((ta.inProgress / ta.total) * 100) : 0;
-                const closedPct = ta.total > 0 ? Math.round((ta.closed / ta.total) * 100) : 0;
-                const pendingPct = ta.total > 0 ? Math.round((ta.pending / ta.total) * 100) : 0;
-                
-                return (
-                  <div key={ta.owner} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-slate-700 capitalize">{ta.owner}</span>
-                      <span className="text-slate-500 font-medium">
-                        {ta.total} task{ta.total !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    {/* The outer bar takes up proportionate width to the max owner tasks */}
-                    <div className="h-2 w-full rounded-full bg-slate-50 border border-slate-100">
-                      <div className="flex h-full rounded-full overflow-hidden" style={{ width: `${totalPct}%` }}>
-                        <div style={{ width: `${completedPct}%` }} className="bg-brand-500" title={`Completed: ${ta.completed}`} />
-                        <div style={{ width: `${inProgressPct}%` }} className="bg-amber-400" title={`In Progress: ${ta.inProgress}`} />
-                        <div style={{ width: `${closedPct}%` }} className="bg-slate-500" title={`Closed: ${ta.closed}`} />
-                        <div style={{ width: `${pendingPct}%` }} className="bg-red-500" title={`Pending: ${ta.pending}`} />
-                      </div>
-                    </div>
-                    <div className="flex gap-2.5 text-[11px] font-semibold mt-1 flex-wrap">
-                      {ta.completed > 0 && <span className="text-brand-700 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-brand-500"></span>{ta.completed} Completed</span>}
-                      {ta.inProgress > 0 && <span className="text-amber-600 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>{ta.inProgress} In Progress</span>}
-                      {ta.pending > 0 && <span className="text-red-600 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>{ta.pending} Pending</span>}
-                      {ta.closed > 0 && <span className="text-slate-600 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>{ta.closed} Closed</span>}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="flex flex-col items-center justify-center py-6 text-center">
-                <CheckSquare className="h-8 w-8 text-slate-200 mb-2" />
-                <p className="text-sm text-slate-400">No active tasks</p>
-                <Link to="/daily-tasks" className="mt-2 text-xs text-brand-600 hover:underline">
-                  Add tasks to track →
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-        
-      </div>
-
-      {/* Right Column: Recent Deals */}
-      <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col h-full">
+        {/* Right Column: Recent Deals */}
+      <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
           <div className="flex items-center gap-2">
             <div className="rounded-md bg-blue-50 p-1.5">
@@ -437,7 +371,7 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="divide-y divide-slate-50 overflow-y-auto min-h-0 flex-1">
+        <div className="divide-y divide-slate-50 overflow-y-auto">
           {s.recentDeals && s.recentDeals.length > 0 ? (
               s.recentDeals.map((deal) => {
                 const stageM = STAGE_META[deal.stage] ?? { label: deal.stage, color: "text-slate-600", bar: "bg-slate-400" };
@@ -474,6 +408,69 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ── Task Analytics ──────────────── */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <div className="rounded-md bg-amber-50 p-1.5">
+              <CheckSquare className="h-4 w-4 text-amber-600" />
+            </div>
+            <h2 className="text-sm font-semibold text-slate-800">Task Analytics</h2>
+          </div>
+          <Link to="/daily-tasks" className="text-xs text-brand-600 hover:underline font-medium">
+            View all
+          </Link>
+        </div>
+
+        <div className="p-5">
+          {s.taskAnalytics && s.taskAnalytics.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {s.taskAnalytics.map((ta) => {
+                const totalPct = Math.round((ta.total / maxTaskCount) * 100);
+                const completedPct = ta.total > 0 ? Math.round((ta.completed / ta.total) * 100) : 0;
+                const inProgressPct = ta.total > 0 ? Math.round((ta.inProgress / ta.total) * 100) : 0;
+                const closedPct = ta.total > 0 ? Math.round((ta.closed / ta.total) * 100) : 0;
+                const pendingPct = ta.total > 0 ? Math.round((ta.pending / ta.total) * 100) : 0;
+                
+                return (
+                  <div key={ta.owner} className="space-y-1.5 p-4 rounded-lg border border-slate-100 bg-slate-50/50">
+                    <div className="flex items-center justify-between text-xs mb-3">
+                      <span className="font-bold text-slate-800 capitalize text-sm">{ta.owner}</span>
+                      <span className="text-slate-500 font-medium">
+                        {ta.total} task{ta.total !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    {/* The outer bar takes up proportionate width to the max owner tasks */}
+                    <div className="h-2 w-full rounded-full bg-slate-100 border border-slate-200">
+                      <div className="flex h-full rounded-full overflow-hidden" style={{ width: `${totalPct === 0 ? 1 : totalPct}%` }}>
+                        <div style={{ width: `${completedPct}%` }} className="bg-brand-500" title={`Completed: ${ta.completed}`} />
+                        <div style={{ width: `${inProgressPct}%` }} className="bg-amber-400" title={`In Progress: ${ta.inProgress}`} />
+                        <div style={{ width: `${closedPct}%` }} className="bg-slate-500" title={`Closed: ${ta.closed}`} />
+                        <div style={{ width: `${pendingPct}%` }} className="bg-red-500" title={`Pending: ${ta.pending}`} />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5 text-[11px] font-semibold mt-3">
+                      {ta.completed > 0 && <span className="text-brand-700 flex items-center justify-between"><span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-brand-500"></span>Completed</span> <span>{ta.completed}</span></span>}
+                      {ta.inProgress > 0 && <span className="text-amber-600 flex items-center justify-between"><span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>In Progress</span> <span>{ta.inProgress}</span></span>}
+                      {ta.pending > 0 && <span className="text-red-600 flex items-center justify-between"><span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>Pending</span> <span>{ta.pending}</span></span>}
+                      {ta.closed > 0 && <span className="text-slate-600 flex items-center justify-between"><span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Closed</span> <span>{ta.closed}</span></span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <CheckSquare className="h-8 w-8 text-slate-200 mb-2" />
+              <p className="text-sm text-slate-400">No active tasks</p>
+              <Link to="/daily-tasks" className="mt-2 text-xs text-brand-600 hover:underline">
+                Add tasks to track →
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 

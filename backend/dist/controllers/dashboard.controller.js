@@ -29,7 +29,7 @@ export async function getDashboardStats(_req, res) {
             safe(() => prisma.deal.aggregate({ _sum: { expectedRevenue: true } }), { _sum: { expectedRevenue: 0 } }),
             safe(() => prisma.deal.findMany({
                 orderBy: { createdAt: "desc" },
-                take: 5,
+                take: 2,
                 select: {
                     id: true,
                     title: true,
@@ -44,7 +44,12 @@ export async function getDashboardStats(_req, res) {
             safe(() => prisma.dailyTask.groupBy({
                 by: ["owner", "status"],
                 _count: { id: true },
-                where: { owner: { not: null } },
+                where: {
+                    owner: {
+                        not: null,
+                        notIn: ["", "N/A", "n/a"]
+                    }
+                },
             }), []),
         ]);
         const STAGE_ORDER = [

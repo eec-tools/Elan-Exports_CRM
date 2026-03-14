@@ -361,7 +361,7 @@ export default function DailyTasksPage() {
                                 <th className="border-r border-slate-200 px-4 py-3 font-semibold min-w-[140px]">Owner</th>
                                 <th className="border-r border-slate-200 px-4 py-3 font-semibold min-w-[160px]">Status</th>
                                 <th className="border-r border-slate-200 px-4 py-3 font-semibold min-w-[120px]">Deadline</th>
-                                <th className="border-r border-slate-200 px-4 py-3 font-semibold min-w-[200px] w-full">Notes</th>
+                                <th className="border-r border-slate-200 px-4 py-3 font-semibold min-w-[200px] max-w-[350px]">Notes</th>
                                 <th className="px-3 py-3 font-semibold w-10 text-center"></th>
                             </tr>
                         </thead>
@@ -585,7 +585,7 @@ export default function DailyTasksPage() {
                                                     onKeyDown={handleKeyDown}
                                                 />
                                             ) : (
-                                                <div className="px-4 py-2.5 text-slate-500 line-clamp-2 leading-relaxed">
+                                                <div className="px-4 py-2.5 text-slate-500 whitespace-pre-wrap break-words leading-relaxed max-w-[350px]">
                                                     {task.notes}
                                                 </div>
                                             )}

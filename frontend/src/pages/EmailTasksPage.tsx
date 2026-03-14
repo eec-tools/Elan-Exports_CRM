@@ -145,7 +145,6 @@ const RESPONDENT_OPTIONS = [
   "mohita",
   "buyer",
   "supplier",
-  "N/A",
   "fahad",
   "madan",
 ];
