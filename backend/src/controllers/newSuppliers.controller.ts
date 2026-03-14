@@ -1,15 +1,28 @@
+import { Response } from "express";
 import prisma from "../config/db.js";
+import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
+
 /**
- * GET /api/old-suppliers
+ * GET /api/new-suppliers
  */
-export async function listOldSuppliers(req, res) {
+export async function listNewSuppliers(
+    req: AuthRequest,
+    res: Response,
+): Promise<void> {
     try {
-        const { search = "", page = "1", limit = "20", } = req.query;
+        const {
+            search = "",
+            page = "1",
+            limit = "20",
+        } = req.query as Record<string, string>;
+
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
-        const where = {};
+
+        const where: any = {};
+
         if (search) {
             where.OR = [
                 { company: { contains: search, mode: "insensitive" } },
@@ -20,15 +33,17 @@ export async function listOldSuppliers(req, res) {
                 { currentStatus: { contains: search, mode: "insensitive" } },
             ];
         }
+
         const [suppliers, total] = await Promise.all([
-            prisma.oldSupplier.findMany({
+            (prisma as any).newSupplier.findMany({
                 where,
                 skip,
                 take: limitNum,
                 orderBy: { createdAt: "desc" },
             }),
-            prisma.oldSupplier.count({ where }),
+            (prisma as any).newSupplier.count({ where }),
         ]);
+
         res.json({
             data: suppliers,
             pagination: {
@@ -38,69 +53,94 @@ export async function listOldSuppliers(req, res) {
                 pages: Math.ceil(total / limitNum),
             },
         });
-    }
-    catch (err) {
-        console.error("List old suppliers error:", err);
+    } catch (err) {
+        console.error("List new suppliers error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }
+
 /**
- * GET /api/old-suppliers/:id
+ * GET /api/new-suppliers/:id
  */
-export async function getOldSupplier(req, res) {
+export async function getNewSupplier(
+    req: AuthRequest,
+    res: Response,
+): Promise<void> {
     try {
-        const supplier = await prisma.oldSupplier.findUnique({
+        const supplier = await (prisma as any).newSupplier.findUnique({
             where: { id: req.params.id },
         });
+
         if (!supplier) {
-            res.status(404).json({ error: "Old supplier not found" });
+            res.status(404).json({ error: "New supplier not found" });
             return;
         }
+
         res.json(supplier);
-    }
-    catch (err) {
-        console.error("Get old supplier error:", err);
+    } catch (err) {
+        console.error("Get new supplier error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }
+
 /**
- * POST /api/old-suppliers
+ * POST /api/new-suppliers
  */
-export async function createOldSupplier(req, res) {
+export async function createNewSupplier(
+    req: AuthRequest,
+    res: Response,
+): Promise<void> {
     try {
-        const { company, productCategory, product, country, accountManager, currentStatus, certifications, latestQuotation, reasonInactive, dateMarkedInactive, reactivationPotential, notes } = req.body;
-        const supplier = await prisma.oldSupplier.create({
+        const {
+            company, productCategory, product, country, accountManager,
+            currentStatus, certifications, latestQuotation, reasonInactive,
+            dateMarkedInactive, reactivationPotential, notes
+        } = req.body;
+
+        const supplier = await (prisma as any).newSupplier.create({
             data: {
                 company, productCategory, product, country, accountManager,
                 currentStatus, certifications, latestQuotation, reasonInactive,
                 dateMarkedInactive, reactivationPotential, notes,
-                createdBy: req.user.id,
+                createdBy: req.user!.id,
             },
         });
-        await logActivity(req.user.id, "create", "old_suppliers", supplier.id, {
+
+        await logActivity(req.user!.id, "create", "new_suppliers", supplier.id, {
             company: supplier.company,
         });
+
         res.status(201).json(supplier);
-    }
-    catch (err) {
-        console.error("Create old supplier error:", err);
+    } catch (err) {
+        console.error("Create new supplier error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }
+
 /**
- * PUT /api/old-suppliers/:id
+ * PUT /api/new-suppliers/:id
  */
-export async function updateOldSupplier(req, res) {
+export async function updateNewSupplier(
+    req: AuthRequest,
+    res: Response,
+): Promise<void> {
     try {
-        const existing = await prisma.oldSupplier.findUnique({
+        const existing = await (prisma as any).newSupplier.findUnique({
             where: { id: req.params.id },
         });
+
         if (!existing) {
-            res.status(404).json({ error: "Old supplier not found" });
+            res.status(404).json({ error: "New supplier not found" });
             return;
         }
-        const { company, productCategory, product, country, accountManager, currentStatus, certifications, latestQuotation, reasonInactive, dateMarkedInactive, reactivationPotential, notes } = req.body;
-        const supplier = await prisma.oldSupplier.update({
+
+        const {
+            company, productCategory, product, country, accountManager,
+            currentStatus, certifications, latestQuotation, reasonInactive,
+            dateMarkedInactive, reactivationPotential, notes
+        } = req.body;
+
+        const supplier = await (prisma as any).newSupplier.update({
             where: { id: req.params.id },
             data: {
                 company, productCategory, product, country, accountManager,
@@ -108,46 +148,59 @@ export async function updateOldSupplier(req, res) {
                 dateMarkedInactive, reactivationPotential, notes
             },
         });
-        await logActivity(req.user.id, "update", "old_suppliers", supplier.id, {
+
+        await logActivity(req.user!.id, "update", "new_suppliers", supplier.id, {
             company: supplier.company,
         });
+
         res.json(supplier);
-    }
-    catch (err) {
-        console.error("Update old supplier error:", err);
+    } catch (err) {
+        console.error("Update new supplier error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }
+
 /**
- * DELETE /api/old-suppliers/:id
+ * DELETE /api/new-suppliers/:id
  */
-export async function deleteOldSupplier(req, res) {
+export async function deleteNewSupplier(
+    req: AuthRequest,
+    res: Response,
+): Promise<void> {
     try {
-        const existing = await prisma.oldSupplier.findUnique({
+        const existing = await (prisma as any).newSupplier.findUnique({
             where: { id: req.params.id },
         });
+
         if (!existing) {
-            res.status(404).json({ error: "Old supplier not found" });
+            res.status(404).json({ error: "New supplier not found" });
             return;
         }
-        await prisma.oldSupplier.delete({ where: { id: req.params.id } });
-        await logActivity(req.user.id, "delete", "old_suppliers", req.params.id, {
+
+        await (prisma as any).newSupplier.delete({ where: { id: req.params.id } });
+
+        await logActivity(req.user!.id, "delete", "new_suppliers", req.params.id, {
             company: existing.company,
         });
-        res.json({ message: "Old supplier deleted" });
-    }
-    catch (err) {
-        console.error("Delete old supplier error:", err);
+
+        res.json({ message: "New supplier deleted" });
+    } catch (err) {
+        console.error("Delete new supplier error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }
+
 /**
- * GET /api/old-suppliers/export/csv
+ * GET /api/new-suppliers/export/csv
  */
-export async function exportOldSuppliersCsv(req, res) {
+export async function exportNewSuppliersCsv(
+    req: AuthRequest,
+    res: Response,
+): Promise<void> {
     try {
-        const { search = "" } = req.query;
-        const where = {};
+        const { search = "" } = req.query as Record<string, string>;
+
+        const where: any = {};
         if (search) {
             where.OR = [
                 { company: { contains: search, mode: "insensitive" } },
@@ -158,10 +211,12 @@ export async function exportOldSuppliersCsv(req, res) {
                 { currentStatus: { contains: search, mode: "insensitive" } },
             ];
         }
-        const suppliers = await prisma.oldSupplier.findMany({
+
+        const suppliers = await (prisma as any).newSupplier.findMany({
             where,
             orderBy: { createdAt: "desc" },
         });
+
         const headers = [
             "Company Name",
             "Product Category",
@@ -177,7 +232,8 @@ export async function exportOldSuppliersCsv(req, res) {
             "Notes",
             "Created At"
         ];
-        const rows = suppliers.map((s) => [
+
+        const rows = suppliers.map((s: any) => [
             s.company,
             s.productCategory || "",
             s.product || "",
@@ -192,17 +248,22 @@ export async function exportOldSuppliersCsv(req, res) {
             s.notes || "",
             s.createdAt.toISOString().split("T")[0],
         ]);
+
         const csvContent = [
             headers.join(","),
-            ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")),
+            ...rows.map((row: any[]) =>
+                row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+            ),
         ].join("\n");
+
         res.setHeader("Content-Type", "text/csv");
-        res.setHeader("Content-Disposition", `attachment; filename=old_suppliers_export_${new Date().toISOString().split("T")[0]}.csv`);
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename=new_suppliers_export_${new Date().toISOString().split("T")[0]}.csv`,
+        );
         res.send(csvContent);
-    }
-    catch (err) {
-        console.error("Export old suppliers error:", err);
+    } catch (err) {
+        console.error("Export new suppliers error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }
-//# sourceMappingURL=oldSuppliers.controller.js.map

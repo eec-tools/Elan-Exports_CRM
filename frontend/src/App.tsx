@@ -15,6 +15,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import BuyersPage from "@/pages/BuyersPage";
 import SignedContractSuppliersPage from "@/pages/SignedContractSuppliersPage";
 import OldSuppliersPage from "@/pages/OldSuppliersPage";
+import NewSuppliersPage from "@/pages/NewSuppliersPage";
 import ReportsPage from "@/pages/ReportsPage";
 import MembersPage from "@/pages/MembersPage";
 import ActivityPage from "@/pages/ActivityPage";
@@ -97,6 +98,14 @@ export default function App() {
                   element={
                     <PermissionGate permission="suppliers">
                       <OldSuppliersPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="suppliers/new"
+                  element={
+                    <PermissionGate permission="suppliers">
+                      <NewSuppliersPage />
                     </PermissionGate>
                   }
                 />

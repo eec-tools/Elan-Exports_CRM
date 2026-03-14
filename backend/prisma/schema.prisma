@@ -173,6 +173,30 @@ model OldSupplier {
   @@map("old_suppliers")
 }
 
+// ─── NEW SUPPLIERS ──────────────────────────────────
+
+model NewSupplier {
+  id                    String   @id @default(uuid())
+  company               String
+  productCategory       String?  @map("product_category")
+  product               String?
+  country               String?
+  accountManager        String?  @map("account_manager")
+  currentStatus         String?  @map("current_status")
+  certifications        String?
+  latestQuotation       String?  @map("latest_quotation")
+  reasonInactive        String?  @map("reason_inactive")
+  dateMarkedInactive    String?  @map("date_marked_inactive")
+  reactivationPotential String?  @map("reactivation_potential")
+  notes                 String?
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("new_suppliers")
+}
+
 // ─── REPORTS ────────────────────────────────────────
 
 model Report {

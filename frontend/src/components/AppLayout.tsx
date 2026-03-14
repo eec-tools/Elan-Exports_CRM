@@ -170,7 +170,7 @@ export function AppLayout() {
           >
             <X className="h-5 w-5" />
           </Button>
-          
+
           {/* Desktop collapse toggle - Softer style */}
           <Button
             variant="ghost"
@@ -201,52 +201,74 @@ export function AppLayout() {
                     {sidebarCollapsed && <Factory className="h-4 w-4 text-slate-400" />}
                   </div>
                   <div className="space-y-1">
-                      <NavLink
-                        to="/suppliers/signed-contract"
-                        onClick={() => setSidebarOpen(false)}
-                        className={({ isActive }) =>
-                          `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
-                          } ${isActive
-                            ? "bg-brand-50 text-brand-700"
-                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                          }`
-                        }
-                        title={sidebarCollapsed ? "Signed Contracts" : undefined}
-                      >
-                         {({ isActive }) => (
-                            <>
-                              {isActive && !sidebarCollapsed && (
-                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
-                              )}
-                              <Factory className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
-                              {!sidebarCollapsed && <span className="truncate">Signed Contracts</span>}
-                            </>
-                         )}
-                      </NavLink>
-                      <NavLink
-                        to="/suppliers/old"
-                        onClick={() => setSidebarOpen(false)}
-                        className={({ isActive }) =>
-                          `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
-                          } ${isActive
-                            ? "bg-brand-50 text-brand-700"
-                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                          }`
-                        }
-                        title={sidebarCollapsed ? "Old Supplier Data" : undefined}
-                      >
-                        {({ isActive }) => (
-                            <>
-                              {isActive && !sidebarCollapsed && (
-                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
-                              )}
-                              <Archive className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
-                              {!sidebarCollapsed && <span className="truncate">Old Supplier Data</span>}
-                            </>
-                         )}
-                      </NavLink>
+                    <NavLink
+                      to="/suppliers/new"
+                      onClick={() => setSidebarOpen(false)}
+                      className={({ isActive }) =>
+                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
+                        } ${isActive
+                          ? "bg-brand-50 text-brand-700"
+                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        }`
+                      }
+                      title={sidebarCollapsed ? "New Suppliers" : undefined}
+                    >
+                      {({ isActive }) => (
+                        <>
+                          {isActive && !sidebarCollapsed && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                          )}
+                          <Factory className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
+                          {!sidebarCollapsed && <span className="truncate">New Suppliers</span>}
+                        </>
+                      )}
+                    </NavLink>
+                    <NavLink
+                      to="/suppliers/signed-contract"
+                      onClick={() => setSidebarOpen(false)}
+                      className={({ isActive }) =>
+                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
+                        } ${isActive
+                          ? "bg-brand-50 text-brand-700"
+                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        }`
+                      }
+                      title={sidebarCollapsed ? "Signed Contracts" : undefined}
+                    >
+                      {({ isActive }) => (
+                        <>
+                          {isActive && !sidebarCollapsed && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                          )}
+                          <FileText className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
+                          {!sidebarCollapsed && <span className="truncate">Signed Contracts</span>}
+                        </>
+                      )}
+                    </NavLink>
+                    <NavLink
+                      to="/suppliers/old"
+                      onClick={() => setSidebarOpen(false)}
+                      className={({ isActive }) =>
+                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
+                        } ${isActive
+                          ? "bg-brand-50 text-brand-700"
+                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        }`
+                      }
+                      title={sidebarCollapsed ? "Old Supplier Data" : undefined}
+                    >
+                      {({ isActive }) => (
+                        <>
+                          {isActive && !sidebarCollapsed && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                          )}
+                          <Archive className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
+                          {!sidebarCollapsed && <span className="truncate">Old Supplier Data</span>}
+                        </>
+                      )}
+                    </NavLink>
                   </div>
-                   {!sidebarCollapsed && <Separator className="bg-slate-100 my-4 w-[calc(100%-1.5rem)] mx-auto" />}
+                  {!sidebarCollapsed && <Separator className="bg-slate-100 my-4 w-[calc(100%-1.5rem)] mx-auto" />}
                 </div>
               );
             }
@@ -266,15 +288,15 @@ export function AppLayout() {
                 }
                 title={sidebarCollapsed ? item.label : undefined}
               >
-                  {({ isActive }) => (
-                      <>
-                        {isActive && !sidebarCollapsed && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
-                        )}
-                        <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
-                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                      </>
-                   )}
+                {({ isActive }) => (
+                  <>
+                    {isActive && !sidebarCollapsed && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                    )}
+                    <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
+                    {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                  </>
+                )}
               </NavLink>
             );
           })}
