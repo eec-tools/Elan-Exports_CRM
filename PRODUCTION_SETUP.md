@@ -6,7 +6,7 @@ The CORS error occurs because your backend needs to allow your Vercel frontend d
 
 ### Backend Environment Variables (Render.com)
 
-Add these environment variables in your Render dashboard:
+Add these environment variables in Render dashboard:
 
 ```env
 NODE_ENV=production
