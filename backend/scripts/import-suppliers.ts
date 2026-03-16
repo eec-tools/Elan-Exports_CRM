@@ -3,6 +3,10 @@ import fs from "fs";
 import csv from "csv-parser";
 import dotenv from "dotenv";
 import { Readable } from "stream";
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 dotenv.config();
 
@@ -55,10 +59,7 @@ async function migrateSchema() {
   ];
 
   for (const col of columnsToDrop) {
-    await sql`
-      ALTER TABLE suppliers
-      DROP COLUMN IF EXISTS ${sql(col)}
-    `;
+    await sql.query(`ALTER TABLE suppliers DROP COLUMN IF EXISTS "${col}"`);
     console.log(`  ✂️  Dropped column (if existed): ${col}`);
   }
 
@@ -78,10 +79,7 @@ async function migrateSchema() {
   ];
 
   for (const [col, type] of columnsToAdd) {
-    await sql`
-      ALTER TABLE suppliers
-      ADD COLUMN IF NOT EXISTS ${sql(col)} ${sql(type)}
-    `;
+    await sql.query(`ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS "${col}" ${type}`);
     console.log(`  ✅  Added column (if missing): ${col}`);
   }
 
@@ -199,7 +197,8 @@ async function importSuppliers(suppliers: Record<string, string>[]) {
         other_brands,
         remarks,
         current_status,
-        created_by
+        created_by,
+        updated_at
       ) VALUES (
         ${id},
         ${row.company},
@@ -225,7 +224,8 @@ async function importSuppliers(suppliers: Record<string, string>[]) {
         ${row.other_brands},
         ${row.remarks},
         ${row.current_status ?? "Active"},
-        ${process.env.CREATED_BY_USER_ID ?? null}
+        ${process.env.CREATED_BY_USER_ID ?? null},
+        NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
         company                 = EXCLUDED.company,
@@ -250,7 +250,8 @@ async function importSuppliers(suppliers: Record<string, string>[]) {
         working_with_our_brands = EXCLUDED.working_with_our_brands,
         other_brands            = EXCLUDED.other_brands,
         remarks                 = EXCLUDED.remarks,
-        current_status          = EXCLUDED.current_status
+        current_status          = EXCLUDED.current_status,
+        updated_at              = NOW()
     `;
 
     console.log(`  ✅  [${id}] ${row.company}`);
@@ -261,8 +262,7 @@ async function importSuppliers(suppliers: Record<string, string>[]) {
 // Entry point
 // ─────────────────────────────────────────────
 async function run() {
-  // Change this path to wherever the CSV lives relative to this script
-  const CSV_PATH = "./scripts/Database_for_Signed_Contract_Suppliers.csv";
+  const CSV_PATH = path.join(__dirname, "Database for Signed Contract Suppliers.csv");
 
   await migrateSchema();
 
