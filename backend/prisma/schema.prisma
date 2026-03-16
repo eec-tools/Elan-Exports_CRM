@@ -190,6 +190,8 @@ model NewSupplier {
   dateMarkedInactive    String?  @map("date_marked_inactive")
   reactivationPotential String?  @map("reactivation_potential")
   notes                 String?
+  phone                 String?
+  email                 String?
 
   createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")

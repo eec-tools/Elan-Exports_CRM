@@ -31,6 +31,8 @@ export async function listNewSuppliers(
                 { product: { contains: search, mode: "insensitive" } },
                 { accountManager: { contains: search, mode: "insensitive" } },
                 { currentStatus: { contains: search, mode: "insensitive" } },
+                { phone: { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
             ];
         }
 
@@ -94,14 +96,16 @@ export async function createNewSupplier(
         const {
             company, productCategory, product, country, accountManager,
             currentStatus, certifications, latestQuotation, reasonInactive,
-            dateMarkedInactive, reactivationPotential, notes
+            dateMarkedInactive, reactivationPotential, notes, phone, email
         } = req.body;
+
+        console.log("Creating new supplier with payload:", req.body);
 
         const supplier = await (prisma as any).newSupplier.create({
             data: {
                 company, productCategory, product, country, accountManager,
                 currentStatus, certifications, latestQuotation, reasonInactive,
-                dateMarkedInactive, reactivationPotential, notes,
+                dateMarkedInactive, reactivationPotential, notes, phone, email,
                 createdBy: req.user!.id,
             },
         });
@@ -137,15 +141,17 @@ export async function updateNewSupplier(
         const {
             company, productCategory, product, country, accountManager,
             currentStatus, certifications, latestQuotation, reasonInactive,
-            dateMarkedInactive, reactivationPotential, notes
+            dateMarkedInactive, reactivationPotential, notes, phone, email
         } = req.body;
+
+        console.log("Updating new supplier with payload:", req.body);
 
         const supplier = await (prisma as any).newSupplier.update({
             where: { id: req.params.id },
             data: {
                 company, productCategory, product, country, accountManager,
                 currentStatus, certifications, latestQuotation, reasonInactive,
-                dateMarkedInactive, reactivationPotential, notes
+                dateMarkedInactive, reactivationPotential, notes, phone, email
             },
         });
 
@@ -209,6 +215,8 @@ export async function exportNewSuppliersCsv(
                 { product: { contains: search, mode: "insensitive" } },
                 { accountManager: { contains: search, mode: "insensitive" } },
                 { currentStatus: { contains: search, mode: "insensitive" } },
+                { phone: { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
             ];
         }
 
@@ -223,6 +231,8 @@ export async function exportNewSuppliersCsv(
             "Product",
             "Country",
             "Account Manager",
+            "Phone",
+            "Email",
             "Current Status",
             "Certifications",
             "Latest Quotation",
@@ -239,6 +249,8 @@ export async function exportNewSuppliersCsv(
             s.product || "",
             s.country || "",
             s.accountManager || "",
+            s.phone || "",
+            s.email || "",
             s.currentStatus || "",
             s.certifications || "",
             s.latestQuotation || "",

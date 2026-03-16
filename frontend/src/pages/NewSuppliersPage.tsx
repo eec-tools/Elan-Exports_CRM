@@ -43,6 +43,8 @@ interface Supplier {
     dateMarkedInactive?: string;
     reactivationPotential?: string;
     notes?: string;
+    phone?: string;
+    email?: string;
 }
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
@@ -58,6 +60,8 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
     dateMarkedInactive: "",
     reactivationPotential: "",
     notes: "",
+    phone: "",
+    email: "",
 };
 
 export default function NewSuppliersPage() {
@@ -117,6 +121,7 @@ export default function NewSuppliersPage() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        console.log("Submitting form with payload:", form);
         if (editing?.id) {
             updateMutation.mutate({ id: editing.id, d: form });
         } else {
@@ -223,6 +228,8 @@ export default function NewSuppliersPage() {
                                 <th className="px-5 py-3.5 font-semibold">Product</th>
                                 <th className="px-5 py-3.5 font-semibold">Country</th>
                                 <th className="px-5 py-3.5 font-semibold">Account Manager</th>
+                                <th className="px-5 py-3.5 font-semibold">Phone</th>
+                                <th className="px-5 py-3.5 font-semibold">Email</th>
                                 <th className="px-5 py-3.5 font-semibold">Current Status</th>
                                 <th className="px-5 py-3.5 font-semibold">Certifications</th>
                                 <th className="px-5 py-3.5 font-semibold">Reason Inactive</th>
@@ -234,7 +241,7 @@ export default function NewSuppliersPage() {
                         <tbody className="divide-y divide-slate-100 text-slate-700">
                             {isLoading && suppliers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={canEdit ? 11 : 10} className="h-32 text-center">
+                                    <td colSpan={canEdit ? 13 : 12} className="h-32 text-center">
                                         <div className="flex justify-center">
                                             <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                                         </div>
@@ -242,7 +249,7 @@ export default function NewSuppliersPage() {
                                 </tr>
                             ) : suppliers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={canEdit ? 11 : 10} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                                    <td colSpan={canEdit ? 13 : 12} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                                         <div className="flex flex-col items-center justify-center gap-3">
                                             <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                                                 <Building2 className="h-6 w-6 text-slate-300" />
@@ -262,6 +269,8 @@ export default function NewSuppliersPage() {
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.product}>{s.product}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100">{s.country}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.accountManager}</td>
+                                        <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.phone}</td>
+                                        <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.email}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.currentStatus}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.certifications}>{s.certifications}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reasonInactive}>{s.reasonInactive}</td>
@@ -378,6 +387,25 @@ export default function NewSuppliersPage() {
                                     value={form.accountManager ?? ""}
                                     onChange={(e) =>
                                         setForm({ ...form, accountManager: e.target.value })
+                                    }
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Phone Number</Label>
+                                <Input
+                                    value={form.phone ?? ""}
+                                    onChange={(e) =>
+                                        setForm({ ...form, phone: e.target.value })
+                                    }
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Email</Label>
+                                <Input
+                                    type="email"
+                                    value={form.email ?? ""}
+                                    onChange={(e) =>
+                                        setForm({ ...form, email: e.target.value })
                                     }
                                 />
                             </div>
