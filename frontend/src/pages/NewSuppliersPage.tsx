@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -264,7 +265,14 @@ export default function NewSuppliersPage() {
                             ) : (
                                 suppliers.map((s: Supplier) => (
                                     <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
-                                        <td className="px-5 py-3.5 border-r border-slate-100 font-medium">{s.company}</td>
+                                        <td className="px-5 py-3.5 border-r border-slate-100 font-medium">
+                                            <Link
+                                                to={`/suppliers/new/${s.id}`}
+                                                className="text-brand-600 hover:text-brand-800 hover:underline"
+                                            >
+                                                {s.company}
+                                            </Link>
+                                        </td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500" title={s.productCategory}>{s.productCategory}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.product}>{s.product}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100">{s.country}</td>
