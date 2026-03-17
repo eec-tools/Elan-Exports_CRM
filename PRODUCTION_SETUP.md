@@ -21,7 +21,7 @@ SMTP_APP_PASSWORD=your-app-password
 PORT=3001
 ```
 
-### Frontend Environment Variables (Vercel)
+### Frontend env Variables (Vercel)
 
 Add these in Vercel project settings:
 
