@@ -367,8 +367,9 @@ export async function sendCredentials(
     });
 
     res.json({ message: "Credentials sent" });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Send credentials error:", err);
-    res.status(500).json({ error: "Failed to send email" });
+    const message = err?.message || "Failed to send email";
+    res.status(500).json({ error: `Failed to send email: ${message}` });
   }
 }

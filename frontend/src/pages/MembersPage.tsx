@@ -67,27 +67,28 @@ export default function MembersPage() {
   const createMutation = useMutation({
     mutationFn: async ({
       data,
-      sendCredentials,
-      password,
     }: {
       data: any;
       sendCredentials: boolean;
       password: string;
     }) => {
       const res = await api.post("/members", data);
-      if (sendCredentials) {
-        await api.post(`/members/${res.data.id}/send-credentials`, {
-          password,
-        });
-      }
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: async (member, { sendCredentials, password }) => {
       queryClient.invalidateQueries({ queryKey: ["members"] });
       setDialogOpen(false);
       setEditingMember(null);
       setSendOnSubmit(false);
       toast.success("Member created successfully");
+      if (sendCredentials) {
+        try {
+          await api.post(`/members/${member.id}/send-credentials`, { password });
+          toast.success("Credentials sent to " + member.email);
+        } catch (err: any) {
+          toast.error(err.response?.data?.error || "Member created, but failed to send credentials email");
+        }
+      }
     },
     onError: (err: any) =>
       toast.error(err.response?.data?.error || "Failed to create member"),
@@ -119,8 +120,6 @@ export default function MembersPage() {
     mutationFn: async ({
       id,
       data,
-      sendCredentials,
-      password,
     }: {
       id: string;
       data: any;
@@ -128,17 +127,22 @@ export default function MembersPage() {
       password?: string;
     }) => {
       const res = await api.put(`/members/${id}`, data);
-      if (sendCredentials && password) {
-        await api.post(`/members/${id}/send-credentials`, { password });
-      }
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: async (member, { id, sendCredentials, password }) => {
       queryClient.invalidateQueries({ queryKey: ["members"] });
       setDialogOpen(false);
       setEditingMember(null);
       setSendOnSubmit(false);
       toast.success("Member updated successfully");
+      if (sendCredentials && password) {
+        try {
+          await api.post(`/members/${id}/send-credentials`, { password });
+          toast.success("Credentials sent to " + member.email);
+        } catch (err: any) {
+          toast.error(err.response?.data?.error || "Member updated, but failed to send credentials email");
+        }
+      }
     },
     onError: (err: any) =>
       toast.error(err.response?.data?.error || "Failed to update member"),
