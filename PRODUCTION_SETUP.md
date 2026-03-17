@@ -29,7 +29,7 @@ Add these in Vercel project settings:
 VITE_API_URL=https://elan-exports-crm.onrender.com/api
 ```
 
-## 📋 Deployment Checklist
+## Deployment Checklist
 
 ### Backend (Render.com)
 
