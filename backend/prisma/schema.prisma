@@ -1,4 +1,3 @@
-// backend/prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,46 +7,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── AUTH & USERS ───────────────────────────────────
-
-enum Role {
-  admin
-  member
-}
-
-enum Permission {
-  buyers
-  suppliers
-  analytics
-  reports
-  vault
-  task_tracker
-}
-
-enum AccessLevel {
-  read
-  edit
-}
-
 model User {
-  id             String           @id @default(uuid())
-  email          String           @unique
-  passwordHash   String           @map("password_hash")
-  fullName       String           @map("full_name")
-  isActive       Boolean          @default(true) @map("is_active")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-
-  roles            UserRole[]
-  permissions      UserPermission[]
-  activityLogs     ActivityLog[]
-  accessRequests   AccessRequest[]  @relation("requester")
+  id               String           @id @default(uuid())
+  email            String           @unique
+  passwordHash     String           @map("password_hash")
+  fullName         String           @map("full_name")
+  isActive         Boolean          @default(true) @map("is_active")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
   reviewedRequests AccessRequest[]  @relation("reviewer")
+  accessRequests   AccessRequest[]  @relation("requester")
+  activityLogs     ActivityLog[]
   buyers           Buyer[]
-  suppliers        Supplier[]
-  reports          Report[]
-  vaultDocuments   VaultDocument[]
   deals            Deal[]
+  reports          Report[]
+  suppliers        Supplier[]
+  permissions      UserPermission[]
+  roles            UserRole[]
+  vaultDocuments   VaultDocument[]
 
   @@map("users")
 }
@@ -56,7 +33,6 @@ model UserRole {
   id     String @id @default(uuid())
   userId String @map("user_id")
   role   Role
-
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, role])
@@ -68,14 +44,11 @@ model UserPermission {
   userId      String      @map("user_id")
   permission  Permission
   accessLevel AccessLevel @default(edit) @map("access_level")
-
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, permission])
   @@map("user_permissions")
 }
-
-// ─── BUYERS ─────────────────────────────────────────
 
 model Buyer {
   id                        String    @id @default(uuid())
@@ -101,80 +74,69 @@ model Buyer {
   notes                     String?
   status                    String?   @default("Pending")
   requiredProducts          Json      @default("[]") @map("required_products")
-
   createdBy                 String?   @map("created_by")
   createdAt                 DateTime  @default(now()) @map("created_at")
   updatedAt                 DateTime  @updatedAt @map("updated_at")
-
   creator                   User?     @relation(fields: [createdBy], references: [id])
 
   @@map("buyers")
 }
 
-// ─── SUPPLIERS ──────────────────────────────────────
-
 model Supplier {
   id                     String   @id @default(uuid())
   company                String
-  lidlFactoryId          String?  @map("lidl_factory_id")
-  commissionPercent      String?  @map("commission_percent")
-  contractBuyer          String?  @map("contract_buyer")
-  approvedConfirmPercent String?  @map("approved_confirm_percent")
-  products               String?
   country                String?
   contactPerson          String?  @map("contact_person")
-  phone                  String?
-  companyAddress         String?  @map("company_address")
   email                  String?
-  website                String?
-  productCatalogShared   String?  @map("product_catalog_shared")
-  productionCapacity     String?  @map("production_capacity")
-  factoryVideosShared    String?  @map("factory_videos_shared")
-  warehouseVideosShared  String?  @map("warehouse_videos_shared")
-  exportingCountries     String?  @map("exporting_countries")
-  samplePolicy           String?  @map("sample_policy")
+  phone                  String?
+  products               String?
+  contractBuyer          String?  @map("contract_buyer")
+  commissionPercent      String?  @map("commission_percent")
   certifications         String?
-  workingWithOurBrands   String?  @map("working_with_our_brands")
-  otherBrands            String?  @map("other_brands")
-  remarks                String?
+  productionCapacity     String?  @map("production_capacity")
   currentStatus          String?  @default("Active") @map("current_status")
-  documents              Json     @default("[]")
-  contractDocument       Json?    @map("contract_document")
-
+  remarks                String?
   createdBy              String?  @map("created_by")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
-
+  approvedConfirmPercent String?  @map("approved_confirm_percent")
+  companyAddress         String?  @map("company_address")
+  exportingCountries     String?  @map("exporting_countries")
+  factoryVideosShared    String?  @map("factory_videos_shared")
+  lidlFactoryId          String?  @map("lidl_factory_id")
+  otherBrands            String?  @map("other_brands")
+  productCatalogShared   String?  @map("product_catalog_shared")
+  samplePolicy           String?  @map("sample_policy")
+  warehouseVideosShared  String?  @map("warehouse_videos_shared")
+  website                String?
+  workingWithOurBrands   String?  @map("working_with_our_brands")
+  documents              Json     @default("[]")
+  contractDocument       Json?    @map("contract_document")
   creator                User?    @relation(fields: [createdBy], references: [id])
 
   @@map("suppliers")
 }
 
-// ─── OLD SUPPLIERS ──────────────────────────────────
-
 model OldSupplier {
   id                    String   @id @default(uuid())
   company               String
-  productCategory       String?  @map("product_category")
-  product               String?
   country               String?
-  accountManager        String?  @map("account_manager")
-  currentStatus         String?  @map("current_status")
-  certifications        String?
-  latestQuotation       String?  @map("latest_quotation")
-  reasonInactive        String?  @map("reason_inactive")
-  dateMarkedInactive    String?  @map("date_marked_inactive")
-  reactivationPotential String?  @map("reactivation_potential")
   notes                 String?
-
-  createdBy String?  @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy             String?  @map("created_by")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  accountManager        String?  @map("account_manager")
+  certifications        String?
+  currentStatus         String?  @map("current_status")
+  dateMarkedInactive    String?  @map("date_marked_inactive")
+  latestQuotation       String?  @map("latest_quotation")
+  product               String?
+  productCategory       String?  @map("product_category")
+  reactivationPotential String?  @map("reactivation_potential")
+  reasonInactive        String?  @map("reason_inactive")
 
   @@map("old_suppliers")
 }
-
-// ─── NEW SUPPLIERS ──────────────────────────────────
 
 model NewSupplier {
   id                    String   @id @default(uuid())
@@ -190,17 +152,14 @@ model NewSupplier {
   dateMarkedInactive    String?  @map("date_marked_inactive")
   reactivationPotential String?  @map("reactivation_potential")
   notes                 String?
-  phone                 String?
+  createdBy             String?  @map("created_by")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
   email                 String?
-
-  createdBy String?  @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  phone                 String?
 
   @@map("new_suppliers")
 }
-
-// ─── REPORTS ────────────────────────────────────────
 
 model Report {
   id              String    @id @default(uuid())
@@ -213,17 +172,13 @@ model Report {
   updateDate      DateTime? @map("update_date") @db.Date
   buyerSupplier   String    @default("Buyer") @map("buyer_supplier")
   reportDate      DateTime  @map("report_date") @db.Date
-
   createdBy       String?   @map("created_by")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
-
   creator         User?     @relation(fields: [createdBy], references: [id])
 
   @@map("reports")
 }
-
-// ─── ACTIVITY LOGS ──────────────────────────────────
 
 model ActivityLog {
   id         String   @id @default(uuid())
@@ -233,13 +188,10 @@ model ActivityLog {
   entityId   String?  @map("entity_id")
   details    Json?
   createdAt  DateTime @default(now()) @map("created_at")
-
   user       User?    @relation(fields: [userId], references: [id])
 
   @@map("activity_logs")
 }
-
-// ─── ACCESS REQUESTS ────────────────────────────────
 
 model AccessRequest {
   id         String    @id @default(uuid())
@@ -250,14 +202,11 @@ model AccessRequest {
   createdAt  DateTime  @default(now()) @map("created_at")
   reviewedAt DateTime? @map("reviewed_at")
   reviewedBy String?   @map("reviewed_by")
-
-  user       User      @relation("requester", fields: [userId], references: [id])
   reviewer   User?     @relation("reviewer", fields: [reviewedBy], references: [id])
+  user       User      @relation("requester", fields: [userId], references: [id])
 
   @@map("access_requests")
 }
-
-// ─── APP SETTINGS ───────────────────────────────────
 
 model AppSetting {
   id    String @id @default(uuid())
@@ -267,46 +216,39 @@ model AppSetting {
   @@map("app_settings")
 }
 
-// ─── EMAIL TASK TRACKER ─────────────────────────────
-
 model EmailTracker {
-  id               String    @id @default(uuid())
-  dateReceived     DateTime  @map("date_received")
-  senderAddress    String    @map("sender_address")
-  subject          String
-  task             String?
-  productCategory  String?   @map("product_category")
-  priority         String?
-  respondent       String?
-  status           String    @default("Not Started")
-  notes            String?
-  emailLink        String?   @map("email_link")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  id              String   @id @default(uuid())
+  dateReceived    DateTime @map("date_received")
+  senderAddress   String   @map("sender_address")
+  subject         String
+  task            String?
+  productCategory String?  @map("product_category")
+  priority        String?
+  respondent      String?
+  status          String   @default("Not Started")
+  notes           String?
+  emailLink       String?  @map("email_link")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("email_tracker")
 }
 
-// ─── VAULT DOCUMENTS ────────────────────────────────
-
 model VaultDocument {
-  id          String   @id @default(uuid())
-  name        String
-  category    String
-  region      String   @default("Global")
-  fileUrl     String   @map("file_url")
-  publicId    String   @map("public_id")
-  fileType    String   @map("file_type")
-  uploadedBy  String?  @map("uploaded_by")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  uploader    User?   @relation(fields: [uploadedBy], references: [id])
+  id         String   @id @default(uuid())
+  name       String
+  category   String
+  region     String   @default("Global")
+  fileUrl    String   @map("file_url")
+  publicId   String   @map("public_id")
+  fileType   String   @map("file_type")
+  uploadedBy String?  @map("uploaded_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  uploader   User?    @relation(fields: [uploadedBy], references: [id])
 
   @@map("vault_documents")
 }
-
-// ─── DAILY TASK TRACKER ─────────────────────────────
 
 model DailyTask {
   id        String    @id @default(uuid())
@@ -318,48 +260,35 @@ model DailyTask {
   status    String    @default("Not Started")
   deadline  DateTime? @db.Date
   notes     String?
-  
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@map("daily_tasks")
 }
 
-// ─── DEALS ──────────────────────────────────────────
-
 model Deal {
-  id              String   @id @default(uuid())
-  title           String
-  buyer           String?
-  supplier        String?
-  product         String?
-  hsCode          String?  @map("hs_code")
-  volume          String?
-  price           Float?
-  expectedRevenue Float?   @map("expected_revenue")
-  margin          Float?   @default(15)
-  stage           String   @default("LEAD")
-  probability     Float?   @default(20)
-  category        String?
-  riskScore       String?  @default("Medium") @map("risk_score")
-  notes           String?
-
-  createdBy       String?  @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  creator              User?                 @relation(fields: [createdBy], references: [id])
-  complianceDocuments  ComplianceDocument[]
+  id                  String               @id @default(uuid())
+  title               String
+  buyer               String?
+  supplier            String?
+  product             String?
+  hsCode              String?              @map("hs_code")
+  volume              String?
+  price               Float?
+  expectedRevenue     Float?               @map("expected_revenue")
+  margin              Float?               @default(15)
+  stage               String               @default("LEAD")
+  probability         Float?               @default(20)
+  category            String?
+  riskScore           String?              @default("Medium") @map("risk_score")
+  notes               String?
+  createdBy           String?              @map("created_by")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  complianceDocuments ComplianceDocument[]
+  creator             User?                @relation(fields: [createdBy], references: [id])
 
   @@map("deals")
-}
-
-// ─── COMPLIANCE ──────────────────────────────────────
-
-enum ComplianceStatus {
-  RECEIVED
-  PENDING
-  MISSING
 }
 
 model ComplianceDocument {
@@ -369,11 +298,34 @@ model ComplianceDocument {
   status    ComplianceStatus @default(MISSING)
   dueDate   DateTime?        @map("due_date") @db.Date
   notes     String?
-
   createdAt DateTime         @default(now()) @map("created_at")
   updatedAt DateTime         @updatedAt @map("updated_at")
-
   deal      Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@map("compliance_documents")
+}
+
+enum Role {
+  admin
+  member
+}
+
+enum Permission {
+  buyers
+  suppliers
+  analytics
+  reports
+  vault
+  task_tracker
+}
+
+enum AccessLevel {
+  read
+  edit
+}
+
+enum ComplianceStatus {
+  RECEIVED
+  PENDING
+  MISSING
 }
