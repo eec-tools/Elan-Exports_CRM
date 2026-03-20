@@ -294,7 +294,8 @@ export async function sendCredentials(req, res) {
     }
     catch (err) {
         console.error("Send credentials error:", err);
-        res.status(500).json({ error: "Failed to send email" });
+        const message = err?.message || "Failed to send email";
+        res.status(500).json({ error: `Failed to send email: ${message}` });
     }
 }
 //# sourceMappingURL=members.controller.js.map

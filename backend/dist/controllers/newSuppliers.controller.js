@@ -18,6 +18,8 @@ export async function listNewSuppliers(req, res) {
                 { product: { contains: search, mode: "insensitive" } },
                 { accountManager: { contains: search, mode: "insensitive" } },
                 { currentStatus: { contains: search, mode: "insensitive" } },
+                { phone: { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
             ];
         }
         const [suppliers, total] = await Promise.all([
@@ -68,12 +70,13 @@ export async function getNewSupplier(req, res) {
  */
 export async function createNewSupplier(req, res) {
     try {
-        const { company, productCategory, product, country, accountManager, currentStatus, certifications, latestQuotation, reasonInactive, dateMarkedInactive, reactivationPotential, notes } = req.body;
+        const { company, productCategory, product, country, accountManager, currentStatus, certifications, latestQuotation, reasonInactive, dateMarkedInactive, reactivationPotential, notes, phone, email } = req.body;
+        console.log("Creating new supplier with payload:", req.body);
         const supplier = await prisma.newSupplier.create({
             data: {
                 company, productCategory, product, country, accountManager,
                 currentStatus, certifications, latestQuotation, reasonInactive,
-                dateMarkedInactive, reactivationPotential, notes,
+                dateMarkedInactive, reactivationPotential, notes, phone, email,
                 createdBy: req.user.id,
             },
         });
@@ -99,13 +102,14 @@ export async function updateNewSupplier(req, res) {
             res.status(404).json({ error: "New supplier not found" });
             return;
         }
-        const { company, productCategory, product, country, accountManager, currentStatus, certifications, latestQuotation, reasonInactive, dateMarkedInactive, reactivationPotential, notes } = req.body;
+        const { company, productCategory, product, country, accountManager, currentStatus, certifications, latestQuotation, reasonInactive, dateMarkedInactive, reactivationPotential, notes, phone, email } = req.body;
+        console.log("Updating new supplier with payload:", req.body);
         const supplier = await prisma.newSupplier.update({
             where: { id: req.params.id },
             data: {
                 company, productCategory, product, country, accountManager,
                 currentStatus, certifications, latestQuotation, reasonInactive,
-                dateMarkedInactive, reactivationPotential, notes
+                dateMarkedInactive, reactivationPotential, notes, phone, email
             },
         });
         await logActivity(req.user.id, "update", "new_suppliers", supplier.id, {
@@ -156,6 +160,8 @@ export async function exportNewSuppliersCsv(req, res) {
                 { product: { contains: search, mode: "insensitive" } },
                 { accountManager: { contains: search, mode: "insensitive" } },
                 { currentStatus: { contains: search, mode: "insensitive" } },
+                { phone: { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
             ];
         }
         const suppliers = await prisma.newSupplier.findMany({
@@ -168,6 +174,8 @@ export async function exportNewSuppliersCsv(req, res) {
             "Product",
             "Country",
             "Account Manager",
+            "Phone",
+            "Email",
             "Current Status",
             "Certifications",
             "Latest Quotation",
@@ -183,6 +191,8 @@ export async function exportNewSuppliersCsv(req, res) {
             s.product || "",
             s.country || "",
             s.accountManager || "",
+            s.phone || "",
+            s.email || "",
             s.currentStatus || "",
             s.certifications || "",
             s.latestQuotation || "",

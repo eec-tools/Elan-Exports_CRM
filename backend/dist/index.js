@@ -38,9 +38,14 @@ app.use((req, res, next) => {
     next();
 });
 // CORS configuration
-const allowedOrigins = process.env.FRONTEND_URL
+const hardcodedOrigins = [
+    "http://localhost:5173",
+    "http://elan-exports-frontend.s3-website.ap-south-1.amazonaws.com",
+];
+const envOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(",").map((url) => url.trim())
     : [];
+const allowedOrigins = [...new Set([...hardcodedOrigins, ...envOrigins])];
 app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (e.g. curl, Postman, mobile apps)
@@ -67,6 +72,8 @@ app.use(cors({
     exposedHeaders: ["Content-Range", "X-Content-Range"],
     maxAge: 600, // 10 minutes
 }));
+// Handle preflight requests for all routes
+app.options("*", cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 // Rate limiting - stricter in production

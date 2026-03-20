@@ -193,9 +193,18 @@ export async function updateBuyer(
       return;
     }
 
+    const {
+      id,
+      createdAt,
+      updatedAt,
+      createdBy,
+      creator,
+      ...updateData
+    } = req.body;
+
     const buyer = await prisma.buyer.update({
       where: { id: req.params.id },
-      data: req.body,
+      data: updateData,
     });
 
     await logActivity(req.user!.id, "update", "buyers", buyer.id, {
