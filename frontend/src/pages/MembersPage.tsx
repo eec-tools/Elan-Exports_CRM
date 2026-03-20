@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Loader2, Pencil, UserCheck, UserX, UserRound, Users, ShieldAlert, CheckCircle2, ShieldHalf, Shield, KeyRound, Mail } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, UserCheck, UserX, UserRound, Users, ShieldAlert, CheckCircle2, ShieldHalf, Shield, KeyRound, Mail, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 
@@ -55,6 +55,33 @@ export default function MembersPage() {
   const [newPerms, setNewPerms] = useState<
     { permission: string; accessLevel: string }[]
   >([]);
+
+  // Passkey state
+  const [passkeyDialogOpen, setPasskeyDialogOpen] = useState(false);
+  const [newPasskey, setNewPasskey] = useState("");
+
+  const { data: currentPasskey } = useQuery({
+    queryKey: ["currentPasskey"],
+    queryFn: () => api.get("/settings/sensitive_data_passkey").then((r) => r.data),
+    enabled: passkeyDialogOpen,
+  });
+
+  useEffect(() => {
+    if (currentPasskey?.value) {
+      setNewPasskey(currentPasskey.value);
+    }
+  }, [currentPasskey]);
+
+  const updatePasskeyMutation = useMutation({
+    mutationFn: (value: string) => api.put("/settings/sensitive_data_passkey", { value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["currentPasskey"] });
+      setPasskeyDialogOpen(false);
+      toast.success("Confidential passkey updated successfully!");
+    },
+    onError: (err: any) =>
+      toast.error(err.response?.data?.error || "Failed to update passkey"),
+  });
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["members"],
@@ -218,6 +245,14 @@ export default function MembersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+           <Button
+             variant="outline"
+             onClick={() => setPasskeyDialogOpen(true)}
+             className="gap-2 text-slate-700 bg-white border-slate-200 hover:bg-slate-50 shadow-sm h-9"
+           >
+             <Lock className="h-4 w-4 text-brand-500" />
+             Manage Passkey
+           </Button>
            <Button
              onClick={() => {
                setEditingMember(null);
@@ -631,6 +666,62 @@ export default function MembersPage() {
                  {deleteMutation.isPending ? "Removing..." : "Yes, remove member"}
                </Button>
             </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Manage Passkey Modal ── */}
+      <Dialog open={passkeyDialogOpen} onOpenChange={setPasskeyDialogOpen}>
+        <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-12 w-12 rounded-full bg-brand-100 flex items-center justify-center shrink-0 border border-brand-200">
+              <Lock className="h-6 w-6 text-brand-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900">Manage Confidential Passkey</DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">
+                This passkey acts as a global shared secret to view sensitive data.
+              </DialogDescription>
+            </div>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newPasskey.trim().length === 0) {
+                toast.error("Passkey cannot be empty");
+                return;
+              }
+              updatePasskeyMutation.mutate(newPasskey);
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-1.5">
+              <Label className="text-slate-700 font-semibold">New Passkey *</Label>
+              <Input
+                value={newPasskey}
+                onChange={(e) => setNewPasskey(e.target.value)}
+                placeholder="e.g. secret123"
+                className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPasskeyDialogOpen(false)}
+                className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={updatePasskeyMutation.isPending}
+                className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm"
+              >
+                {updatePasskeyMutation.isPending ? "Saving..." : "Save Passkey"}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
