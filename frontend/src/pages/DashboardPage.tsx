@@ -1,7 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   Users,
   Factory,
@@ -23,9 +26,16 @@ import {
   AlertTriangle,
   Package,
   CheckSquare,
+  Pencil,
+  Plus,
+  Trash2,
+  Link as LinkIcon,
+  MessageSquare,
+  Calendar,
+  Layout,
 } from "lucide-react";
 
-// ─── Types ──────────────────────────────────────────────────────────
+// ─── Types & Configuration ──────────────────────────────────────────
 interface PipelineStage {
   stage: string;
   count: number;
@@ -107,9 +117,78 @@ const RISK_META: Record<string, { icon: React.ElementType; color: string }> = {
   High:   { icon: AlertTriangle, color: "text-rose-500" },
 };
 
+interface QuickLink {
+  id: string;
+  title: string;
+  url: string;
+}
+
+const DEFAULT_QUICK_LINKS: QuickLink[] = [
+  { id: "1", title: "Google Meet", url: "https://meet.google.com/pqs-znoa-jwk?authuser=0" },
+  { id: "2", title: "Google Drive", url: "https://drive.google.com/drive/folders/1GfVddDUKMlzeoiQ_vFpuFptukawWnbwW" },
+];
+
+const getIconForLink = (title: string) => {
+  const t = title.toLowerCase();
+  if (t.includes("meet") || t.includes("zoom") || t.includes("video") || t.includes("teams")) return Video;
+  if (t.includes("drive") || t.includes("dropbox") || t.includes("files") || t.includes("storage")) return HardDrive;
+  if (t.includes("slack") || t.includes("chat") || t.includes("messages") || t.includes("discord")) return MessageSquare;
+  if (t.includes("doc") || t.includes("sheet") || t.includes("notion")) return FileText;
+  if (t.includes("calendar")) return Calendar;
+  if (t.includes("board") || t.includes("trello") || t.includes("jira") || t.includes("asana")) return Layout;
+  return LinkIcon;
+};
+
+const getColorForLink = (title: string) => {
+  const t = title.toLowerCase();
+  if (t.includes("meet") || t.includes("youtube") || t.includes("video")) return { text: "text-red-600", bg: "bg-red-50", hover: "group-hover:bg-red-100", borderHover: "hover:border-red-200" };
+  if (t.includes("drive") || t.includes("zoom") || t.includes("blue")) return { text: "text-blue-600", bg: "bg-blue-50", hover: "group-hover:bg-blue-100", borderHover: "hover:border-blue-200" };
+  if (t.includes("slack") || t.includes("discord") || t.includes("teams")) return { text: "text-indigo-600", bg: "bg-indigo-50", hover: "group-hover:bg-indigo-100", borderHover: "hover:border-indigo-200" };
+  if (t.includes("board") || t.includes("trello") || t.includes("jira")) return { text: "text-emerald-600", bg: "bg-emerald-50", hover: "group-hover:bg-emerald-100", borderHover: "hover:border-emerald-200" };
+  if (t.includes("calendar")) return { text: "text-amber-600", bg: "bg-amber-50", hover: "group-hover:bg-amber-100", borderHover: "hover:border-amber-200" };
+  return { text: "text-slate-600", bg: "bg-slate-50", hover: "group-hover:bg-slate-100", borderHover: "hover:border-slate-300" };
+};
+
 // ─── Component ──────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Quick Links State
+  const [editLinksOpen, setEditLinksOpen] = useState(false);
+  const [editingLinks, setEditingLinks] = useState<QuickLink[]>([]);
+
+  const { data: quickLinks } = useQuery({
+    queryKey: ["custom-quick-links"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("/settings/custom_quick_links");
+        if (res.data?.value) {
+          const parsed = JSON.parse(res.data.value);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed as QuickLink[];
+        }
+      } catch { /* ignore */ }
+      return DEFAULT_QUICK_LINKS;
+    },
+  });
+
+  useEffect(() => {
+    if (editLinksOpen && quickLinks) {
+      setEditingLinks([...quickLinks]);
+    }
+  }, [editLinksOpen, quickLinks]);
+
+  const updateLinksMutation = useMutation({
+    mutationFn: async (links: QuickLink[]) => {
+      await api.put("/settings/custom_quick_links", { value: JSON.stringify(links) });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["custom-quick-links"] });
+      setEditLinksOpen(false);
+      toast.success("Quick links updated successfully");
+    },
+    onError: () => toast.error("Failed to update links"),
+  });
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["dashboard-stats"],
@@ -496,40 +575,135 @@ export default function DashboardPage() {
 
       {/* ── Quick Links ──────────────────────────────────────────── */}
       <div>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="rounded-md bg-slate-100 p-1.5">
-            <Zap className="h-4 w-4 text-slate-500" />
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="rounded-md bg-slate-100 p-1.5">
+              <Zap className="h-4 w-4 text-slate-500" />
+            </div>
+            <h2 className="text-sm font-semibold text-slate-700">Quick Links</h2>
           </div>
-          <h2 className="text-sm font-semibold text-slate-700">Quick Links</h2>
+          {user?.roles?.includes("admin") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setEditLinksOpen(true)}
+              className="h-8 text-slate-500 hover:text-brand-600 hover:bg-brand-50"
+            >
+              <Pencil className="h-3.5 w-3.5 mr-1.5" />
+              Edit Links
+            </Button>
+          )}
         </div>
         <div className="flex gap-3 flex-wrap">
-          <a
-            href="https://meet.google.com/pqs-znoa-jwk?authuser=0"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group inline-flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-red-200"
-          >
-            <div className="rounded-lg bg-red-50 p-1.5 group-hover:bg-red-100 transition-colors">
-              <Video className="h-4 w-4 text-red-600" />
-            </div>
-            <span className="text-slate-700">Google Meet</span>
-            <ExternalLink className="h-3 w-3 text-slate-300 group-hover:text-slate-500 transition-colors" />
-          </a>
-          <a
-            href="https://drive.google.com/drive/folders/1GfVddDUKMlzeoiQ_vFpuFptukawWnbwW"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group inline-flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200"
-          >
-            <div className="rounded-lg bg-blue-50 p-1.5 group-hover:bg-blue-100 transition-colors">
-              <HardDrive className="h-4 w-4 text-blue-600" />
-            </div>
-            <span className="text-slate-700">Google Drive</span>
-            <ExternalLink className="h-3 w-3 text-slate-300 group-hover:text-slate-500 transition-colors" />
-          </a>
+          {(quickLinks || []).map((link) => {
+            const Icon = getIconForLink(link.title);
+            const colors = getColorForLink(link.title);
+            return (
+              <a
+                key={link.id}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`group inline-flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 ${colors.borderHover}`}
+              >
+                <div className={`rounded-lg ${colors.bg} p-1.5 ${colors.hover} transition-colors`}>
+                  <Icon className={`h-4 w-4 ${colors.text}`} />
+                </div>
+                <span className="text-slate-700">{link.title}</span>
+                <ExternalLink className="h-3 w-3 text-slate-300 group-hover:text-slate-500 transition-colors" />
+              </a>
+            );
+          })}
         </div>
       </div>
 
+      {/* ── Edit Quick Links Modal ── */}
+      {editLinksOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg animate-in fade-in zoom-in-95 duration-200">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">Edit Quick Links</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                updateLinksMutation.mutate(editingLinks);
+              }}
+              className="space-y-4 max-h-[70vh] flex flex-col"
+            >
+              <div className="space-y-3 overflow-y-auto pr-1">
+                {editingLinks.map((link, idx) => (
+                  <div key={link.id} className="flex items-start gap-2 bg-slate-50 p-3 rounded-lg border border-slate-100 relative group">
+                    <div className="flex-1 space-y-2">
+                       <input
+                         type="text"
+                         required
+                         value={link.title}
+                         onChange={(e) => {
+                           const newLinks = [...editingLinks];
+                           newLinks[idx].title = e.target.value;
+                           setEditingLinks(newLinks);
+                         }}
+                         className="w-full h-8 rounded-md border border-slate-200 px-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                         placeholder="Link Title (e.g. Google Meet)"
+                       />
+                       <input
+                         type="url"
+                         required
+                         value={link.url}
+                         onChange={(e) => {
+                           const newLinks = [...editingLinks];
+                           newLinks[idx].url = e.target.value;
+                           setEditingLinks(newLinks);
+                         }}
+                         className="w-full h-8 rounded-md border border-slate-200 px-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                         placeholder="URL (e.g. https://...)"
+                       />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setEditingLinks(editingLinks.filter(l => l.id !== link.id))}
+                      className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 h-8 w-8 shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                {editingLinks.length === 0 && (
+                  <p className="text-sm text-slate-500 text-center py-4">No quick links configured.</p>
+                )}
+              </div>
+              
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full gap-2 border-dashed border-2 py-5 text-slate-600 hover:text-brand-600 hover:border-brand-300 hover:bg-brand-50"
+                onClick={() => setEditingLinks([...editingLinks, { id: Date.now().toString(), title: "", url: "" }])}
+              >
+                <Plus className="h-4 w-4" /> Add Link
+              </Button>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setEditLinksOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateLinksMutation.isPending}
+                  className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 shadow-sm disabled:opacity-50"
+                >
+                  {updateLinksMutation.isPending ? "Saving..." : "Save Links"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
