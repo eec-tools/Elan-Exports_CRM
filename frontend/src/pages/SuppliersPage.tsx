@@ -115,6 +115,7 @@ export default function SuppliersPage() {
     mutationFn: (d: Partial<Supplier>) => api.post("/suppliers", d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-stats"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       setDialogOpen(false);
       toast.success("Supplier created");
@@ -127,6 +128,7 @@ export default function SuppliersPage() {
       api.put(`/suppliers/${id}`, d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-stats"] });
       setDialogOpen(false);
       toast.success("Supplier updated");
     },
@@ -137,6 +139,7 @@ export default function SuppliersPage() {
     mutationFn: (id: string) => api.delete(`/suppliers/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-stats"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       toast.success("Supplier deleted");
     },
