@@ -14,6 +14,13 @@ import {
     DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
     Plus,
     Search,
     Pencil,
@@ -71,6 +78,14 @@ export default function NewSuppliersPage() {
     const canEdit = hasEditPermission("suppliers");
 
     const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [countryFilter, setCountryFilter] = useState("all");
+    const [categoryFilter, setCategoryFilter] = useState("all");
+    const [managerFilter, setManagerFilter] = useState("all");
+    const [productFilter, setProductFilter] = useState("all");
+    const [certificationFilter, setCertificationFilter] = useState("all");
+    const [dateFrom, setDateFrom] = useState<string>("");
+    const [dateTo, setDateTo] = useState<string>("");
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Partial<Supplier> | null>(null);
@@ -81,11 +96,30 @@ export default function NewSuppliersPage() {
     );
 
     const { data, isLoading } = useQuery({
-        queryKey: ["new-suppliers", search, page],
+        queryKey: ["new-suppliers", search, statusFilter, countryFilter, categoryFilter, managerFilter, productFilter, certificationFilter, dateFrom, dateTo, page],
         queryFn: () =>
             api
-                .get("/new-suppliers", { params: { search, page, limit: 20 } })
+                .get("/new-suppliers", { 
+                    params: { 
+                        search, 
+                        status: statusFilter !== "all" ? statusFilter : undefined,
+                        country: countryFilter !== "all" ? countryFilter : undefined,
+                        productCategory: categoryFilter !== "all" ? categoryFilter : undefined,
+                        accountManager: managerFilter !== "all" ? managerFilter : undefined,
+                        product: productFilter !== "all" ? productFilter : undefined,
+                        certifications: certificationFilter !== "all" ? certificationFilter : undefined,
+                        dateFrom: dateFrom || undefined,
+                        dateTo: dateTo || undefined,
+                        page, 
+                        limit: 20 
+                    } 
+                })
                 .then((r) => r.data),
+    });
+
+    const { data: filters } = useQuery({
+        queryKey: ["new-supplier-filters"],
+        queryFn: () => api.get("/new-suppliers/filters").then((r) => r.data),
     });
 
     const createMutation = useMutation({
@@ -93,6 +127,7 @@ export default function NewSuppliersPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
             queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["new-supplier-filters"] });
             setDialogOpen(false);
             toast.success("Supplier created");
         },
@@ -104,6 +139,7 @@ export default function NewSuppliersPage() {
             api.put(`/new-suppliers/${id}`, d),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
+            queryClient.invalidateQueries({ queryKey: ["new-supplier-filters"] });
             setDialogOpen(false);
             toast.success("Supplier updated");
         },
@@ -115,6 +151,7 @@ export default function NewSuppliersPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
             queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["new-supplier-filters"] });
             toast.success("Supplier deleted");
         },
         onError: () => toast.error("Failed to delete supplier"),
@@ -206,11 +243,101 @@ export default function NewSuppliersPage() {
                             className="pl-9 h-9 bg-slate-50 border-slate-200 focus:bg-white focus:ring-brand-500/20 focus:border-brand-500 text-sm"
                         />
                     </div>
-                    {search && (
+                    
+                    <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+                        <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+                            <SelectValue placeholder="All Statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Statuses</SelectItem>
+                            {filters?.statuses?.map((s: string) => (
+                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={countryFilter} onValueChange={(v) => { setCountryFilter(v); setPage(1); }}>
+                        <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+                            <SelectValue placeholder="All Countries" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Countries</SelectItem>
+                            {filters?.countries?.map((c: string) => (
+                                <SelectItem key={c} value={c}>{c}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(1); }}>
+                        <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+                            <SelectValue placeholder="All Categories" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Categories</SelectItem>
+                            {filters?.productCategories?.map((c: string) => (
+                                <SelectItem key={c} value={c}>{c}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={managerFilter} onValueChange={(v) => { setManagerFilter(v); setPage(1); }}>
+                        <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+                            <SelectValue placeholder="All Managers" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Managers</SelectItem>
+                            {filters?.accountManagers?.map((m: string) => (
+                                <SelectItem key={m} value={m}>{m}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={productFilter} onValueChange={(v) => { setProductFilter(v); setPage(1); }}>
+                        <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+                            <SelectValue placeholder="All Products" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Products</SelectItem>
+                            {filters?.products?.map((p: string) => (
+                                <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={certificationFilter} onValueChange={(v) => { setCertificationFilter(v); setPage(1); }}>
+                        <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+                            <SelectValue placeholder="All Certifications" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Certifications</SelectItem>
+                            {filters?.certifications?.map((c: string) => (
+                                <SelectItem key={c} value={c}>{c}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-md px-2 h-9">
+                        <span className="text-xs font-medium text-slate-500">Date:</span>
+                        <input 
+                            type="date" 
+                            value={dateFrom} 
+                            onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                            className="text-xs bg-transparent border-none p-0 focus:ring-0 w-24 text-slate-700 outline-none"
+                        />
+                        <span className="text-slate-300">-</span>
+                        <input 
+                            type="date" 
+                            value={dateTo} 
+                            onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                            className="text-xs bg-transparent border-none p-0 focus:ring-0 w-24 text-slate-700 outline-none"
+                        />
+                    </div>
+
+                    {(search || statusFilter !== "all" || countryFilter !== "all" || categoryFilter !== "all" || managerFilter !== "all" || productFilter !== "all" || certificationFilter !== "all" || dateFrom || dateTo) && (
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => { setSearch(""); setPage(1); }}
+                            onClick={() => { setSearch(""); setStatusFilter("all"); setCountryFilter("all"); setCategoryFilter("all"); setManagerFilter("all"); setProductFilter("all"); setCertificationFilter("all"); setDateFrom(""); setDateTo(""); setPage(1); }}
                             className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 h-9 px-2 gap-1 ml-auto"
                         >
                             <X className="h-4 w-4" /> Clear
@@ -224,7 +351,7 @@ export default function NewSuppliersPage() {
                     <table className="w-full text-sm text-left border-collapse min-w-max">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
                             <tr>
-                                <th className="px-5 py-3.5 font-semibold">Company Name</th>
+                                <th className="px-5 py-3.5 font-semibold sticky left-0 z-30 bg-slate-50 shadow-[inset_-1px_0_0_0_#e2e8f0]">Company Name</th>
                                 <th className="px-5 py-3.5 font-semibold">Product Category</th>
                                 <th className="px-5 py-3.5 font-semibold">Product</th>
                                 <th className="px-5 py-3.5 font-semibold">Country</th>
@@ -257,7 +384,7 @@ export default function NewSuppliersPage() {
                                             </div>
                                             <p className="text-slate-600 font-medium text-base">No suppliers found</p>
                                             <p className="text-slate-400 text-sm max-w-[250px]">
-                                                {search ? "Try adjusting your search." : "You have not added any suppliers yet."}
+                                                {(search || statusFilter !== "all" || countryFilter !== "all" || categoryFilter !== "all" || managerFilter !== "all" || productFilter !== "all" || certificationFilter !== "all" || dateFrom || dateTo) ? "Try adjusting your search or filters." : "You have not added any suppliers yet."}
                                             </p>
                                         </div>
                                     </td>
@@ -265,7 +392,7 @@ export default function NewSuppliersPage() {
                             ) : (
                                 suppliers.map((s: Supplier) => (
                                     <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
-                                        <td className="px-5 py-3.5 border-r border-slate-100 font-medium">
+                                        <td className="px-5 py-3.5 font-medium sticky left-0 z-10 bg-white group-hover:bg-slate-50 shadow-[inset_-1px_0_0_0_#f1f5f9]">
                                             <Link
                                                 to={`/suppliers/new/${s.id}`}
                                                 className="text-brand-600 hover:text-brand-800 hover:underline"
@@ -365,38 +492,54 @@ export default function NewSuppliersPage() {
                             <div className="space-y-2">
                                 <Label>Product Category</Label>
                                 <Input
+                                    list="list-category"
                                     value={form.productCategory ?? ""}
                                     onChange={(e) =>
                                         setForm({ ...form, productCategory: e.target.value })
                                     }
                                 />
+                                <datalist id="list-category">
+                                    {filters?.productCategories?.map((c: string) => <option key={c} value={c} />)}
+                                </datalist>
                             </div>
                             <div className="space-y-2">
                                 <Label>Product</Label>
                                 <Input
+                                    list="list-products"
                                     value={form.product ?? ""}
                                     onChange={(e) =>
                                         setForm({ ...form, product: e.target.value })
                                     }
                                 />
+                                <datalist id="list-products">
+                                    {filters?.products?.map((p: string) => <option key={p} value={p} />)}
+                                </datalist>
                             </div>
                             <div className="space-y-2">
                                 <Label>Country</Label>
                                 <Input
+                                    list="list-country"
                                     value={form.country ?? ""}
                                     onChange={(e) =>
                                         setForm({ ...form, country: e.target.value })
                                     }
                                 />
+                                <datalist id="list-country">
+                                    {filters?.countries?.map((c: string) => <option key={c} value={c} />)}
+                                </datalist>
                             </div>
                             <div className="space-y-2">
                                 <Label>Account Manager</Label>
                                 <Input
+                                    list="list-manager"
                                     value={form.accountManager ?? ""}
                                     onChange={(e) =>
                                         setForm({ ...form, accountManager: e.target.value })
                                     }
                                 />
+                                <datalist id="list-manager">
+                                    {filters?.accountManagers?.map((m: string) => <option key={m} value={m} />)}
+                                </datalist>
                             </div>
                             <div className="space-y-2">
                                 <Label>Phone Number</Label>
@@ -420,20 +563,32 @@ export default function NewSuppliersPage() {
                             <div className="space-y-2">
                                 <Label>Current Status</Label>
                                 <Input
+                                    list="list-status"
                                     value={form.currentStatus ?? ""}
                                     onChange={(e) =>
                                         setForm({ ...form, currentStatus: e.target.value })
                                     }
                                 />
+                                <datalist id="list-status">
+                                    <option value="New" />
+                                    <option value="Contacted" />
+                                    <option value="Quoted" />
+                                    <option value="Rejected" />
+                                    {filters?.statuses?.filter((s: string) => !["New", "Contacted", "Quoted", "Rejected"].includes(s)).map((s: string) => <option key={s} value={s} />)}
+                                </datalist>
                             </div>
                             <div className="space-y-2">
                                 <Label>Certifications</Label>
                                 <Input
+                                    list="list-certifications"
                                     value={form.certifications ?? ""}
                                     onChange={(e) =>
                                         setForm({ ...form, certifications: e.target.value })
                                     }
                                 />
+                                <datalist id="list-certifications">
+                                    {filters?.certifications?.map((c: string) => <option key={c} value={c} />)}
+                                </datalist>
                             </div>
                             <div className="space-y-2">
                                 <Label>Latest Quotation</Label>

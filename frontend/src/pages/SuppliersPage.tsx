@@ -84,6 +84,12 @@ export default function SuppliersPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [countryFilter, setCountryFilter] = useState("all");
+  const [buyerFilter, setBuyerFilter] = useState("all");
+  const [productFilter, setProductFilter] = useState("all");
+  const [certificationFilter, setCertificationFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<Supplier> | null>(null);
@@ -97,13 +103,29 @@ export default function SuppliersPage() {
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["suppliers", search, statusFilter, page],
+    queryKey: ["suppliers", search, statusFilter, countryFilter, buyerFilter, productFilter, certificationFilter, dateFrom, dateTo, page],
     queryFn: () =>
       api
         .get("/suppliers", {
-          params: { search, status: statusFilter !== "all" ? statusFilter : undefined, page, limit: 20 },
+          params: { 
+            search, 
+            status: statusFilter !== "all" ? statusFilter : undefined, 
+            country: countryFilter !== "all" ? countryFilter : undefined,
+            contractBuyer: buyerFilter !== "all" ? buyerFilter : undefined,
+            products: productFilter !== "all" ? productFilter : undefined,
+            certifications: certificationFilter !== "all" ? certificationFilter : undefined,
+            dateFrom: dateFrom || undefined,
+            dateTo: dateTo || undefined,
+            page, 
+            limit: 20 
+          },
         })
         .then((r) => r.data),
+  });
+
+  const { data: filters } = useQuery({
+    queryKey: ["supplier-filters"],
+    queryFn: () => api.get("/suppliers/filters").then((r) => r.data),
   });
 
   const { data: stats } = useQuery({
@@ -117,6 +139,7 @@ export default function SuppliersPage() {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-stats"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-filters"] });
       setDialogOpen(false);
       toast.success("Supplier created");
     },
@@ -129,6 +152,7 @@ export default function SuppliersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-filters"] });
       setDialogOpen(false);
       toast.success("Supplier updated");
     },
@@ -141,6 +165,7 @@ export default function SuppliersPage() {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-stats"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-filters"] });
       toast.success("Supplier deleted");
     },
     onError: () => toast.error("Failed to delete supplier"),
@@ -326,18 +351,103 @@ export default function SuppliersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="Signed">Signed</SelectItem>
-              <SelectItem value="Active">Active</SelectItem>
-              <SelectItem value="Under Review">Under Review</SelectItem>
-              <SelectItem value="Inactive">Inactive</SelectItem>
+              {filters?.statuses?.length > 0 ? (
+                filters.statuses.map((s: string) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))
+              ) : (
+                <>
+                  <SelectItem value="Signed">Signed</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Under Review">Under Review</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
 
-          {(search || statusFilter !== "all") && (
+          <Select
+            value={countryFilter}
+            onValueChange={(v) => { setCountryFilter(v); setPage(1); }}
+          >
+            <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+              <SelectValue placeholder="All Countries" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Countries</SelectItem>
+              {filters?.countries?.map((c: string) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={buyerFilter}
+            onValueChange={(v) => { setBuyerFilter(v); setPage(1); }}
+          >
+            <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+              <SelectValue placeholder="All Buyers" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Buyers</SelectItem>
+              {filters?.contractBuyers?.map((b: string) => (
+                <SelectItem key={b} value={b}>{b}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={productFilter}
+            onValueChange={(v) => { setProductFilter(v); setPage(1); }}
+          >
+            <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+              <SelectValue placeholder="All Products" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Products</SelectItem>
+              {filters?.products?.map((p: string) => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={certificationFilter}
+            onValueChange={(v) => { setCertificationFilter(v); setPage(1); }}
+          >
+            <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
+              <SelectValue placeholder="All Certifications" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Certifications</SelectItem>
+              {filters?.certifications?.map((c: string) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-md px-2 h-9">
+            <span className="text-xs font-medium text-slate-500">Date:</span>
+            <input 
+              type="date" 
+              value={dateFrom} 
+              onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+              className="text-xs bg-transparent border-none p-0 focus:ring-0 w-24 text-slate-700 outline-none"
+            />
+            <span className="text-slate-300">-</span>
+            <input 
+              type="date" 
+              value={dateTo} 
+              onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+              className="text-xs bg-transparent border-none p-0 focus:ring-0 w-24 text-slate-700 outline-none"
+            />
+          </div>
+
+          {(search || statusFilter !== "all" || countryFilter !== "all" || buyerFilter !== "all" || productFilter !== "all" || certificationFilter !== "all" || dateFrom || dateTo) && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setSearch(""); setStatusFilter("all"); setPage(1); }}
+              onClick={() => { setSearch(""); setStatusFilter("all"); setCountryFilter("all"); setBuyerFilter("all"); setProductFilter("all"); setCertificationFilter("all"); setDateFrom(""); setDateTo(""); setPage(1); }}
               className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 h-9 px-2 gap-1 ml-auto"
             >
               <X className="h-4 w-4" /> Clear
@@ -351,7 +461,7 @@ export default function SuppliersPage() {
           <table className="w-full text-sm text-left border-collapse min-w-max">
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
               <tr>
-                <th className="px-5 py-3.5 font-semibold">Company Name</th>
+                <th className="px-5 py-3.5 font-semibold sticky left-0 z-30 bg-slate-50 shadow-[inset_-1px_0_0_0_#e2e8f0]">Company Name</th>
                 <th className="px-5 py-3.5 font-semibold">Country</th>
                 <th className="px-5 py-3.5 font-semibold">Contact Person</th>
                 <th className="px-5 py-3.5 font-semibold">Email</th>
@@ -381,7 +491,7 @@ export default function SuppliersPage() {
                       </div>
                       <p className="text-slate-600 font-medium text-base">No suppliers found</p>
                       <p className="text-slate-400 text-sm max-w-[250px]">
-                        {(search || statusFilter !== "all") ? "Try adjusting your search or filters." : "You have not added any suppliers yet."}
+                        {(search || statusFilter !== "all" || countryFilter !== "all" || buyerFilter !== "all" || productFilter !== "all" || certificationFilter !== "all" || dateFrom || dateTo) ? "Try adjusting your search or filters." : "You have not added any suppliers yet."}
                       </p>
                     </div>
                   </td>
@@ -389,7 +499,7 @@ export default function SuppliersPage() {
               ) : (
                 suppliers.map((s: Supplier) => (
                   <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-5 py-3.5 border-r border-slate-100 font-medium">
+                    <td className="px-5 py-3.5 font-medium sticky left-0 z-10 bg-white group-hover:bg-slate-50 shadow-[inset_-1px_0_0_0_#f1f5f9]">
                       <Link
                         to={`/suppliers/signed-contract/${s.id}`}
                         className="text-brand-600 hover:text-brand-700 hover:underline"
@@ -515,11 +625,15 @@ export default function SuppliersPage() {
               <div className="space-y-2">
                 <Label>Country</Label>
                 <Input
+                  list="list-country"
                   value={form.country ?? ""}
                   onChange={(e) =>
                     setForm({ ...form, country: e.target.value })
                   }
                 />
+                <datalist id="list-country">
+                  {filters?.countries?.map((c: string) => <option key={c} value={c} />)}
+                </datalist>
               </div>
               <div className="space-y-2">
                 <Label>Website</Label>
@@ -533,11 +647,15 @@ export default function SuppliersPage() {
               <div className="space-y-2">
                 <Label>Contract Buyer</Label>
                 <Input
+                  list="list-contractBuyer"
                   value={form.contractBuyer ?? ""}
                   onChange={(e) =>
                     setForm({ ...form, contractBuyer: e.target.value })
                   }
                 />
+                <datalist id="list-contractBuyer">
+                  {filters?.contractBuyers?.map((c: string) => <option key={c} value={c} />)}
+                </datalist>
               </div>
               <div className="space-y-2">
                 <Label>Commission %</Label>
@@ -569,11 +687,15 @@ export default function SuppliersPage() {
               <div className="space-y-2">
                 <Label>Certifications</Label>
                 <Input
+                  list="list-certifications"
                   value={form.certifications ?? ""}
                   onChange={(e) =>
                     setForm({ ...form, certifications: e.target.value })
                   }
                 />
+                <datalist id="list-certifications">
+                  {filters?.certifications?.map((c: string) => <option key={c} value={c} />)}
+                </datalist>
               </div>
               <div className="space-y-2">
                 <Label>Production Capacity</Label>
@@ -731,20 +853,18 @@ export default function SuppliersPage() {
               </div>
               <div className="space-y-2">
                 <Label>Current Status</Label>
-                <Select
+                <Input
+                  list="list-status"
                   value={form.currentStatus ?? "Active"}
-                  onValueChange={(v) => setForm({ ...form, currentStatus: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Signed">Signed</SelectItem>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Inactive">Inactive</SelectItem>
-                    <SelectItem value="Under Review">Under Review</SelectItem>
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => setForm({ ...form, currentStatus: e.target.value })}
+                />
+                <datalist id="list-status">
+                  <option value="Signed" />
+                  <option value="Active" />
+                  <option value="Inactive" />
+                  <option value="Under Review" />
+                  {filters?.statuses?.filter((s: string) => !["Signed", "Active", "Inactive", "Under Review"].includes(s)).map((s: string) => <option key={s} value={s} />)}
+                </datalist>
               </div>
             </div>
             <div className="space-y-2">
@@ -759,13 +879,14 @@ export default function SuppliersPage() {
             </div>
             <div className="space-y-2">
               <Label>Products</Label>
-              <Textarea
+              <Input
+                list="list-products"
                 value={form.products ?? ""}
-                onChange={(e) =>
-                  setForm({ ...form, products: e.target.value })
-                }
-                rows={2}
+                onChange={(e) => setForm({ ...form, products: e.target.value })}
               />
+              <datalist id="list-products">
+                {filters?.products?.map((p: string) => <option key={p} value={p} />)}
+              </datalist>
             </div>
             <div className="space-y-2">
               <Label>Exporting Countries</Label>

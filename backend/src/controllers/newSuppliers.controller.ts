@@ -15,6 +15,14 @@ export async function listNewSuppliers(
             search = "",
             page = "1",
             limit = "20",
+            status,
+            country,
+            productCategory,
+            accountManager,
+            product,
+            certifications,
+            dateFrom,
+            dateTo
         } = req.query as Record<string, string>;
 
         const pageNum = Math.max(1, parseInt(page));
@@ -34,6 +42,35 @@ export async function listNewSuppliers(
                 { phone: { contains: search, mode: "insensitive" } },
                 { email: { contains: search, mode: "insensitive" } },
             ];
+        }
+
+        if (status && status !== "all") {
+            where.currentStatus = status;
+        }
+        if (country && country !== "all") {
+            where.country = country;
+        }
+        if (productCategory && productCategory !== "all") {
+            where.productCategory = productCategory;
+        }
+        if (accountManager && accountManager !== "all") {
+            where.accountManager = accountManager;
+        }
+        if (product && product !== "all") {
+            where.product = product;
+        }
+        if (certifications && certifications !== "all") {
+            where.certifications = certifications;
+        }
+        const dateFilter: any = {};
+        if (dateFrom && dateFrom !== "all") {
+            dateFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+        }
+        if (dateTo && dateTo !== "all") {
+            dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
+        }
+        if (Object.keys(dateFilter).length > 0) {
+            where.createdAt = dateFilter;
         }
 
         const [suppliers, total] = await Promise.all([
@@ -276,6 +313,43 @@ export async function exportNewSuppliersCsv(
         res.send(csvContent);
     } catch (err) {
         console.error("Export new suppliers error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+
+/**
+ * GET /api/new-suppliers/filters
+ */
+export async function getNewSupplierFilters(
+    req: AuthRequest,
+    res: Response,
+): Promise<void> {
+    try {
+        const [statuses, countries, categories, managers, productsRaw, certificationsRaw, datesRaw] = await Promise.all([
+            (prisma as any).newSupplier.findMany({ select: { currentStatus: true }, distinct: ['currentStatus'] }),
+            (prisma as any).newSupplier.findMany({ select: { country: true }, distinct: ['country'] }),
+            (prisma as any).newSupplier.findMany({ select: { productCategory: true }, distinct: ['productCategory'] }),
+            (prisma as any).newSupplier.findMany({ select: { accountManager: true }, distinct: ['accountManager'] }),
+            (prisma as any).newSupplier.findMany({ select: { product: true }, distinct: ['product'] }),
+            (prisma as any).newSupplier.findMany({ select: { certifications: true }, distinct: ['certifications'] }),
+            (prisma as any).newSupplier.findMany({ select: { createdAt: true } }),
+        ]);
+
+        const formattedDates = Array.from(new Set(datesRaw.map((d: any) => 
+            new Date(d.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+        ))).filter(Boolean);
+
+        res.json({
+            statuses: statuses.map((s: any) => s.currentStatus).filter(Boolean),
+            countries: countries.map((c: any) => c.country).filter(Boolean),
+            productCategories: categories.map((c: any) => c.productCategory).filter(Boolean),
+            accountManagers: managers.map((m: any) => m.accountManager).filter(Boolean),
+            products: productsRaw.map((p: any) => p.product).filter(Boolean),
+            certifications: certificationsRaw.map((c: any) => c.certifications).filter(Boolean),
+            dates: formattedDates,
+        });
+    } catch (err) {
+        console.error("Get new supplier filters error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }

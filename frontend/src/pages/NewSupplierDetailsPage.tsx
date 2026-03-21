@@ -96,6 +96,7 @@ export default function NewSupplierDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["new-supplier", id] });
       queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["new-supplier-filters"] });
       setDialogOpen(false);
       toast.success("Supplier updated");
     },
@@ -126,7 +127,8 @@ export default function NewSupplierDetailsPage() {
 
   const registeredSince = supplier.createdAt
     ? new Date(supplier.createdAt).toLocaleDateString("en-IN", {
-        month: "short",
+        day: "2-digit",
+        month: "2-digit",
         year: "numeric",
       })
     : "";
@@ -171,7 +173,7 @@ export default function NewSupplierDetailsPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             Supplier ID: #{supplier.id.slice(0, 8).toUpperCase()}
-            {registeredSince && ` · Added ${registeredSince}`}
+            {registeredSince && ` · Added On ${registeredSince}`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

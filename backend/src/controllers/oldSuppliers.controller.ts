@@ -15,6 +15,12 @@ export async function listOldSuppliers(
       search = "",
       page = "1",
       limit = "20",
+      status,
+      country,
+      productCategory,
+      accountManager,
+      dateFrom,
+      dateTo
     } = req.query as Record<string, string>;
 
     const pageNum = Math.max(1, parseInt(page));
@@ -33,6 +39,29 @@ export async function listOldSuppliers(
         { currentStatus: { contains: search, mode: "insensitive" } },
       ];
     }
+
+    if (status && status !== "all") {
+      where.currentStatus = status;
+    }
+    if (country && country !== "all") {
+      where.country = country;
+    }
+    if (productCategory && productCategory !== "all") {
+      where.productCategory = productCategory;
+    }
+    if (accountManager && accountManager !== "all") {
+      where.accountManager = accountManager;
+    }
+        const dateFilter: any = {};
+        if (dateFrom && dateFrom !== "all") {
+            dateFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+        }
+        if (dateTo && dateTo !== "all") {
+            dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
+        }
+        if (Object.keys(dateFilter).length > 0) {
+            where.createdAt = dateFilter;
+        }
 
     const [suppliers, total] = await Promise.all([
       prisma.oldSupplier.findMany({
@@ -264,6 +293,33 @@ export async function exportOldSuppliersCsv(
     res.send(csvContent);
   } catch (err) {
     console.error("Export old suppliers error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * GET /api/old-suppliers/filters
+ */
+export async function getOldSupplierFilters(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const [statuses, countries, categories, managers] = await Promise.all([
+      prisma.oldSupplier.findMany({ select: { currentStatus: true }, distinct: ['currentStatus'] }),
+      prisma.oldSupplier.findMany({ select: { country: true }, distinct: ['country'] }),
+      prisma.oldSupplier.findMany({ select: { productCategory: true }, distinct: ['productCategory'] }),
+      prisma.oldSupplier.findMany({ select: { accountManager: true }, distinct: ['accountManager'] }),
+    ]);
+
+    res.json({
+      statuses: statuses.map(s => s.currentStatus).filter(Boolean),
+      countries: countries.map(c => c.country).filter(Boolean),
+      productCategories: categories.map(c => c.productCategory).filter(Boolean),
+      accountManagers: managers.map(m => m.accountManager).filter(Boolean),
+    });
+  } catch (err) {
+    console.error("Get old supplier filters error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 }

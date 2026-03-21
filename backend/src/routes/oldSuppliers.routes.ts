@@ -6,6 +6,7 @@ import {
   updateOldSupplier,
   deleteOldSupplier,
   exportOldSuppliersCsv,
+  getOldSupplierFilters,
 } from "../controllers/oldSuppliers.controller.js";
 import {
   authenticate,
@@ -18,6 +19,7 @@ const router = Router();
 router.use(authenticate, requirePermission("suppliers"));
 
 router.get("/", listOldSuppliers);
+router.get("/filters", getOldSupplierFilters);
 router.get("/export/csv", exportOldSuppliersCsv);
 router.get("/:id", getOldSupplier);
 

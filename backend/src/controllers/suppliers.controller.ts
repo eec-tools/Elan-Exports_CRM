@@ -56,6 +56,12 @@ export async function listSuppliers(
       page = "1",
       limit = "20",
       status,
+      country,
+      contractBuyer,
+      products,
+      certifications,
+      dateFrom,
+      dateTo
     } = req.query as Record<string, string>;
 
     const pageNum = Math.max(1, parseInt(page));
@@ -76,6 +82,28 @@ export async function listSuppliers(
 
     if (status && status !== "all") {
       where.currentStatus = status;
+    }
+    if (country && country !== "all") {
+      where.country = country;
+    }
+    if (contractBuyer && contractBuyer !== "all") {
+      where.contractBuyer = contractBuyer;
+    }
+    if (products && products !== "all") {
+      where.products = products;
+    }
+    if (certifications && certifications !== "all") {
+      where.certifications = certifications;
+    }
+    const dateFilter: any = {};
+    if (dateFrom && dateFrom !== "all") {
+      dateFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+    }
+    if (dateTo && dateTo !== "all") {
+      dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
+    }
+    if (Object.keys(dateFilter).length > 0) {
+      where.createdAt = dateFilter;
     }
 
     const [suppliers, total] = await Promise.all([
@@ -373,6 +401,41 @@ export async function getSupplierStats(
     res.json(stats);
   } catch (err) {
     console.error("Get supplier stats error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * GET /api/suppliers/filters
+ */
+export async function getSupplierFilters(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const [countries, contractBuyers, statuses, productsRaw, certificationsRaw, datesRaw] = await Promise.all([
+      prisma.supplier.findMany({ select: { country: true }, distinct: ['country'] }),
+      prisma.supplier.findMany({ select: { contractBuyer: true }, distinct: ['contractBuyer'] }),
+      prisma.supplier.findMany({ select: { currentStatus: true }, distinct: ['currentStatus'] }),
+      prisma.supplier.findMany({ select: { products: true }, distinct: ['products'] }),
+      prisma.supplier.findMany({ select: { certifications: true }, distinct: ['certifications'] }),
+      prisma.supplier.findMany({ select: { createdAt: true } }),
+    ]);
+
+    const formattedDates = Array.from(new Set(datesRaw.map(d => 
+      new Date(d.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+    ))).filter(Boolean);
+
+    res.json({
+      countries: countries.map(c => c.country).filter(Boolean),
+      contractBuyers: contractBuyers.map(c => c.contractBuyer).filter(Boolean),
+      statuses: statuses.map(s => s.currentStatus).filter(Boolean),
+      products: productsRaw.map(p => p.products).filter(Boolean),
+      certifications: certificationsRaw.map(c => c.certifications).filter(Boolean),
+      dates: formattedDates,
+    });
+  } catch (err) {
+    console.error("Get supplier filters error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 }
