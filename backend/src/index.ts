@@ -24,6 +24,10 @@ import vaultRoutes from "./routes/vault.routes.js";
 import dailyTaskRoutes from "./routes/dailyTask.routes.js";
 import dealsRoutes from "./routes/deals.routes.js";
 import complianceRoutes from "./routes/compliance.routes.js";
+import introEmailCampaignRoutes from "./routes/introEmailCampaign.routes.js";
+import newSupplierEmailCampaignRoutes from "./routes/newSupplierEmailCampaign.routes.js";
+import notificationsRoutes from "./routes/notifications.routes.js";
+import { startEmailCampaignScheduler } from "./services/emailCampaignScheduler.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -127,6 +131,9 @@ app.use("/api/vault", vaultRoutes);
 app.use("/api/daily-tasks", dailyTaskRoutes);
 app.use("/api/deals", dealsRoutes);
 app.use("/api/compliance", complianceRoutes);
+app.use("/api/intro-campaigns", introEmailCampaignRoutes);
+app.use("/api/new-supplier-campaigns", newSupplierEmailCampaignRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 // Health check with detailed status
 app.get("/api/health", async (_req, res) => {
@@ -180,6 +187,7 @@ app.listen(PORT, () => {
   console.log(`📚 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`🔒 Allowed origins: ${allowedOrigins.join(", ") || "localhost only"}`);
+  startEmailCampaignScheduler();
 });
 
 // Graceful shutdown

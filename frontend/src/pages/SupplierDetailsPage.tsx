@@ -50,6 +50,11 @@ import {
   Upload,
   X,
   Trash2,
+  Bell,
+  CheckCircle2,
+  Circle,
+  Clock,
+  MessageSquareText,
 } from "lucide-react";
 
 interface Supplier {
@@ -80,6 +85,19 @@ interface Supplier {
   createdAt?: string;
   documents?: { name: string; url: string }[];
   contractDocument?: { name: string; url: string } | null;
+}
+
+interface EmailCampaign {
+  id: string;
+  supplierId: string;
+  status: "active" | "completed" | "response_received";
+  currentStep: number;
+  introEmailSentAt: string;
+  followup1SentAt?: string | null;
+  followup2SentAt?: string | null;
+  followup3SentAt?: string | null;
+  responseReceivedAt?: string | null;
+  nextFollowupDue?: string | null;
 }
 
 function getCatalogViewUrl(url?: string) {
@@ -147,6 +165,49 @@ export default function SupplierDetailsPage() {
     queryKey: ["supplier", id],
     queryFn: () => api.get(`/suppliers/${id}`).then((r) => r.data),
     enabled: !!id,
+  });
+
+  const { data: campaign } = useQuery<EmailCampaign | null>({
+    queryKey: ["intro-campaign", id],
+    queryFn: () =>
+      api
+        .get(`/intro-campaigns/${id}`)
+        .then((r) => r.data)
+        .catch((e) => (e.response?.status === 404 ? null : Promise.reject(e))),
+    enabled: !!id,
+  });
+
+  const startCampaignMutation = useMutation({
+    mutationFn: () => api.post(`/intro-campaigns/${id}/start`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["intro-campaign", id] });
+      queryClient.invalidateQueries({ queryKey: ["intro-campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["intro-campaigns-due"] });
+      toast.success("Intro email campaign started");
+    },
+    onError: () => toast.error("Failed to start campaign"),
+  });
+
+  const markSentMutation = useMutation({
+    mutationFn: () => api.post(`/intro-campaigns/${id}/mark-sent`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["intro-campaign", id] });
+      queryClient.invalidateQueries({ queryKey: ["intro-campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["intro-campaigns-due"] });
+      toast.success("Follow-up marked as sent");
+    },
+    onError: () => toast.error("Failed to mark email as sent"),
+  });
+
+  const markResponseMutation = useMutation({
+    mutationFn: () => api.post(`/intro-campaigns/${id}/mark-response`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["intro-campaign", id] });
+      queryClient.invalidateQueries({ queryKey: ["intro-campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["intro-campaigns-due"] });
+      toast.success("Supplier response recorded — campaign stopped");
+    },
+    onError: () => toast.error("Failed to record response"),
   });
 
   const updateMutation = useMutation({
@@ -668,6 +729,141 @@ export default function SupplierDetailsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Intro Email Campaign ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Intro Email Campaign
+            </CardTitle>
+            {campaign?.status === "active" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-purple-600 border-purple-200 hover:bg-purple-50 h-8 gap-1.5"
+                onClick={() => markResponseMutation.mutate()}
+                disabled={markResponseMutation.isPending}
+              >
+                <MessageSquareText className="h-3.5 w-3.5" />
+                Supplier Responded
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!campaign ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center gap-3">
+              <div className="rounded-full bg-slate-100 p-3">
+                <Mail className="h-5 w-5 text-slate-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">No campaign started yet</p>
+                <p className="text-xs text-slate-500 mt-0.5">Start a campaign after sending the intro email to this supplier</p>
+              </div>
+              <PermissionGate permission="suppliers" editOnly>
+                <Button
+                  size="sm"
+                  className="bg-brand-600 hover:bg-brand-700 text-white gap-1.5"
+                  onClick={() => startCampaignMutation.mutate()}
+                  disabled={startCampaignMutation.isPending}
+                >
+                  {startCampaignMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+                  Start Intro Email Campaign
+                </Button>
+              </PermissionGate>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Status banner */}
+              {campaign.status === "response_received" && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 text-sm font-medium">
+                  <MessageSquareText className="h-4 w-4 shrink-0" />
+                  Supplier responded on {new Date(campaign.responseReceivedAt!).toLocaleDateString()} — campaign stopped
+                </div>
+              )}
+              {campaign.status === "completed" && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm font-medium">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  All follow-ups completed
+                </div>
+              )}
+
+              {/* Timeline */}
+              <div className="space-y-3">
+                {[
+                  { label: "Intro Email", sentAt: campaign.introEmailSentAt, step: 0 },
+                  { label: "Follow-up 1", sentAt: campaign.followup1SentAt, step: 1 },
+                  { label: "Follow-up 2", sentAt: campaign.followup2SentAt, step: 2 },
+                  { label: "Follow-up 3", sentAt: campaign.followup3SentAt, step: 3 },
+                ].map((item, idx) => {
+                  const isSent = !!item.sentAt;
+                  const isDue =
+                    campaign.status === "active" &&
+                    campaign.currentStep === item.step &&
+                    item.step > 0 &&
+                    campaign.nextFollowupDue &&
+                    new Date(campaign.nextFollowupDue) <= new Date();
+                  const isNext =
+                    campaign.status === "active" &&
+                    campaign.currentStep === item.step &&
+                    item.step > 0 &&
+                    !isDue;
+
+                  return (
+                    <div key={idx} className="flex items-start gap-3">
+                      <div className="mt-0.5 shrink-0">
+                        {isSent ? (
+                          <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        ) : isDue ? (
+                          <Clock className="h-5 w-5 text-amber-500 animate-pulse" />
+                        ) : (
+                          <Circle className="h-5 w-5 text-slate-300" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className={`text-sm font-medium ${isSent ? "text-slate-800" : "text-slate-400"}`}>
+                            {item.label}
+                          </span>
+                          {isSent && (
+                            <span className="text-xs text-slate-500">{new Date(item.sentAt!).toLocaleDateString()}</span>
+                          )}
+                          {isDue && (
+                            <span className="text-xs text-amber-600 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                              Due today
+                            </span>
+                          )}
+                          {isNext && campaign.nextFollowupDue && (
+                            <span className="text-xs text-slate-400">
+                              Due {new Date(campaign.nextFollowupDue).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                        {(isDue || isNext) && (
+                          <PermissionGate permission="suppliers" editOnly>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-1.5 h-7 text-xs text-brand-600 border-brand-200 hover:bg-brand-50 gap-1"
+                              onClick={() => markSentMutation.mutate()}
+                              disabled={markSentMutation.isPending}
+                            >
+                              {markSentMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
+                              Mark as Sent
+                            </Button>
+                          </PermissionGate>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Edit Dialog ── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

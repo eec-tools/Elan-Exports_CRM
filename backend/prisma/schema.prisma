@@ -8,23 +8,24 @@ datasource db {
 }
 
 model User {
-  id               String           @id @default(uuid())
-  email            String           @unique
-  passwordHash     String           @map("password_hash")
-  fullName         String           @map("full_name")
-  isActive         Boolean          @default(true) @map("is_active")
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
-  reviewedRequests AccessRequest[]  @relation("reviewer")
-  accessRequests   AccessRequest[]  @relation("requester")
-  activityLogs     ActivityLog[]
-  buyers           Buyer[]
-  deals            Deal[]
-  reports          Report[]
-  suppliers        Supplier[]
-  permissions      UserPermission[]
-  roles            UserRole[]
-  vaultDocuments   VaultDocument[]
+  id                String             @id @default(uuid())
+  email             String             @unique
+  passwordHash      String             @map("password_hash")
+  fullName          String             @map("full_name")
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  reviewedRequests  AccessRequest[]    @relation("reviewer")
+  accessRequests    AccessRequest[]    @relation("requester")
+  activityLogs      ActivityLog[]
+  buyers            Buyer[]
+  deals             Deal[]
+  reports           Report[]
+  suppliers         Supplier[]
+  permissions       UserPermission[]
+  roles             UserRole[]
+  vaultDocuments    VaultDocument[]
+  notificationReads NotificationRead[]
 
   @@map("users")
 }
@@ -83,39 +84,60 @@ model Buyer {
 }
 
 model Supplier {
-  id                     String   @id @default(uuid())
+  id                     String                 @id @default(uuid())
   company                String
   country                String?
-  contactPerson          String?  @map("contact_person")
+  contactPerson          String?                @map("contact_person")
   email                  String?
   phone                  String?
   products               String?
-  contractBuyer          String?  @map("contract_buyer")
-  commissionPercent      String?  @map("commission_percent")
+  contractBuyer          String?                @map("contract_buyer")
+  commissionPercent      String?                @map("commission_percent")
   certifications         String?
-  productionCapacity     String?  @map("production_capacity")
-  currentStatus          String?  @default("Under Review") @map("current_status")
+  productionCapacity     String?                @map("production_capacity")
+  currentStatus          String?                @default("Under Review") @map("current_status")
   remarks                String?
-  createdBy              String?  @map("created_by")
-  createdAt              DateTime @default(now()) @map("created_at")
-  updatedAt              DateTime @updatedAt @map("updated_at")
-  approvedConfirmPercent String?  @map("approved_confirm_percent")
-  companyAddress         String?  @map("company_address")
-  exportingCountries     String?  @map("exporting_countries")
-  factoryVideosShared    String?  @map("factory_videos_shared")
-  lidlFactoryId          String?  @map("lidl_factory_id")
-  otherBrands            String?  @map("other_brands")
-  productCatalogShared   String?  @map("product_catalog_shared")
-  samplePolicy           String?  @map("sample_policy")
-  warehouseVideosShared  String?  @map("warehouse_videos_shared")
+  createdBy              String?                @map("created_by")
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+  approvedConfirmPercent String?                @map("approved_confirm_percent")
+  companyAddress         String?                @map("company_address")
+  exportingCountries     String?                @map("exporting_countries")
+  factoryVideosShared    String?                @map("factory_videos_shared")
+  lidlFactoryId          String?                @map("lidl_factory_id")
+  otherBrands            String?                @map("other_brands")
+  productCatalogShared   String?                @map("product_catalog_shared")
+  samplePolicy           String?                @map("sample_policy")
+  warehouseVideosShared  String?                @map("warehouse_videos_shared")
   website                String?
-  workingWithOurBrands   String?  @map("working_with_our_brands")
-  documents              Json     @default("[]")
-  contractDocument       Json?    @map("contract_document")
-  creator                User?    @relation(fields: [createdBy], references: [id])
-  supplierStage          String   @default("Signed") @map("supplier_stage")
+  workingWithOurBrands   String?                @map("working_with_our_brands")
+  documents              Json                   @default("[]")
+  contractDocument       Json?                  @map("contract_document")
+  creator                User?                  @relation(fields: [createdBy], references: [id])
+  supplierStage          String                 @default("Signed") @map("supplier_stage")
+  emailCampaign          SupplierEmailCampaign?
 
   @@map("suppliers")
+}
+
+model SupplierEmailCampaign {
+  id                 String    @id @default(uuid())
+  supplierId         String    @unique @map("supplier_id")
+  status             String    @default("active")
+  // status: "active" | "completed" | "response_received"
+  currentStep        Int       @default(1) @map("current_step")
+  // 1 = intro sent, 2 = followup1 sent, 3 = followup2 sent, 4 = followup3 sent (completed)
+  introEmailSentAt   DateTime  @map("intro_email_sent_at")
+  followup1SentAt    DateTime? @map("followup1_sent_at")
+  followup2SentAt    DateTime? @map("followup2_sent_at")
+  followup3SentAt    DateTime? @map("followup3_sent_at")
+  responseReceivedAt DateTime? @map("response_received_at")
+  nextFollowupDue    DateTime? @map("next_followup_due")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  supplier           Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@map("supplier_email_campaigns")
 }
 
 model OldSupplier {
@@ -141,27 +163,48 @@ model OldSupplier {
 }
 
 model NewSupplier {
-  id                    String   @id @default(uuid())
+  id                    String                    @id @default(uuid())
   company               String
-  productCategory       String?  @map("product_category")
+  productCategory       String?                   @map("product_category")
   product               String?
   country               String?
-  accountManager        String?  @map("account_manager")
-  currentStatus         String?  @map("current_status")
+  accountManager        String?                   @map("account_manager")
+  currentStatus         String?                   @map("current_status")
   certifications        String?
-  latestQuotation       String?  @map("latest_quotation")
-  reasonInactive        String?  @map("reason_inactive")
-  dateMarkedInactive    String?  @map("date_marked_inactive")
-  reactivationPotential String?  @map("reactivation_potential")
+  latestQuotation       String?                   @map("latest_quotation")
+  reasonInactive        String?                   @map("reason_inactive")
+  dateMarkedInactive    String?                   @map("date_marked_inactive")
+  reactivationPotential String?                   @map("reactivation_potential")
   notes                 String?
-  createdBy             String?  @map("created_by")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  createdBy             String?                   @map("created_by")
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
   email                 String?
   phone                 String?
-  supplierStage         String   @default("Onboarding") @map("supplier_stage")
+  supplierStage         String                    @default("Onboarding") @map("supplier_stage")
+  emailCampaign         NewSupplierEmailCampaign?
 
   @@map("new_suppliers")
+}
+
+model NewSupplierEmailCampaign {
+  id                 String      @id @default(uuid())
+  newSupplierId      String      @unique @map("new_supplier_id")
+  status             String      @default("active")
+  // status: "active" | "completed" | "response_received"
+  currentStep        Int         @default(1) @map("current_step")
+  // 1 = intro sent, 2 = followup1 sent, 3 = followup2 sent, 4 = followup3 sent (completed)
+  introEmailSentAt   DateTime    @map("intro_email_sent_at")
+  followup1SentAt    DateTime?   @map("followup1_sent_at")
+  followup2SentAt    DateTime?   @map("followup2_sent_at")
+  followup3SentAt    DateTime?   @map("followup3_sent_at")
+  responseReceivedAt DateTime?   @map("response_received_at")
+  nextFollowupDue    DateTime?   @map("next_followup_due")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  newSupplier        NewSupplier @relation(fields: [newSupplierId], references: [id], onDelete: Cascade)
+
+  @@map("new_supplier_email_campaigns")
 }
 
 model Report {
@@ -311,6 +354,34 @@ model ComplianceDocument {
 enum Role {
   admin
   member
+}
+
+model Notification {
+  id         String             @id @default(uuid())
+  type       String
+  title      String
+  message    String
+  entityType String             @map("entity_type")
+  entityId   String             @map("entity_id")
+  entityName String             @map("entity_name")
+  entityLink String?            @map("entity_link")
+  createdBy  String?            @map("created_by")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  reads      NotificationRead[]
+
+  @@map("notifications")
+}
+
+model NotificationRead {
+  id             String       @id @default(uuid())
+  notificationId String       @map("notification_id")
+  userId         String       @map("user_id")
+  readAt         DateTime     @default(now()) @map("read_at")
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@map("notification_reads")
 }
 
 enum Permission {

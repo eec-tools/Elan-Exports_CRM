@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
+import { createNotification } from "../services/notificationService.js";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -211,6 +212,19 @@ export async function updateSupplier(
       company: supplier.company,
     });
 
+    if (updateData.currentStatus && existing.currentStatus !== updateData.currentStatus) {
+      await createNotification({
+        type: "status_change",
+        title: "Supplier Status Updated",
+        message: `${supplier.company} status changed from "${existing.currentStatus}" to "${updateData.currentStatus}"`,
+        entityType: "supplier",
+        entityId: supplier.id,
+        entityName: supplier.company,
+        entityLink: `/suppliers/signed-contract/${supplier.id}`,
+        createdBy: req.user!.id,
+      });
+    }
+
     res.json(supplier);
   } catch (err) {
     console.error("Update supplier error:", err);
@@ -246,6 +260,7 @@ export async function updateSupplierStage(
       return;
     }
 
+
     const commonData = {
       company: existing.company,
       country: existing.country,
@@ -265,6 +280,16 @@ export async function updateSupplierStage(
       });
       await prisma.supplier.delete({ where: { id: req.params.id } });
       await logActivity(req.user!.id, "move_to_new_suppliers", "suppliers", newSupplier.id, { company: existing.company });
+      await createNotification({
+        type: "stage_change",
+        title: "Supplier Moved to Onboarding",
+        message: `${existing.company} moved from Signed → Onboarding`,
+        entityType: "new_supplier",
+        entityId: newSupplier.id,
+        entityName: existing.company,
+        entityLink: `/suppliers/new/${newSupplier.id}`,
+        createdBy: req.user!.id,
+      });
       res.json(newSupplier);
     } else if (stage === "Closed") {
       const oldSupplier = await prisma.oldSupplier.create({
@@ -275,6 +300,16 @@ export async function updateSupplierStage(
       });
       await prisma.supplier.delete({ where: { id: req.params.id } });
       await logActivity(req.user!.id, "move_to_old_suppliers", "suppliers", oldSupplier.id, { company: existing.company });
+      await createNotification({
+        type: "stage_change",
+        title: "Supplier Moved to Closed",
+        message: `${existing.company} moved from Signed → Closed`,
+        entityType: "old_supplier",
+        entityId: oldSupplier.id,
+        entityName: existing.company,
+        entityLink: `/suppliers/old`,
+        createdBy: req.user!.id,
+      });
       res.json(oldSupplier);
     } else {
       res.status(400).json({ error: "Invalid stage" });

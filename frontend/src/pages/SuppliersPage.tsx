@@ -37,9 +37,18 @@ import {
   FileCheck2,
   CheckCircle2,
   PauseCircle,
+  Bell,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
+
+interface EmailCampaign {
+  supplierId: string;
+  status: "active" | "completed" | "response_received";
+  currentStep: number;
+  nextFollowupDue?: string | null;
+}
 
 interface Supplier {
   id: string;
@@ -69,6 +78,50 @@ interface Supplier {
   documents?: { name: string; url: string }[];
   contractDocument?: { name: string; url: string } | null;
   supplierStage?: string;
+}
+
+const FOLLOWUP_LABELS: Record<number, string> = {
+  1: "Follow-up 1 Due",
+  2: "Follow-up 2 Due",
+  3: "Follow-up 3 Due",
+};
+
+function EmailCampaignBadge({ campaign }: { campaign?: EmailCampaign }) {
+  if (!campaign) {
+    return <span className="text-xs text-slate-400">No Campaign</span>;
+  }
+
+  const isDueToday =
+    campaign.status === "active" &&
+    campaign.nextFollowupDue &&
+    new Date(campaign.nextFollowupDue) <= new Date();
+
+  if (campaign.status === "response_received") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+        <Mail className="h-3 w-3" /> Responded
+      </span>
+    );
+  }
+  if (campaign.status === "completed") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
+        <CheckCircle2 className="h-3 w-3" /> Completed
+      </span>
+    );
+  }
+  if (isDueToday) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200 animate-pulse">
+        <Bell className="h-3 w-3" /> {FOLLOWUP_LABELS[campaign.currentStep] ?? "Follow-up Due"}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+      <Mail className="h-3 w-3" /> Step {campaign.currentStep}/4
+    </span>
+  );
 }
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
@@ -133,6 +186,15 @@ export default function SuppliersPage() {
     queryKey: ["supplier-stats"],
     queryFn: () => api.get("/suppliers/stats").then((r) => r.data),
   });
+
+  const { data: campaigns } = useQuery<EmailCampaign[]>({
+    queryKey: ["intro-campaigns"],
+    queryFn: () => api.get("/intro-campaigns").then((r) => r.data),
+  });
+
+  const campaignMap = new Map<string, EmailCampaign>(
+    (campaigns ?? []).map((c) => [c.supplierId, c]),
+  );
 
   const createMutation = useMutation({
     mutationFn: (d: Partial<Supplier>) => api.post("/suppliers", d),
@@ -486,13 +548,14 @@ export default function SuppliersPage() {
                 <th className="px-5 py-3.5 font-semibold">Remarks</th>
                 <th className="px-5 py-3.5 font-semibold">Status</th>
                 <th className="px-5 py-3.5 font-semibold">Stage</th>
+                <th className="px-5 py-3.5 font-semibold">Intro Email</th>
                 {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading && suppliers.length === 0 ? (
                  <tr>
-                 <td colSpan={canEdit ? 10 : 9} className="h-32 text-center">
+                 <td colSpan={canEdit ? 11 : 10} className="h-32 text-center">
                    <div className="flex justify-center">
                      <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                    </div>
@@ -500,7 +563,7 @@ export default function SuppliersPage() {
                </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 10 : 9} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                  <td colSpan={canEdit ? 11 : 10} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                         <Building2 className="h-6 w-6 text-slate-300" />
@@ -537,8 +600,8 @@ export default function SuppliersPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
-                        <Select 
-                            value={s.supplierStage || "Signed"} 
+                        <Select
+                            value={s.supplierStage || "Signed"}
                             onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
                             disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
                         >
@@ -551,6 +614,9 @@ export default function SuppliersPage() {
                                 <SelectItem value="Closed">Closed</SelectItem>
                             </SelectContent>
                         </Select>
+                    </td>
+                    <td className="px-5 py-3.5 border-r border-slate-100">
+                      <EmailCampaignBadge campaign={campaignMap.get(s.id)} />
                     </td>
                     {canEdit && (
                       <td className="px-5 py-3.5 text-right font-medium">

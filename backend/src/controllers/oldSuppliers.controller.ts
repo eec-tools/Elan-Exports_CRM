@@ -2,6 +2,7 @@ import { Response } from "express";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
+import { createNotification } from "../services/notificationService.js";
 
 /**
  * GET /api/old-suppliers
@@ -234,6 +235,16 @@ export async function updateOldSupplierStage(
       });
       await prisma.oldSupplier.delete({ where: { id: req.params.id } });
       await logActivity(req.user!.id, "move_to_new_suppliers", "old_suppliers", newSupplier.id, { company: existing.company });
+      await createNotification({
+        type: "stage_change",
+        title: "Supplier Reactivated to Onboarding",
+        message: `${existing.company} moved from Closed → Onboarding`,
+        entityType: "new_supplier",
+        entityId: newSupplier.id,
+        entityName: existing.company,
+        entityLink: `/suppliers/new/${newSupplier.id}`,
+        createdBy: req.user!.id,
+      });
       res.json(newSupplier);
     } else if (stage === "Signed") {
       const supplier = await prisma.supplier.create({
@@ -244,6 +255,16 @@ export async function updateOldSupplierStage(
       });
       await prisma.oldSupplier.delete({ where: { id: req.params.id } });
       await logActivity(req.user!.id, "move_to_suppliers", "old_suppliers", supplier.id, { company: existing.company });
+      await createNotification({
+        type: "stage_change",
+        title: "Supplier Reactivated to Signed",
+        message: `${existing.company} moved from Closed → Signed`,
+        entityType: "supplier",
+        entityId: supplier.id,
+        entityName: existing.company,
+        entityLink: `/suppliers/signed-contract/${supplier.id}`,
+        createdBy: req.user!.id,
+      });
       res.json(supplier);
     } else {
       res.status(400).json({ error: "Invalid stage" });

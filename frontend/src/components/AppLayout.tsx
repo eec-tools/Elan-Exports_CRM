@@ -18,12 +18,14 @@ import {
   CalendarCheck,
   TrendingUp,
   ClipboardCheck,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
 import logo from "@/assets/elanexportslogo.png";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const navItems = [
   {
@@ -108,6 +110,13 @@ const navItems = [
     label: "Daily Tasks",
     icon: CalendarCheck,
     perm: "task_tracker",
+    adminOnly: false,
+  },
+  {
+    to: "/notifications",
+    label: "Notifications",
+    icon: Bell,
+    perm: null,
     adminOnly: false,
   },
 ];
@@ -350,22 +359,27 @@ export function AppLayout() {
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-        {/* Top bar (mobile) */}
-        <header className="flex h-16 items-center border-b border-slate-200 bg-white px-4 md:hidden shrink-0 shadow-sm z-30">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(true)}
-            className="text-slate-600 hover:bg-slate-100 mr-2"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <img
-            src={logo}
-            alt="Logo"
-            className="h-8 w-8 rounded-full object-cover mr-3 border border-slate-100"
-          />
-          <span className="text-[17px] font-bold text-slate-900 tracking-tight">Élan Exports</span>
+        {/* Top bar (global) */}
+        <header className="flex h-16 items-center border-b border-slate-200 bg-white px-4 shrink-0 shadow-sm z-30">
+          <div className="flex items-center md:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              className="text-slate-600 hover:bg-slate-100 mr-2"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <img
+              src={logo}
+              alt="Logo"
+              className="h-8 w-8 rounded-full object-cover mr-3 border border-slate-100"
+            />
+            <span className="text-[17px] font-bold text-slate-900 tracking-tight">Élan Exports</span>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <NotificationBell />
+          </div>
         </header>
 
         {/* Page content */}

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
+import { createNotification } from "../services/notificationService.js";
 
 const prisma = new PrismaClient();
 
@@ -85,6 +86,8 @@ export const updateDeal = async (req: Request, res: Response) => {
       notes,
     } = req.body;
 
+    const existing = await prisma.deal.findUnique({ where: { id }, select: { stage: true, title: true } });
+
     const deal = await prisma.deal.update({
       where: { id },
       data: {
@@ -108,6 +111,19 @@ export const updateDeal = async (req: Request, res: Response) => {
         ...(notes !== undefined && { notes }),
       },
     });
+
+    if (stage !== undefined && existing?.stage !== stage) {
+      await createNotification({
+        type: "deal_stage_change",
+        title: "Deal Stage Updated",
+        message: `Deal "${deal.title}" moved from ${existing?.stage} → ${stage}`,
+        entityType: "deal",
+        entityId: deal.id,
+        entityName: deal.title,
+        entityLink: `/deals`,
+      });
+    }
+
     res.json(deal);
   } catch (err) {
     console.error(err);

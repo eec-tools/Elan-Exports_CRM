@@ -33,9 +33,61 @@ import {
     Building2,
     AlertCircle,
     X,
+    Bell,
+    Mail,
+    CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
+
+interface EmailCampaign {
+    newSupplierId: string;
+    status: "active" | "completed" | "response_received";
+    currentStep: number;
+    nextFollowupDue?: string | null;
+}
+
+const FOLLOWUP_LABELS: Record<number, string> = {
+    1: "Follow-up 1 Due",
+    2: "Follow-up 2 Due",
+    3: "Follow-up 3 Due",
+};
+
+function EmailCampaignBadge({ campaign }: { campaign?: EmailCampaign }) {
+    if (!campaign) return <span className="text-xs text-slate-400">No Campaign</span>;
+
+    const isDueToday =
+        campaign.status === "active" &&
+        campaign.nextFollowupDue &&
+        new Date(campaign.nextFollowupDue) <= new Date();
+
+    if (campaign.status === "response_received") {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                <Mail className="h-3 w-3" /> Responded
+            </span>
+        );
+    }
+    if (campaign.status === "completed") {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
+                <CheckCircle2 className="h-3 w-3" /> Completed
+            </span>
+        );
+    }
+    if (isDueToday) {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200 animate-pulse">
+                <Bell className="h-3 w-3" /> {FOLLOWUP_LABELS[campaign.currentStep] ?? "Follow-up Due"}
+            </span>
+        );
+    }
+    return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+            <Mail className="h-3 w-3" /> Step {campaign.currentStep}/4
+        </span>
+    );
+}
 
 interface Supplier {
     id: string;
@@ -122,6 +174,15 @@ export default function NewSuppliersPage() {
         queryKey: ["new-supplier-filters"],
         queryFn: () => api.get("/new-suppliers/filters").then((r) => r.data),
     });
+
+    const { data: campaigns } = useQuery<EmailCampaign[]>({
+        queryKey: ["new-supplier-campaigns"],
+        queryFn: () => api.get("/new-supplier-campaigns").then((r) => r.data),
+    });
+
+    const campaignMap = new Map<string, EmailCampaign>(
+        (campaigns ?? []).map((c) => [c.newSupplierId, c]),
+    );
 
     const createMutation = useMutation({
         mutationFn: (d: Partial<Supplier>) => api.post("/new-suppliers", d),
@@ -378,13 +439,14 @@ export default function NewSuppliersPage() {
                                 <th className="px-5 py-3.5 font-semibold">Reactivation Potential</th>
                                 <th className="px-5 py-3.5 font-semibold">Notes</th>
                                 <th className="px-5 py-3.5 font-semibold">Stage</th>
+                                <th className="px-5 py-3.5 font-semibold">Intro Email</th>
                                 {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-slate-700">
                             {isLoading && suppliers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={canEdit ? 13 : 12} className="h-32 text-center">
+                                    <td colSpan={canEdit ? 14 : 13} className="h-32 text-center">
                                         <div className="flex justify-center">
                                             <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                                         </div>
@@ -392,7 +454,7 @@ export default function NewSuppliersPage() {
                                 </tr>
                             ) : suppliers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={canEdit ? 13 : 12} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                                    <td colSpan={canEdit ? 14 : 13} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                                         <div className="flex flex-col items-center justify-center gap-3">
                                             <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                                                 <Building2 className="h-6 w-6 text-slate-300" />
@@ -427,8 +489,8 @@ export default function NewSuppliersPage() {
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reactivationPotential}>{s.reactivationPotential}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.notes}>{s.notes}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
-                                            <Select 
-                                                value={s.supplierStage || "Onboarding"} 
+                                            <Select
+                                                value={s.supplierStage || "Onboarding"}
                                                 onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
                                                 disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
                                             >
@@ -441,6 +503,9 @@ export default function NewSuppliersPage() {
                                                     <SelectItem value="Closed">Closed</SelectItem>
                                                 </SelectContent>
                                             </Select>
+                                        </td>
+                                        <td className="px-5 py-3.5 border-r border-slate-100">
+                                            <EmailCampaignBadge campaign={campaignMap.get(s.id)} />
                                         </td>
                                         {canEdit && (
                                             <td className="px-5 py-3.5 text-right font-medium">

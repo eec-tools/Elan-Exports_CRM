@@ -33,6 +33,8 @@ import {
   MessageSquare,
   Calendar,
   Layout,
+  Bell,
+  Mail,
 } from "lucide-react";
 
 // ─── Types & Configuration ──────────────────────────────────────────
@@ -123,6 +125,18 @@ interface QuickLink {
   url: string;
 }
 
+interface DueCampaign {
+  supplierId: string;
+  currentStep: number;
+  nextFollowupDue: string;
+  supplier: {
+    id: string;
+    company: string;
+    email: string | null;
+    contactPerson: string | null;
+  };
+}
+
 const DEFAULT_QUICK_LINKS: QuickLink[] = [
   { id: "1", title: "Google Meet", url: "https://meet.google.com/pqs-znoa-jwk?authuser=0" },
   { id: "2", title: "Google Drive", url: "https://drive.google.com/drive/folders/1GfVddDUKMlzeoiQ_vFpuFptukawWnbwW" },
@@ -193,6 +207,12 @@ export default function DashboardPage() {
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["dashboard-stats"],
     queryFn: () => api.get("/dashboard/stats").then((r) => r.data),
+    refetchInterval: 60_000,
+  });
+
+  const { data: dueCampaigns } = useQuery<DueCampaign[]>({
+    queryKey: ["intro-campaigns-due"],
+    queryFn: () => api.get("/intro-campaigns/due").then((r) => r.data),
     refetchInterval: 60_000,
   });
 
@@ -571,6 +591,60 @@ export default function DashboardPage() {
             <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
         ))}
+      </div>
+
+      {/* ── Email Follow-ups Due Today ───────────────────────────── */}
+      <div className="rounded-xl border border-amber-200 bg-white shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between border-b border-amber-100 px-5 py-4 bg-amber-50">
+          <div className="flex items-center gap-2">
+            <div className="rounded-md bg-amber-100 p-1.5">
+              <Bell className="h-4 w-4 text-amber-600" />
+            </div>
+            <h2 className="text-sm font-semibold text-slate-800">Email Follow-ups Due Today</h2>
+            {dueCampaigns && dueCampaigns.length > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center rounded-full bg-amber-500 text-white text-xs font-bold h-5 min-w-[20px] px-1.5">
+                {dueCampaigns.length}
+              </span>
+            )}
+          </div>
+          <Link to="/suppliers/signed-contract" className="text-xs text-brand-600 hover:underline font-medium">
+            View all suppliers →
+          </Link>
+        </div>
+        {!dueCampaigns || dueCampaigns.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <CheckCircle2 className="h-8 w-8 text-green-300 mb-2" />
+            <p className="text-sm font-medium text-slate-600">No follow-ups due today</p>
+            <p className="text-xs text-slate-400 mt-0.5">All email campaigns are on track</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {dueCampaigns.map((c) => (
+              <div key={c.supplierId} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="rounded-full bg-amber-100 p-1.5 shrink-0">
+                    <Mail className="h-3.5 w-3.5 text-amber-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{c.supplier.company}</p>
+                    <p className="text-xs text-slate-500 truncate">{c.supplier.contactPerson ?? c.supplier.email ?? "—"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 ml-4 shrink-0">
+                  <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                    Follow-up {c.currentStep}
+                  </span>
+                  <Link
+                    to={`/suppliers/signed-contract/${c.supplier.id}`}
+                    className="text-xs text-brand-600 hover:underline font-medium"
+                  >
+                    Open →
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Quick Links ──────────────────────────────────────────── */}
