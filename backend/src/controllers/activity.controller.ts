@@ -11,10 +11,28 @@ export async function listActivity(
   res: Response,
 ): Promise<void> {
   try {
-    const { limit = "100" } = req.query as Record<string, string>;
+    const { limit = "100", days } = req.query as Record<string, string>;
     const limitNum = Math.min(500, Math.max(1, parseInt(limit)));
 
+    let gteDate = new Date();
+    gteDate.setFullYear(gteDate.getFullYear() - 1); // default 1 year expiry
+
+    let lteDate = new Date();
+
+    if (days) {
+      gteDate = new Date();
+      gteDate.setDate(gteDate.getDate() - parseInt(days));
+    }
+
+    const where = {
+       createdAt: {
+         gte: gteDate,
+         lte: lteDate,
+       }
+    };
+
     const logs = await prisma.activityLog.findMany({
+      where,
       take: limitNum,
       orderBy: { createdAt: "desc" },
       include: {

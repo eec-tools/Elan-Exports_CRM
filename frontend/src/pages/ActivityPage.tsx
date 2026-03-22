@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
-import { Loader2, Activity, Clock, UserRound, ArrowRight } from "lucide-react";
+import { Loader2, Activity, Clock, UserRound, ArrowRight, Filter } from "lucide-react";
 import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Log {
   id: string;
@@ -14,9 +16,11 @@ interface Log {
 }
 
 export default function ActivityPage() {
+  const [daysFilter, setDaysFilter] = useState("all");
+
   const { data: logs = [], isLoading } = useQuery({
-    queryKey: ["activity"],
-    queryFn: () => api.get("/activity").then((r) => r.data),
+    queryKey: ["activity", daysFilter],
+    queryFn: () => api.get("/activity", { params: { days: daysFilter === "all" ? undefined : daysFilter } }).then((r) => r.data),
   });
 
   const getActionStyles = (action: string) => {
@@ -56,6 +60,21 @@ export default function ActivityPage() {
           <p className="text-sm text-slate-500 mt-0.5">
             Real-time audit trail of actions taken across the CRM.
           </p>
+        </div>
+        <div className="flex items-center gap-3">
+           <Filter className="h-4 w-4 text-slate-400" />
+           <Select value={daysFilter} onValueChange={setDaysFilter}>
+              <SelectTrigger className="w-[180px] bg-white border-slate-200">
+                 <SelectValue placeholder="Select timeframe" />
+              </SelectTrigger>
+              <SelectContent>
+                 <SelectItem value="all">Last 1 Year (Default)</SelectItem>
+                 <SelectItem value="30">Last 30 Days</SelectItem>
+                 <SelectItem value="7">Last 7 Days</SelectItem>
+                 <SelectItem value="2">Last 2 Days</SelectItem>
+                 <SelectItem value="1">Last 24 Hours</SelectItem>
+              </SelectContent>
+           </Select>
         </div>
       </div>
 
