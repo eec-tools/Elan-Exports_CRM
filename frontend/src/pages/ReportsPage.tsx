@@ -52,9 +52,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import logoUrl from "@/assets/elanexportslogo.png";
 
 interface Report {
   id: string;
@@ -77,22 +74,6 @@ const resolveImageUrl = (url?: string | null) => {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   return `${API_BASE}${url}`;
-};
-
-const BUYER_COLORS: [number, number, number][] = [
-  [204, 153, 204], 
-  [255, 204, 204], 
-  [204, 229, 255], 
-  [204, 255, 229], 
-  [255, 229, 204], 
-];
-
-const getBuyerColor = (buyerName: string) => {
-  let hash = 0;
-  for (let i = 0; i < buyerName.length; i++) {
-    hash = (hash * 31 + buyerName.charCodeAt(i)) >>> 0;
-  }
-  return BUYER_COLORS[hash % BUYER_COLORS.length];
 };
 
 const reportSchema = z.object({
@@ -278,201 +259,36 @@ export default function ReportsPage() {
     setUploadingImage(false);
   };
 
-  const loadImage = (url: string): Promise<HTMLImageElement> => {
-    return new Promise((resolve, reject) => {
-      const img = new window.Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = url;
-    });
-  };
-
-  const loadLogoWatermark = async (): Promise<HTMLImageElement | null> => {
-    try {
-      const base = await loadImage(logoUrl);
-      const canvas = document.createElement("canvas");
-      canvas.width = base.width;
-      canvas.height = base.height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return base;
-
-      ctx.drawImage(base, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-        data[i] = gray;
-        data[i + 1] = gray;
-        data[i + 2] = gray;
-        data[i + 3] = data[i + 3] * 0.2; 
-      }
-
-      ctx.putImageData(imageData, 0, 0);
-
-      const wm = new window.Image();
-      wm.src = canvas.toDataURL("image/png");
-      await new Promise((resolve, reject) => {
-        wm.onload = () => resolve(null);
-        wm.onerror = reject;
-      });
-      return wm;
-    } catch {
-      return null;
-    }
-  };
-
   const downloadPdf = async () => {
     if (!items.length) {
       toast.error("No reports to download in the current view.");
       return;
     }
 
-    toast.info("Generating PDF...");
-
-    const logoImage = await loadLogoWatermark();
-    const imageMap: Record<string, HTMLImageElement> = {};
-    await Promise.all(
-      items
-        .filter((r) => r.productImageUrl)
-        .map(async (r) => {
-          try {
-            imageMap[r.id] = await loadImage(
-              resolveImageUrl(r.productImageUrl)!,
-            );
-          } catch {
-            // ignore broken images
-          }
-        }),
-    );
-
-    const doc = new jsPDF({ orientation: "landscape" });
-    const generatedAt = new Date();
-    const generatedLabel = `Generated on: ${format(
-      generatedAt,
-      "dd MMM yyyy, HH:mm",
-    )}`;
-
-    const grouped: Record<string, Report[]> = {};
-    for (const r of items) {
-      const key = r.buyerName || "Unknown Buyer";
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(r);
-    }
-
-    const buyerNames = Object.keys(grouped);
-    let firstSection = true;
-
-    buyerNames.forEach((buyer) => {
-      const reports = grouped[buyer];
-      if (!firstSection) {
-        doc.addPage();
-      }
-      firstSection = false;
-
-      if (logoImage) {
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const maxLogoWidth = pageWidth * 0.4;
-        const maxLogoHeight = pageHeight * 0.5;
-        const ratio = Math.min(
-          maxLogoWidth / logoImage.width,
-          maxLogoHeight / logoImage.height,
-        );
-        const w = logoImage.width * ratio;
-        const h = logoImage.height * ratio;
-        const x = (pageWidth - w) / 2;
-        const y = (pageHeight - h) / 2;
-        doc.addImage(logoImage, "PNG", x, y, w, h, undefined, "FAST");
-      }
-
-      const [r, g, b] = getBuyerColor(buyer);
-      const pageWidth = doc.internal.pageSize.getWidth();
-
-      doc.setFontSize(8);
-      doc.setTextColor(80, 80, 80);
-      doc.text(generatedLabel, pageWidth - 10, 8, { align: "right" });
-
-      doc.setFillColor(r, g, b);
-      doc.rect(10, 10, 277, 12, "F");
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(14);
-      doc.text(`Buyer - ${buyer}`, 14, 18);
-
-      doc.setFontSize(10);
-      const startY = 26;
-      const imgHeight = 22;
-      const cellPad = 1.5;
-      const minProductCellHeight = imgHeight + 2 * cellPad + 6;
-
-      autoTable(doc, {
-        startY,
-        head: [
-          ["Product", "Supplier Company Name", "Brief Summary", "Key Updates"],
-        ],
-        body: reports.map((r) => [
-          "",
-          r.companyName,
-          r.status,
-          r.keyUpdates || "",
-        ]),
-        styles: { fontSize: 8, minCellHeight: minProductCellHeight },
-        headStyles: { fillColor: [230, 204, 230] },
-        columnStyles: {
-          0: { cellWidth: 45 },
-          1: { cellWidth: 75 },
-          2: { cellWidth: 70 },
-          3: { cellWidth: 80 },
+    try {
+      toast.loading("Generating Premium PDF...", { id: "pdf-gen" });
+      const res = await api.get("/reports/export/pdf", {
+        params: {
+          search,
+          from: filterFrom ? format(filterFrom, "yyyy-MM-dd") : undefined,
+          to: filterTo ? format(filterTo, "yyyy-MM-dd") : undefined,
         },
-        didDrawCell: (hookData: any) => {
-          if (hookData.section === "body" && hookData.column.index === 0) {
-            const item = reports[hookData.row.index];
-            const img = imageMap[item.id];
-            const cellX = hookData.cell.x + cellPad;
-            const cellY = hookData.cell.y + cellPad;
-            let currentY = cellY;
-
-            if (img) {
-              const cellW = hookData.cell.width - cellPad * 2;
-              const ratio = Math.min(cellW / img.width, imgHeight / img.height);
-              const w = img.width * ratio;
-              const h = img.height * ratio;
-              doc.addImage(img, "JPEG", cellX, currentY, w, h);
-
-              const labelY = currentY + h - 6;
-              doc.setFillColor(255, 255, 255);
-              doc.rect(
-                cellX,
-                labelY - 5,
-                hookData.cell.width - 2 * cellPad,
-                7,
-                "F",
-              );
-              doc.setTextColor(0, 0, 0);
-              doc.setFontSize(8);
-              doc.text(item.productName.toUpperCase(), cellX + 2, labelY);
-
-              currentY = cellY + h + 2;
-            }
-
-            if (!img) {
-              doc.setFontSize(8);
-              doc.setTextColor(0, 0, 0);
-              doc.text(item.productName, cellX, currentY + 4, {
-                maxWidth: hookData.cell.width - 2 * cellPad,
-              });
-            }
-          }
-        },
+        responseType: "blob",
       });
-    });
 
-    doc.save("reports.pdf");
-    toast.success("PDF downloaded");
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "buyer-reports-export.pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("PDF downloaded successfully", { id: "pdf-gen" });
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to generate PDF", { id: "pdf-gen" });
+    }
   };
 
   const getStatusColor = (status: string) => {

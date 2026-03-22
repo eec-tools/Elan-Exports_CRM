@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
+import { generateBuyerReportsPdf } from "../services/reportsPdf.service.js";
 
 /**
  * GET /api/reports
@@ -179,5 +180,57 @@ export async function deleteReport(
   } catch (err) {
     console.error("Delete report error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * GET /api/reports/export/pdf
+ */
+export async function exportPdf(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const { buyerSupplier, from, to } = req.query as Record<string, string>;
+
+    const where: any = {};
+    if (buyerSupplier) {
+      where.buyerSupplier = buyerSupplier;
+    }
+    if (from || to) {
+      where.reportDate = {};
+      if (from) where.reportDate.gte = new Date(from);
+      if (to) where.reportDate.lte = new Date(to);
+    }
+
+    const reports = await prisma.report.findMany({
+      where,
+      orderBy: [
+         { buyerName: "asc" },
+         { reportDate: "desc" }
+      ],
+    });
+
+    if (reports.length === 0) {
+      res.status(404).json({ error: "No reports found to export" });
+      return;
+    }
+
+    const pdfBuffer = await generateBuyerReportsPdf(reports);
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="buyer-reports-export.pdf"`,
+      "Content-Length": String(pdfBuffer.length),
+    });
+
+    res.send(pdfBuffer);
+    
+    // Log export asynchronously
+    logActivity(req.user!.id, "export", "reports", "pdf", {}).catch(console.error);
+
+  } catch (err) {
+    console.error("Export PDF error:", err);
+    res.status(500).json({ error: "Internal server error generating PDF" });
   }
 }
