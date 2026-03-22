@@ -68,6 +68,7 @@ interface Supplier {
   currentStatus?: string;
   documents?: { name: string; url: string }[];
   contractDocument?: { name: string; url: string } | null;
+  supplierStage?: string;
 }
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
@@ -169,6 +170,20 @@ export default function SuppliersPage() {
       toast.success("Supplier deleted");
     },
     onError: () => toast.error("Failed to delete supplier"),
+  });
+
+  const changeStageMutation = useMutation({
+    mutationFn: ({ id, stage }: { id: string; stage: string }) =>
+      api.patch(`/suppliers/${id}/stage`, { stage }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["old-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success(`Supplier moved to ${variables.stage}`);
+    },
+    onError: () => toast.error("Failed to update supplier stage"),
   });
 
   const uploadCatalogMutation = useMutation({
@@ -470,6 +485,7 @@ export default function SuppliersPage() {
                 <th className="px-5 py-3.5 font-semibold">Certifications</th>
                 <th className="px-5 py-3.5 font-semibold">Remarks</th>
                 <th className="px-5 py-3.5 font-semibold">Status</th>
+                <th className="px-5 py-3.5 font-semibold">Stage</th>
                 {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
               </tr>
             </thead>
@@ -519,6 +535,22 @@ export default function SuppliersPage() {
                           <StatusIcon status={s.currentStatus} className="h-3 w-3 mr-1.5" />
                           {s.currentStatus || "Active"}
                       </span>
+                    </td>
+                    <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
+                        <Select 
+                            value={s.supplierStage || "Signed"} 
+                            onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
+                            disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
+                        >
+                            <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[110px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Onboarding">Onboarding</SelectItem>
+                                <SelectItem value="Signed">Signed</SelectItem>
+                                <SelectItem value="Closed">Closed</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </td>
                     {canEdit && (
                       <td className="px-5 py-3.5 text-right font-medium">

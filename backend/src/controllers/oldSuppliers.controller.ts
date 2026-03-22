@@ -190,6 +190,71 @@ export async function updateOldSupplier(
 }
 
 /**
+ * PATCH /api/old-suppliers/:id/stage
+ */
+export async function updateOldSupplierStage(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const { stage } = req.body;
+    const existing = await prisma.oldSupplier.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: "Old supplier not found" });
+      return;
+    }
+
+    if (stage === "Closed") {
+      const supplier = await prisma.oldSupplier.update({
+        where: { id: req.params.id },
+        data: { supplierStage: stage },
+      });
+      await logActivity(req.user!.id, "update_stage", "old_suppliers", supplier.id, { company: supplier.company, stage });
+      res.json(supplier);
+      return;
+    }
+
+    const commonData = {
+      company: existing.company,
+      country: existing.country,
+      certifications: existing.certifications,
+      createdBy: req.user!.id,
+      supplierStage: stage,
+    };
+
+    if (stage === "Onboarding") {
+      const newSupplier = await prisma.newSupplier.create({
+        data: {
+          ...commonData,
+          notes: existing.notes,
+        },
+      });
+      await prisma.oldSupplier.delete({ where: { id: req.params.id } });
+      await logActivity(req.user!.id, "move_to_new_suppliers", "old_suppliers", newSupplier.id, { company: existing.company });
+      res.json(newSupplier);
+    } else if (stage === "Signed") {
+      const supplier = await prisma.supplier.create({
+        data: {
+          ...commonData,
+          remarks: existing.notes,
+        },
+      });
+      await prisma.oldSupplier.delete({ where: { id: req.params.id } });
+      await logActivity(req.user!.id, "move_to_suppliers", "old_suppliers", supplier.id, { company: existing.company });
+      res.json(supplier);
+    } else {
+      res.status(400).json({ error: "Invalid stage" });
+    }
+  } catch (err) {
+    console.error("Update old supplier stage error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
  * DELETE /api/old-suppliers/:id
  */
 export async function deleteOldSupplier(

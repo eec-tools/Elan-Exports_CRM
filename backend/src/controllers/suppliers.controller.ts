@@ -219,6 +219,73 @@ export async function updateSupplier(
 }
 
 /**
+ * PATCH /api/suppliers/:id/stage
+ */
+export async function updateSupplierStage(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const { stage } = req.body;
+    const existing = await prisma.supplier.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: "Supplier not found" });
+      return;
+    }
+
+    if (stage === "Signed") {
+      const supplier = await prisma.supplier.update({
+        where: { id: req.params.id },
+        data: { supplierStage: stage },
+      });
+      await logActivity(req.user!.id, "update_stage", "suppliers", supplier.id, { company: supplier.company, stage });
+      res.json(supplier);
+      return;
+    }
+
+    const commonData = {
+      company: existing.company,
+      country: existing.country,
+      certifications: existing.certifications,
+      createdBy: req.user!.id,
+      supplierStage: stage,
+    };
+
+    if (stage === "Onboarding") {
+      const newSupplier = await prisma.newSupplier.create({
+        data: {
+          ...commonData,
+          email: existing.email,
+          phone: existing.phone,
+          notes: existing.remarks,
+        },
+      });
+      await prisma.supplier.delete({ where: { id: req.params.id } });
+      await logActivity(req.user!.id, "move_to_new_suppliers", "suppliers", newSupplier.id, { company: existing.company });
+      res.json(newSupplier);
+    } else if (stage === "Closed") {
+      const oldSupplier = await prisma.oldSupplier.create({
+        data: {
+          ...commonData,
+          notes: existing.remarks,
+        },
+      });
+      await prisma.supplier.delete({ where: { id: req.params.id } });
+      await logActivity(req.user!.id, "move_to_old_suppliers", "suppliers", oldSupplier.id, { company: existing.company });
+      res.json(oldSupplier);
+    } else {
+      res.status(400).json({ error: "Invalid stage" });
+    }
+  } catch (err) {
+    console.error("Update supplier stage error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
  * DELETE /api/suppliers/:id
  */
 export async function deleteSupplier(

@@ -10,6 +10,7 @@ import {
   uploadSupplierFile,
   getSupplierStats,
   getSupplierFilters,
+  updateSupplierStage,
 } from "../controllers/suppliers.controller.js";
 import {
   authenticate,
@@ -30,6 +31,7 @@ router.get("/:id", getSupplier);
 router.post("/upload", requireEdit("suppliers"), uploadSupplierFile.single("file"), uploadCatalog);
 router.post("/", requireEdit("suppliers"), createSupplier);
 router.put("/:id", requireEdit("suppliers"), updateSupplier);
+router.patch("/:id/stage", requireEdit("suppliers"), updateSupplierStage);
 router.delete("/:id", requireEdit("suppliers"), deleteSupplier);
 
 export default router;

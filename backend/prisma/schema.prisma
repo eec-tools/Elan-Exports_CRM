@@ -113,6 +113,7 @@ model Supplier {
   documents              Json     @default("[]")
   contractDocument       Json?    @map("contract_document")
   creator                User?    @relation(fields: [createdBy], references: [id])
+  supplierStage          String   @default("Signed") @map("supplier_stage")
 
   @@map("suppliers")
 }
@@ -134,6 +135,7 @@ model OldSupplier {
   productCategory       String?  @map("product_category")
   reactivationPotential String?  @map("reactivation_potential")
   reasonInactive        String?  @map("reason_inactive")
+  supplierStage         String   @default("Closed") @map("supplier_stage")
 
   @@map("old_suppliers")
 }
@@ -157,6 +159,7 @@ model NewSupplier {
   updatedAt             DateTime @updatedAt @map("updated_at")
   email                 String?
   phone                 String?
+  supplierStage         String   @default("Onboarding") @map("supplier_stage")
 
   @@map("new_suppliers")
 }

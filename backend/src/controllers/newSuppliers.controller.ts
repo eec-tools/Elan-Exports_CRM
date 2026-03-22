@@ -204,6 +204,73 @@ export async function updateNewSupplier(
 }
 
 /**
+ * PATCH /api/new-suppliers/:id/stage
+ */
+export async function updateNewSupplierStage(
+    req: AuthRequest,
+    res: Response,
+): Promise<void> {
+    try {
+        const { stage } = req.body;
+        const existing = await (prisma as any).newSupplier.findUnique({
+            where: { id: req.params.id },
+        });
+
+        if (!existing) {
+            res.status(404).json({ error: "New supplier not found" });
+            return;
+        }
+
+        if (stage === "Onboarding") {
+            const supplier = await (prisma as any).newSupplier.update({
+                where: { id: req.params.id },
+                data: { supplierStage: stage },
+            });
+            await logActivity(req.user!.id, "update_stage", "new_suppliers", supplier.id, { company: supplier.company, stage });
+            res.json(supplier);
+            return;
+        }
+
+        const commonData = {
+            company: existing.company,
+            country: existing.country,
+            certifications: existing.certifications,
+            createdBy: req.user!.id,
+            supplierStage: stage,
+        };
+
+        if (stage === "Signed") {
+            const supplier = await (prisma as any).supplier.create({
+                data: {
+                    ...commonData,
+                    email: existing.email,
+                    phone: existing.phone,
+                    remarks: existing.notes,
+                },
+            });
+            await (prisma as any).newSupplier.delete({ where: { id: req.params.id } });
+            await logActivity(req.user!.id, "move_to_suppliers", "new_suppliers", supplier.id, { company: existing.company });
+            res.json(supplier);
+        } else if (stage === "Closed") {
+            const oldSupplier = await (prisma as any).oldSupplier.create({
+                data: {
+                    ...commonData,
+                    notes: existing.notes,
+                },
+            });
+            await (prisma as any).newSupplier.delete({ where: { id: req.params.id } });
+            await logActivity(req.user!.id, "move_to_old_suppliers", "new_suppliers", oldSupplier.id, { company: existing.company });
+            res.json(oldSupplier);
+        } else {
+            res.status(400).json({ error: "Invalid stage" });
+        }
+    } catch (err) {
+        console.error("Update new supplier stage error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+
+/**
  * DELETE /api/new-suppliers/:id
  */
 export async function deleteNewSupplier(

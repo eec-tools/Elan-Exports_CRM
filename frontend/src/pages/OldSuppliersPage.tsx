@@ -50,6 +50,7 @@ interface Supplier {
   dateMarkedInactive?: string;
   reactivationPotential?: string;
   notes?: string;
+  supplierStage?: string;
 }
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
@@ -140,6 +141,19 @@ export default function OldSuppliersPage() {
       toast.success("Supplier deleted");
     },
     onError: () => toast.error("Failed to delete supplier"),
+  });
+
+  const changeStageMutation = useMutation({
+    mutationFn: ({ id, stage }: { id: string; stage: string }) =>
+      api.patch(`/old-suppliers/${id}/stage`, { stage }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["old-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success(`Supplier moved to ${variables.stage}`);
+    },
+    onError: () => toast.error("Failed to update supplier stage"),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -304,6 +318,7 @@ export default function OldSuppliersPage() {
                 <th className="px-5 py-3.5 font-semibold">Reason Inactive</th>
                 <th className="px-5 py-3.5 font-semibold">Reactivation Potential</th>
                 <th className="px-5 py-3.5 font-semibold">Notes</th>
+                <th className="px-5 py-3.5 font-semibold">Stage</th>
                 {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
               </tr>
             </thead>
@@ -343,6 +358,22 @@ export default function OldSuppliersPage() {
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reasonInactive}>{s.reasonInactive}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reactivationPotential}>{s.reactivationPotential}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.notes}>{s.notes}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
+                        <Select 
+                            value={s.supplierStage || "Closed"} 
+                            onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
+                            disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
+                        >
+                            <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[110px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Onboarding">Onboarding</SelectItem>
+                                <SelectItem value="Signed">Signed</SelectItem>
+                                <SelectItem value="Closed">Closed</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </td>
                     {canEdit && (
                       <td className="px-5 py-3.5 text-right font-medium">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

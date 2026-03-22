@@ -7,6 +7,7 @@ import {
   deleteOldSupplier,
   exportOldSuppliersCsv,
   getOldSupplierFilters,
+  updateOldSupplierStage,
 } from "../controllers/oldSuppliers.controller.js";
 import {
   authenticate,
@@ -25,6 +26,7 @@ router.get("/:id", getOldSupplier);
 
 router.post("/", requireEdit("suppliers"), createOldSupplier);
 router.put("/:id", requireEdit("suppliers"), updateOldSupplier);
+router.patch("/:id/stage", requireEdit("suppliers"), updateOldSupplierStage);
 router.delete("/:id", requireEdit("suppliers"), deleteOldSupplier);
 
 export default router;
