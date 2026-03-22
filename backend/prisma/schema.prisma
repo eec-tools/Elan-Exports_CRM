@@ -94,7 +94,7 @@ model Supplier {
   commissionPercent      String?  @map("commission_percent")
   certifications         String?
   productionCapacity     String?  @map("production_capacity")
-  currentStatus          String?  @default("Active") @map("current_status")
+  currentStatus          String?  @default("Under Review") @map("current_status")
   remarks                String?
   createdBy              String?  @map("created_by")
   createdAt              DateTime @default(now()) @map("created_at")

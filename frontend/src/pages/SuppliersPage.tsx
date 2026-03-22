@@ -75,7 +75,7 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
   company: "",
   contactPerson: "",
   email: "",
-  currentStatus: "Active",
+  currentStatus: "Under Review",
 };
 
 export default function SuppliersPage() {
@@ -885,18 +885,23 @@ export default function SuppliersPage() {
               </div>
               <div className="space-y-2">
                 <Label>Current Status</Label>
-                <Input
-                  list="list-status"
-                  value={form.currentStatus ?? "Active"}
-                  onChange={(e) => setForm({ ...form, currentStatus: e.target.value })}
-                />
-                <datalist id="list-status">
-                  <option value="Signed" />
-                  <option value="Active" />
-                  <option value="Inactive" />
-                  <option value="Under Review" />
-                  {filters?.statuses?.filter((s: string) => !["Signed", "Active", "Inactive", "Under Review"].includes(s)).map((s: string) => <option key={s} value={s} />)}
-                </datalist>
+                <Select
+                  value={form.currentStatus ?? "Under Review"}
+                  onValueChange={(v) => setForm({ ...form, currentStatus: v })}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Select Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Signed">Signed</SelectItem>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                    <SelectItem value="Under Review">Under Review</SelectItem>
+                    {filters?.statuses?.filter((s: string) => !["Signed", "Active", "Inactive", "Under Review"].includes(s)).map((s: string) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">
