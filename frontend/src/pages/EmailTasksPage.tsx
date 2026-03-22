@@ -200,15 +200,19 @@ export default function EmailTasksPage() {
     fetchTasks();
   };
 
-  const updateTask = async (id: string, field: string, value: string) => {
+  const updateTaskFieldLocal = (field: string, value: string) => {
+    if (selectedTask) {
+      setSelectedTask({ ...selectedTask, [field]: value });
+    }
+  };
+
+  const saveTaskToDatabase = async () => {
+    if (!selectedTask) return;
     try {
-      await api.put(`/email-tasks/${id}`, { [field]: value });
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)),
-      );
-      if (selectedTask && selectedTask.id === id) {
-        setSelectedTask((prev) => (prev ? { ...prev, [field]: value } : prev));
-      }
+      const { id, task, priority, status, productCategory, respondent, notes } = selectedTask;
+      await api.put(`/email-tasks/${id}`, { task, priority, status, productCategory, respondent, notes });
+      setTasks((prev) => prev.map((t) => (t.id === id ? selectedTask : t)));
+      setIsEditing(false);
       toast.success("Task updated successfully", { duration: 2000 });
     } catch {
       toast.error("Failed to update task");
@@ -571,7 +575,7 @@ export default function EmailTasksPage() {
         <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden bg-white rounded-xl shadow-2xl border-none">
           {selectedTask && (
             <>
-              <div className="bg-slate-50 p-5 px-6 border-b border-slate-100 flex items-start justify-between">
+              <div className="bg-slate-50 p-5 pl-6 pr-14 border-b border-slate-100 flex items-start justify-between">
                 <div>
                   <DialogTitle className="text-lg font-bold text-slate-900 pr-4 leading-tight">
                     {selectedTask.subject}
@@ -593,10 +597,13 @@ export default function EmailTasksPage() {
                   <Button
                     variant={isEditing ? "default" : "secondary"}
                     size="sm"
-                    onClick={() => setIsEditing(!isEditing)}
+                    onClick={() => {
+                        if (isEditing) saveTaskToDatabase();
+                        else setIsEditing(true);
+                    }}
                     className={`h-8 text-xs transition-all shadow-sm ${isEditing ? "bg-brand-600 hover:bg-brand-700 text-white" : "bg-white border hover:bg-slate-50 text-slate-700"}`}
                   >
-                    {isEditing ? <><Save className="h-3.5 w-3.5 mr-1.5" /> Done Editing</> : <><Edit className="h-3.5 w-3.5 mr-1.5" /> Edit Task</>}
+                    {isEditing ? <><Save className="h-3.5 w-3.5 mr-1.5" /> Save Changes</> : <><Edit className="h-3.5 w-3.5 mr-1.5" /> Edit Task</>}
                   </Button>
                 </div>
               </div>
@@ -608,7 +615,7 @@ export default function EmailTasksPage() {
                     {isEditing ? (
                       <select
                         value={selectedTask.task || ""}
-                        onChange={(e) => updateTask(selectedTask.id, "task", e.target.value)}
+                        onChange={(e) => updateTaskFieldLocal("task", e.target.value)}
                         className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm"
                       >
                         <option value="">Uncategorized</option>
@@ -626,7 +633,7 @@ export default function EmailTasksPage() {
                     {isEditing ? (
                       <select
                         value={selectedTask.priority || ""}
-                        onChange={(e) => updateTask(selectedTask.id, "priority", e.target.value)}
+                        onChange={(e) => updateTaskFieldLocal("priority", e.target.value)}
                         className={`h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm ${selectedTask.priority === "Urgent" ? "text-rose-600 font-bold" : ""}`}
                       >
                         <option value="">Set Priority...</option>
@@ -647,7 +654,7 @@ export default function EmailTasksPage() {
                     {isEditing ? (
                       <select
                         value={selectedTask.status}
-                        onChange={(e) => updateTask(selectedTask.id, "status", e.target.value)}
+                        onChange={(e) => updateTaskFieldLocal("status", e.target.value)}
                         className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm"
                       >
                         <option value="Not Started">Not Started</option>
@@ -667,7 +674,7 @@ export default function EmailTasksPage() {
                     {isEditing ? (
                       <select
                         value={selectedTask.productCategory || ""}
-                        onChange={(e) => updateTask(selectedTask.id, "productCategory", e.target.value)}
+                        onChange={(e) => updateTaskFieldLocal("productCategory", e.target.value)}
                         className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm"
                       >
                         <option value="">Select Category...</option>
@@ -685,7 +692,7 @@ export default function EmailTasksPage() {
                     {isEditing ? (
                       <select
                         value={selectedTask.respondent || ""}
-                        onChange={(e) => updateTask(selectedTask.id, "respondent", e.target.value)}
+                        onChange={(e) => updateTaskFieldLocal("respondent", e.target.value)}
                         className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm w-full sm:w-1/2"
                       >
                         <option value="">Unassigned</option>
@@ -704,7 +711,7 @@ export default function EmailTasksPage() {
                     {isEditing ? (
                       <Textarea
                         value={selectedTask.notes || ""}
-                        onChange={(e) => updateTask(selectedTask.id, "notes", e.target.value)}
+                        onChange={(e) => updateTaskFieldLocal("notes", e.target.value)}
                         className="min-h-[100px] text-sm border-slate-200 bg-white placeholder:text-slate-400 focus:ring-brand-500/50 shadow-sm resize-y"
                         placeholder="Add some notes about this task..."
                       />
