@@ -548,7 +548,7 @@ export default function BuyersPage() {
              </div>
 
             {/* Business Details */}
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 -mb-2 mt-4">Business Intelligence</h3>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 mt-6">Business Intelligence</h3>
             <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label className="text-slate-700">Risk Rating</Label>
