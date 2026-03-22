@@ -143,7 +143,12 @@ export default function NewSupplierDetailsPage() {
 
   const markSentMutation = useMutation({
     mutationFn: () => api.post(`/new-supplier-campaigns/${id}/mark-sent`),
-    onSuccess: () => {
+    onSuccess: (res) => {
+      if (res.data?.movedToOld) {
+        toast.success("All emails sent — supplier moved to Old Suppliers (no response)");
+        navigate("/suppliers/old");
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["new-supplier-campaign", id] });
       queryClient.invalidateQueries({ queryKey: ["new-supplier-campaigns"] });
       toast.success("Follow-up marked as sent");
@@ -424,7 +429,6 @@ export default function NewSupplierDetailsPage() {
                   { label: "Intro Email", sentAt: campaign.introEmailSentAt, step: 0 },
                   { label: "Follow-up 1", sentAt: campaign.followup1SentAt, step: 1 },
                   { label: "Follow-up 2", sentAt: campaign.followup2SentAt, step: 2 },
-                  { label: "Follow-up 3", sentAt: campaign.followup3SentAt, step: 3 },
                 ].map((item, idx) => {
                   const isSent = !!item.sentAt;
                   const isDue =

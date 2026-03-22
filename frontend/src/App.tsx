@@ -5,7 +5,7 @@ import {
   Navigate,
   Outlet,
 } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, MutationCache } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
@@ -30,7 +30,15 @@ import CompliancePage from "@/pages/CompliancePage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import { Loader2 } from "lucide-react";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onSuccess: () => {
+      // Automatically refetch notifications whenever any mutation succeeds
+      // This keeps the notification bell "real-time" across the entire app
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  }),
+});
 
 function ProtectedRoute() {
   const { user, isLoading } = useAuth();

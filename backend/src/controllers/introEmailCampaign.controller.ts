@@ -148,6 +148,17 @@ export async function startCampaign(req: AuthRequest, res: Response) {
       },
     });
 
+    await createNotification({
+      type: "campaign_started",
+      title: "Campaign Started",
+      message: `Intro email campaign started for ${supplier.company}`,
+      entityType: "supplier",
+      entityId: supplierId,
+      entityName: supplier.company,
+      entityLink: `/suppliers/signed-contract/${supplierId}`,
+      createdBy: req.user?.id,
+    });
+
     res.status(201).json(campaign);
   } catch (err) {
     res.status(500).json({ error: "Failed to start campaign" });
@@ -185,12 +196,6 @@ export async function markEmailSent(req: AuthRequest, res: Response) {
       updateData = {
         currentStep: 3,
         followup2SentAt: now,
-        nextFollowupDue: addDays(now, 3),
-      };
-    } else if (campaign.currentStep === 3) {
-      updateData = {
-        currentStep: 4,
-        followup3SentAt: now,
         nextFollowupDue: null,
         status: "completed",
       };
@@ -201,14 +206,53 @@ export async function markEmailSent(req: AuthRequest, res: Response) {
     const updated = await prisma.supplierEmailCampaign.update({
       where: { supplierId },
       data: updateData,
-      include: { supplier: { select: { company: true } } },
+      include: { supplier: true },
     });
 
     if (updateData.status === "completed") {
+      const fullSupplier = updated.supplier;
+
+      await prisma.oldSupplier.create({
+        data: {
+          company: fullSupplier.company,
+          country: fullSupplier.country ?? null,
+          product: fullSupplier.products ?? null,
+          certifications: fullSupplier.certifications ?? null,
+          accountManager: fullSupplier.contractBuyer ?? null,
+          notes: fullSupplier.remarks ?? null,
+          currentStatus: "Inactive",
+          reasonInactive: "No response to email campaign",
+          dateMarkedInactive: new Date().toISOString().split("T")[0],
+          supplierStage: "Closed",
+          createdBy: req.user?.id ?? null,
+        },
+      });
+
       await createNotification({
-        type: "campaign_completed",
-        title: "Email Campaign Completed",
-        message: `All follow-up emails completed for ${updated.supplier.company}`,
+        type: "supplier_moved_to_old",
+        title: "Supplier Moved to Old Suppliers",
+        message: `${fullSupplier.company} was moved to Old Suppliers — no response to email campaign`,
+        entityType: "supplier",
+        entityId: supplierId,
+        entityName: fullSupplier.company,
+        entityLink: `/suppliers/old`,
+        createdBy: req.user?.id,
+      });
+
+      // Delete original supplier — cascades to campaign
+      await prisma.supplier.delete({ where: { id: supplierId } });
+
+      return res.json({ ...updated, movedToOld: true });
+    } else {
+      let stepName = "";
+      if (updateData.currentStep === 2) stepName = "Follow-up 1";
+      if (updateData.currentStep === 3) stepName = "Follow-up 2";
+      if (updateData.currentStep === 4) stepName = "Follow-up 3";
+
+      await createNotification({
+        type: "campaign_followup",
+        title: "Follow-up Sent",
+        message: `${stepName} sent to ${updated.supplier.company}`,
         entityType: "supplier",
         entityId: supplierId,
         entityName: updated.supplier.company,
