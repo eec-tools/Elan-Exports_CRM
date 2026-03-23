@@ -52,8 +52,7 @@ app.use((req, res, next) => {
 // CORS configuration
 const hardcodedOrigins = [
   "http://localhost:5173",
-  "http://elan-exports-frontend.s3-website.ap-south-1.amazonaws.com",
-  "https://d2j8d56nigd3ee.cloudfront.net"
+  "http://elan-exports-s3.s3-website.ap-south-1.amazonaws.com",
 ];
 
 const envOrigins = process.env.FRONTEND_URL
