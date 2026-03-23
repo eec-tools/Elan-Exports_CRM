@@ -42,16 +42,16 @@ export async function listOldSuppliers(
     }
 
     if (status && status !== "all") {
-      where.currentStatus = status;
+      where.currentStatus = { equals: status, mode: "insensitive" };
     }
     if (country && country !== "all") {
-      where.country = country;
+      where.country = { equals: country, mode: "insensitive" };
     }
     if (productCategory && productCategory !== "all") {
-      where.productCategory = productCategory;
+      where.productCategory = { equals: productCategory, mode: "insensitive" };
     }
     if (accountManager && accountManager !== "all") {
-      where.accountManager = accountManager;
+      where.accountManager = { equals: accountManager, mode: "insensitive" };
     }
         const dateFilter: any = {};
         if (dateFrom && dateFrom !== "all") {
@@ -313,7 +313,7 @@ export async function exportOldSuppliersCsv(
   res: Response,
 ): Promise<void> {
   try {
-    const { search = "" } = req.query as Record<string, string>;
+    const { search = "", status, country, productCategory, accountManager } = req.query as Record<string, string>;
 
     const where: any = {};
     if (search) {
@@ -325,6 +325,18 @@ export async function exportOldSuppliersCsv(
         { accountManager: { contains: search, mode: "insensitive" } },
         { currentStatus: { contains: search, mode: "insensitive" } },
       ];
+    }
+    if (status && status !== "all") {
+      where.currentStatus = { equals: status, mode: "insensitive" };
+    }
+    if (country && country !== "all") {
+      where.country = { equals: country, mode: "insensitive" };
+    }
+    if (productCategory && productCategory !== "all") {
+      where.productCategory = { equals: productCategory, mode: "insensitive" };
+    }
+    if (accountManager && accountManager !== "all") {
+      where.accountManager = { equals: accountManager, mode: "insensitive" };
     }
 
     const suppliers = await prisma.oldSupplier.findMany({
@@ -398,11 +410,22 @@ export async function getOldSupplierFilters(
       prisma.oldSupplier.findMany({ select: { accountManager: true }, distinct: ['accountManager'] }),
     ]);
 
+    // Deduplicate filter values case-insensitively (keep the first occurrence)
+    const dedup = (arr: (string | null | undefined)[]) => {
+      const seen = new Map<string, string>();
+      for (const v of arr) {
+        if (!v) continue;
+        const key = v.toLowerCase();
+        if (!seen.has(key)) seen.set(key, v);
+      }
+      return Array.from(seen.values());
+    };
+
     res.json({
-      statuses: statuses.map(s => s.currentStatus).filter(Boolean),
-      countries: countries.map(c => c.country).filter(Boolean),
-      productCategories: categories.map(c => c.productCategory).filter(Boolean),
-      accountManagers: managers.map(m => m.accountManager).filter(Boolean),
+      statuses: dedup(statuses.map(s => s.currentStatus)),
+      countries: dedup(countries.map(c => c.country)),
+      productCategories: dedup(categories.map(c => c.productCategory)),
+      accountManagers: dedup(managers.map(m => m.accountManager)),
     });
   } catch (err) {
     console.error("Get old supplier filters error:", err);

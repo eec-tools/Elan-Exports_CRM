@@ -257,7 +257,17 @@ export default function NewSuppliersPage() {
     const handleExport = async () => {
         try {
             const res = await api.get("/new-suppliers/export/csv", {
-                params: { search },
+                params: {
+                    search,
+                    status: statusFilter !== "all" ? statusFilter : undefined,
+                    country: countryFilter !== "all" ? countryFilter : undefined,
+                    productCategory: categoryFilter !== "all" ? categoryFilter : undefined,
+                    accountManager: managerFilter !== "all" ? managerFilter : undefined,
+                    product: productFilter !== "all" ? productFilter : undefined,
+                    certifications: certificationFilter !== "all" ? certificationFilter : undefined,
+                    dateFrom: dateFrom || undefined,
+                    dateTo: dateTo || undefined,
+                },
                 responseType: "blob",
             });
             const url = URL.createObjectURL(res.data);

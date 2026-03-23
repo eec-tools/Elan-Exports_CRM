@@ -314,7 +314,16 @@ export default function SuppliersPage() {
   const handleExport = async () => {
     try {
       const res = await api.get("/suppliers/export/csv", {
-        params: { search },
+        params: {
+          search,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          country: countryFilter !== "all" ? countryFilter : undefined,
+          contractBuyer: buyerFilter !== "all" ? buyerFilter : undefined,
+          products: productFilter !== "all" ? productFilter : undefined,
+          certifications: certificationFilter !== "all" ? certificationFilter : undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+        },
         responseType: "blob",
       });
       const url = URL.createObjectURL(res.data);

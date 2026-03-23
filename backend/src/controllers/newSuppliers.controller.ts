@@ -46,22 +46,22 @@ export async function listNewSuppliers(
         }
 
         if (status && status !== "all") {
-            where.currentStatus = status;
+            where.currentStatus = { equals: status, mode: "insensitive" };
         }
         if (country && country !== "all") {
-            where.country = country;
+            where.country = { equals: country, mode: "insensitive" };
         }
         if (productCategory && productCategory !== "all") {
-            where.productCategory = productCategory;
+            where.productCategory = { equals: productCategory, mode: "insensitive" };
         }
         if (accountManager && accountManager !== "all") {
-            where.accountManager = accountManager;
+            where.accountManager = { equals: accountManager, mode: "insensitive" };
         }
         if (product && product !== "all") {
-            where.product = product;
+            where.product = { equals: product, mode: "insensitive" };
         }
         if (certifications && certifications !== "all") {
-            where.certifications = certifications;
+            where.certifications = { equals: certifications, mode: "insensitive" };
         }
         const dateFilter: any = {};
         if (dateFrom && dateFrom !== "all") {
@@ -342,7 +342,7 @@ export async function exportNewSuppliersCsv(
     res: Response,
 ): Promise<void> {
     try {
-        const { search = "" } = req.query as Record<string, string>;
+        const { search = "", status, country, productCategory, accountManager, product, certifications, dateFrom, dateTo } = req.query as Record<string, string>;
 
         const where: any = {};
         if (search) {
@@ -356,6 +356,34 @@ export async function exportNewSuppliersCsv(
                 { phone: { contains: search, mode: "insensitive" } },
                 { email: { contains: search, mode: "insensitive" } },
             ];
+        }
+        if (status && status !== "all") {
+            where.currentStatus = { equals: status, mode: "insensitive" };
+        }
+        if (country && country !== "all") {
+            where.country = { equals: country, mode: "insensitive" };
+        }
+        if (productCategory && productCategory !== "all") {
+            where.productCategory = { equals: productCategory, mode: "insensitive" };
+        }
+        if (accountManager && accountManager !== "all") {
+            where.accountManager = { equals: accountManager, mode: "insensitive" };
+        }
+        if (product && product !== "all") {
+            where.product = { equals: product, mode: "insensitive" };
+        }
+        if (certifications && certifications !== "all") {
+            where.certifications = { equals: certifications, mode: "insensitive" };
+        }
+        const dateFilter: any = {};
+        if (dateFrom && dateFrom !== "all") {
+            dateFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+        }
+        if (dateTo && dateTo !== "all") {
+            dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
+        }
+        if (Object.keys(dateFilter).length > 0) {
+            where.createdAt = dateFilter;
         }
 
         const suppliers = await (prisma as any).newSupplier.findMany({
@@ -440,13 +468,23 @@ export async function getNewSupplierFilters(
             new Date(d.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
         ))).filter(Boolean);
 
+        // Deduplicate filter values case-insensitively (keep the first occurrence)
+        const dedup = (arr: string[]) => {
+            const seen = new Map<string, string>();
+            for (const v of arr) {
+                const key = v.toLowerCase();
+                if (!seen.has(key)) seen.set(key, v);
+            }
+            return Array.from(seen.values());
+        };
+
         res.json({
-            statuses: statuses.map((s: any) => s.currentStatus).filter(Boolean),
-            countries: countries.map((c: any) => c.country).filter(Boolean),
-            productCategories: categories.map((c: any) => c.productCategory).filter(Boolean),
-            accountManagers: managers.map((m: any) => m.accountManager).filter(Boolean),
-            products: productsRaw.map((p: any) => p.product).filter(Boolean),
-            certifications: certificationsRaw.map((c: any) => c.certifications).filter(Boolean),
+            statuses: dedup(statuses.map((s: any) => s.currentStatus).filter(Boolean)),
+            countries: dedup(countries.map((c: any) => c.country).filter(Boolean)),
+            productCategories: dedup(categories.map((c: any) => c.productCategory).filter(Boolean)),
+            accountManagers: dedup(managers.map((m: any) => m.accountManager).filter(Boolean)),
+            products: dedup(productsRaw.map((p: any) => p.product).filter(Boolean)),
+            certifications: dedup(certificationsRaw.map((c: any) => c.certifications).filter(Boolean)),
             dates: formattedDates,
         });
     } catch (err) {

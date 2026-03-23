@@ -180,7 +180,13 @@ export default function OldSuppliersPage() {
   const handleExport = async () => {
     try {
       const res = await api.get("/old-suppliers/export/csv", {
-        params: { search },
+        params: {
+          search,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          country: countryFilter !== "all" ? countryFilter : undefined,
+          productCategory: categoryFilter !== "all" ? categoryFilter : undefined,
+          accountManager: managerFilter !== "all" ? managerFilter : undefined,
+        },
         responseType: "blob",
       });
       const url = URL.createObjectURL(res.data);
