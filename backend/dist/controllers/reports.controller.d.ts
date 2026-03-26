@@ -16,4 +16,8 @@ export declare function updateReport(req: AuthRequest, res: Response): Promise<v
  * DELETE /api/reports/:id
  */
 export declare function deleteReport(req: AuthRequest, res: Response): Promise<void>;
+/**
+ * GET /api/reports/export/pdf
+ */
+export declare function exportPdf(req: AuthRequest, res: Response): Promise<void>;
 //# sourceMappingURL=reports.controller.d.ts.map

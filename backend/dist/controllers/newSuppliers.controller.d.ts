@@ -17,6 +17,10 @@ export declare function createNewSupplier(req: AuthRequest, res: Response): Prom
  */
 export declare function updateNewSupplier(req: AuthRequest, res: Response): Promise<void>;
 /**
+ * PATCH /api/new-suppliers/:id/stage
+ */
+export declare function updateNewSupplierStage(req: AuthRequest, res: Response): Promise<void>;
+/**
  * DELETE /api/new-suppliers/:id
  */
 export declare function deleteNewSupplier(req: AuthRequest, res: Response): Promise<void>;
@@ -24,4 +28,8 @@ export declare function deleteNewSupplier(req: AuthRequest, res: Response): Prom
  * GET /api/new-suppliers/export/csv
  */
 export declare function exportNewSuppliersCsv(req: AuthRequest, res: Response): Promise<void>;
+/**
+ * GET /api/new-suppliers/filters
+ */
+export declare function getNewSupplierFilters(req: AuthRequest, res: Response): Promise<void>;
 //# sourceMappingURL=newSuppliers.controller.d.ts.map

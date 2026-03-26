@@ -1,5 +1,6 @@
 import prisma from "../config/db.js";
 import { logActivity } from "../services/activityLogger.js";
+import { createNotification } from "../services/notificationService.js";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -38,7 +39,7 @@ export const uploadSupplierFile = multer({
  */
 export async function listSuppliers(req, res) {
     try {
-        const { search = "", page = "1", limit = "20", status, } = req.query;
+        const { search = "", page = "1", limit = "20", status, country, contractBuyer, products, certifications, dateFrom, dateTo } = req.query;
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
@@ -53,7 +54,29 @@ export async function listSuppliers(req, res) {
             ];
         }
         if (status && status !== "all") {
-            where.currentStatus = status;
+            where.currentStatus = { equals: status, mode: "insensitive" };
+        }
+        if (country && country !== "all") {
+            where.country = { equals: country, mode: "insensitive" };
+        }
+        if (contractBuyer && contractBuyer !== "all") {
+            where.contractBuyer = { equals: contractBuyer, mode: "insensitive" };
+        }
+        if (products && products !== "all") {
+            where.products = { equals: products, mode: "insensitive" };
+        }
+        if (certifications && certifications !== "all") {
+            where.certifications = { equals: certifications, mode: "insensitive" };
+        }
+        const dateFilter = {};
+        if (dateFrom && dateFrom !== "all") {
+            dateFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+        }
+        if (dateTo && dateTo !== "all") {
+            dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
+        }
+        if (Object.keys(dateFilter).length > 0) {
+            where.createdAt = dateFilter;
         }
         const [suppliers, total] = await Promise.all([
             prisma.supplier.findMany({
@@ -141,10 +164,104 @@ export async function updateSupplier(req, res) {
         await logActivity(req.user.id, "update", "suppliers", supplier.id, {
             company: supplier.company,
         });
+        if (updateData.currentStatus && existing.currentStatus !== updateData.currentStatus) {
+            await createNotification({
+                type: "status_change",
+                title: "Supplier Status Updated",
+                message: `${supplier.company} status changed from "${existing.currentStatus}" to "${updateData.currentStatus}"`,
+                entityType: "supplier",
+                entityId: supplier.id,
+                entityName: supplier.company,
+                entityLink: `/suppliers/signed-contract/${supplier.id}`,
+                createdBy: req.user.id,
+            });
+        }
         res.json(supplier);
     }
     catch (err) {
         console.error("Update supplier error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+/**
+ * PATCH /api/suppliers/:id/stage
+ */
+export async function updateSupplierStage(req, res) {
+    try {
+        const { stage } = req.body;
+        const existing = await prisma.supplier.findUnique({
+            where: { id: req.params.id },
+        });
+        if (!existing) {
+            res.status(404).json({ error: "Supplier not found" });
+            return;
+        }
+        if (stage === "Signed") {
+            const supplier = await prisma.supplier.update({
+                where: { id: req.params.id },
+                data: { supplierStage: stage },
+            });
+            await logActivity(req.user.id, "update_stage", "suppliers", supplier.id, { company: supplier.company, stage });
+            res.json(supplier);
+            return;
+        }
+        const commonData = {
+            company: existing.company,
+            country: existing.country,
+            certifications: existing.certifications,
+            createdBy: req.user.id,
+            supplierStage: stage,
+        };
+        if (stage === "Onboarding") {
+            const newSupplier = await prisma.newSupplier.create({
+                data: {
+                    ...commonData,
+                    email: existing.email,
+                    phone: existing.phone,
+                    notes: existing.remarks,
+                },
+            });
+            await prisma.supplier.delete({ where: { id: req.params.id } });
+            await logActivity(req.user.id, "move_to_new_suppliers", "suppliers", newSupplier.id, { company: existing.company });
+            await createNotification({
+                type: "stage_change",
+                title: "Supplier Moved to Onboarding",
+                message: `${existing.company} moved from Signed → Onboarding`,
+                entityType: "new_supplier",
+                entityId: newSupplier.id,
+                entityName: existing.company,
+                entityLink: `/suppliers/new/${newSupplier.id}`,
+                createdBy: req.user.id,
+            });
+            res.json(newSupplier);
+        }
+        else if (stage === "Closed") {
+            const oldSupplier = await prisma.oldSupplier.create({
+                data: {
+                    ...commonData,
+                    notes: existing.remarks,
+                },
+            });
+            await prisma.supplier.delete({ where: { id: req.params.id } });
+            await logActivity(req.user.id, "move_to_old_suppliers", "suppliers", oldSupplier.id, { company: existing.company });
+            await createNotification({
+                type: "stage_change",
+                title: "Supplier Moved to Closed",
+                message: `${existing.company} moved from Signed → Closed`,
+                entityType: "old_supplier",
+                entityId: oldSupplier.id,
+                entityName: existing.company,
+                entityLink: `/suppliers/old`,
+                createdBy: req.user.id,
+            });
+            res.json(oldSupplier);
+        }
+        else {
+            res.status(400).json({ error: "Invalid stage" });
+        }
+    }
+    catch (err) {
+        console.error("Update supplier stage error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }
@@ -176,7 +293,7 @@ export async function deleteSupplier(req, res) {
  */
 export async function exportSuppliersCsv(req, res) {
     try {
-        const { search = "" } = req.query;
+        const { search = "", status, country, contractBuyer, products, certifications, dateFrom, dateTo } = req.query;
         const where = {};
         if (search) {
             where.OR = [
@@ -184,6 +301,31 @@ export async function exportSuppliersCsv(req, res) {
                 { contactPerson: { contains: search, mode: "insensitive" } },
                 { email: { contains: search, mode: "insensitive" } },
             ];
+        }
+        if (status && status !== "all") {
+            where.currentStatus = { equals: status, mode: "insensitive" };
+        }
+        if (country && country !== "all") {
+            where.country = { equals: country, mode: "insensitive" };
+        }
+        if (contractBuyer && contractBuyer !== "all") {
+            where.contractBuyer = { equals: contractBuyer, mode: "insensitive" };
+        }
+        if (products && products !== "all") {
+            where.products = { equals: products, mode: "insensitive" };
+        }
+        if (certifications && certifications !== "all") {
+            where.certifications = { equals: certifications, mode: "insensitive" };
+        }
+        const dateFilter = {};
+        if (dateFrom && dateFrom !== "all") {
+            dateFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+        }
+        if (dateTo && dateTo !== "all") {
+            dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
+        }
+        if (Object.keys(dateFilter).length > 0) {
+            where.createdAt = dateFilter;
         }
         const suppliers = await prisma.supplier.findMany({
             where,
@@ -304,6 +446,46 @@ export async function getSupplierStats(req, res) {
     }
     catch (err) {
         console.error("Get supplier stats error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+/**
+ * GET /api/suppliers/filters
+ */
+export async function getSupplierFilters(req, res) {
+    try {
+        const [countries, contractBuyers, statuses, productsRaw, certificationsRaw, datesRaw] = await Promise.all([
+            prisma.supplier.findMany({ select: { country: true }, distinct: ['country'] }),
+            prisma.supplier.findMany({ select: { contractBuyer: true }, distinct: ['contractBuyer'] }),
+            prisma.supplier.findMany({ select: { currentStatus: true }, distinct: ['currentStatus'] }),
+            prisma.supplier.findMany({ select: { products: true }, distinct: ['products'] }),
+            prisma.supplier.findMany({ select: { certifications: true }, distinct: ['certifications'] }),
+            prisma.supplier.findMany({ select: { createdAt: true } }),
+        ]);
+        const formattedDates = Array.from(new Set(datesRaw.map(d => new Date(d.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })))).filter(Boolean);
+        // Deduplicate filter values case-insensitively (keep the first occurrence)
+        const dedup = (arr) => {
+            const seen = new Map();
+            for (const v of arr) {
+                if (!v)
+                    continue;
+                const key = v.toLowerCase();
+                if (!seen.has(key))
+                    seen.set(key, v);
+            }
+            return Array.from(seen.values());
+        };
+        res.json({
+            countries: dedup(countries.map(c => c.country)),
+            contractBuyers: dedup(contractBuyers.map(c => c.contractBuyer)),
+            statuses: dedup(statuses.map(s => s.currentStatus)),
+            products: dedup(productsRaw.map(p => p.products)),
+            certifications: dedup(certificationsRaw.map(c => c.certifications)),
+            dates: formattedDates,
+        });
+    }
+    catch (err) {
+        console.error("Get supplier filters error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }

@@ -5,9 +5,23 @@ import prisma from "../config/db.js";
  */
 export async function listActivity(req, res) {
     try {
-        const { limit = "100" } = req.query;
+        const { limit = "100", days } = req.query;
         const limitNum = Math.min(500, Math.max(1, parseInt(limit)));
+        let gteDate = new Date();
+        gteDate.setFullYear(gteDate.getFullYear() - 1); // default 1 year expiry
+        let lteDate = new Date();
+        if (days) {
+            gteDate = new Date();
+            gteDate.setDate(gteDate.getDate() - parseInt(days));
+        }
+        const where = {
+            createdAt: {
+                gte: gteDate,
+                lte: lteDate,
+            }
+        };
         const logs = await prisma.activityLog.findMany({
+            where,
             take: limitNum,
             orderBy: { createdAt: "desc" },
             include: {

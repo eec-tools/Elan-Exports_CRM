@@ -1,11 +1,12 @@
 import prisma from "../config/db.js";
 import { logActivity } from "../services/activityLogger.js";
+import { createNotification } from "../services/notificationService.js";
 /**
  * GET /api/new-suppliers
  */
 export async function listNewSuppliers(req, res) {
     try {
-        const { search = "", page = "1", limit = "20", } = req.query;
+        const { search = "", page = "1", limit = "20", status, country, productCategory, accountManager, product, certifications, dateFrom, dateTo } = req.query;
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
@@ -21,6 +22,34 @@ export async function listNewSuppliers(req, res) {
                 { phone: { contains: search, mode: "insensitive" } },
                 { email: { contains: search, mode: "insensitive" } },
             ];
+        }
+        if (status && status !== "all") {
+            where.currentStatus = { equals: status, mode: "insensitive" };
+        }
+        if (country && country !== "all") {
+            where.country = { equals: country, mode: "insensitive" };
+        }
+        if (productCategory && productCategory !== "all") {
+            where.productCategory = { equals: productCategory, mode: "insensitive" };
+        }
+        if (accountManager && accountManager !== "all") {
+            where.accountManager = { equals: accountManager, mode: "insensitive" };
+        }
+        if (product && product !== "all") {
+            where.product = { equals: product, mode: "insensitive" };
+        }
+        if (certifications && certifications !== "all") {
+            where.certifications = { equals: certifications, mode: "insensitive" };
+        }
+        const dateFilter = {};
+        if (dateFrom && dateFrom !== "all") {
+            dateFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+        }
+        if (dateTo && dateTo !== "all") {
+            dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
+        }
+        if (Object.keys(dateFilter).length > 0) {
+            where.createdAt = dateFilter;
         }
         const [suppliers, total] = await Promise.all([
             prisma.newSupplier.findMany({
@@ -115,10 +144,104 @@ export async function updateNewSupplier(req, res) {
         await logActivity(req.user.id, "update", "new_suppliers", supplier.id, {
             company: supplier.company,
         });
+        if (currentStatus && existing.currentStatus !== currentStatus) {
+            await createNotification({
+                type: "status_change",
+                title: "New Supplier Status Updated",
+                message: `${supplier.company} status changed from "${existing.currentStatus}" to "${currentStatus}"`,
+                entityType: "new_supplier",
+                entityId: supplier.id,
+                entityName: supplier.company,
+                entityLink: `/suppliers/new/${supplier.id}`,
+                createdBy: req.user.id,
+            });
+        }
         res.json(supplier);
     }
     catch (err) {
         console.error("Update new supplier error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+/**
+ * PATCH /api/new-suppliers/:id/stage
+ */
+export async function updateNewSupplierStage(req, res) {
+    try {
+        const { stage } = req.body;
+        const existing = await prisma.newSupplier.findUnique({
+            where: { id: req.params.id },
+        });
+        if (!existing) {
+            res.status(404).json({ error: "New supplier not found" });
+            return;
+        }
+        if (stage === "Onboarding") {
+            const supplier = await prisma.newSupplier.update({
+                where: { id: req.params.id },
+                data: { supplierStage: stage },
+            });
+            await logActivity(req.user.id, "update_stage", "new_suppliers", supplier.id, { company: supplier.company, stage });
+            res.json(supplier);
+            return;
+        }
+        const commonData = {
+            company: existing.company,
+            country: existing.country,
+            certifications: existing.certifications,
+            createdBy: req.user.id,
+            supplierStage: stage,
+        };
+        if (stage === "Signed") {
+            const supplier = await prisma.supplier.create({
+                data: {
+                    ...commonData,
+                    email: existing.email,
+                    phone: existing.phone,
+                    remarks: existing.notes,
+                },
+            });
+            await prisma.newSupplier.delete({ where: { id: req.params.id } });
+            await logActivity(req.user.id, "move_to_suppliers", "new_suppliers", supplier.id, { company: existing.company });
+            await createNotification({
+                type: "stage_change",
+                title: "Supplier Converted to Signed",
+                message: `${existing.company} moved from Onboarding → Signed`,
+                entityType: "supplier",
+                entityId: supplier.id,
+                entityName: existing.company,
+                entityLink: `/suppliers/signed-contract/${supplier.id}`,
+                createdBy: req.user.id,
+            });
+            res.json(supplier);
+        }
+        else if (stage === "Closed") {
+            const oldSupplier = await prisma.oldSupplier.create({
+                data: {
+                    ...commonData,
+                    notes: existing.notes,
+                },
+            });
+            await prisma.newSupplier.delete({ where: { id: req.params.id } });
+            await logActivity(req.user.id, "move_to_old_suppliers", "new_suppliers", oldSupplier.id, { company: existing.company });
+            await createNotification({
+                type: "stage_change",
+                title: "New Supplier Moved to Closed",
+                message: `${existing.company} moved from Onboarding → Closed`,
+                entityType: "old_supplier",
+                entityId: oldSupplier.id,
+                entityName: existing.company,
+                entityLink: `/suppliers/old`,
+                createdBy: req.user.id,
+            });
+            res.json(oldSupplier);
+        }
+        else {
+            res.status(400).json({ error: "Invalid stage" });
+        }
+    }
+    catch (err) {
+        console.error("Update new supplier stage error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }
@@ -150,7 +273,7 @@ export async function deleteNewSupplier(req, res) {
  */
 export async function exportNewSuppliersCsv(req, res) {
     try {
-        const { search = "" } = req.query;
+        const { search = "", status, country, productCategory, accountManager, product, certifications, dateFrom, dateTo } = req.query;
         const where = {};
         if (search) {
             where.OR = [
@@ -163,6 +286,34 @@ export async function exportNewSuppliersCsv(req, res) {
                 { phone: { contains: search, mode: "insensitive" } },
                 { email: { contains: search, mode: "insensitive" } },
             ];
+        }
+        if (status && status !== "all") {
+            where.currentStatus = { equals: status, mode: "insensitive" };
+        }
+        if (country && country !== "all") {
+            where.country = { equals: country, mode: "insensitive" };
+        }
+        if (productCategory && productCategory !== "all") {
+            where.productCategory = { equals: productCategory, mode: "insensitive" };
+        }
+        if (accountManager && accountManager !== "all") {
+            where.accountManager = { equals: accountManager, mode: "insensitive" };
+        }
+        if (product && product !== "all") {
+            where.product = { equals: product, mode: "insensitive" };
+        }
+        if (certifications && certifications !== "all") {
+            where.certifications = { equals: certifications, mode: "insensitive" };
+        }
+        const dateFilter = {};
+        if (dateFrom && dateFrom !== "all") {
+            dateFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+        }
+        if (dateTo && dateTo !== "all") {
+            dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
+        }
+        if (Object.keys(dateFilter).length > 0) {
+            where.createdAt = dateFilter;
         }
         const suppliers = await prisma.newSupplier.findMany({
             where,
@@ -212,6 +363,46 @@ export async function exportNewSuppliersCsv(req, res) {
     }
     catch (err) {
         console.error("Export new suppliers error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+/**
+ * GET /api/new-suppliers/filters
+ */
+export async function getNewSupplierFilters(req, res) {
+    try {
+        const [statuses, countries, categories, managers, productsRaw, certificationsRaw, datesRaw] = await Promise.all([
+            prisma.newSupplier.findMany({ select: { currentStatus: true }, distinct: ['currentStatus'] }),
+            prisma.newSupplier.findMany({ select: { country: true }, distinct: ['country'] }),
+            prisma.newSupplier.findMany({ select: { productCategory: true }, distinct: ['productCategory'] }),
+            prisma.newSupplier.findMany({ select: { accountManager: true }, distinct: ['accountManager'] }),
+            prisma.newSupplier.findMany({ select: { product: true }, distinct: ['product'] }),
+            prisma.newSupplier.findMany({ select: { certifications: true }, distinct: ['certifications'] }),
+            prisma.newSupplier.findMany({ select: { createdAt: true } }),
+        ]);
+        const formattedDates = Array.from(new Set(datesRaw.map((d) => new Date(d.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })))).filter(Boolean);
+        // Deduplicate filter values case-insensitively (keep the first occurrence)
+        const dedup = (arr) => {
+            const seen = new Map();
+            for (const v of arr) {
+                const key = v.toLowerCase();
+                if (!seen.has(key))
+                    seen.set(key, v);
+            }
+            return Array.from(seen.values());
+        };
+        res.json({
+            statuses: dedup(statuses.map((s) => s.currentStatus).filter(Boolean)),
+            countries: dedup(countries.map((c) => c.country).filter(Boolean)),
+            productCategories: dedup(categories.map((c) => c.productCategory).filter(Boolean)),
+            accountManagers: dedup(managers.map((m) => m.accountManager).filter(Boolean)),
+            products: dedup(productsRaw.map((p) => p.product).filter(Boolean)),
+            certifications: dedup(certificationsRaw.map((c) => c.certifications).filter(Boolean)),
+            dates: formattedDates,
+        });
+    }
+    catch (err) {
+        console.error("Get new supplier filters error:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 }

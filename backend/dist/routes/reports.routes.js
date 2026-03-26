@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import path from "path";
-import { listReports, createReport, updateReport, deleteReport, } from "../controllers/reports.controller.js";
+import { listReports, createReport, updateReport, deleteReport, exportPdf, } from "../controllers/reports.controller.js";
 import { authenticate, requirePermission, requireEdit, } from "../middleware/auth.js";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -34,6 +34,7 @@ const upload = multer({
 const router = Router();
 router.use(authenticate, requirePermission("reports"));
 router.get("/", listReports);
+router.get("/export/pdf", exportPdf);
 router.post("/", requireEdit("reports"), upload.single("productImage"), createReport);
 router.put("/:id", requireEdit("reports"), upload.single("productImage"), updateReport);
 router.delete("/:id", requireEdit("reports"), deleteReport);

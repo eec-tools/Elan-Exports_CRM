@@ -19,6 +19,10 @@ export declare function createSupplier(req: AuthRequest, res: Response): Promise
  */
 export declare function updateSupplier(req: AuthRequest, res: Response): Promise<void>;
 /**
+ * PATCH /api/suppliers/:id/stage
+ */
+export declare function updateSupplierStage(req: AuthRequest, res: Response): Promise<void>;
+/**
  * DELETE /api/suppliers/:id
  */
 export declare function deleteSupplier(req: AuthRequest, res: Response): Promise<void>;
@@ -34,4 +38,8 @@ export declare function uploadCatalog(req: Request, res: Response): Promise<void
  * GET /api/suppliers/stats
  */
 export declare function getSupplierStats(req: AuthRequest, res: Response): Promise<void>;
+/**
+ * GET /api/suppliers/filters
+ */
+export declare function getSupplierFilters(req: AuthRequest, res: Response): Promise<void>;
 //# sourceMappingURL=suppliers.controller.d.ts.map

@@ -17,6 +17,10 @@ export declare function createOldSupplier(req: AuthRequest, res: Response): Prom
  */
 export declare function updateOldSupplier(req: AuthRequest, res: Response): Promise<void>;
 /**
+ * PATCH /api/old-suppliers/:id/stage
+ */
+export declare function updateOldSupplierStage(req: AuthRequest, res: Response): Promise<void>;
+/**
  * DELETE /api/old-suppliers/:id
  */
 export declare function deleteOldSupplier(req: AuthRequest, res: Response): Promise<void>;
@@ -24,4 +28,8 @@ export declare function deleteOldSupplier(req: AuthRequest, res: Response): Prom
  * GET /api/old-suppliers/export/csv
  */
 export declare function exportOldSuppliersCsv(req: AuthRequest, res: Response): Promise<void>;
+/**
+ * GET /api/old-suppliers/filters
+ */
+export declare function getOldSupplierFilters(req: AuthRequest, res: Response): Promise<void>;
 //# sourceMappingURL=oldSuppliers.controller.d.ts.map

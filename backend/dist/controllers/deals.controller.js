@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { createNotification } from "../services/notificationService.js";
 const prisma = new PrismaClient();
 // GET /api/deals
 export const getAllDeals = async (_req, res) => {
@@ -49,6 +50,7 @@ export const updateDeal = async (req, res) => {
     try {
         const id = req.params.id;
         const { title, buyer, supplier, product, hsCode, volume, price, expectedRevenue, margin, stage, probability, category, riskScore, notes, } = req.body;
+        const existing = await prisma.deal.findUnique({ where: { id }, select: { stage: true, title: true } });
         const deal = await prisma.deal.update({
             where: { id },
             data: {
@@ -72,6 +74,17 @@ export const updateDeal = async (req, res) => {
                 ...(notes !== undefined && { notes }),
             },
         });
+        if (stage !== undefined && existing?.stage !== stage) {
+            await createNotification({
+                type: "deal_stage_change",
+                title: "Deal Stage Updated",
+                message: `Deal "${deal.title}" moved from ${existing?.stage} → ${stage}`,
+                entityType: "deal",
+                entityId: deal.id,
+                entityName: deal.title,
+                entityLink: `/deals`,
+            });
+        }
         res.json(deal);
     }
     catch (err) {

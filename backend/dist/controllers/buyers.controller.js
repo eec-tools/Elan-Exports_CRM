@@ -153,9 +153,10 @@ export async function updateBuyer(req, res) {
             res.status(404).json({ error: "Buyer not found" });
             return;
         }
+        const { id, createdAt, updatedAt, createdBy, creator, ...updateData } = req.body;
         const buyer = await prisma.buyer.update({
             where: { id: req.params.id },
-            data: req.body,
+            data: updateData,
         });
         await logActivity(req.user.id, "update", "buyers", buyer.id, {
             company: buyer.company,
