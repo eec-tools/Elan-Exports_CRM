@@ -226,8 +226,10 @@ export async function exportPdf(
 
     res.send(pdfBuffer);
     
-    // Log export asynchronously
-    logActivity(req.user!.id, "export", "reports", "pdf", {}).catch(console.error);
+    // Log export asynchronously without impacting the response.
+    if (req.user?.id) {
+      logActivity(req.user.id, "export", "reports", "pdf", {}).catch(console.error);
+    }
 
   } catch (err) {
     console.error("Export PDF error:", err);

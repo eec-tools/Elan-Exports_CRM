@@ -2,28 +2,44 @@ import puppeteer from "puppeteer";
 import { format } from "date-fns";
 export async function generateBuyerReportsPdf(reports) {
     const generatedDate = format(new Date(), "PPpp");
+    const safeText = (value, fallback = "-") => {
+        if (typeof value === "string") {
+            const trimmed = value.trim();
+            return trimmed.length > 0 ? trimmed : fallback;
+        }
+        return fallback;
+    };
+    const safeDate = (value) => {
+        if (!value)
+            return null;
+        const date = value instanceof Date ? value : new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date;
+    };
     // Create table rows
     let tableRowsHtml = "";
     for (const report of reports) {
-        const updates = (report.keyUpdates || "")
+        const updates = safeText(report.keyUpdates, "")
             .split("\n")
             .map(u => u.trim())
             .filter(u => u.length > 0);
         const bulletUpdates = updates.length > 0
             ? updates.map(u => `<div style="margin-bottom: 2px; padding-left: 10px; text-indent: -10px;">&bull; ${u}</div>`).join("")
             : "<span class='empty'>-</span>";
-        const updatedText = report.updateDate ? format(new Date(report.updateDate), "MMM dd, yyyy") : format(new Date(report.reportDate), "MMM dd, yyyy");
-        const supplierHtml = report.companyName.replace(/\n/g, "<br/>");
+        const updateDate = safeDate(report.updateDate);
+        const reportDate = safeDate(report.reportDate);
+        const effectiveDate = updateDate || reportDate;
+        const updatedText = effectiveDate ? format(effectiveDate, "MMM dd, yyyy") : "-";
+        const supplierHtml = safeText(report.companyName).replace(/\n/g, "<br/>");
         const imageUrl = report.productImageUrl && report.productImageUrl.startsWith("http")
             ? report.productImageUrl
             : "https://via.placeholder.com/150x150.png?text=No+Image";
         tableRowsHtml += `
         <tr>
            <td class="img-cell"><img src="${imageUrl}" alt="Product" /></td>
-           <td>${report.buyerName}</td>
-           <td class="bold">${report.productName}</td>
+        <td>${safeText(report.buyerName)}</td>
+        <td class="bold">${safeText(report.productName)}</td>
            <td>${supplierHtml}</td>
-           <td><span class="status-badge">${report.status}</span></td>
+        <td><span class="status-badge">${safeText(report.status)}</span></td>
            <td class="text-right whitespace-nowrap">${updatedText}</td>
            <td class="updates">${bulletUpdates}</td>
         </tr>
@@ -199,24 +215,36 @@ export async function generateBuyerReportsPdf(reports) {
   `;
     const browser = await puppeteer.launch({
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--no-zygote",
+            "--single-process",
+        ],
     });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 15000 }).catch(() => {
-        // Ignore timeout errors
-    });
-    const pdfBuffer = await page.pdf({
-        format: "A4",
-        landscape: true,
-        printBackground: true,
-        margin: {
-            top: "10mm",
-            right: "10mm",
-            bottom: "10mm",
-            left: "10mm"
-        }
-    });
-    await browser.close();
-    return Buffer.from(pdfBuffer);
+    try {
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => {
+            // Continue PDF rendering even if remote assets (fonts/images) are slow.
+        });
+        const pdfBuffer = await page.pdf({
+            format: "A4",
+            landscape: true,
+            printBackground: true,
+            margin: {
+                top: "10mm",
+                right: "10mm",
+                bottom: "10mm",
+                left: "10mm"
+            }
+        });
+        return Buffer.from(pdfBuffer);
+    }
+    finally {
+        await browser.close();
+    }
 }
 //# sourceMappingURL=reportsPdf.service.js.map
