@@ -1,8 +1,67 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
 import { createNotification } from "../services/notificationService.js";
+import { v2 as cloudinary } from "cloudinary";
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+
+// ─── Cloudinary config ──────────────────────────────
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const newSupplierCatalogStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (_req: Express.Request, file: Express.Multer.File) => {
+    let resource_type = "auto";
+    let isRaw = false;
+    if (
+      file.mimetype === "application/pdf" ||
+      file.originalname.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|csv|zip)$/)
+    ) {
+      resource_type = "raw";
+      isRaw = true;
+    }
+    const extMatch = file.originalname.match(/\.[^/.]+$/);
+    const ext = isRaw && extMatch ? extMatch[0] : "";
+    const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
+    return {
+      folder: "elan-new-suppliers",
+      resource_type,
+      public_id: `new_supplier_catalog_${Date.now()}_${baseName}${ext}`,
+    };
+  },
+} as any);
+
+export const uploadNewSupplierFile = multer({
+  storage: newSupplierCatalogStorage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+
+/**
+ * POST /api/new-suppliers/upload
+ */
+export async function uploadNewSupplierCatalog(
+  _req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const file = _req.file as any;
+    if (!file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    const fileUrl: string = file.path || file.secure_url || file.url;
+    res.json({ url: fileUrl });
+  } catch (err) {
+    console.error("Upload new supplier catalog error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
 
 /**
  * GET /api/new-suppliers
@@ -134,7 +193,8 @@ export async function createNewSupplier(
         const {
             company, productCategory, product, country, accountManager,
             currentStatus, certifications, latestQuotation, reasonInactive,
-            dateMarkedInactive, reactivationPotential, notes, phone, email
+            dateMarkedInactive, reactivationPotential, notes, phone, email,
+            productCatalog
         } = req.body;
 
         console.log("Creating new supplier with payload:", req.body);
@@ -144,6 +204,7 @@ export async function createNewSupplier(
                 company, productCategory, product, country, accountManager,
                 currentStatus, certifications, latestQuotation, reasonInactive,
                 dateMarkedInactive, reactivationPotential, notes, phone, email,
+                productCatalog,
                 createdBy: req.user!.id,
             },
         });
@@ -179,7 +240,8 @@ export async function updateNewSupplier(
         const {
             company, productCategory, product, country, accountManager,
             currentStatus, certifications, latestQuotation, reasonInactive,
-            dateMarkedInactive, reactivationPotential, notes, phone, email
+            dateMarkedInactive, reactivationPotential, notes, phone, email,
+            productCatalog
         } = req.body;
 
         console.log("Updating new supplier with payload:", req.body);
@@ -189,7 +251,8 @@ export async function updateNewSupplier(
             data: {
                 company, productCategory, product, country, accountManager,
                 currentStatus, certifications, latestQuotation, reasonInactive,
-                dateMarkedInactive, reactivationPotential, notes, phone, email
+                dateMarkedInactive, reactivationPotential, notes, phone, email,
+                productCatalog
             },
         });
 

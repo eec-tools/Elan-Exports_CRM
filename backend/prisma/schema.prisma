@@ -75,6 +75,29 @@ model Buyer {
   notes                     String?
   status                    String?   @default("Pending")
   requiredProducts          Json      @default("[]") @map("required_products")
+  // New fields from Buyer Registration Form
+  tradeName                 String?   @map("trade_name")
+  buyerType                 String?   @map("buyer_type")
+  city                      String?
+  whatsapp                  String?
+  contactRole               String?   @map("contact_role")
+  additionalContacts        Json?     @map("additional_contacts")
+  productCategories         String?   @map("product_categories")
+  marketsServed             String?   @map("markets_served")
+  annualImportVolume        String?   @map("annual_import_volume")
+  annualPurchaseValue       String?   @map("annual_purchase_value")
+  currentSuppliersOrigins   String?   @map("current_suppliers_origins")
+  sourcingRequirements      Json?     @map("sourcing_requirements")
+  preferredCurrency         String?   @map("preferred_currency")
+  shippingMode              String?   @map("shipping_mode")
+  portsOfDischarge          String?   @map("ports_of_discharge")
+  countryOfFinalDelivery    String?   @map("country_of_final_delivery")
+  freightForwarder          String?   @map("freight_forwarder")
+  packingRequirements       String?   @map("packing_requirements")
+  socialEthicalCompliance   String?   @map("social_ethical_compliance")
+  howHeardAboutUs           String?   @map("how_heard_about_us")
+  tradeFairName             String?   @map("trade_fair_name")
+  productCatalog            String?   @map("product_catalog_shared")
   createdBy                 String?   @map("created_by")
   createdAt                 DateTime  @default(now()) @map("created_at")
   updatedAt                 DateTime  @updatedAt @map("updated_at")
@@ -353,6 +376,7 @@ model NewSupplier {
   organicSegregationSop       String?                   @map("organic_segregation_sop")
   cleaningLinelearanceSop     String?                   @map("cleaning_linelearance_sop")
   noProhibitedAids            String?                   @map("no_prohibited_aids")
+  productCatalog              String?                   @map("product_catalog")
 
   @@map("new_suppliers")
 }

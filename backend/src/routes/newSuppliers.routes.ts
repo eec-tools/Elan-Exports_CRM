@@ -8,6 +8,8 @@ import {
     exportNewSuppliersCsv,
     getNewSupplierFilters,
     updateNewSupplierStage,
+    uploadNewSupplierCatalog,
+    uploadNewSupplierFile,
 } from "../controllers/newSuppliers.controller.js";
 import {
     authenticate,
@@ -24,6 +26,7 @@ router.get("/filters", getNewSupplierFilters);
 router.get("/export/csv", exportNewSuppliersCsv);
 router.get("/:id", getNewSupplier);
 
+router.post("/upload", requireEdit("suppliers"), uploadNewSupplierFile.single("file"), uploadNewSupplierCatalog);
 router.post("/", requireEdit("suppliers"), createNewSupplier);
 router.put("/:id", requireEdit("suppliers"), updateNewSupplier);
 router.patch("/:id/stage", requireEdit("suppliers"), updateNewSupplierStage);

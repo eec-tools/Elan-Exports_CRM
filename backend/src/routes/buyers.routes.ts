@@ -8,6 +8,8 @@ import {
   updateBuyer,
   deleteBuyer,
   exportBuyersCsv,
+  uploadBuyerCatalog,
+  uploadBuyerFile,
 } from "../controllers/buyers.controller.js";
 import {
   authenticate,
@@ -27,6 +29,7 @@ router.get("/export/csv", exportBuyersCsv);
 router.get("/:id", getBuyer);
 
 // Write operations require edit access
+router.post("/upload", requireEdit("buyers"), uploadBuyerFile.single("file"), uploadBuyerCatalog);
 router.post("/", requireEdit("buyers"), createBuyer);
 router.put("/:id", requireEdit("buyers"), updateBuyer);
 router.delete("/:id", requireEdit("buyers"), deleteBuyer);

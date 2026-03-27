@@ -40,6 +40,8 @@ import {
   Circle,
   Clock,
   MessageSquareText,
+  Upload,
+  X,
 } from "lucide-react";
 
 interface EmailCampaign {
@@ -143,6 +145,7 @@ interface NewSupplier {
   organicSegregationSop?: string;
   cleaningLinelearanceSop?: string;
   noProhibitedAids?: string;
+  productCatalog?: string;
 }
 
 const ORGANIC_CERT_MARKETS = ["India — NPOP", "USA — USDA Organic (NOP)", "EU — EU Organic (Reg 2018/848)", "UK — UK Organic", "Australia — ACO / NASAA", "Japan — JAS Organic"];
@@ -176,6 +179,7 @@ export default function NewSupplierDetailsPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<Partial<NewSupplier>>({});
+  const [catalogFile, setCatalogFile] = useState<File | null>(null);
 
   const { data: supplier, isLoading } = useQuery<NewSupplier>({
     queryKey: ["new-supplier", id],
@@ -194,6 +198,18 @@ export default function NewSupplierDetailsPage() {
       toast.success("Supplier updated");
     },
     onError: () => toast.error("Failed to update supplier"),
+  });
+
+  const uploadCatalogMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await api.post("/new-suppliers/upload", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data;
+    },
+    onError: () => toast.error("Failed to upload product catalog"),
   });
 
   const { data: campaign } = useQuery<EmailCampaign | null>({
@@ -271,16 +287,26 @@ export default function NewSupplierDetailsPage() {
       })
     : "";
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.company) return;
+    let catalogUrl = form.productCatalog;
+    if (catalogFile) {
+      try {
+        const uploadRes = await uploadCatalogMutation.mutateAsync(catalogFile);
+        catalogUrl = uploadRes.url;
+      } catch {
+        return;
+      }
+    }
     if (supplier?.id) {
-      updateMutation.mutate({ id: supplier.id, d: form });
+      updateMutation.mutate({ id: supplier.id, d: { ...form, productCatalog: catalogUrl } });
     }
   };
 
   const openEdit = () => {
     setForm(supplier || {});
+    setCatalogFile(null);
     setDialogOpen(true);
   };
 
@@ -504,6 +530,26 @@ export default function NewSupplierDetailsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Product Catalog ── */}
+      {supplier.productCatalog && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" />Product Catalog</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <a
+              href={supplier.productCatalog}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-brand-600 hover:underline text-sm font-medium"
+            >
+              <FileText className="h-4 w-4" />
+              Open Product Catalog (PDF)
+            </a>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Organic Certs by Market ── */}
       {supplier.organicCertsByMarket && supplier.organicCertsByMarket.some(r => r.certNumber || r.expiryDate) && (
@@ -877,6 +923,65 @@ export default function NewSupplierDetailsPage() {
               <div className="space-y-2"><Label>Reactivation Potential</Label><Input value={form.reactivationPotential ?? ""} onChange={(e) => setForm({ ...form, reactivationPotential: e.target.value })} /></div>
               <div className="space-y-2 sm:col-span-2"><Label>Notes</Label><Textarea value={form.notes ?? ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} /></div>
             </div></div>
+
+            <Separator />
+
+            {/* Product Catalog */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Product Catalog</p>
+              <div className="space-y-3">
+                {form.productCatalog && !catalogFile && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                    <a
+                      href={form.productCatalog}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-600 hover:underline truncate"
+                    >
+                      View current catalog
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, productCatalog: "" })}
+                      className="ml-auto text-slate-400 hover:text-rose-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <input
+                    id="catalog-upload-nsd"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => setCatalogFile(e.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-200 text-sm text-slate-600 hover:bg-slate-50"
+                    onClick={() => document.getElementById("catalog-upload-nsd")?.click()}
+                  >
+                    <Upload className="h-4 w-4" />
+                    {catalogFile ? "Change File" : form.productCatalog ? "Replace Catalog" : "Upload Catalog (PDF)"}
+                  </button>
+                  {catalogFile && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                      <span className="truncate max-w-[200px]">{catalogFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCatalogFile(null)}
+                        className="text-slate-400 hover:text-rose-500"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>

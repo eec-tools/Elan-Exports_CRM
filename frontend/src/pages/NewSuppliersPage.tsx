@@ -36,6 +36,8 @@ import {
     Bell,
     Mail,
     CheckCircle2,
+    Upload,
+    FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -188,6 +190,8 @@ interface Supplier {
     organicSegregationSop?: string;
     cleaningLinelearanceSop?: string;
     noProhibitedAids?: string;
+    // Product Catalog
+    productCatalog?: string;
 }
 
 interface OrganicCertRow {
@@ -289,6 +293,7 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
     organicSegregationSop: "",
     cleaningLinelearanceSop: "",
     noProhibitedAids: "",
+    productCatalog: "",
 };
 
 export default function NewSuppliersPage() {
@@ -309,6 +314,7 @@ export default function NewSuppliersPage() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Partial<Supplier> | null>(null);
     const [form, setForm] = useState<Partial<Supplier>>(EMPTY_SUPPLIER);
+    const [catalogFile, setCatalogFile] = useState<File | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(
         null,
@@ -398,25 +404,49 @@ export default function NewSuppliersPage() {
         onError: () => toast.error("Failed to update supplier stage"),
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const uploadCatalogMutation = useMutation({
+        mutationFn: async (file: File) => {
+            const fd = new FormData();
+            fd.append("file", file);
+            const res = await api.post("/new-suppliers/upload", fd, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            return res.data;
+        },
+        onError: () => toast.error("Failed to upload product catalog"),
+    });
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Submitting form with payload:", form);
+        let catalogUrl = form.productCatalog;
+        if (catalogFile) {
+            try {
+                const uploadRes = await uploadCatalogMutation.mutateAsync(catalogFile);
+                catalogUrl = uploadRes.url;
+            } catch {
+                return;
+            }
+        }
+        const payload = { ...form, productCatalog: catalogUrl };
+        console.log("Submitting form with payload:", payload);
         if (editing?.id) {
-            updateMutation.mutate({ id: editing.id, d: form });
+            updateMutation.mutate({ id: editing.id, d: payload });
         } else {
-            createMutation.mutate(form);
+            createMutation.mutate(payload);
         }
     };
 
     const openCreate = () => {
         setEditing(null);
         setForm(EMPTY_SUPPLIER);
+        setCatalogFile(null);
         setDialogOpen(true);
     };
 
     const openEdit = (s: Supplier) => {
         setEditing(s);
         setForm(s);
+        setCatalogFile(null);
         setDialogOpen(true);
     };
 
@@ -1289,6 +1319,67 @@ export default function NewSuppliersPage() {
                                 <div className="space-y-2 sm:col-span-2">
                                     <Label>Notes</Label>
                                     <Textarea value={form.notes ?? ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* ── Product Catalog ── */}
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Product Catalog</p>
+                            <div className="space-y-3">
+                                {form.productCatalog && !catalogFile && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                                        <a
+                                            href={form.productCatalog}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-brand-600 hover:underline truncate"
+                                        >
+                                            View current catalog
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick={() => setForm({ ...form, productCatalog: "" })}
+                                            className="ml-auto text-slate-400 hover:text-rose-500"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        id="catalog-upload-ns"
+                                        type="file"
+                                        accept=".pdf,.doc,.docx"
+                                        className="hidden"
+                                        onChange={(e) => setCatalogFile(e.target.files?.[0] ?? null)}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2 text-slate-600 border-slate-200"
+                                        onClick={() => document.getElementById("catalog-upload-ns")?.click()}
+                                    >
+                                        <Upload className="h-4 w-4" />
+                                        {catalogFile ? "Change File" : form.productCatalog ? "Replace Catalog" : "Upload Catalog (PDF)"}
+                                    </Button>
+                                    {catalogFile && (
+                                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                                            <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                                            <span className="truncate max-w-[200px]">{catalogFile.name}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCatalogFile(null)}
+                                                className="text-slate-400 hover:text-rose-500"
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

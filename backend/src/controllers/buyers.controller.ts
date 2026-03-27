@@ -2,6 +2,65 @@ import { Request, Response } from "express";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
+import { v2 as cloudinary } from "cloudinary";
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+
+// ─── Cloudinary config ──────────────────────────────
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const buyerCatalogStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (_req: Express.Request, file: Express.Multer.File) => {
+    let resource_type = "auto";
+    let isRaw = false;
+    if (
+      file.mimetype === "application/pdf" ||
+      file.originalname.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|csv|zip)$/)
+    ) {
+      resource_type = "raw";
+      isRaw = true;
+    }
+    const extMatch = file.originalname.match(/\.[^/.]+$/);
+    const ext = isRaw && extMatch ? extMatch[0] : "";
+    const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
+    return {
+      folder: "elan-buyers",
+      resource_type,
+      public_id: `buyer_catalog_${Date.now()}_${baseName}${ext}`,
+    };
+  },
+} as any);
+
+export const uploadBuyerFile = multer({
+  storage: buyerCatalogStorage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+
+/**
+ * POST /api/buyers/upload
+ */
+export async function uploadBuyerCatalog(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const file = req.file as any;
+    if (!file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    const fileUrl: string = file.path || file.secure_url || file.url;
+    res.json({ url: fileUrl });
+  } catch (err) {
+    console.error("Upload buyer catalog error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
 
 /**
  * GET /api/buyers
@@ -281,48 +340,80 @@ export async function exportBuyersCsv(
 
     const headers = [
       "Company",
+      "Trade Name",
       "Contact Person",
+      "Contact Role",
       "Email",
       "Phone",
+      "WhatsApp",
       "Country",
+      "City",
       "Region",
       "Status",
+      "Buyer Type",
+      "Product Categories",
       "Product Category Interest",
+      "Markets Served",
+      "Annual Import Volume",
+      "Annual Purchase Value",
+      "Current Suppliers / Origins",
+      "Sourcing Requirements (count)",
       "MOQ Requirements",
       "Pricing Range",
-      "Certification Requirements",
+      "Preferred Currency",
       "Payment Terms",
       "Incoterms",
+      "Certification Requirements",
+      "Shipping Mode",
+      "Ports of Discharge",
+      "Country of Final Delivery",
+      "Freight Forwarder",
+      "How Heard About Us",
+      "Trade Fair Name",
       "Risk Rating",
       "Strategic Value",
       "Lead Source",
       "Last Contact Date",
-      "Required Products",
       "Notes",
       "Created At",
     ];
 
-    const rows = buyers.map((b) => [
+    const rows = (buyers as any[]).map((b) => [
       b.company,
+      b.tradeName || "",
       b.name,
+      b.contactRole || "",
       b.email,
       b.phone || "",
+      b.whatsapp || "",
       b.country,
+      b.city || "",
       b.region || "",
       b.status || "",
+      b.buyerType || "",
+      b.productCategories || "",
       b.productCategoryInterest || "",
+      b.marketsServed || "",
+      b.annualImportVolume || "",
+      b.annualPurchaseValue || "",
+      b.currentSuppliersOrigins || "",
+      Array.isArray(b.sourcingRequirements) ? String(b.sourcingRequirements.length) : "0",
       b.moqRequirements || "",
       b.pricingRange || "",
-      b.certificationRequirements || "",
+      b.preferredCurrency || "",
       b.paymentTerms || "",
       b.incoterms || "",
+      b.certificationRequirements || "",
+      b.shippingMode || "",
+      b.portsOfDischarge || "",
+      b.countryOfFinalDelivery || "",
+      b.freightForwarder || "",
+      b.howHeardAboutUs || "",
+      b.tradeFairName || "",
       b.riskRating || "",
       b.strategicValue || "",
       b.leadSource || "",
       b.lastContactDate ? b.lastContactDate.toISOString().split("T")[0] : "",
-      Array.isArray(b.requiredProducts)
-        ? (b.requiredProducts as any[]).map((p: any) => p.name).join("; ")
-        : "",
       b.notes || "",
       b.createdAt.toISOString().split("T")[0],
     ]);

@@ -24,6 +24,7 @@ import AccessRequestsPage from "@/pages/AccessRequestsPage";
 import EmailTasksPage from "@/pages/EmailTasksPage";
 import DailyTasksPage from "@/pages/DailyTasksPage";
 import SupplierDetailsPage from "@/pages/SupplierDetailsPage";
+import BuyerDetailsPage from "@/pages/BuyerDetailsPage";
 import VaultPage from "@/pages/VaultPage";
 import DealsPage from "@/pages/DealsPage";
 import CompliancePage from "@/pages/CompliancePage";
@@ -80,6 +81,14 @@ export default function App() {
                   element={
                     <PermissionGate permission="buyers">
                       <BuyersPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="buyers/:id"
+                  element={
+                    <PermissionGate permission="buyers">
+                      <BuyerDetailsPage />
                     </PermissionGate>
                   }
                 />
