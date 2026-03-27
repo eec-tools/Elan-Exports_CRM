@@ -84,38 +84,129 @@ model Buyer {
 }
 
 model Supplier {
-  id                     String                 @id @default(uuid())
-  company                String
-  country                String?
-  contactPerson          String?                @map("contact_person")
-  email                  String?
-  phone                  String?
-  products               String?
-  contractBuyer          String?                @map("contract_buyer")
-  commissionPercent      String?                @map("commission_percent")
-  certifications         String?
-  productionCapacity     String?                @map("production_capacity")
-  currentStatus          String?                @default("Under Review") @map("current_status")
-  remarks                String?
-  createdBy              String?                @map("created_by")
-  createdAt              DateTime               @default(now()) @map("created_at")
-  updatedAt              DateTime               @updatedAt @map("updated_at")
-  approvedConfirmPercent String?                @map("approved_confirm_percent")
-  companyAddress         String?                @map("company_address")
-  exportingCountries     String?                @map("exporting_countries")
-  factoryVideosShared    String?                @map("factory_videos_shared")
-  lidlFactoryId          String?                @map("lidl_factory_id")
-  otherBrands            String?                @map("other_brands")
-  productCatalogShared   String?                @map("product_catalog_shared")
-  samplePolicy           String?                @map("sample_policy")
-  warehouseVideosShared  String?                @map("warehouse_videos_shared")
-  website                String?
-  workingWithOurBrands   String?                @map("working_with_our_brands")
-  documents              Json                   @default("[]")
-  contractDocument       Json?                  @map("contract_document")
-  creator                User?                  @relation(fields: [createdBy], references: [id])
-  supplierStage          String                 @default("Signed") @map("supplier_stage")
-  emailCampaign          SupplierEmailCampaign?
+  id                          String                 @id @default(uuid())
+  company                     String
+  country                     String?
+  contactPerson               String?                @map("contact_person")
+  email                       String?
+  phone                       String?
+  products                    String?
+  contractBuyer               String?                @map("contract_buyer")
+  commissionPercent           String?                @map("commission_percent")
+  certifications              String?
+  productionCapacity          String?                @map("production_capacity")
+  currentStatus               String?                @default("Under Review") @map("current_status")
+  remarks                     String?
+  createdBy                   String?                @map("created_by")
+  createdAt                   DateTime               @default(now()) @map("created_at")
+  updatedAt                   DateTime               @updatedAt @map("updated_at")
+  approvedConfirmPercent      String?                @map("approved_confirm_percent")
+  companyAddress              String?                @map("company_address")
+  exportingCountries          String?                @map("exporting_countries")
+  factoryVideosShared         String?                @map("factory_videos_shared")
+  lidlFactoryId               String?                @map("lidl_factory_id")
+  otherBrands                 String?                @map("other_brands")
+  productCatalogShared        String?                @map("product_catalog_shared")
+  samplePolicy                String?                @map("sample_policy")
+  warehouseVideosShared       String?                @map("warehouse_videos_shared")
+  website                     String?
+  workingWithOurBrands        String?                @map("working_with_our_brands")
+  documents                   Json                   @default("[]")
+  contractDocument            Json?                  @map("contract_document")
+  creator                     User?                  @relation(fields: [createdBy], references: [id])
+  supplierStage               String                 @default("Signed") @map("supplier_stage")
+  emailCampaign               SupplierEmailCampaign?
+  // Section 1 — Identity
+  tradeName                   String?                @map("trade_name")
+  yearEstablished             String?                @map("year_established")
+  manufacturingAddress        String?                @map("manufacturing_address")
+  city                        String?
+  state                       String?
+  postalCode                  String?                @map("postal_code")
+  supplierType                String?                @map("supplier_type")
+  // Section 2 — Contacts
+  whatsapp                    String?
+  // Section 3 — Products
+  hsCode                      String?                @map("hs_code")
+  organicStatus               String?                @map("organic_status")
+  ingredientList              String?                @map("ingredient_list")
+  allergenDeclaration         String?                @map("allergen_declaration")
+  shelfLife                   String?                @map("shelf_life")
+  storageConditions           String?                @map("storage_conditions")
+  packagingType               String?                @map("packaging_type")
+  netWeightVariants           String?                @map("net_weight_variants")
+  sampleAvailable             String?                @map("sample_available")
+  sampleLeadTime              String?                @map("sample_lead_time")
+  sampleCost                  String?                @map("sample_cost")
+  // Section 4 — Production
+  annualProductionVolume      String?                @map("annual_production_volume")
+  avgMonthlyVolume            String?                @map("avg_monthly_volume")
+  maxScalableMonthlyVolume    String?                @map("max_scalable_monthly_volume")
+  peakSeasonMonths            String?                @map("peak_season_months")
+  offSeasonAvailability       String?                @map("off_season_availability")
+  minExportableBatch          String?                @map("min_exportable_batch")
+  moq                         String?
+  leadTimeFirstOrder          String?                @map("lead_time_first_order")
+  leadTimeRepeatOrder         String?                @map("lead_time_repeat_order")
+  // Section 5 — Commercial
+  incotermsSupported          String?                @map("incoterms_supported")
+  portsOfExport               String?                @map("ports_of_export")
+  targetExportMarkets         String?                @map("target_export_markets")
+  currencyPreferred           String?                @map("currency_preferred")
+  paymentTerms                String?                @map("payment_terms")
+  // Section 5 — Banking (Wire Transfer)
+  bankName                    String?                @map("bank_name")
+  bankBranch                  String?                @map("bank_branch")
+  bankAddress                 String?                @map("bank_address")
+  accountNumber               String?                @map("account_number")
+  swiftBicCode                String?                @map("swift_bic_code")
+  iban                        String?
+  // Section 5 — Banking (L/C)
+  lcAdvisingBankName          String?                @map("lc_advising_bank_name")
+  lcBeneficiaryName           String?                @map("lc_beneficiary_name")
+  lcBankAddress               String?                @map("lc_bank_address")
+  lcSwiftCode                 String?                @map("lc_swift_code")
+  // Section 6 — Regulatory
+  iecNumber                   String?                @map("iec_number")
+  gstNumber                   String?                @map("gst_number")
+  fssaiLicense                String?                @map("fssai_license")
+  apedaNumber                 String?                @map("apeda_number")
+  fdaRegistrationNumber       String?                @map("fda_registration_number")
+  usAgentAppointed            String?                @map("us_agent_appointed")
+  tracesNtRegistration        String?                @map("traces_nt_registration")
+  coiCapability               String?                @map("coi_capability")
+  daffBiosecurity             String?                @map("daff_biosecurity")
+  jasLabelCompliance          String?                @map("jas_label_compliance")
+  // Section 7 — Certifications & Food Safety
+  haccpAvailable              String?                @map("haccp_available")
+  isoFsscCertNo               String?                @map("iso_fssc_cert_no")
+  isoCertValidityDate         String?                @map("iso_cert_validity_date")
+  latestInternalAuditDate     String?                @map("latest_internal_audit_date")
+  latestThirdPartyAuditDate   String?                @map("latest_third_party_audit_date")
+  auditingBodyName            String?                @map("auditing_body_name")
+  // Section 8 — Organic Certification Chain
+  farmerOrganicCert           String?                @map("farmer_organic_cert")
+  aggregatorOrganicCert       String?                @map("aggregator_organic_cert")
+  processingUnitOrganicCert   String?                @map("processing_unit_organic_cert")
+  certifyingBodyName          String?                @map("certifying_body_name")
+  certsValidForExport         String?                @map("certs_valid_for_export")
+  organicCertsByMarket        Json?                  @map("organic_certs_by_market")
+  // Section 9 — Lab Testing
+  labTestingRecords           Json?                  @map("lab_testing_records")
+  gmoFreeDeclaration          String?                @map("gmo_free_declaration")
+  irradiationFreeDeclaration  String?                @map("irradiation_free_declaration")
+  foodContactCompliance       String?                @map("food_contact_compliance")
+  compostabilityCert          String?                @map("compostability_cert")
+  migrationTestReport         String?                @map("migration_test_report")
+  // Section 10 — Branding
+  exportBrand                 String?                @map("export_brand")
+  healthNutritionClaims       String?                @map("health_nutrition_claims")
+  claimsApprovedMarkets       String?                @map("claims_approved_markets")
+  packagingComplianceRegions  String?                @map("packaging_compliance_regions")
+  // Section 11 — Processing Compliance
+  organicSegregationSop       String?                @map("organic_segregation_sop")
+  cleaningLinelearanceSop     String?                @map("cleaning_linelearance_sop")
+  noProhibitedAids            String?                @map("no_prohibited_aids")
 
   @@map("suppliers")
 }
@@ -163,26 +254,105 @@ model OldSupplier {
 }
 
 model NewSupplier {
-  id                    String                    @id @default(uuid())
-  company               String
-  productCategory       String?                   @map("product_category")
-  product               String?
-  country               String?
-  accountManager        String?                   @map("account_manager")
-  currentStatus         String?                   @map("current_status")
-  certifications        String?
-  latestQuotation       String?                   @map("latest_quotation")
-  reasonInactive        String?                   @map("reason_inactive")
-  dateMarkedInactive    String?                   @map("date_marked_inactive")
-  reactivationPotential String?                   @map("reactivation_potential")
-  notes                 String?
-  createdBy             String?                   @map("created_by")
-  createdAt             DateTime                  @default(now()) @map("created_at")
-  updatedAt             DateTime                  @updatedAt @map("updated_at")
-  email                 String?
-  phone                 String?
-  supplierStage         String                    @default("Onboarding") @map("supplier_stage")
-  emailCampaign         NewSupplierEmailCampaign?
+  id                          String                    @id @default(uuid())
+  company                     String
+  productCategory             String?                   @map("product_category")
+  product                     String?
+  country                     String?
+  accountManager              String?                   @map("account_manager")
+  currentStatus               String?                   @map("current_status")
+  certifications              String?
+  latestQuotation             String?                   @map("latest_quotation")
+  reasonInactive              String?                   @map("reason_inactive")
+  dateMarkedInactive          String?                   @map("date_marked_inactive")
+  reactivationPotential       String?                   @map("reactivation_potential")
+  notes                       String?
+  createdBy                   String?                   @map("created_by")
+  createdAt                   DateTime                  @default(now()) @map("created_at")
+  updatedAt                   DateTime                  @updatedAt @map("updated_at")
+  email                       String?
+  phone                       String?
+  supplierStage               String                    @default("Onboarding") @map("supplier_stage")
+  emailCampaign               NewSupplierEmailCampaign?
+  // Section 1 — Identity
+  tradeName                   String?                   @map("trade_name")
+  yearEstablished             String?                   @map("year_established")
+  manufacturingAddress        String?                   @map("manufacturing_address")
+  city                        String?
+  state                       String?
+  postalCode                  String?                   @map("postal_code")
+  supplierType                String?                   @map("supplier_type")
+  // Section 2 — Contacts
+  whatsapp                    String?
+  // Section 3 — Products
+  hsCode                      String?                   @map("hs_code")
+  organicStatus               String?                   @map("organic_status")
+  ingredientList              String?                   @map("ingredient_list")
+  allergenDeclaration         String?                   @map("allergen_declaration")
+  shelfLife                   String?                   @map("shelf_life")
+  storageConditions           String?                   @map("storage_conditions")
+  packagingType               String?                   @map("packaging_type")
+  netWeightVariants           String?                   @map("net_weight_variants")
+  sampleAvailable             String?                   @map("sample_available")
+  sampleLeadTime              String?                   @map("sample_lead_time")
+  sampleCost                  String?                   @map("sample_cost")
+  // Section 4 — Production
+  annualProductionVolume      String?                   @map("annual_production_volume")
+  avgMonthlyVolume            String?                   @map("avg_monthly_volume")
+  maxScalableMonthlyVolume    String?                   @map("max_scalable_monthly_volume")
+  peakSeasonMonths            String?                   @map("peak_season_months")
+  offSeasonAvailability       String?                   @map("off_season_availability")
+  minExportableBatch          String?                   @map("min_exportable_batch")
+  moq                         String?
+  leadTimeFirstOrder          String?                   @map("lead_time_first_order")
+  leadTimeRepeatOrder         String?                   @map("lead_time_repeat_order")
+  // Section 5 — Commercial
+  incotermsSupported          String?                   @map("incoterms_supported")
+  portsOfExport               String?                   @map("ports_of_export")
+  targetExportMarkets         String?                   @map("target_export_markets")
+  currencyPreferred           String?                   @map("currency_preferred")
+  paymentTerms                String?                   @map("payment_terms")
+  // Section 6 — Regulatory
+  iecNumber                   String?                   @map("iec_number")
+  gstNumber                   String?                   @map("gst_number")
+  fssaiLicense                String?                   @map("fssai_license")
+  apedaNumber                 String?                   @map("apeda_number")
+  fdaRegistrationNumber       String?                   @map("fda_registration_number")
+  usAgentAppointed            String?                   @map("us_agent_appointed")
+  tracesNtRegistration        String?                   @map("traces_nt_registration")
+  coiCapability               String?                   @map("coi_capability")
+  daffBiosecurity             String?                   @map("daff_biosecurity")
+  jasLabelCompliance          String?                   @map("jas_label_compliance")
+  // Section 7 — Certifications & Food Safety
+  haccpAvailable              String?                   @map("haccp_available")
+  isoFsscCertNo               String?                   @map("iso_fssc_cert_no")
+  isoCertValidityDate         String?                   @map("iso_cert_validity_date")
+  latestInternalAuditDate     String?                   @map("latest_internal_audit_date")
+  latestThirdPartyAuditDate   String?                   @map("latest_third_party_audit_date")
+  auditingBodyName            String?                   @map("auditing_body_name")
+  // Section 8 — Organic Certification Chain
+  farmerOrganicCert           String?                   @map("farmer_organic_cert")
+  aggregatorOrganicCert       String?                   @map("aggregator_organic_cert")
+  processingUnitOrganicCert   String?                   @map("processing_unit_organic_cert")
+  certifyingBodyName          String?                   @map("certifying_body_name")
+  certsValidForExport         String?                   @map("certs_valid_for_export")
+  organicCertsByMarket        Json?                     @map("organic_certs_by_market")
+  // Section 9 — Lab Testing
+  labTestingRecords           Json?                     @map("lab_testing_records")
+  gmoFreeDeclaration          String?                   @map("gmo_free_declaration")
+  irradiationFreeDeclaration  String?                   @map("irradiation_free_declaration")
+  foodContactCompliance       String?                   @map("food_contact_compliance")
+  compostabilityCert          String?                   @map("compostability_cert")
+  migrationTestReport         String?                   @map("migration_test_report")
+  // Section 10 — Branding
+  exportBrand                 String?                   @map("export_brand")
+  healthNutritionClaims       String?                   @map("health_nutrition_claims")
+  claimsApprovedMarkets       String?                   @map("claims_approved_markets")
+  packagingComplianceRegions  String?                   @map("packaging_compliance_regions")
+  // Section 11 — Processing Compliance
+  organicSegregationSop       String?                   @map("organic_segregation_sop")
+  cleaningLinelearanceSop     String?                   @map("cleaning_linelearance_sop")
+  noProhibitedAids            String?                   @map("no_prohibited_aids")
 
   @@map("new_suppliers")
 }
