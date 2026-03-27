@@ -1,4 +1,5 @@
 import prisma from "../config/db.js";
+import { broadcastToAll } from "./sse.js";
 
 export interface CreateNotificationParams {
   type: string;
@@ -20,7 +21,8 @@ export async function createNotification(
   params: CreateNotificationParams,
 ): Promise<void> {
   try {
-    await prisma.notification.create({ data: params });
+    const notification = await prisma.notification.create({ data: params });
+    broadcastToAll("notification", notification);
   } catch (err) {
     console.error("[NotificationService] Failed to create notification:", err);
   }

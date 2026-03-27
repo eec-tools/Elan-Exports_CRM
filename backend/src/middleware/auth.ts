@@ -14,12 +14,19 @@ export async function authenticate(
 ): Promise<void> {
   try {
     const header = req.headers.authorization;
-    if (!header?.startsWith("Bearer ")) {
+    let token = "";
+    if (header?.startsWith("Bearer ")) {
+      token = header.slice(7);
+    } else if (req.query.token && typeof req.query.token === "string") {
+      token = req.query.token;
+    }
+
+    if (!token) {
       res.status(401).json({ error: "Missing or invalid token" });
       return;
     }
 
-    const payload = verifyToken(header.slice(7));
+    const payload = verifyToken(token);
 
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },

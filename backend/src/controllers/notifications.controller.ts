@@ -115,3 +115,29 @@ export async function markAllRead(req: AuthRequest, res: Response) {
     res.status(500).json({ error: "Failed to mark all as read" });
   }
 }
+
+/**
+ * GET /api/notifications/stream
+ * Establish an SSE connection for real-time notifications.
+ */
+import { addClient, removeClient } from "../services/sse.js";
+
+export function streamNotifications(req: AuthRequest, res: Response) {
+  const userId = req.user!.id;
+
+  // Set necessary headers for SSE
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  // Send an initial connected event
+  res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+
+  addClient(userId, res);
+
+  req.on("close", () => {
+    removeClient(userId, res);
+  });
+}
+
