@@ -6,25 +6,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
-  Users,
-  Factory,
   FileText,
-  UserCog,
   Loader2,
   Video,
   HardDrive,
   ExternalLink,
   TrendingUp,
-  DollarSign,
-  Archive,
-  CalendarCheck,
-  ArrowRight,
   Zap,
   BarChart3,
   CheckCircle2,
-  Clock,
-  AlertTriangle,
-  Package,
   CheckSquare,
   Pencil,
   Plus,
@@ -113,11 +103,7 @@ const STAGE_META: Record<string, { label: string; color: string; bar: string }> 
   CLOSED_LOST:  { label: "Closed Lost",  color: "text-rose-600",    bar: "bg-rose-400" },
 };
 
-const RISK_META: Record<string, { icon: React.ElementType; color: string }> = {
-  Low:    { icon: CheckCircle2,  color: "text-emerald-500" },
-  Medium: { icon: Clock,         color: "text-amber-500" },
-  High:   { icon: AlertTriangle, color: "text-rose-500" },
-};
+
 
 interface QuickLink {
   id: string;
