@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -58,8 +58,43 @@ export function NotificationBell() {
       if (!res.ok) return { count: 0 };
       return res.json() as Promise<{ count: number }>;
     },
-    refetchInterval: 30_000,
   });
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const sse = new EventSource(`${API_BASE}/notifications/stream?token=${token}`);
+    
+    // Play 'ting' sound via a very short base64 wav
+    const playTing = () => {
+      const audio = new Audio("data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACApby7pIBbRERbf6S6uqSAXEZGXH+jubmjf11HR11/ore3on9dSElef6G2tqGAXkpKXoCgtbSgf19LS19/oLOzn39gTE1ggJ+ysp9/YU5OYX+esbGef2FPT2J/na+vnX9iUFBigJyurpx/Y1FRY4Ccra2cf2RSU2R/m6ysm39kVFRkgJqrq5p/ZVVVZYCaqqqagGZWVmaAmampmX9mV1dmf5ioqJiAZ1hYZ4CYp6eYgGdZWWh/l6aml4BoWlpogJelpZZ/aVtbaYCWpKSWgGlcXGmAlqOjlYBqXFxqgJWiopWAal1daoCUoaGUf2teXmt/lKCglH9rX19rgJOgoJOAbGBgbICTn5+TgGxhYWyAkp6ekn9tYWFtgJKdnZKAbWJibYCSnZ2RgG5jY26AkZyckYBuY2RugJGbm5F/b2Rkb3+Qm5qQf29lZW9/kJqakH9vZWZwgI+ZmY+AcGZmcH+PmZiPf3BnZ3B/j5iYj39xZ2dxf46Xl46AcWhocYCOl5eOgHFpaXGAjpaWjX9yaWlygI2Wlo1/cmpqcn+NlZWNf3JqanKAjZWUjIBza2tzf4yUlIx/c2trc4CMlJOMf3NsbHN/jJOTi4B0bGx0gIuTkot/dG1tdICLkpKLgHRtbXR/i5KSi4B0bm51gIqRkYp/dW5udYCKkZGKgHVub3V/ipCQin91b291gIqQkIp/dW9vdn+Jj4+Jf3ZwcHaAiY+PiX92cHB2gImPj4l/dnBxdoCJjo6JgHZxcXd/iI6OiIB3cXF3gIiOjoiAd3Jyd3+IjY2IgHdycneAiI2NiH93cnJ3f4iNjYiAd3NzeICHjIyHf3hzc3iAh4yMh4B4c3N4f4eMjId/eHR0eICHi4uHf3h0dHh/h4uLh394dHR4gIaLi4Z/eXR0eYCGioqGf3l1dXl/hoqKhoB5dXV5f4aKioaAeXV1eYCGioqGgHl1dXl/homJhoB5dnZ5gIaJiYV/enZ2en+FiYmFgHp2dnp/hYmJhX96dnZ6gIWIiIWAend3en+FiIiFf3p3d3qAhYiIhX96d3d6gIWIiIV/end3eg==");
+      audio.play().catch(e => console.error("Audio playback blocked:", e));
+    };
+
+    sse.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "connected") {
+          console.log("[NotificationBell] SSE Connected");
+        }
+      } catch (err) {
+        console.error("SSE parse error", err);
+      }
+    };
+
+    sse.addEventListener("notification", () => {
+      playTing();
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    });
+
+    sse.onerror = (err) => {
+      console.error("SSE Error:", err);
+      sse.close();
+    };
+
+    return () => sse.close();
+  }, [queryClient]);
 
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications", "dropdown"],

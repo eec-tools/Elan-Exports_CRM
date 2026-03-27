@@ -36,7 +36,7 @@ interface PaginationData {
 
 const PRIORITY_OPTIONS = ["Urgent", "High", "Medium", "Low"];
 const STATUS_OPTIONS = ["not started", "inprogress", "completed", "closed"];
-const OWNER_OPTIONS = ["vandana", "shirali", "madan", "mohita", "fahad"];
+const OWNER_OPTIONS = ["vandana", "shirali", "madan", "mohita"];
 const COMPANY_OPTIONS = ["EEC", "MTG", "Skin'd India", "Fresh Food Company"];
 
 // Premium styling helpers
