@@ -216,11 +216,39 @@ export async function createBuyer(
   res: Response,
 ): Promise<void> {
   try {
-    const buyer = await prisma.buyer.create({
-      data: {
-        ...req.body,
-        createdBy: req.user!.id,
-      },
+    const incomingLinks: { id: string; type: "new" | "signed" }[] =
+      Array.isArray(req.body.supplierLinks) ? req.body.supplierLinks : [];
+
+    const buyer = await prisma.$transaction(async (tx) => {
+      const created = await tx.buyer.create({
+        data: { ...req.body, createdBy: req.user!.id },
+      });
+
+      for (const link of incomingLinks) {
+        if (link.type === "new") {
+          const ns = await (tx as any).newSupplier.findUnique({ where: { id: link.id } });
+          if (!ns) continue;
+          const ids = (ns.buyerIds as string[]) ?? [];
+          if (!ids.includes(created.id)) {
+            await (tx as any).newSupplier.update({
+              where: { id: link.id },
+              data: { buyerIds: [...ids, created.id] },
+            });
+          }
+        } else {
+          const s = await tx.supplier.findUnique({ where: { id: link.id } });
+          if (!s) continue;
+          const ids = (s.buyerIds as string[]) ?? [];
+          if (!ids.includes(created.id)) {
+            await tx.supplier.update({
+              where: { id: link.id },
+              data: { buyerIds: [...ids, created.id] as any },
+            });
+          }
+        }
+      }
+
+      return created;
     });
 
     await logActivity(req.user!.id, "create", "buyers", buyer.id, {
@@ -261,9 +289,71 @@ export async function updateBuyer(
       ...updateData
     } = req.body;
 
-    const buyer = await prisma.buyer.update({
-      where: { id: req.params.id },
-      data: updateData,
+    const buyerId = req.params.id as string;
+    const incomingLinks: { id: string; type: "new" | "signed" }[] =
+      Array.isArray(updateData.supplierLinks)
+        ? updateData.supplierLinks
+        : ((existing.supplierLinks as any[]) ?? []);
+    const oldLinks: { id: string; type: "new" | "signed" }[] =
+      (existing.supplierLinks as any[]) ?? [];
+
+    const linkKey = (l: { id: string; type: string }) => `${l.id}::${l.type}`;
+    const oldKeys = new Set(oldLinks.map(linkKey));
+    const newKeys = new Set(incomingLinks.map(linkKey));
+    const added = incomingLinks.filter((l) => !oldKeys.has(linkKey(l)));
+    const removed = oldLinks.filter((l) => !newKeys.has(linkKey(l)));
+
+    const buyer = await prisma.$transaction(async (tx) => {
+      const updated = await tx.buyer.update({
+        where: { id: buyerId },
+        data: updateData,
+      });
+
+      for (const link of added) {
+        if (link.type === "new") {
+          const ns = await (tx as any).newSupplier.findUnique({ where: { id: link.id } });
+          if (!ns) continue;
+          const ids = (ns.buyerIds as string[]) ?? [];
+          if (!ids.includes(buyerId)) {
+            await (tx as any).newSupplier.update({
+              where: { id: link.id },
+              data: { buyerIds: [...ids, buyerId] },
+            });
+          }
+        } else {
+          const s = await tx.supplier.findUnique({ where: { id: link.id } });
+          if (!s) continue;
+          const ids = (s.buyerIds as string[]) ?? [];
+          if (!ids.includes(buyerId)) {
+            await tx.supplier.update({
+              where: { id: link.id },
+              data: { buyerIds: [...ids, buyerId] as any },
+            });
+          }
+        }
+      }
+
+      for (const link of removed) {
+        if (link.type === "new") {
+          const ns = await (tx as any).newSupplier.findUnique({ where: { id: link.id } });
+          if (!ns) continue;
+          const ids = (ns.buyerIds as string[]) ?? [];
+          await (tx as any).newSupplier.update({
+            where: { id: link.id },
+            data: { buyerIds: ids.filter((bid: string) => bid !== buyerId) },
+          });
+        } else {
+          const s = await tx.supplier.findUnique({ where: { id: link.id } });
+          if (!s) continue;
+          const ids = (s.buyerIds as string[]) ?? [];
+          await tx.supplier.update({
+            where: { id: link.id },
+            data: { buyerIds: ids.filter((bid: string) => bid !== buyerId) as any },
+          });
+        }
+      }
+
+      return updated;
     });
 
     await logActivity(req.user!.id, "update", "buyers", buyer.id, {
@@ -294,15 +384,60 @@ export async function deleteBuyer(
       return;
     }
 
-    await prisma.buyer.delete({ where: { id: req.params.id } });
+    const buyerId = req.params.id as string;
+    const supplierLinks: { id: string; type: "new" | "signed" }[] =
+      (existing.supplierLinks as any[]) ?? [];
 
-    await logActivity(req.user!.id, "delete", "buyers", req.params.id, {
+    await prisma.$transaction(async (tx) => {
+      for (const link of supplierLinks) {
+        if (link.type === "new") {
+          const ns = await (tx as any).newSupplier.findUnique({ where: { id: link.id } });
+          if (!ns) continue;
+          const ids = (ns.buyerIds as string[]) ?? [];
+          await (tx as any).newSupplier.update({
+            where: { id: link.id },
+            data: { buyerIds: ids.filter((bid: string) => bid !== buyerId) },
+          });
+        } else {
+          const s = await tx.supplier.findUnique({ where: { id: link.id } });
+          if (!s) continue;
+          const ids = (s.buyerIds as string[]) ?? [];
+          await tx.supplier.update({
+            where: { id: link.id },
+            data: { buyerIds: ids.filter((bid: string) => bid !== buyerId) as any },
+          });
+        }
+      }
+      await tx.buyer.delete({ where: { id: buyerId } });
+    });
+
+    await logActivity(req.user!.id, "delete", "buyers", buyerId, {
       company: existing.company,
     });
 
     res.json({ message: "Buyer deleted" });
   } catch (err) {
     console.error("Delete buyer error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * GET /api/buyers/list
+ * Lightweight list for dropdown population
+ */
+export async function listBuyersForDropdown(
+  _req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const buyers = await prisma.buyer.findMany({
+      select: { id: true, company: true, name: true },
+      orderBy: { company: "asc" },
+    });
+    res.json(buyers);
+  } catch (err) {
+    console.error("List buyers dropdown error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 }

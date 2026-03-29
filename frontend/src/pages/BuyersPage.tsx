@@ -46,6 +46,8 @@ import { PermissionGate } from "@/components/PermissionGate";
 import { Separator } from "@/components/ui/separator";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
 import { SelectWithOthers } from "@/components/SelectWithOthers";
+import { EntityLinkSelect } from "@/components/EntityLinkSelect";
+import type { EntityOption } from "@/components/EntityLinkSelect";
 
 interface SourcingRequirement {
   id: string;
@@ -125,6 +127,7 @@ interface Buyer {
   howHeardAboutUs?: string;
   tradeFairName?: string;
   productCatalog?: string;
+  supplierLinks?: { id: string; type: "new" | "signed" }[];
 }
 
 const EMPTY_SOURCING_REQ = (): SourcingRequirement => ({
@@ -150,6 +153,7 @@ const EMPTY_BUYER: Partial<Buyer> = {
   status: "Pending",
   additionalContacts: [],
   sourcingRequirements: [],
+  supplierLinks: [],
 };
 
 export default function BuyersPage() {
@@ -182,12 +186,32 @@ export default function BuyersPage() {
     queryFn: () => api.get("/buyers/stats").then((r) => r.data),
   });
 
+  const { data: newSuppliersListData, isLoading: newSuppLoading } = useQuery<{ id: string; company: string; type: "new" }[]>({
+    queryKey: ["new-suppliers-list"],
+    queryFn: () => api.get("/new-suppliers/list").then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const { data: signedSuppliersListData, isLoading: signedSuppLoading } = useQuery<{ id: string; company: string; type: "signed" }[]>({
+    queryKey: ["suppliers-list"],
+    queryFn: () => api.get("/suppliers/list").then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const suppliersListLoading = newSuppLoading || signedSuppLoading;
+
+  const allSupplierOptions: EntityOption[] = [
+    ...(newSuppliersListData ?? []).map((s) => ({ id: s.id, label: `${s.company} (New)`, type: "new" as const })),
+    ...(signedSuppliersListData ?? []).map((s) => ({ id: s.id, label: `${s.company} (Signed)`, type: "signed" as const })),
+  ];
+
   const createMutation = useMutation({
     mutationFn: (data: Partial<Buyer>) => api.post("/buyers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["buyers"] });
       queryClient.invalidateQueries({ queryKey: ["buyer-stats"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["buyers-list"] });
       setDialogOpen(false);
       toast.success("Buyer created successfully");
     },
@@ -200,6 +224,10 @@ export default function BuyersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["buyers"] });
       queryClient.invalidateQueries({ queryKey: ["buyer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["new-supplier"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier"] });
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       setDialogOpen(false);
       toast.success("Buyer updated successfully");
     },
@@ -746,6 +774,29 @@ export default function BuyersPage() {
                     <button type="button" className="text-destructive hover:underline font-medium" onClick={() => setForm({ ...form, productCatalog: "" })}>Remove</button>
                   </div>
                 )}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* ── Suppliers in Talks With ── */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Suppliers in Talks With</p>
+              <div className="space-y-2">
+                <Label>Supplier(s) in talks with</Label>
+                <EntityLinkSelect
+                  selectedIds={(form.supplierLinks ?? []).map((l) => l.id)}
+                  onChange={(ids) => {
+                    const links = ids.map((id) => {
+                      const found = allSupplierOptions.find((s) => s.id === id);
+                      return { id, type: (found?.type ?? "new") as "new" | "signed" };
+                    });
+                    setForm({ ...form, supplierLinks: links });
+                  }}
+                  options={allSupplierOptions}
+                  isLoading={suppliersListLoading}
+                  placeholder="Select suppliers in talks with this buyer…"
+                />
               </div>
             </div>
 

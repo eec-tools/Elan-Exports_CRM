@@ -16,6 +16,7 @@ import {
 import { PermissionGate } from "@/components/PermissionGate";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
 import { SelectWithOthers } from "@/components/SelectWithOthers";
+import { EntityLinkSelect } from "@/components/EntityLinkSelect";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -146,6 +147,7 @@ interface NewSupplier {
   cleaningLinelearanceSop?: string;
   noProhibitedAids?: string;
   productCatalog?: string;
+  buyerIds?: string[];
 }
 
 const ORGANIC_CERT_MARKETS = ["India — NPOP", "USA — USDA Organic (NOP)", "EU — EU Organic (Reg 2018/848)", "UK — UK Organic", "Australia — ACO / NASAA", "Japan — JAS Organic"];
@@ -194,10 +196,18 @@ export default function NewSupplierDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["new-supplier", id] });
       queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["new-supplier-filters"] });
+      queryClient.invalidateQueries({ queryKey: ["buyer"] });
+      queryClient.invalidateQueries({ queryKey: ["buyers"] });
       setDialogOpen(false);
       toast.success("Supplier updated");
     },
     onError: () => toast.error("Failed to update supplier"),
+  });
+
+  const { data: buyersListData, isLoading: buyersListLoading } = useQuery<{ id: string; company: string; name: string }[]>({
+    queryKey: ["buyers-list"],
+    queryFn: () => api.get("/buyers/list").then((r) => r.data),
+    staleTime: 60_000,
   });
 
   const uploadCatalogMutation = useMutation({
@@ -547,6 +557,34 @@ export default function NewSupplierDetailsPage() {
               <FileText className="h-4 w-4" />
               Open Product Catalog (PDF)
             </a>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Buyers in Talks With ── */}
+      {(supplier.buyerIds ?? []).length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Buyers in Talks With
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {(supplier.buyerIds ?? []).map((buyerId) => {
+                const buyer = buyersListData?.find((b) => b.id === buyerId);
+                return (
+                  <Link
+                    key={buyerId}
+                    to={`/buyers/${buyerId}`}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 border border-brand-200 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 transition-colors"
+                  >
+                    {buyer ? `${buyer.company}${buyer.name ? ` (${buyer.name})` : ""}` : buyerId.slice(0, 8)}
+                  </Link>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -980,6 +1018,26 @@ export default function NewSupplierDetailsPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* ── Buyers in Talks With ── */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Buyers in Talks With</p>
+              <div className="space-y-2">
+                <Label>Buyer(s) in talks with</Label>
+                <EntityLinkSelect
+                  selectedIds={form.buyerIds ?? []}
+                  onChange={(ids) => setForm({ ...form, buyerIds: ids })}
+                  options={(buyersListData ?? []).map((b) => ({
+                    id: b.id,
+                    label: `${b.company}${b.name ? ` (${b.name})` : ""}`,
+                  }))}
+                  isLoading={buyersListLoading}
+                  placeholder="Select buyers in talks with this supplier…"
+                />
               </div>
             </div>
 

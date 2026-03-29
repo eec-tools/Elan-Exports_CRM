@@ -64,6 +64,26 @@ export async function uploadNewSupplierCatalog(
 }
 
 /**
+ * GET /api/new-suppliers/list
+ * Lightweight list for dropdown population
+ */
+export async function listNewSuppliersForDropdown(
+    _req: AuthRequest,
+    res: Response,
+): Promise<void> {
+    try {
+        const suppliers = await (prisma as any).newSupplier.findMany({
+            select: { id: true, company: true },
+            orderBy: { company: "asc" },
+        });
+        res.json(suppliers.map((s: any) => ({ ...s, type: "new" })));
+    } catch (err) {
+        console.error("List new suppliers dropdown error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+
+/**
  * GET /api/new-suppliers
  */
 export async function listNewSuppliers(
@@ -194,19 +214,37 @@ export async function createNewSupplier(
             company, productCategory, product, country, accountManager,
             currentStatus, certifications, latestQuotation, reasonInactive,
             dateMarkedInactive, reactivationPotential, notes, phone, email,
-            productCatalog
+            productCatalog, buyerIds: incomingBuyerIds
         } = req.body;
 
         console.log("Creating new supplier with payload:", req.body);
 
-        const supplier = await (prisma as any).newSupplier.create({
-            data: {
-                company, productCategory, product, country, accountManager,
-                currentStatus, certifications, latestQuotation, reasonInactive,
-                dateMarkedInactive, reactivationPotential, notes, phone, email,
-                productCatalog,
-                createdBy: req.user!.id,
-            },
+        const buyerIdsArr: string[] = Array.isArray(incomingBuyerIds) ? incomingBuyerIds : [];
+
+        const supplier = await (prisma as any).$transaction(async (tx: any) => {
+            const created = await tx.newSupplier.create({
+                data: {
+                    company, productCategory, product, country, accountManager,
+                    currentStatus, certifications, latestQuotation, reasonInactive,
+                    dateMarkedInactive, reactivationPotential, notes, phone, email,
+                    productCatalog, buyerIds: buyerIdsArr,
+                    createdBy: req.user!.id,
+                },
+            });
+
+            for (const buyerId of buyerIdsArr) {
+                const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
+                if (!buyer) continue;
+                const links = (buyer.supplierLinks as { id: string; type: string }[]) ?? [];
+                if (!links.some((l) => l.id === created.id && l.type === "new")) {
+                    await tx.buyer.update({
+                        where: { id: buyerId },
+                        data: { supplierLinks: [...links, { id: created.id, type: "new" }] },
+                    });
+                }
+            }
+
+            return created;
         });
 
         await logActivity(req.user!.id, "create", "new_suppliers", supplier.id, {
@@ -241,19 +279,57 @@ export async function updateNewSupplier(
             company, productCategory, product, country, accountManager,
             currentStatus, certifications, latestQuotation, reasonInactive,
             dateMarkedInactive, reactivationPotential, notes, phone, email,
-            productCatalog
+            productCatalog, buyerIds: incomingBuyerIds
         } = req.body;
 
         console.log("Updating new supplier with payload:", req.body);
 
-        const supplier = await (prisma as any).newSupplier.update({
-            where: { id: req.params.id },
-            data: {
-                company, productCategory, product, country, accountManager,
-                currentStatus, certifications, latestQuotation, reasonInactive,
-                dateMarkedInactive, reactivationPotential, notes, phone, email,
-                productCatalog
-            },
+        const supplierId = req.params.id;
+        const incomingIds: string[] = Array.isArray(incomingBuyerIds)
+            ? incomingBuyerIds
+            : ((existing.buyerIds as string[]) ?? []);
+        const oldIds: string[] = (existing.buyerIds as string[]) ?? [];
+        const added = incomingIds.filter((bid) => !oldIds.includes(bid));
+        const removed = oldIds.filter((bid) => !incomingIds.includes(bid));
+
+        const supplier = await (prisma as any).$transaction(async (tx: any) => {
+            const updated = await tx.newSupplier.update({
+                where: { id: supplierId },
+                data: {
+                    company, productCategory, product, country, accountManager,
+                    currentStatus, certifications, latestQuotation, reasonInactive,
+                    dateMarkedInactive, reactivationPotential, notes, phone, email,
+                    productCatalog, buyerIds: incomingIds,
+                },
+            });
+
+            for (const buyerId of added) {
+                const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
+                if (!buyer) continue;
+                const links = (buyer.supplierLinks as { id: string; type: string }[]) ?? [];
+                if (!links.some((l) => l.id === supplierId && l.type === "new")) {
+                    await tx.buyer.update({
+                        where: { id: buyerId },
+                        data: { supplierLinks: [...links, { id: supplierId, type: "new" }] },
+                    });
+                }
+            }
+
+            for (const buyerId of removed) {
+                const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
+                if (!buyer) continue;
+                const links = (buyer.supplierLinks as { id: string; type: string }[]) ?? [];
+                await tx.buyer.update({
+                    where: { id: buyerId },
+                    data: {
+                        supplierLinks: links.filter(
+                            (l) => !(l.id === supplierId && l.type === "new"),
+                        ),
+                    },
+                });
+            }
+
+            return updated;
         });
 
         await logActivity(req.user!.id, "update", "new_suppliers", supplier.id, {
@@ -316,48 +392,83 @@ export async function updateNewSupplierStage(
             supplierStage: stage,
         };
 
+        const oldBuyerIds: string[] = (existing.buyerIds as string[]) ?? [];
+
         if (stage === "Signed") {
-            const supplier = await (prisma as any).supplier.create({
-                data: {
-                    ...commonData,
-                    email: existing.email,
-                    phone: existing.phone,
-                    remarks: existing.notes,
-                },
+            const result = await (prisma as any).$transaction(async (tx: any) => {
+                const supplier = await tx.supplier.create({
+                    data: {
+                        ...commonData,
+                        email: existing.email,
+                        phone: existing.phone,
+                        remarks: existing.notes,
+                        buyerIds: oldBuyerIds,
+                    },
+                });
+                // Update each linked buyer's supplierLinks from type "new" → "signed"
+                for (const buyerId of oldBuyerIds) {
+                    const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
+                    if (!buyer) continue;
+                    const links = (buyer.supplierLinks as { id: string; type: string }[]) ?? [];
+                    const updated = links.map((l) =>
+                        l.id === req.params.id && l.type === "new"
+                            ? { id: supplier.id, type: "signed" }
+                            : l,
+                    );
+                    await tx.buyer.update({
+                        where: { id: buyerId },
+                        data: { supplierLinks: updated },
+                    });
+                }
+                await tx.newSupplier.delete({ where: { id: req.params.id } });
+                return supplier;
             });
-            await (prisma as any).newSupplier.delete({ where: { id: req.params.id } });
-            await logActivity(req.user!.id, "move_to_suppliers", "new_suppliers", supplier.id, { company: existing.company });
+            await logActivity(req.user!.id, "move_to_suppliers", "new_suppliers", result.id, { company: existing.company });
             await createNotification({
               type: "stage_change",
               title: "Supplier Converted to Signed",
               message: `${existing.company} moved from Onboarding → Signed`,
               entityType: "supplier",
-              entityId: supplier.id,
+              entityId: result.id,
               entityName: existing.company,
-              entityLink: `/suppliers/signed-contract/${supplier.id}`,
+              entityLink: `/suppliers/signed-contract/${result.id}`,
               createdBy: req.user!.id,
             });
-            res.json(supplier);
+            res.json(result);
         } else if (stage === "Closed") {
-            const oldSupplier = await (prisma as any).oldSupplier.create({
-                data: {
-                    ...commonData,
-                    notes: existing.notes,
-                },
+            const result = await (prisma as any).$transaction(async (tx: any) => {
+                const oldSupplier = await tx.oldSupplier.create({
+                    data: { ...commonData, notes: existing.notes },
+                });
+                // Remove this supplier from all linked buyers' supplierLinks
+                for (const buyerId of oldBuyerIds) {
+                    const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
+                    if (!buyer) continue;
+                    const links = (buyer.supplierLinks as { id: string; type: string }[]) ?? [];
+                    await tx.buyer.update({
+                        where: { id: buyerId },
+                        data: {
+                            supplierLinks: links.filter(
+                                (l) => !(l.id === req.params.id && l.type === "new"),
+                            ),
+                        },
+                    });
+                }
+                await tx.newSupplier.delete({ where: { id: req.params.id } });
+                return oldSupplier;
             });
-            await (prisma as any).newSupplier.delete({ where: { id: req.params.id } });
-            await logActivity(req.user!.id, "move_to_old_suppliers", "new_suppliers", oldSupplier.id, { company: existing.company });
+            await logActivity(req.user!.id, "move_to_old_suppliers", "new_suppliers", result.id, { company: existing.company });
             await createNotification({
               type: "stage_change",
               title: "New Supplier Moved to Closed",
               message: `${existing.company} moved from Onboarding → Closed`,
               entityType: "old_supplier",
-              entityId: oldSupplier.id,
+              entityId: result.id,
               entityName: existing.company,
               entityLink: `/suppliers/old`,
               createdBy: req.user!.id,
             });
-            res.json(oldSupplier);
+            res.json(result);
         } else {
             res.status(400).json({ error: "Invalid stage" });
         }
@@ -384,9 +495,27 @@ export async function deleteNewSupplier(
             return;
         }
 
-        await (prisma as any).newSupplier.delete({ where: { id: req.params.id } });
+        const supplierId = req.params.id;
+        const buyerIds: string[] = (existing.buyerIds as string[]) ?? [];
 
-        await logActivity(req.user!.id, "delete", "new_suppliers", req.params.id, {
+        await (prisma as any).$transaction(async (tx: any) => {
+            for (const buyerId of buyerIds) {
+                const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
+                if (!buyer) continue;
+                const links = (buyer.supplierLinks as { id: string; type: string }[]) ?? [];
+                await tx.buyer.update({
+                    where: { id: buyerId },
+                    data: {
+                        supplierLinks: links.filter(
+                            (l) => !(l.id === supplierId && l.type === "new"),
+                        ),
+                    },
+                });
+            }
+            await tx.newSupplier.delete({ where: { id: supplierId } });
+        });
+
+        await logActivity(req.user!.id, "delete", "new_suppliers", supplierId, {
             company: existing.company,
         });
 

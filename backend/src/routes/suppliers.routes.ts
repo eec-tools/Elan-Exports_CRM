@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   listSuppliers,
+  listSuppliersForDropdown,
   getSupplier,
   createSupplier,
   updateSupplier,
@@ -23,6 +24,7 @@ const router = Router();
 router.use(authenticate, requirePermission("suppliers"));
 
 router.get("/", listSuppliers);
+router.get("/list", listSuppliersForDropdown);
 router.get("/stats", getSupplierStats);
 router.get("/filters", getSupplierFilters);
 router.get("/export/csv", exportSuppliersCsv);

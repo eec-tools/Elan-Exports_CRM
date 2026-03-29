@@ -44,6 +44,7 @@ import { PermissionGate } from "@/components/PermissionGate";
 import { Separator } from "@/components/ui/separator";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
 import { SelectWithOthers } from "@/components/SelectWithOthers";
+import { EntityLinkSelect } from "@/components/EntityLinkSelect";
 
 interface EmailCampaign {
     newSupplierId: string;
@@ -192,6 +193,8 @@ interface Supplier {
     noProhibitedAids?: string;
     // Product Catalog
     productCatalog?: string;
+    // Buyer links
+    buyerIds?: string[];
 }
 
 interface OrganicCertRow {
@@ -294,6 +297,7 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
     cleaningLinelearanceSop: "",
     noProhibitedAids: "",
     productCatalog: "",
+    buyerIds: [],
 };
 
 export default function NewSuppliersPage() {
@@ -352,6 +356,12 @@ export default function NewSuppliersPage() {
         queryFn: () => api.get("/new-supplier-campaigns").then((r) => r.data),
     });
 
+    const { data: buyersListData, isLoading: buyersListLoading } = useQuery<{ id: string; company: string; name: string }[]>({
+        queryKey: ["buyers-list"],
+        queryFn: () => api.get("/buyers/list").then((r) => r.data),
+        staleTime: 60_000,
+    });
+
     const campaignMap = new Map<string, EmailCampaign>(
         (campaigns ?? []).map((c) => [c.newSupplierId, c]),
     );
@@ -362,6 +372,7 @@ export default function NewSuppliersPage() {
             queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
             queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
             queryClient.invalidateQueries({ queryKey: ["new-supplier-filters"] });
+            queryClient.invalidateQueries({ queryKey: ["buyers-list"] });
             setDialogOpen(false);
             toast.success("Supplier created");
         },
@@ -374,6 +385,8 @@ export default function NewSuppliersPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
             queryClient.invalidateQueries({ queryKey: ["new-supplier-filters"] });
+            queryClient.invalidateQueries({ queryKey: ["buyer"] });
+            queryClient.invalidateQueries({ queryKey: ["buyers"] });
             setDialogOpen(false);
             toast.success("Supplier updated");
         },
@@ -1381,6 +1394,26 @@ export default function NewSuppliersPage() {
                                         </div>
                                     )}
                                 </div>
+                            </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* ── Buyers in Talks With ── */}
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Buyers in Talks With</p>
+                            <div className="space-y-2">
+                                <Label>Buyer(s) in talks with</Label>
+                                <EntityLinkSelect
+                                    selectedIds={form.buyerIds ?? []}
+                                    onChange={(ids) => setForm({ ...form, buyerIds: ids })}
+                                    options={(buyersListData ?? []).map((b) => ({
+                                        id: b.id,
+                                        label: `${b.company}${b.name ? ` (${b.name})` : ""}`,
+                                    }))}
+                                    isLoading={buyersListLoading}
+                                    placeholder="Select buyers in talks with this supplier…"
+                                />
                             </div>
                         </div>
 

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   listBuyers,
+  listBuyersForDropdown,
   getBuyerStats,
   getCrProducts,
   getBuyer,
@@ -23,6 +24,7 @@ const router = Router();
 router.use(authenticate, requirePermission("buyers"));
 
 router.get("/", listBuyers);
+router.get("/list", listBuyersForDropdown);
 router.get("/stats", getBuyerStats);
 router.get("/cr-products", getCrProducts);
 router.get("/export/csv", exportBuyersCsv);

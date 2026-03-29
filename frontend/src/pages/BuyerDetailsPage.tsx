@@ -23,6 +23,8 @@ import {
 import { PermissionGate } from "@/components/PermissionGate";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
 import { SelectWithOthers } from "@/components/SelectWithOthers";
+import { EntityLinkSelect } from "@/components/EntityLinkSelect";
+import type { EntityOption } from "@/components/EntityLinkSelect";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -128,6 +130,7 @@ interface Buyer {
   howHeardAboutUs?: string;
   tradeFairName?: string;
   productCatalog?: string;
+  supplierLinks?: { id: string; type: "new" | "signed" }[];
 }
 
 function InfoRow({
@@ -244,11 +247,36 @@ export default function BuyerDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["buyer", id] });
       queryClient.invalidateQueries({ queryKey: ["buyers"] });
       queryClient.invalidateQueries({ queryKey: ["buyer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["new-supplier"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier"] });
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       setDialogOpen(false);
       toast.success("Buyer updated");
     },
     onError: () => toast.error("Failed to update buyer"),
   });
+
+  const { data: newSuppliersListData, isLoading: newSuppLoading } = useQuery<{ id: string; company: string; type: "new" }[]>({
+    queryKey: ["new-suppliers-list"],
+    queryFn: () => api.get("/new-suppliers/list").then((r) => r.data),
+    staleTime: 60_000,
+    enabled: !!(buyer?.supplierLinks?.length || dialogOpen),
+  });
+
+  const { data: signedSuppliersListData, isLoading: signedSuppLoading } = useQuery<{ id: string; company: string; type: "signed" }[]>({
+    queryKey: ["suppliers-list"],
+    queryFn: () => api.get("/suppliers/list").then((r) => r.data),
+    staleTime: 60_000,
+    enabled: !!(buyer?.supplierLinks?.length || dialogOpen),
+  });
+
+  const suppliersListLoading = newSuppLoading || signedSuppLoading;
+
+  const allSupplierOptions: EntityOption[] = [
+    ...(newSuppliersListData ?? []).map((s) => ({ id: s.id, label: `${s.company} (New)`, type: "new" as const })),
+    ...(signedSuppliersListData ?? []).map((s) => ({ id: s.id, label: `${s.company} (Signed)`, type: "signed" as const })),
+  ];
 
   const uploadCatalogMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -931,6 +959,41 @@ export default function BuyerDetailsPage() {
               <FileText className="h-4 w-4" />
               Open Product Catalog (PDF)
             </a>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Suppliers in Talks With ── */}
+      {(buyer.supplierLinks ?? []).length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Suppliers in Talks With
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {(buyer.supplierLinks ?? []).map((link) => {
+                const found = allSupplierOptions.find((s) => s.id === link.id);
+                const path =
+                  link.type === "new"
+                    ? `/suppliers/new/${link.id}`
+                    : `/suppliers/signed-contract/${link.id}`;
+                const label = found
+                  ? found.label
+                  : `${link.id.slice(0, 8)} (${link.type === "new" ? "New" : "Signed"})`;
+                return (
+                  <Link
+                    key={`${link.id}-${link.type}`}
+                    to={path}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1986,6 +2049,29 @@ export default function BuyerDetailsPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* ── Suppliers in Talks With ── */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Suppliers in Talks With</p>
+              <div className="space-y-2">
+                <Label>Supplier(s) in talks with</Label>
+                <EntityLinkSelect
+                  selectedIds={(form.supplierLinks ?? []).map((l) => l.id)}
+                  onChange={(ids) => {
+                    const links = ids.map((id) => {
+                      const found = allSupplierOptions.find((s) => s.id === id);
+                      return { id, type: (found?.type ?? "new") as "new" | "signed" };
+                    });
+                    setForm({ ...form, supplierLinks: links });
+                  }}
+                  options={allSupplierOptions}
+                  isLoading={suppliersListLoading}
+                  placeholder="Select suppliers in talks with this buyer…"
+                />
               </div>
             </div>
 

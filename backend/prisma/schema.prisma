@@ -98,6 +98,7 @@ model Buyer {
   howHeardAboutUs           String?   @map("how_heard_about_us")
   tradeFairName             String?   @map("trade_fair_name")
   productCatalog            String?   @map("product_catalog_shared")
+  supplierLinks             Json      @default("[]") @map("supplier_links")
   createdBy                 String?   @map("created_by")
   createdAt                 DateTime  @default(now()) @map("created_at")
   updatedAt                 DateTime  @updatedAt @map("updated_at")
@@ -230,6 +231,7 @@ model Supplier {
   organicSegregationSop       String?                @map("organic_segregation_sop")
   cleaningLinelearanceSop     String?                @map("cleaning_linelearance_sop")
   noProhibitedAids            String?                @map("no_prohibited_aids")
+  buyerIds                    Json                   @default("[]") @map("buyer_ids")
 
   @@map("suppliers")
 }
@@ -377,6 +379,7 @@ model NewSupplier {
   cleaningLinelearanceSop     String?                   @map("cleaning_linelearance_sop")
   noProhibitedAids            String?                   @map("no_prohibited_aids")
   productCatalog              String?                   @map("product_catalog")
+  buyerIds                    Json                      @default("[]") @map("buyer_ids")
 
   @@map("new_suppliers")
 }
