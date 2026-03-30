@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
@@ -27,6 +27,13 @@ import { useState } from "react";
 import logo from "@/assets/elanexportslogo.png";
 import { NotificationBell } from "@/components/NotificationBell";
 
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 const navItems = [
   {
     to: "/",
@@ -53,13 +60,6 @@ const navItems = [
     to: "/deals",
     label: "Deals",
     icon: TrendingUp,
-    perm: null,
-    adminOnly: false,
-  },
-  {
-    to: "/compliance",
-    label: "Compliance",
-    icon: ClipboardCheck,
     perm: null,
     adminOnly: false,
   },
@@ -124,8 +124,11 @@ const navItems = [
 export function AppLayout() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const isDashboard = location.pathname === "/";
 
   const handleLogout = () => {
     logout();
@@ -377,6 +380,22 @@ export function AppLayout() {
             />
             <span className="text-[17px] font-bold text-slate-900 tracking-tight">Élan Exports</span>
           </div>
+          
+          <div className="hidden md:flex flex-col justify-center ml-4">
+            <h1 className="text-sm font-bold tracking-tight sm:text-base text-slate-800">
+              {getGreeting()},{" "}
+              <span className="text-brand-600">
+                {user?.fullName?.split(" ")[0] ?? "Admin"}
+              </span>{" "}
+              👋
+            </h1>
+            {isDashboard && (
+              <p className="text-xs text-slate-500">
+                Here's what's happening at Élan Exports today.
+              </p>
+            )}
+          </div>
+
           <div className="ml-auto flex items-center gap-2">
             <NotificationBell />
           </div>

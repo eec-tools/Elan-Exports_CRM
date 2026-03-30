@@ -69,13 +69,6 @@ interface DashboardStats {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 function formatCurrency(n: number | null | undefined) {
   const v = n ?? 0;
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
@@ -275,46 +268,32 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Hero Banner ──────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-brand-900 via-brand-800 to-brand-700 px-6 py-5 text-white shadow-xl">
-        {/* Decorative blobs */}
+
+      {/* <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-brand-900 via-brand-800 to-brand-700 px-6 py-5 text-white shadow-xl">
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/5 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-12 left-1/3 h-32 w-32 rounded-full bg-accent/10 blur-3xl" />
         <div className="pointer-events-none absolute right-1/4 bottom-0 h-24 w-24 rounded-full bg-white/5 blur-2xl" />
 
-        <div className="relative flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-brand-300">{formatDate()}</p>
-            <h1 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
-              {getGreeting()},{" "}
-              <span style={{ color: "hsl(42, 85%, 60%)" }}>
-                {user?.fullName?.split(" ")[0] ?? "there"}
-              </span>{" "}
-              👋
-            </h1>
-            <p className="mt-1 text-sm text-brand-300">
-              Here's what's happening at Élan Exports today.
-            </p>
-          </div>
+        <div className="relative flex gap-4 w-full justify-between items-center sm:flex-row flex-col">
 
-          <div className="mt-4 flex gap-3 sm:mt-0 flex-wrap">
-            <div className="flex flex-col items-center rounded-xl bg-white/10 px-4 py-2 backdrop-blur-sm border border-white/10">
-              <span className="text-xl font-bold text-white">{s.totalDeals}</span>
-              <span className="text-[11px] text-brand-300 mt-0.5">Total Deals</span>
+          <div className="flex w-full gap-4 sm:flex-row flex-col">
+            <div className="flex-1 flex flex-col items-center rounded-xl bg-white/10 px-4 py-3 backdrop-blur-sm border border-white/10">
+              <span className="text-2xl font-bold text-white">{s.totalDeals}</span>
+              <span className="text-xs text-brand-300 mt-1">Total Deals</span>
             </div>
-            <div className="flex flex-col items-center rounded-xl bg-white/10 px-4 py-2 backdrop-blur-sm border border-white/10">
-              <span className="text-xl font-bold" style={{ color: "hsl(42, 85%, 65%)" }}>
+            <div className="flex-1 flex flex-col items-center rounded-xl bg-white/10 px-4 py-3 backdrop-blur-sm border border-white/10">
+              <span className="text-2xl font-bold" style={{ color: "hsl(42, 85%, 65%)" }}>
                 {formatCurrency(s.totalPipelineRevenue)}
               </span>
-              <span className="text-[11px] text-brand-300 mt-0.5">Pipeline Value</span>
+              <span className="text-xs text-brand-300 mt-1">Pipeline Value</span>
             </div>
-            <div className="flex flex-col items-center rounded-xl bg-white/10 px-4 py-2 backdrop-blur-sm border border-white/10">
-              <span className="text-xl font-bold text-white">{s.pendingTasks}</span>
-              <span className="text-[11px] text-brand-300 mt-0.5">Open Tasks</span>
+            <div className="flex-1 flex flex-col items-center rounded-xl bg-white/10 px-4 py-3 backdrop-blur-sm border border-white/10">
+              <span className="text-2xl font-bold text-white">{s.pendingTasks}</span>
+              <span className="text-xs text-brand-300 mt-1">Open Tasks</span>
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* ── Email Follow-ups Due Today ───────────────────────────── */}
       <div className="rounded-xl border border-amber-200 bg-white shadow-sm overflow-hidden">

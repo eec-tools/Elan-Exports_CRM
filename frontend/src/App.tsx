@@ -27,7 +27,6 @@ import SupplierDetailsPage from "@/pages/SupplierDetailsPage";
 import BuyerDetailsPage from "@/pages/BuyerDetailsPage";
 import VaultPage from "@/pages/VaultPage";
 import DealsPage from "@/pages/DealsPage";
-import CompliancePage from "@/pages/CompliancePage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import { Loader2 } from "lucide-react";
 
@@ -171,7 +170,6 @@ export default function App() {
                   }
                 />
                 <Route path="deals" element={<DealsPage />} />
-                <Route path="compliance" element={<CompliancePage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
 
                 {/* Admin-only routes */}

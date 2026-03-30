@@ -197,6 +197,63 @@ export async function createSupplier(
       company: supplier.company,
     });
 
+    // --- NEW: AUTO-GENERATE REPORT ON CREATE ---
+    try {
+      let reportBuyer = supplier.contractBuyer || "";
+      const incomingIds: string[] = Array.isArray(req.body.buyerIds) ? req.body.buyerIds : [];
+      if (!reportBuyer && incomingIds.length > 0) {
+          const firstBuyer = await prisma.buyer.findUnique({ where: { id: incomingIds[0] } });
+          if (firstBuyer) reportBuyer = firstBuyer.company || firstBuyer.name || "";
+      }
+      if (!reportBuyer) reportBuyer = "Direct";
+      const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
+      
+      const reportProduct = supplier.products || "N/A";
+      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] Supplier Added.`;
+
+      const existingReport = await prisma.report.findFirst({
+          where: { 
+              productName: { equals: reportProduct, mode: "insensitive" }
+          },
+          orderBy: { createdAt: 'desc' }
+      });
+
+      const mergeStr = (a: string, b: string) => {
+          if (!b || b === "Direct" || b === "N/A") return a;
+          if (!a || a === "Direct" || a === "N/A") return b;
+          const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
+          return Array.from(s).filter(Boolean).join(", ");
+      };
+
+      if (existingReport && reportProduct !== "N/A") {
+          await prisma.report.update({
+              where: { id: existingReport.id },
+              data: {
+                  companyName: mergeStr(existingReport.companyName, supplier.company),
+                  buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
+                  status: mergeStr(existingReport.status, supplier.currentStatus || "Under Review"),
+                  keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
+                  updateDate: new Date()
+              }
+          });
+      } else {
+          await prisma.report.create({
+            data: {
+              productName: reportProduct,
+              buyerName: mappedBuyer,
+              companyName: supplier.company,
+              status: supplier.currentStatus || "Under Review",
+              keyUpdates: newUpdatePoint,
+              buyerSupplier: "Supplier",
+              reportDate: new Date(),
+              updateDate: new Date(),
+              createdBy: req.user!.id,
+            }
+          });
+      }
+    } catch(e) { console.error("Auto Report Gen Failed", e); }
+    // -------------------------------------------
+
     res.status(201).json(supplier);
   } catch (err) {
     console.error("Create supplier error:", err);
@@ -269,6 +326,74 @@ export async function updateSupplier(
     await logActivity(req.user!.id, "update", "suppliers", supplier.id, {
       company: supplier.company,
     });
+
+    // --- NEW: AUTO-GENERATE REPORT ---
+    const changedRemarks = existing.remarks !== updateData.remarks;
+    const changedStatus = existing.currentStatus !== updateData.currentStatus;
+
+    if (changedRemarks || changedStatus) {
+      let updatesText = "";
+      const parts = [];
+      if (changedStatus) parts.push(`Status changed to '${updateData.currentStatus}'`);
+      if (changedRemarks) parts.push(`Remarks: ${updateData.remarks || "(cleared)"}`);
+      updatesText += parts.join(" | ");
+
+      try {
+        let reportBuyer = supplier.contractBuyer || existing.contractBuyer || "";
+        if (!reportBuyer && Array.isArray(incomingIds) && incomingIds.length > 0) {
+            const firstBuyer = await prisma.buyer.findUnique({ where: { id: incomingIds[0] } });
+            if (firstBuyer) reportBuyer = firstBuyer.company || firstBuyer.name || "";
+        }
+        if (!reportBuyer) reportBuyer = "Direct";
+        const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
+        
+        const reportProduct = supplier.products || existing.products || "N/A";
+        
+        const existingReport = await prisma.report.findFirst({
+            where: { 
+                productName: { equals: reportProduct, mode: "insensitive" }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        const mergeStr = (a: string, b: string) => {
+            if (!b || b === "Direct" || b === "N/A") return a;
+            if (!a || a === "Direct" || a === "N/A") return b;
+            const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
+            return Array.from(s).filter(Boolean).join(", ");
+        };
+
+        const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] ${updatesText}`;
+        
+        if (existingReport && reportProduct !== "N/A") {
+            await prisma.report.update({
+                where: { id: existingReport.id },
+                data: {
+                    companyName: mergeStr(existingReport.companyName, supplier.company),
+                    buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
+                    status: mergeStr(existingReport.status, updateData.currentStatus || existing.currentStatus || "Status Updated"),
+                    keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
+                    updateDate: new Date()
+                }
+            });
+        } else {
+            await prisma.report.create({
+              data: {
+                productName: reportProduct,
+                buyerName: mappedBuyer,
+                companyName: supplier.company,
+                status: updateData.currentStatus || existing.currentStatus || "Status Updated",
+                keyUpdates: newUpdatePoint,
+                buyerSupplier: "Supplier",
+                reportDate: new Date(),
+                updateDate: new Date(),
+                createdBy: req.user!.id,
+              }
+            });
+        }
+      } catch(e) { console.error("Auto Report Gen Failed", e); }
+    }
+    // ---------------------------------
 
     if (updateData.currentStatus && existing.currentStatus !== updateData.currentStatus) {
       await createNotification({
@@ -450,6 +575,45 @@ export async function deleteSupplier(
     await logActivity(req.user!.id, "delete", "suppliers", supplierId, {
       company: existing.company,
     });
+
+    // --- NEW: AUTO-GENERATE REPORT CLEANUP ---
+    try {
+        const reportProduct = existing.products || "N/A";
+        if (reportProduct !== "N/A") {
+            const existingReport = await prisma.report.findFirst({
+                where: { productName: { equals: reportProduct, mode: "insensitive" } },
+                orderBy: { createdAt: 'desc' }
+            });
+            if (existingReport) {
+                const newCompany = existingReport.companyName.split(',').map((x: string) => x.trim()).filter((x: string) => x !== existing.company).join(', ');
+                const newBuyer = existingReport.buyerName.split(',').map((x: string) => x.trim()).filter((x: string) => !x.includes(`(${existing.company})`)).join(', ');
+                const newUpdate = `[${new Date().toLocaleDateString()}] [${existing.company}] Supplier Deleted from System.`;
+                const finalUpdates = existingReport.keyUpdates ? `${newUpdate}\n\n${existingReport.keyUpdates}` : newUpdate;
+
+                if (!newCompany) {
+                    await prisma.report.update({
+                        where: { id: existingReport.id },
+                        data: {
+                            companyName: "No Active Suppliers",
+                            buyerName: "None",
+                            status: "System Deleted",
+                            keyUpdates: finalUpdates
+                        }
+                    });
+                } else {
+                    await prisma.report.update({
+                        where: { id: existingReport.id },
+                        data: {
+                            companyName: newCompany,
+                            buyerName: newBuyer || "None",
+                            keyUpdates: finalUpdates
+                        }
+                    });
+                }
+            }
+        }
+    } catch(e) { console.error("Report Cleanup Failed", e); }
+    // ------------------------------------------
 
     res.json({ message: "Supplier deleted" });
   } catch (err) {

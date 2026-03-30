@@ -101,6 +101,7 @@ export default function ReportsPage() {
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewingReport, setViewingReport] = useState<Report | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -455,7 +456,7 @@ export default function ReportsPage() {
                 </tr>
               ) : (
                 items.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group align-top">
+                  <tr key={item.id} onClick={() => setViewingReport(item)} className="cursor-pointer hover:bg-slate-50/80 transition-colors group align-top">
                     <td className="px-5 py-4">
                       <div className="flex flex-col gap-2">
                         {item.productImageUrl ? (
@@ -532,7 +533,7 @@ export default function ReportsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-slate-400 hover:text-brand-600 hover:bg-brand-50"
-                            onClick={() => openEdit(item)}
+                            onClick={(e) => { e.stopPropagation(); openEdit(item); }}
                             title="Edit Report"
                           >
                             <Pencil className="h-4 w-4" />
@@ -541,7 +542,8 @@ export default function ReportsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setReportToDelete(item);
                               setDeleteDialogOpen(true);
                             }}
@@ -834,6 +836,131 @@ export default function ReportsPage() {
                   </Button>
               </div>
           </DialogContent>
+      </Dialog>
+
+      {/* ── View Report Details Modal ── */}
+      <Dialog open={!!viewingReport} onOpenChange={(open) => !open && setViewingReport(null)}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0 bg-white rounded-xl shadow-2xl border-none custom-scrollbar-light">
+           {viewingReport && (
+             <>
+               <div className="bg-slate-900 border-b border-slate-800 flex flex-col sm:flex-row relative">
+                 <Button 
+                   variant="ghost" 
+                   size="icon" 
+                   className="absolute right-4 top-4 text-slate-400 hover:text-white hover:bg-white/10"
+                   onClick={() => setViewingReport(null)}
+                 >
+                   <X className="h-5 w-5" />
+                 </Button>
+
+                 {/* Left: Image */}
+                 <div className="w-full sm:w-[280px] shrink-0 bg-slate-800/50 border-r border-slate-800 p-6 flex flex-col items-center justify-center min-h-[220px]">
+                    {viewingReport.productImageUrl ? (
+                        <div className="h-40 w-40 rounded-xl overflow-hidden border-4 border-slate-700 shadow-2xl">
+                           <img src={resolveImageUrl(viewingReport.productImageUrl)} alt="Product" className="h-full w-full object-cover" />
+                        </div>
+                    ) : (
+                        <div className="h-40 w-40 rounded-xl bg-slate-800/80 border-4 border-slate-700/50 flex flex-col items-center justify-center text-slate-500 shadow-xl">
+                            <PackageSearch className="h-10 w-10 mb-3 opacity-50" />
+                            <span className="text-[10px] uppercase font-bold tracking-widest">No Image</span>
+                        </div>
+                    )}
+                 </div>
+
+                 {/* Right: Header Details */}
+                 <div className="flex-1 p-8 flex flex-col justify-center">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-sm text-[10px] font-bold uppercase tracking-widest text-brand-300 bg-brand-900/40 w-fit mb-3 border border-brand-800/50">
+                       Product Specification
+                    </span>
+                    <h2 className="text-3xl font-bold text-white tracking-tight mb-4">
+                       {viewingReport.productName}
+                    </h2>
+                    
+                    <div className="grid grid-cols-2 gap-6 mt-2">
+                       <div>
+                          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1">Suppliers Attached</p>
+                          <p className="text-sm font-medium text-slate-200">
+                             {viewingReport.companyName.split(',').map((c, i) => (
+                               <span key={i} className="inline-block bg-slate-800 text-slate-300 px-2 py-1 rounded-md mb-1 mr-1 border border-slate-700">{c.trim()}</span>
+                             ))}
+                          </p>
+                       </div>
+                       <div>
+                          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1">Assigned Buyers</p>
+                          <p className="text-sm font-medium text-slate-200">
+                             {viewingReport.buyerName.split(',').map((c, i) => (
+                               <span key={i} className="inline-block bg-indigo-900/30 text-indigo-300 px-2 py-1 rounded-md mb-1 mr-1 border border-indigo-800/50">{c.trim()}</span>
+                             ))}
+                          </p>
+                       </div>
+                    </div>
+                 </div>
+               </div>
+
+               {/* Timeline Body */}
+               <div className="p-8 bg-slate-50 min-h-[300px]">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-6 flex items-center gap-2">
+                    <Clock className="h-4 w-4" /> Timeline of Updates
+                  </h3>
+                  
+                  <div className="space-y-6 pl-4 border-l-2 border-slate-200 relative">
+                     {(() => {
+                        if (!viewingReport.keyUpdates) return <p className="text-slate-400 italic pl-4">No updates recorded.</p>;
+                        
+                        // Parse updates into timeline blocks
+                        // Example line: "[03/30/2026] [Supplier Name] Status changed to 'Approved'"
+                        const lines = viewingReport.keyUpdates.split('\n').filter(l => l.trim().length > 0);
+                        
+                        return lines.map((line, idx) => {
+                           // Attempt to extract date and main text
+                           const dateMatch = line.match(/^\[(.*?)\]\s+(.*)/);
+                           let dateStr = "";
+                           let content = line;
+                           
+                           if (dateMatch) {
+                               dateStr = dateMatch[1];
+                               content = dateMatch[2];
+                           }
+
+                           // Attempt to extract supplier tag block from content
+                           const supplierMatch = content.match(/^\[(.*?)\]\s+(.*)/);
+                           let supplierTag = "";
+                           if (supplierMatch) {
+                               supplierTag = supplierMatch[1];
+                               content = supplierMatch[2];
+                           }
+                           
+                           return (
+                               <div key={idx} className="relative pl-6">
+                                 {/* Timeline Dot */}
+                                 <div className="absolute -left-[29px] top-1.5 h-3.5 w-3.5 rounded-full border-[3px] border-slate-50 bg-brand-500 shadow-sm ring-1 ring-slate-200" />
+                                 
+                                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex flex-wrap items-center gap-3 mb-2">
+                                       {dateStr && (
+                                           <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+                                             {dateStr}
+                                           </span>
+                                       )}
+                                       {supplierTag && (
+                                           <span className="text-xs font-bold uppercase tracking-wider text-brand-700 bg-brand-50 border border-brand-100 px-2.5 py-1 rounded-md flex items-center gap-1.5">
+                                             <Building2 className="h-3 w-3" /> {supplierTag}
+                                           </span>
+                                       )}
+                                    </div>
+                                    <p className="text-slate-700 leading-relaxed text-[15px]">
+                                       {content}
+                                    </p>
+                                 </div>
+                               </div>
+                           );
+                        });
+                     })()}
+                  </div>
+               </div>
+             </>
+           )}
+        </DialogContent>
       </Dialog>
     </div>
   );

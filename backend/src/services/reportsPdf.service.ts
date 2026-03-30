@@ -18,8 +18,51 @@ export async function generateBuyerReportsPdf(reports: Report[]): Promise<Buffer
    const date = value instanceof Date ? value : new Date(value as string);
    return Number.isNaN(date.getTime()) ? null : date;
   };
+
+  // Build buyer-supplier mapping
+  const buyerSupplierMap = new Map<string, Set<string>>();
+  const buyerStats = new Map<string, { count: number; suppliers: Set<string> }>();
   
-  // Create table rows
+  for (const report of reports) {
+    const buyer = safeText(report.buyerName);
+    const supplier = safeText(report.companyName);
+    
+    if (buyer !== "-" && supplier !== "-") {
+      if (!buyerSupplierMap.has(buyer)) {
+        buyerSupplierMap.set(buyer, new Set());
+      }
+      buyerSupplierMap.get(buyer)!.add(supplier);
+
+      if (!buyerStats.has(buyer)) {
+        buyerStats.set(buyer, { count: 0, suppliers: new Set() });
+      }
+      buyerStats.get(buyer)!.count++;
+      buyerStats.get(buyer)!.suppliers.add(supplier);
+    }
+  }
+
+  // Create buyer-supplier mapping table rows
+  let mappingTableRowsHtml = "";
+  const uniqueBuyers = Array.from(buyerSupplierMap.keys()).sort();
+  
+  for (const buyer of uniqueBuyers) {
+    const suppliers = Array.from(buyerSupplierMap.get(buyer)!).sort();
+    const stats = buyerStats.get(buyer)!;
+    
+    for (let i = 0; i < suppliers.length; i++) {
+      const isFirstSupplier = i === 0;
+      
+      mappingTableRowsHtml += `
+        <tr>
+          ${isFirstSupplier ? `<td class="buyer-cell" rowspan="${suppliers.length}"><strong>${buyer}</strong><br/><span class="supplier-count">${stats.count} mapping(s)</span></td>` : ""}
+          <td class="supplier-cell">${suppliers[i]}</td>
+          <td class="count-cell">${reports.filter(r => safeText(r.buyerName) === buyer && safeText(r.companyName) === suppliers[i]).length}</td>
+        </tr>
+      `;
+    }
+  }
+
+  // Create main table rows
   let tableRowsHtml = "";
   
   for (const report of reports) {
