@@ -1,0 +1,1 @@
+-- Baseline: schema already applied via prisma db push
