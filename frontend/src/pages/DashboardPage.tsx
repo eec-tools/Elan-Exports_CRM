@@ -76,6 +76,14 @@ function formatCurrency(n: number | null | undefined) {
   return `$${v.toFixed(0)}`;
 }
 
+function formatDate() {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
+}
 
 // ─── Stage config ────────────────────────────────────────────────────
 const STAGE_META: Record<string, { label: string; color: string; bar: string }> = {
