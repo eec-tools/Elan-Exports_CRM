@@ -129,6 +129,7 @@ export function streamNotifications(req: AuthRequest, res: Response) {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering for SSE
   res.flushHeaders();
 
   // Send an initial connected event
@@ -136,7 +137,17 @@ export function streamNotifications(req: AuthRequest, res: Response) {
 
   addClient(userId, res);
 
+  // Heartbeat every 25s to prevent AWS/nginx idle timeout from dropping the connection
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(": ping\n\n");
+    } catch {
+      clearInterval(heartbeat);
+    }
+  }, 25000);
+
   req.on("close", () => {
+    clearInterval(heartbeat);
     removeClient(userId, res);
   });
 }

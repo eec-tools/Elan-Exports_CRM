@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
+import { EntityLinkSelect } from "@/components/EntityLinkSelect";
 import { SelectWithOthers } from "@/components/SelectWithOthers";
 import {
   useSensitiveDataUnlock,
@@ -68,6 +69,7 @@ interface Supplier {
   lidlFactoryId?: string;
   commissionPercent?: string;
   contractBuyer?: string;
+  buyerIds?: string[];
   approvedConfirmPercent?: string;
   products?: string;
   country?: string;
@@ -264,6 +266,13 @@ export default function SupplierDetailsPage() {
     enabled: !!id,
   });
 
+  const { data: buyersListData, isLoading: buyersListLoading } = useQuery<{ id: string; company: string; name: string }[]>({
+    queryKey: ["buyers-list"],
+    queryFn: () => api.get("/buyers/list").then((r) => r.data),
+    staleTime: 60_000,
+    enabled: !!(supplier?.buyerIds?.length || dialogOpen),
+  });
+
   const startCampaignMutation = useMutation({
     mutationFn: () => api.post(`/intro-campaigns/${id}/start`),
     onSuccess: () => {
@@ -309,6 +318,8 @@ export default function SupplierDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["supplier", id] });
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-filters"] });
+      queryClient.invalidateQueries({ queryKey: ["buyer"] });
+      queryClient.invalidateQueries({ queryKey: ["buyers"] });
       setDialogOpen(false);
       toast.success("Supplier updated");
     },
@@ -554,6 +565,36 @@ export default function SupplierDetailsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
+            {(supplier.buyerIds ?? []).length > 0 && (
+              <div className="flex items-start gap-3 py-2">
+                <Building2 className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground">Contract Buyers</p>
+                  {!isUnlocked ? (
+                    <div className="mt-1">
+                      <span className="font-mono tracking-widest text-muted-foreground opacity-60">
+                        ••••••••••••••••
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {(supplier.buyerIds ?? []).map((buyerId) => {
+                        const buyer = buyersListData?.find((b) => b.id === buyerId);
+                        return (
+                          <Link
+                            key={buyerId}
+                            to={`/buyers/${buyerId}`}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 border border-brand-200 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 transition-colors"
+                          >
+                            {buyer ? `${buyer.company}${buyer.name ? ` (${buyer.name})` : ""}` : buyerId.slice(0, 8)}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <InfoRow
               icon={Building2}
               label="Contract Buyer"
@@ -1253,7 +1294,20 @@ export default function SupplierDetailsPage() {
             {/* ── Commercial & Export ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Commercial & Export Terms</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Contract Buyer</Label><Input value={form.contractBuyer ?? ""} onChange={(e) => setForm({ ...form, contractBuyer: e.target.value })} /></div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Contract Buyer(s)</Label>
+                <EntityLinkSelect
+                  selectedIds={form.buyerIds ?? []}
+                  onChange={(ids) => setForm({ ...form, buyerIds: ids })}
+                  options={(buyersListData ?? []).map((b) => ({
+                    id: b.id,
+                    label: `${b.company}${b.name ? ` (${b.name})` : ""}`,
+                  }))}
+                  isLoading={buyersListLoading}
+                  placeholder="Select contract buyer(s)…"
+                />
+              </div>
+              <div className="space-y-2"><Label>Contract Buyer (legacy)</Label><Input value={form.contractBuyer ?? ""} onChange={(e) => setForm({ ...form, contractBuyer: e.target.value })} /></div>
               <div className="space-y-2"><Label>Commission %</Label><Input value={form.commissionPercent ?? ""} onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })} /></div>
               <div className="space-y-2"><Label>Approved Confirm %</Label><Input value={form.approvedConfirmPercent ?? ""} onChange={(e) => setForm({ ...form, approvedConfirmPercent: e.target.value })} /></div>
               <div className="space-y-2"><Label>Currency Preferred</Label><Input value={form.currencyPreferred ?? ""} onChange={(e) => setForm({ ...form, currencyPreferred: e.target.value })} placeholder="e.g. USD, EUR" /></div>
