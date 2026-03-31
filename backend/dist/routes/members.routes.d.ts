@@ -1,3 +1,0 @@
-declare const router: import("express-serve-static-core").Router;
-export default router;
-//# sourceMappingURL=members.routes.d.ts.map
