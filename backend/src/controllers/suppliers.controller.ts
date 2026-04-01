@@ -3,6 +3,7 @@ import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
 import { createNotification } from "../services/notificationService.js";
+import { syncSupplierDocsToVault } from "../services/vaultSync.service.js";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -260,6 +261,21 @@ export async function createSupplier(
     } catch (e) { console.error("Auto Report Gen Failed", e); }
     // -------------------------------------------
 
+    // --- VAULT SYNC: auto-create folders ---
+    try {
+      const docs = (supplier as any).documents;
+      const supplierProducts = (supplier as any).supplierProducts;
+      const contractDoc = (supplier as any).contractDocument;
+      const productCatalogs = (supplier as any).productCatalogs;
+      await syncSupplierDocsToVault(supplier.company, {
+        certificates: Array.isArray(docs) ? docs : [],
+        productCatalogs: Array.isArray(productCatalogs) ? productCatalogs : [],
+        warehousePhotos: [],
+        contractDocument: contractDoc && contractDoc.url ? contractDoc : null,
+      }, req.user!.id);
+    } catch(e) { console.error("Vault Sync Failed", e); }
+    // ---------------------------------------
+
     res.status(201).json(supplier);
   } catch (err) {
     console.error("Create supplier error:", err);
@@ -408,6 +424,20 @@ export async function updateSupplier(
       } catch (e) { console.error("Auto Report Gen Failed", e); }
     }
     // ---------------------------------
+
+    // --- VAULT SYNC: auto-create folders ---
+    try {
+      const docs = (supplier as any).documents;
+      const contractDoc = (supplier as any).contractDocument;
+      const productCatalogs = (supplier as any).productCatalogs;
+      await syncSupplierDocsToVault(supplier.company, {
+        certificates: Array.isArray(docs) ? docs : [],
+        productCatalogs: Array.isArray(productCatalogs) ? productCatalogs : [],
+        warehousePhotos: [],
+        contractDocument: contractDoc && contractDoc.url ? contractDoc : null,
+      }, req.user!.id);
+    } catch(e) { console.error("Vault Sync Failed", e); }
+    // ---------------------------------------
 
     if (updateData.currentStatus && existing.currentStatus !== updateData.currentStatus) {
       await createNotification({

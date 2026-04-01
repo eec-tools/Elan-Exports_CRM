@@ -2,6 +2,8 @@ import { Router } from "express";
 import {
   listDocuments,
   getCategories,
+  getBreadcrumbs,
+  createFolder,
   uploadDocument,
   editDocument,
   deleteDocument,
@@ -17,8 +19,10 @@ router.use(authenticate);
 // Read – all authenticated users
 router.get("/", listDocuments);
 router.get("/categories", getCategories);
+router.get("/breadcrumbs/:id", getBreadcrumbs);
 
 // Write – admin only
+router.post("/folder", requireAdmin, createFolder);
 router.post("/upload", requireAdmin, upload.single("file"), uploadDocument);
 router.put("/:id", requireAdmin, editDocument);
 router.delete("/:id", requireAdmin, deleteDocument);

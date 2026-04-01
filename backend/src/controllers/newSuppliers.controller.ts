@@ -3,6 +3,7 @@ import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
 import { createNotification } from "../services/notificationService.js";
+import { syncSupplierDocsToVault } from "../services/vaultSync.service.js";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -352,6 +353,16 @@ export async function createNewSupplier(
         } catch(e) { console.error("Auto Report Gen Failed", e); }
         // -------------------------------------------
 
+        // --- VAULT SYNC: auto-create folders ---
+        try {
+            await syncSupplierDocsToVault(supplier.company, {
+                certificates: supplier.certificates as any[] ?? [],
+                productCatalogs: supplier.productCatalogs as any[] ?? [],
+                warehousePhotos: supplier.warehousePhotos as any[] ?? [],
+            }, req.user!.id);
+        } catch(e) { console.error("Vault Sync Failed", e); }
+        // ---------------------------------------
+
         res.status(201).json(supplier);
     } catch (err) {
         console.error("Create new supplier error:", err);
@@ -549,6 +560,16 @@ export async function updateNewSupplier(
             } catch(e) { console.error("Auto Report Gen Failed", e); }
         }
         // ---------------------------------
+
+        // --- VAULT SYNC: auto-create folders ---
+        try {
+            await syncSupplierDocsToVault(supplier.company, {
+                certificates: supplier.certificates as any[] ?? [],
+                productCatalogs: supplier.productCatalogs as any[] ?? [],
+                warehousePhotos: supplier.warehousePhotos as any[] ?? [],
+            }, req.user!.id);
+        } catch(e) { console.error("Vault Sync Failed", e); }
+        // ---------------------------------------
 
         if (currentStatus && existing.currentStatus !== currentStatus) {
           await createNotification({

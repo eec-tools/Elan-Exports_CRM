@@ -65,33 +65,48 @@ function deriveFileType(mimetype: string): string {
 
 // ─── Controllers ────────────────────────────────────
 
-/** GET /api/vault - list all vault documents (optional ?category=) */
+/** GET /api/vault - list documents/folders in a given parent (or root) */
 export async function listDocuments(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
   try {
-    const { category, search } = req.query as {
+    const { category, search, parentId } = req.query as {
       category?: string;
       search?: string;
+      parentId?: string;
     };
 
     const where: any = {};
-    if (category && category !== "all") where.category = category;
+
+    // If searching, search across everything (not scoped to parent)
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
         { category: { contains: search, mode: "insensitive" } },
         { region: { contains: search, mode: "insensitive" } },
       ];
+    } else {
+      // Scope to parent folder (null = root)
+      if (parentId) {
+        where.parentId = parentId;
+      } else {
+        where.parentId = null;
+      }
     }
+
+    if (category && category !== "all") where.category = category;
 
     const documents = await prisma.vaultDocument.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: [
+        { isFolder: "desc" }, // folders first
+        { name: "asc" },
+      ],
       include: {
         uploader: { select: { fullName: true, email: true } },
+        _count: { select: { children: true } },
       },
     });
 
@@ -125,6 +140,78 @@ export async function getCategories(
   }
 }
 
+/** GET /api/vault/breadcrumbs/:id - get ancestor chain for breadcrumbs */
+export async function getBreadcrumbs(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { id } = req.params;
+    const crumbs: { id: string; name: string }[] = [];
+
+    let currentId: string | null = id as string;
+    let safety = 20; // prevent infinite loops
+
+    while (currentId && safety-- > 0) {
+      const doc: any = await prisma.vaultDocument.findUnique({
+        where: { id: currentId },
+        select: { id: true, name: true, parentId: true },
+      });
+      if (!doc) break;
+      crumbs.unshift({ id: doc.id, name: doc.name });
+      currentId = doc.parentId as string | null;
+    }
+
+    res.json(crumbs);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /api/vault/folder - create a new folder */
+export async function createFolder(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { name, parentId, category } = req.body;
+    if (!name) {
+      res.status(400).json({ error: "Folder name is required" });
+      return;
+    }
+
+    const userId = (req as any).user?.id;
+
+    // Determine category: inherit from parent if applicable
+    let folderCategory = category || "General";
+    if (parentId) {
+      const parent = await prisma.vaultDocument.findUnique({ where: { id: parentId } });
+      if (parent) folderCategory = parent.category;
+    }
+
+    const folder = await prisma.vaultDocument.create({
+      data: {
+        name,
+        category: folderCategory,
+        region: "Global",
+        isFolder: true,
+        parentId: parentId || null,
+        uploadedBy: userId ?? null,
+      },
+      include: {
+        uploader: { select: { fullName: true, email: true } },
+        _count: { select: { children: true } },
+      },
+    });
+
+    res.status(201).json(folder);
+  } catch (err) {
+    next(err);
+  }
+}
+
 /** POST /api/vault/upload - upload a new document */
 export async function uploadDocument(
   req: Request,
@@ -138,7 +225,7 @@ export async function uploadDocument(
       return;
     }
 
-    const { name, category, region } = req.body;
+    const { name, category, region, parentId } = req.body;
     if (!name || !category) {
       res.status(400).json({ error: "Name and category are required" });
       return;
@@ -154,10 +241,13 @@ export async function uploadDocument(
         fileUrl: file.path || file.secure_url || file.url,
         publicId: file.filename || file.public_id,
         fileType: deriveFileType(file.mimetype),
+        isFolder: false,
+        parentId: parentId || null,
         uploadedBy: userId ?? null,
       },
       include: {
         uploader: { select: { fullName: true, email: true } },
+        _count: { select: { children: true } },
       },
     });
 
@@ -192,6 +282,7 @@ export async function editDocument(
       },
       include: {
         uploader: { select: { fullName: true, email: true } },
+        _count: { select: { children: true } },
       },
     });
 
@@ -201,7 +292,7 @@ export async function editDocument(
   }
 }
 
-/** DELETE /api/vault/:id - delete a document and its Cloudinary file */
+/** DELETE /api/vault/:id - delete a document/folder and its Cloudinary file */
 export async function deleteDocument(
   req: Request,
   res: Response,
@@ -216,15 +307,18 @@ export async function deleteDocument(
       return;
     }
 
-    // Remove from Cloudinary
-    try {
-      await cloudinary.uploader.destroy(existing.publicId, {
-        resource_type: existing.fileType === "image" ? "image" : "raw",
-      });
-    } catch {
-      // File may already be removed from Cloudinary; continue
+    // If it's a file, remove from Cloudinary
+    if (!existing.isFolder && existing.publicId) {
+      try {
+        await cloudinary.uploader.destroy(existing.publicId, {
+          resource_type: existing.fileType === "image" ? "image" : "raw",
+        });
+      } catch {
+        // File may already be removed from Cloudinary; continue
+      }
     }
 
+    // Cascade delete is handled by Prisma relation (onDelete: Cascade)
     await prisma.vaultDocument.delete({ where: { id: id as string } });
 
     res.json({ message: "Document deleted successfully" });
