@@ -3,6 +3,7 @@ import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
 import { generateBuyerReportsPdf } from "../services/reportsPdf.service.js";
+import { generateBuyerReportsExcel } from "../services/reportsExcel.service.js";
 
 /**
  * GET /api/reports
@@ -234,5 +235,59 @@ export async function exportPdf(
   } catch (err) {
     console.error("Export PDF error:", err);
     res.status(500).json({ error: "Internal server error generating PDF" });
+  }
+}
+
+/**
+ * GET /api/reports/export/excel
+ */
+export async function exportExcel(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const { buyerSupplier, from, to } = req.query as Record<string, string>;
+
+    const where: any = {};
+    if (buyerSupplier) {
+      where.buyerSupplier = buyerSupplier;
+    }
+    if (from || to) {
+      where.reportDate = {};
+      if (from) where.reportDate.gte = new Date(from);
+      if (to) where.reportDate.lte = new Date(to);
+    }
+
+    const reports = await prisma.report.findMany({
+      where,
+      orderBy: [
+         { buyerName: "asc" },
+         { reportDate: "desc" }
+      ],
+    });
+
+    if (reports.length === 0) {
+      res.status(404).json({ error: "No reports found to export" });
+      return;
+    }
+
+    const excelBuffer = await generateBuyerReportsExcel(reports);
+
+    res.set({
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="buyer-reports-export.xlsx"`,
+      "Content-Length": String(excelBuffer.length),
+    });
+
+    res.send(excelBuffer);
+    
+    // Log export asynchronously without impacting the response.
+    if (req.user?.id) {
+      logActivity(req.user.id, "export", "reports", "excel", {}).catch(console.error);
+    }
+
+  } catch (err) {
+    console.error("Export Excel error:", err);
+    res.status(500).json({ error: "Internal server error generating Excel" });
   }
 }

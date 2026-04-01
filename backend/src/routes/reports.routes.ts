@@ -7,6 +7,7 @@ import {
   updateReport,
   deleteReport,
   exportPdf,
+  exportExcel,
 } from "../controllers/reports.controller.js";
 import {
   authenticate,
@@ -53,6 +54,7 @@ router.use(authenticate, requirePermission("reports"));
 
 router.get("/", listReports);
 router.get("/export/pdf", exportPdf);
+router.get("/export/excel", exportExcel);
 
 router.post(
   "/",

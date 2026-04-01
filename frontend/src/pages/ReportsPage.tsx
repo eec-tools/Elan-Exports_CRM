@@ -48,7 +48,8 @@ import {
   CheckCircle2,
   Clock,
   LayoutGrid,
-  Loader2
+  Loader2,
+  FileSpreadsheet
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -292,6 +293,40 @@ export default function ReportsPage() {
     }
   };
 
+  const downloadExcel = async () => {
+    if (!items.length) {
+      toast.error("No reports to download in the current view.");
+      return;
+    }
+
+    try {
+      toast.loading("Generating Excel Spreadsheet...");
+      const res = await api.get("/reports/export/excel", {
+        params: {
+          search,
+          from: filterFrom ? format(filterFrom, "yyyy-MM-dd") : undefined,
+          to: filterTo ? format(filterTo, "yyyy-MM-dd") : undefined,
+        },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "buyer-reports-export.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.dismiss();
+      toast.success("Excel downloaded successfully");
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.response?.data?.error || "Failed to generate Excel");
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "completed":
@@ -325,6 +360,10 @@ export default function ReportsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={downloadExcel} className="gap-2 bg-white hover:bg-slate-50 text-brand-700 shadow-sm border-brand-200 hover:border-brand-300 h-9">
+            <FileSpreadsheet className="h-4 w-4" />
+            Export Excel
+          </Button>
           <Button variant="outline" onClick={downloadPdf} className="gap-2 bg-white hover:bg-slate-50 text-slate-700 shadow-sm border-slate-200 h-9">
             <Download className="h-4 w-4" />
             Export PDF
@@ -484,9 +523,9 @@ export default function ReportsPage() {
                             <span className="font-semibold text-slate-900 truncate block">{item.buyerName}</span>
                          </div>
                          <div>
-                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-0.5 mt-1">SUPPLIER</span>
-                            <span className="text-slate-600 text-[13px] font-medium flex items-center gap-1.5 truncate">
-                               <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
+                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-0.5 mt-2">SUPPLIER</span>
+                            <span className="font-semibold text-slate-900 truncate flex items-center gap-1.5 block">
+                               <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
                                <span className="truncate">{item.companyName}</span>
                             </span>
                          </div>
