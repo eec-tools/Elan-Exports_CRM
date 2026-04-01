@@ -98,6 +98,7 @@ interface Supplier {
   contactPerson?: string;
   phone?: string;
   companyAddress?: string;
+  dealStage?: string;
   email?: string;
   website?: string;
   productCatalogShared?: string;
@@ -200,6 +201,19 @@ interface Supplier {
 const ORGANIC_CERT_MARKETS = ["India — NPOP", "USA — USDA Organic (NOP)", "EU — EU Organic (Reg 2018/848)", "UK — UK Organic", "Australia — ACO / NASAA", "Japan — JAS Organic"];
 const LAB_TEST_TYPES = ["Pesticide Residue Analysis", "Heavy Metals Test", "Microbiology Test", "Aflatoxin Test", "Moisture Analysis"];
 
+const DEAL_STAGES = [
+  "Communication",
+  "Sampling",
+  "Quotation",
+  "Negotiation with EEC",
+  "Price quotation to Buyer after EEC approval",
+  "Negotiation with buyer",
+  "Price approval by buyer",
+  "Quotation send to the supplier from buyer end",
+  "Orders confirmed from buyers end",
+  "Timeline (Product shipping.. etc) should be established from suppliers end",
+];
+
 const FOLLOWUP_LABELS: Record<number, string> = {
   1: "Follow-up 1 Due",
   2: "Follow-up 2 Due",
@@ -297,16 +311,16 @@ export default function SuppliersPage() {
     queryFn: () =>
       api
         .get("/suppliers", {
-          params: { 
-            search, 
-            status: statusFilter !== "all" ? statusFilter : undefined, 
+          params: {
+            search,
+            status: statusFilter !== "all" ? statusFilter : undefined,
             country: countryFilter !== "all" ? countryFilter : undefined,
             products: productFilter !== "all" ? productFilter : undefined,
             certifications: certificationFilter !== "all" ? certificationFilter : undefined,
             dateFrom: dateFrom || undefined,
             dateTo: dateTo || undefined,
-            page, 
-            limit: 20 
+            page,
+            limit: 20
           },
         })
         .then((r) => r.data),
@@ -651,16 +665,16 @@ export default function SuppliersPage() {
 
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-md px-2 h-9">
             <span className="text-xs font-medium text-slate-500">Date:</span>
-            <input 
-              type="date" 
-              value={dateFrom} 
+            <input
+              type="date"
+              value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
               className="text-xs bg-transparent border-none p-0 focus:ring-0 w-24 text-slate-700 outline-none"
             />
             <span className="text-slate-300">-</span>
-            <input 
-              type="date" 
-              value={dateTo} 
+            <input
+              type="date"
+              value={dateTo}
               onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
               className="text-xs bg-transparent border-none p-0 focus:ring-0 w-24 text-slate-700 outline-none"
             />
@@ -692,6 +706,7 @@ export default function SuppliersPage() {
                 <th className="px-5 py-3.5 font-semibold">Certifications</th>
                 <th className="px-5 py-3.5 font-semibold">Remarks</th>
                 <th className="px-5 py-3.5 font-semibold">Status</th>
+                <th className="px-5 py-3.5 font-semibold">Deal Stage</th>
                 <th className="px-5 py-3.5 font-semibold">Stage</th>
                 <th className="px-5 py-3.5 font-semibold">Intro Email</th>
                 {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
@@ -699,16 +714,16 @@ export default function SuppliersPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading && suppliers.length === 0 ? (
-                 <tr>
-                 <td colSpan={canEdit ? 11 : 10} className="h-32 text-center">
-                   <div className="flex justify-center">
-                     <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
-                   </div>
-                 </td>
-               </tr>
+                <tr>
+                  <td colSpan={canEdit ? 12 : 11} className="h-32 text-center">
+                    <div className="flex justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
+                    </div>
+                  </td>
+                </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 11 : 10} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                  <td colSpan={canEdit ? 12 : 11} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                         <Building2 className="h-6 w-6 text-slate-300" />
@@ -739,25 +754,43 @@ export default function SuppliersPage() {
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.remarks}>{s.remarks}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusStyles(s.currentStatus)} capitalize`}>
-                          <StatusIcon status={s.currentStatus} className="h-3 w-3 mr-1.5" />
-                          {s.currentStatus || "Active"}
+                        <StatusIcon status={s.currentStatus} className="h-3 w-3 mr-1.5" />
+                        {s.currentStatus || "Active"}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
-                        <Select
-                            value={s.supplierStage || "Signed"}
-                            onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
-                            disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
-                        >
-                            <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[110px]">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Onboarding">Onboarding</SelectItem>
-                                <SelectItem value="Signed">Signed</SelectItem>
-                                <SelectItem value="Closed">Closed</SelectItem>
-                            </SelectContent>
-                        </Select>
+                      <Select
+                        value={s.dealStage || "Communication"}
+                        onValueChange={(val) => {
+                          updateMutation.mutate({ id: s.id, d: { dealStage: val } });
+                        }}
+                        disabled={updateMutation.isPending}
+                      >
+                        <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DEAL_STAGES.map((stage) => (
+                            <SelectItem key={stage} value={stage}>{stage}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
+                      <Select
+                        value={s.supplierStage || "Signed"}
+                        onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
+                        disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
+                      >
+                        <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[110px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Onboarding">Onboarding</SelectItem>
+                          <SelectItem value="Signed">Signed</SelectItem>
+                          <SelectItem value="Closed">Closed</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </td>
                     <td className="px-5 py-3.5 border-r border-slate-100">
                       <EmailCampaignBadge campaign={campaignMap.get(s.id)} />
@@ -816,56 +849,56 @@ export default function SuppliersPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6 bg-white rounded-xl shadow-2xl border-none custom-scrollbar-light">
           <div className="flex items-center gap-4 mb-2">
-             <div className="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center shrink-0 border border-brand-200">
-                 <Building2 className="h-5 w-5 text-brand-600" />
-             </div>
-             <div>
-                 <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
-                   {editing?.id ? "Edit Supplier" : "Register New Supplier"}
-                 </DialogTitle>
-                 <DialogDescription className="text-slate-500 mt-1">
-                   Fill in the details below to {editing?.id ? "update the" : "create a new"} supplier record.
-                 </DialogDescription>
-             </div>
+            <div className="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center shrink-0 border border-brand-200">
+              <Building2 className="h-5 w-5 text-brand-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
+                {editing?.id ? "Edit Supplier" : "Register New Supplier"}
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">
+                Fill in the details below to {editing?.id ? "update the" : "create a new"} supplier record.
+              </DialogDescription>
+            </div>
           </div>
           <form onSubmit={handleSubmit} className="space-y-6 mt-4">
 
             {/* ── Basic Info ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Basic Info</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Company *</Label><Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} required /></div>
-              <div className="space-y-2"><Label>Trade / Brand Name</Label><Input value={form.tradeName ?? ""} onChange={(e) => setForm({ ...form, tradeName: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Year Established</Label><Input value={form.yearEstablished ?? ""} onChange={(e) => setForm({ ...form, yearEstablished: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Country</Label><Input list="list-country" value={form.country ?? ""} onChange={(e) => setForm({ ...form, country: e.target.value })} /><datalist id="list-country">{filters?.countries?.map((c: string) => <option key={c} value={c} />)}</datalist></div>
-              <div className="space-y-2"><Label>City</Label><Input value={form.city ?? ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
-              <div className="space-y-2"><Label>State / Province</Label><Input value={form.state ?? ""} onChange={(e) => setForm({ ...form, state: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Postal Code</Label><Input value={form.postalCode ?? ""} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Supplier Type</Label><MultiSelectDropdown value={form.supplierType ?? ""} onChange={(v) => setForm({ ...form, supplierType: v })} options={["Manufacturer","Trader","Processor","Aggregator","Farmer Producer Organisation (FPO)"]} placeholder="Select supplier type(s)…" /></div>
-              <div className="space-y-2"><Label>Website</Label><Input value={form.website ?? ""} onChange={(e) => setForm({ ...form, website: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Lidl Factory ID</Label><Input value={form.lidlFactoryId ?? ""} onChange={(e) => setForm({ ...form, lidlFactoryId: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Company Address</Label><Textarea value={form.companyAddress ?? ""} onChange={(e) => setForm({ ...form, companyAddress: e.target.value })} rows={2} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Manufacturing / Processing Facility Address</Label><Textarea value={form.manufacturingAddress ?? ""} onChange={(e) => setForm({ ...form, manufacturingAddress: e.target.value })} rows={2} /></div>
-            </div></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label>Company *</Label><Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} required /></div>
+                <div className="space-y-2"><Label>Trade / Brand Name</Label><Input value={form.tradeName ?? ""} onChange={(e) => setForm({ ...form, tradeName: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Year Established</Label><Input value={form.yearEstablished ?? ""} onChange={(e) => setForm({ ...form, yearEstablished: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Country</Label><Input list="list-country" value={form.country ?? ""} onChange={(e) => setForm({ ...form, country: e.target.value })} /><datalist id="list-country">{filters?.countries?.map((c: string) => <option key={c} value={c} />)}</datalist></div>
+                <div className="space-y-2"><Label>City</Label><Input value={form.city ?? ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+                <div className="space-y-2"><Label>State / Province</Label><Input value={form.state ?? ""} onChange={(e) => setForm({ ...form, state: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Postal Code</Label><Input value={form.postalCode ?? ""} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Supplier Type</Label><MultiSelectDropdown value={form.supplierType ?? ""} onChange={(v) => setForm({ ...form, supplierType: v })} options={["Manufacturer", "Trader", "Processor", "Aggregator", "Farmer Producer Organisation (FPO)"]} placeholder="Select supplier type(s)…" /></div>
+                <div className="space-y-2"><Label>Website</Label><Input value={form.website ?? ""} onChange={(e) => setForm({ ...form, website: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Lidl Factory ID</Label><Input value={form.lidlFactoryId ?? ""} onChange={(e) => setForm({ ...form, lidlFactoryId: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Company Address</Label><Textarea value={form.companyAddress ?? ""} onChange={(e) => setForm({ ...form, companyAddress: e.target.value })} rows={2} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Manufacturing / Processing Facility Address</Label><Textarea value={form.manufacturingAddress ?? ""} onChange={(e) => setForm({ ...form, manufacturingAddress: e.target.value })} rows={2} /></div>
+              </div></div>
 
             <Separator />
 
             {/* ── Contact Details ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Contact Details</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Contact Person</Label><Input value={form.contactPerson ?? ""} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-              <div className="space-y-2"><Label>WhatsApp</Label><Input value={form.whatsapp ?? ""} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="With country code" /></div>
-              <div className="space-y-2"><Label>Email</Label><Input type="text" value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Current Status</Label>
-                <Select value={form.currentStatus ?? "Under Review"} onValueChange={(v) => setForm({ ...form, currentStatus: v })}>
-                  <SelectTrigger className="bg-white"><SelectValue placeholder="Select Status" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Signed">Signed</SelectItem><SelectItem value="Active">Active</SelectItem><SelectItem value="Inactive">Inactive</SelectItem><SelectItem value="Under Review">Under Review</SelectItem>
-                    {filters?.statuses?.filter((s: string) => !["Signed","Active","Inactive","Under Review"].includes(s)).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label>Contact Person</Label><Input value={form.contactPerson ?? ""} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+                <div className="space-y-2"><Label>WhatsApp</Label><Input value={form.whatsapp ?? ""} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="With country code" /></div>
+                <div className="space-y-2"><Label>Email</Label><Input type="text" value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Current Status</Label>
+                  <Select value={form.currentStatus ?? "Under Review"} onValueChange={(v) => setForm({ ...form, currentStatus: v })}>
+                    <SelectTrigger className="bg-white"><SelectValue placeholder="Select Status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Signed">Signed</SelectItem><SelectItem value="Active">Active</SelectItem><SelectItem value="Inactive">Inactive</SelectItem><SelectItem value="Under Review">Under Review</SelectItem>
+                      {filters?.statuses?.filter((s: string) => !["Signed", "Active", "Inactive", "Under Review"].includes(s)).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div></div>
 
             <Separator />
 
@@ -895,7 +928,7 @@ export default function SuppliersPage() {
                     <div className="space-y-1.5"><Label className="text-xs">Product Name / Description</Label><Input className="h-8 text-sm" value={prod.product} onChange={(e) => updateProduct(i, "product", e.target.value)} placeholder="e.g. Organic Basmati Rice" /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Product Category</Label><Input className="h-8 text-sm" value={prod.productCategory} onChange={(e) => updateProduct(i, "productCategory", e.target.value)} placeholder="e.g. Rice, Spices" /></div>
                     <div className="space-y-1.5"><Label className="text-xs">HS Code (6–8 digit)</Label><Input className="h-8 text-sm" value={prod.hsCode} onChange={(e) => updateProduct(i, "hsCode", e.target.value)} placeholder="e.g. 100630" /></div>
-                    <div className="space-y-1.5"><Label className="text-xs">Organic Status</Label><SelectWithOthers value={prod.organicStatus} onChange={(v) => updateProduct(i, "organicStatus", v)} options={["Certified Organic","In Conversion","Conventional"]} placeholder="Select…" /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">Organic Status</Label><SelectWithOthers value={prod.organicStatus} onChange={(v) => updateProduct(i, "organicStatus", v)} options={["Certified Organic", "In Conversion", "Conventional"]} placeholder="Select…" /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Certifications</Label><Input className="h-8 text-sm" value={prod.certifications} onChange={(e) => updateProduct(i, "certifications", e.target.value)} placeholder="e.g. USDA, EU Organic" /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Shelf Life (months)</Label><Input className="h-8 text-sm" value={prod.shelfLife} onChange={(e) => updateProduct(i, "shelfLife", e.target.value)} /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Storage Conditions</Label><Input className="h-8 text-sm" value={prod.storageConditions} onChange={(e) => updateProduct(i, "storageConditions", e.target.value)} /></div>
@@ -912,206 +945,210 @@ export default function SuppliersPage() {
 
             {/* ── Samples ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Samples</p>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2"><Label>Sample Available?</Label><SelectWithOthers value={form.sampleAvailable ?? ""} onChange={(v) => setForm({ ...form, sampleAvailable: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Sample Lead Time (days)</Label><Input value={form.sampleLeadTime ?? ""} onChange={(e) => setForm({ ...form, sampleLeadTime: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Sample Cost</Label><Input value={form.sampleCost ?? ""} onChange={(e) => setForm({ ...form, sampleCost: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-3"><Label>Sample Policy (additional notes)</Label><Input value={form.samplePolicy ?? ""} onChange={(e) => setForm({ ...form, samplePolicy: e.target.value })} /></div>
-            </div></div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2"><Label>Sample Available?</Label><SelectWithOthers value={form.sampleAvailable ?? ""} onChange={(v) => setForm({ ...form, sampleAvailable: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>Sample Lead Time (days)</Label><Input value={form.sampleLeadTime ?? ""} onChange={(e) => setForm({ ...form, sampleLeadTime: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Sample Cost</Label><Input value={form.sampleCost ?? ""} onChange={(e) => setForm({ ...form, sampleCost: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-3"><Label>Sample Policy (additional notes)</Label><Input value={form.samplePolicy ?? ""} onChange={(e) => setForm({ ...form, samplePolicy: e.target.value })} /></div>
+              </div></div>
 
             <Separator />
 
             {/* ── Production ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Production & Volume Capacity</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Annual Production Volume</Label><Input value={form.annualProductionVolume ?? ""} onChange={(e) => setForm({ ...form, annualProductionVolume: e.target.value })} placeholder="e.g. 500 MT" /></div>
-              <div className="space-y-2"><Label>Avg Monthly Volume</Label><Input value={form.avgMonthlyVolume ?? ""} onChange={(e) => setForm({ ...form, avgMonthlyVolume: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Max Scalable Monthly Volume</Label><Input value={form.maxScalableMonthlyVolume ?? ""} onChange={(e) => setForm({ ...form, maxScalableMonthlyVolume: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Production Capacity (general)</Label><Input value={form.productionCapacity ?? ""} onChange={(e) => setForm({ ...form, productionCapacity: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Min Exportable Batch</Label><Input value={form.minExportableBatch ?? ""} onChange={(e) => setForm({ ...form, minExportableBatch: e.target.value })} /></div>
-              <div className="space-y-2"><Label>MOQ</Label><Input value={form.moq ?? ""} onChange={(e) => setForm({ ...form, moq: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Off-Season Availability?</Label><SelectWithOthers value={form.offSeasonAvailability ?? ""} onChange={(v) => setForm({ ...form, offSeasonAvailability: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Lead Time — First Order (days)</Label><Input value={form.leadTimeFirstOrder ?? ""} onChange={(e) => setForm({ ...form, leadTimeFirstOrder: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Lead Time — Repeat Orders (days)</Label><Input value={form.leadTimeRepeatOrder ?? ""} onChange={(e) => setForm({ ...form, leadTimeRepeatOrder: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Peak Season Months</Label><MultiSelectDropdown value={form.peakSeasonMonths ?? ""} onChange={(v) => setForm({ ...form, peakSeasonMonths: v })} options={["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]} placeholder="Select months…" /></div>
-            </div></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label>Annual Production Volume</Label><Input value={form.annualProductionVolume ?? ""} onChange={(e) => setForm({ ...form, annualProductionVolume: e.target.value })} placeholder="e.g. 500 MT" /></div>
+                <div className="space-y-2"><Label>Avg Monthly Volume</Label><Input value={form.avgMonthlyVolume ?? ""} onChange={(e) => setForm({ ...form, avgMonthlyVolume: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Max Scalable Monthly Volume</Label><Input value={form.maxScalableMonthlyVolume ?? ""} onChange={(e) => setForm({ ...form, maxScalableMonthlyVolume: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Production Capacity (general)</Label><Input value={form.productionCapacity ?? ""} onChange={(e) => setForm({ ...form, productionCapacity: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Min Exportable Batch</Label><Input value={form.minExportableBatch ?? ""} onChange={(e) => setForm({ ...form, minExportableBatch: e.target.value })} /></div>
+                <div className="space-y-2"><Label>MOQ</Label><Input value={form.moq ?? ""} onChange={(e) => setForm({ ...form, moq: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Off-Season Availability?</Label><SelectWithOthers value={form.offSeasonAvailability ?? ""} onChange={(v) => setForm({ ...form, offSeasonAvailability: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>Lead Time — First Order (days)</Label><Input value={form.leadTimeFirstOrder ?? ""} onChange={(e) => setForm({ ...form, leadTimeFirstOrder: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Lead Time — Repeat Orders (days)</Label><Input value={form.leadTimeRepeatOrder ?? ""} onChange={(e) => setForm({ ...form, leadTimeRepeatOrder: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Peak Season Months</Label><MultiSelectDropdown value={form.peakSeasonMonths ?? ""} onChange={(v) => setForm({ ...form, peakSeasonMonths: v })} options={["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]} placeholder="Select months…" /></div>
+              </div></div>
 
             <Separator />
 
             {/* ── Commercial & Export ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Commercial & Export Terms</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Contract Buyer(s)</Label>
-                <EntityLinkSelect
-                  selectedIds={form.buyerIds ?? []}
-                  onChange={(ids) => setForm({ ...form, buyerIds: ids })}
-                  options={(buyersListData ?? []).map((b) => ({
-                    id: b.id,
-                    label: `${b.company}${b.name ? ` (${b.name})` : ""}`,
-                  }))}
-                  isLoading={buyersListLoading}
-                  placeholder="Select contract buyer(s)…"
-                />
-              </div>
-              <div className="space-y-2"><Label>Contract Buyer (legacy)</Label><Input list="list-contractBuyer" value={form.contractBuyer ?? ""} onChange={(e) => setForm({ ...form, contractBuyer: e.target.value })} /><datalist id="list-contractBuyer">{filters?.contractBuyers?.map((c: string) => <option key={c} value={c} />)}</datalist></div>
-              <div className="space-y-2"><Label>Commission %</Label><Input value={form.commissionPercent ?? ""} onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Approved Confirm %</Label><Input value={form.approvedConfirmPercent ?? ""} onChange={(e) => setForm({ ...form, approvedConfirmPercent: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Currency Preferred</Label><Input value={form.currencyPreferred ?? ""} onChange={(e) => setForm({ ...form, currencyPreferred: e.target.value })} placeholder="e.g. USD, EUR" /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Incoterms Supported</Label><MultiSelectDropdown value={form.incotermsSupported ?? ""} onChange={(v) => setForm({ ...form, incotermsSupported: v })} options={["EXW","FCA","FOB","CIF","CNF","CPT","CIP","DDP"]} placeholder="Select incoterms…" /></div>
-              <div className="space-y-2"><Label>Ports of Export</Label><Input value={form.portsOfExport ?? ""} onChange={(e) => setForm({ ...form, portsOfExport: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Exporting Countries</Label><Textarea value={form.exportingCountries ?? ""} onChange={(e) => setForm({ ...form, exportingCountries: e.target.value })} rows={2} /></div>
-              <div className="space-y-2"><Label>Target Export Markets</Label><Input value={form.targetExportMarkets ?? ""} onChange={(e) => setForm({ ...form, targetExportMarkets: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Payment Terms Accepted</Label><MultiSelectDropdown value={form.paymentTerms ?? ""} onChange={(v) => setForm({ ...form, paymentTerms: v })} options={["T/T Advance (100%)","50% Advance + 50% Against BL","L/C at Sight","L/C Usance","D/P (Documents against Payment)","D/A (Documents against Acceptance)","Open Account"]} placeholder="Select payment terms…" /></div>
-            </div></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Contract Buyer(s)</Label>
+                  <EntityLinkSelect
+                    selectedIds={form.buyerIds ?? []}
+                    onChange={(ids) => setForm({ ...form, buyerIds: ids })}
+                    options={(buyersListData ?? []).map((b) => ({
+                      id: b.id,
+                      label: `${b.company}${b.name ? ` (${b.name})` : ""}`,
+                    }))}
+                    isLoading={buyersListLoading}
+                    placeholder="Select contract buyer(s)…"
+                  />
+                </div>
+                <div className="space-y-2"><Label>Contract Buyer (legacy)</Label><Input list="list-contractBuyer" value={form.contractBuyer ?? ""} onChange={(e) => setForm({ ...form, contractBuyer: e.target.value })} /><datalist id="list-contractBuyer">{filters?.contractBuyers?.map((c: string) => <option key={c} value={c} />)}</datalist></div>
+                <div className="space-y-2"><Label>Commission %</Label><Input value={form.commissionPercent ?? ""} onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Approved Confirm %</Label><Input value={form.approvedConfirmPercent ?? ""} onChange={(e) => setForm({ ...form, approvedConfirmPercent: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Currency Preferred</Label><Input value={form.currencyPreferred ?? ""} onChange={(e) => setForm({ ...form, currencyPreferred: e.target.value })} placeholder="e.g. USD, EUR" /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Incoterms Supported</Label><MultiSelectDropdown value={form.incotermsSupported ?? ""} onChange={(v) => setForm({ ...form, incotermsSupported: v })} options={["EXW", "FCA", "FOB", "CIF", "CNF", "CPT", "CIP", "DDP"]} placeholder="Select incoterms…" /></div>
+                <div className="space-y-2"><Label>Ports of Export</Label><Input value={form.portsOfExport ?? ""} onChange={(e) => setForm({ ...form, portsOfExport: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Exporting Countries</Label><Textarea value={form.exportingCountries ?? ""} onChange={(e) => setForm({ ...form, exportingCountries: e.target.value })} rows={2} /></div>
+                <div className="space-y-2"><Label>Target Export Markets</Label><Input value={form.targetExportMarkets ?? ""} onChange={(e) => setForm({ ...form, targetExportMarkets: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Payment Terms Accepted</Label><MultiSelectDropdown value={form.paymentTerms ?? ""} onChange={(v) => setForm({ ...form, paymentTerms: v })} options={["T/T Advance (100%)", "50% Advance + 50% Against BL", "L/C at Sight", "L/C Usance", "D/P (Documents against Payment)", "D/A (Documents against Acceptance)", "Open Account"]} placeholder="Select payment terms…" /></div>
+              </div></div>
 
             <Separator />
 
             {/* ── Banking Details ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Banking Details — Wire Transfer</p>
-            <p className="text-xs text-slate-400 mb-3">Sensitive — only visible to authorised users</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Bank Name</Label><Input value={form.bankName ?? ""} onChange={(e) => setForm({ ...form, bankName: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Bank Branch</Label><Input value={form.bankBranch ?? ""} onChange={(e) => setForm({ ...form, bankBranch: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Bank Address</Label><Input value={form.bankAddress ?? ""} onChange={(e) => setForm({ ...form, bankAddress: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Account Number</Label><Input value={form.accountNumber ?? ""} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} /></div>
-              <div className="space-y-2"><Label>SWIFT / BIC Code</Label><Input value={form.swiftBicCode ?? ""} onChange={(e) => setForm({ ...form, swiftBicCode: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>IBAN (if applicable)</Label><Input value={form.iban ?? ""} onChange={(e) => setForm({ ...form, iban: e.target.value })} /></div>
-            </div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mt-4 mb-3">Banking Details — Letter of Credit (L/C)</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>L/C Advising Bank Name</Label><Input value={form.lcAdvisingBankName ?? ""} onChange={(e) => setForm({ ...form, lcAdvisingBankName: e.target.value })} /></div>
-              <div className="space-y-2"><Label>L/C Beneficiary Name</Label><Input value={form.lcBeneficiaryName ?? ""} onChange={(e) => setForm({ ...form, lcBeneficiaryName: e.target.value })} /></div>
-              <div className="space-y-2"><Label>L/C SWIFT Code</Label><Input value={form.lcSwiftCode ?? ""} onChange={(e) => setForm({ ...form, lcSwiftCode: e.target.value })} /></div>
-              <div className="space-y-2"><Label>L/C Bank Address</Label><Input value={form.lcBankAddress ?? ""} onChange={(e) => setForm({ ...form, lcBankAddress: e.target.value })} /></div>
-            </div></div>
+              <p className="text-xs text-slate-400 mb-3">Sensitive — only visible to authorised users</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label>Bank Name</Label><Input value={form.bankName ?? ""} onChange={(e) => setForm({ ...form, bankName: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Bank Branch</Label><Input value={form.bankBranch ?? ""} onChange={(e) => setForm({ ...form, bankBranch: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Bank Address</Label><Input value={form.bankAddress ?? ""} onChange={(e) => setForm({ ...form, bankAddress: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Account Number</Label><Input value={form.accountNumber ?? ""} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} /></div>
+                <div className="space-y-2"><Label>SWIFT / BIC Code</Label><Input value={form.swiftBicCode ?? ""} onChange={(e) => setForm({ ...form, swiftBicCode: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>IBAN (if applicable)</Label><Input value={form.iban ?? ""} onChange={(e) => setForm({ ...form, iban: e.target.value })} /></div>
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mt-4 mb-3">Banking Details — Letter of Credit (L/C)</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label>L/C Advising Bank Name</Label><Input value={form.lcAdvisingBankName ?? ""} onChange={(e) => setForm({ ...form, lcAdvisingBankName: e.target.value })} /></div>
+                <div className="space-y-2"><Label>L/C Beneficiary Name</Label><Input value={form.lcBeneficiaryName ?? ""} onChange={(e) => setForm({ ...form, lcBeneficiaryName: e.target.value })} /></div>
+                <div className="space-y-2"><Label>L/C SWIFT Code</Label><Input value={form.lcSwiftCode ?? ""} onChange={(e) => setForm({ ...form, lcSwiftCode: e.target.value })} /></div>
+                <div className="space-y-2"><Label>L/C Bank Address</Label><Input value={form.lcBankAddress ?? ""} onChange={(e) => setForm({ ...form, lcBankAddress: e.target.value })} /></div>
+              </div></div>
 
             <Separator />
 
             {/* ── Regulatory ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Regulatory & Legal</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>IEC Number</Label><Input value={form.iecNumber ?? ""} onChange={(e) => setForm({ ...form, iecNumber: e.target.value })} /></div>
-              <div className="space-y-2"><Label>GST Number</Label><Input value={form.gstNumber ?? ""} onChange={(e) => setForm({ ...form, gstNumber: e.target.value })} /></div>
-              <div className="space-y-2"><Label>FSSAI Central License</Label><Input value={form.fssaiLicense ?? ""} onChange={(e) => setForm({ ...form, fssaiLicense: e.target.value })} /></div>
-              <div className="space-y-2"><Label>APEDA Registration</Label><Input value={form.apedaNumber ?? ""} onChange={(e) => setForm({ ...form, apedaNumber: e.target.value })} /></div>
-              <div className="space-y-2"><Label>FDA Registration Number</Label><Input value={form.fdaRegistrationNumber ?? ""} onChange={(e) => setForm({ ...form, fdaRegistrationNumber: e.target.value })} /></div>
-              <div className="space-y-2"><Label>US Agent Appointed?</Label><SelectWithOthers value={form.usAgentAppointed ?? ""} onChange={(v) => setForm({ ...form, usAgentAppointed: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>TRACES NT Registration (EU)?</Label><SelectWithOthers value={form.tracesNtRegistration ?? ""} onChange={(v) => setForm({ ...form, tracesNtRegistration: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>COI Capability?</Label><SelectWithOthers value={form.coiCapability ?? ""} onChange={(v) => setForm({ ...form, coiCapability: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>DAFF Biosecurity (Australia)?</Label><SelectWithOthers value={form.daffBiosecurity ?? ""} onChange={(v) => setForm({ ...form, daffBiosecurity: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>JAS Label Compliance (Japan)?</Label><SelectWithOthers value={form.jasLabelCompliance ?? ""} onChange={(v) => setForm({ ...form, jasLabelCompliance: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-            </div></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label>IEC Number</Label><Input value={form.iecNumber ?? ""} onChange={(e) => setForm({ ...form, iecNumber: e.target.value })} /></div>
+                <div className="space-y-2"><Label>GST Number</Label><Input value={form.gstNumber ?? ""} onChange={(e) => setForm({ ...form, gstNumber: e.target.value })} /></div>
+                <div className="space-y-2"><Label>FSSAI Central License</Label><Input value={form.fssaiLicense ?? ""} onChange={(e) => setForm({ ...form, fssaiLicense: e.target.value })} /></div>
+                <div className="space-y-2"><Label>APEDA Registration</Label><Input value={form.apedaNumber ?? ""} onChange={(e) => setForm({ ...form, apedaNumber: e.target.value })} /></div>
+                <div className="space-y-2"><Label>FDA Registration Number</Label><Input value={form.fdaRegistrationNumber ?? ""} onChange={(e) => setForm({ ...form, fdaRegistrationNumber: e.target.value })} /></div>
+                <div className="space-y-2"><Label>US Agent Appointed?</Label><SelectWithOthers value={form.usAgentAppointed ?? ""} onChange={(v) => setForm({ ...form, usAgentAppointed: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>TRACES NT Registration (EU)?</Label><SelectWithOthers value={form.tracesNtRegistration ?? ""} onChange={(v) => setForm({ ...form, tracesNtRegistration: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>COI Capability?</Label><SelectWithOthers value={form.coiCapability ?? ""} onChange={(v) => setForm({ ...form, coiCapability: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>DAFF Biosecurity (Australia)?</Label><SelectWithOthers value={form.daffBiosecurity ?? ""} onChange={(v) => setForm({ ...form, daffBiosecurity: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>JAS Label Compliance (Japan)?</Label><SelectWithOthers value={form.jasLabelCompliance ?? ""} onChange={(v) => setForm({ ...form, jasLabelCompliance: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+              </div></div>
 
             <Separator />
 
             {/* ── Certifications & Food Safety ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Certifications & Food Safety</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>HACCP Plan Available?</Label><SelectWithOthers value={form.haccpAvailable ?? ""} onChange={(v) => setForm({ ...form, haccpAvailable: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>ISO/FSSC 22000 Cert No.</Label><Input value={form.isoFsscCertNo ?? ""} onChange={(e) => setForm({ ...form, isoFsscCertNo: e.target.value })} /></div>
-              <div className="space-y-2"><Label>ISO Cert Validity Date</Label><Input value={form.isoCertValidityDate ?? ""} onChange={(e) => setForm({ ...form, isoCertValidityDate: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Auditing Body</Label><Input value={form.auditingBodyName ?? ""} onChange={(e) => setForm({ ...form, auditingBodyName: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Latest Internal Audit Date</Label><Input value={form.latestInternalAuditDate ?? ""} onChange={(e) => setForm({ ...form, latestInternalAuditDate: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Latest Third-Party Audit Date</Label><Input value={form.latestThirdPartyAuditDate ?? ""} onChange={(e) => setForm({ ...form, latestThirdPartyAuditDate: e.target.value })} /></div>
-            </div></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label>HACCP Plan Available?</Label><SelectWithOthers value={form.haccpAvailable ?? ""} onChange={(v) => setForm({ ...form, haccpAvailable: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>ISO/FSSC 22000 Cert No.</Label><Input value={form.isoFsscCertNo ?? ""} onChange={(e) => setForm({ ...form, isoFsscCertNo: e.target.value })} /></div>
+                <div className="space-y-2"><Label>ISO Cert Validity Date</Label><Input value={form.isoCertValidityDate ?? ""} onChange={(e) => setForm({ ...form, isoCertValidityDate: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Auditing Body</Label><Input value={form.auditingBodyName ?? ""} onChange={(e) => setForm({ ...form, auditingBodyName: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Latest Internal Audit Date</Label><Input value={form.latestInternalAuditDate ?? ""} onChange={(e) => setForm({ ...form, latestInternalAuditDate: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Latest Third-Party Audit Date</Label><Input value={form.latestThirdPartyAuditDate ?? ""} onChange={(e) => setForm({ ...form, latestThirdPartyAuditDate: e.target.value })} /></div>
+              </div></div>
 
             <Separator />
 
             {/* ── Organic Chain (only when any product is organic) ── */}
-            {(() => { const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion") || form.organicStatus === "Certified Organic" || form.organicStatus === "In Conversion"; return hasOrganic ? (
-            <>
-            <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Organic Certification Chain</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Farmer Organic Cert?</Label><SelectWithOthers value={form.farmerOrganicCert ?? ""} onChange={(v) => setForm({ ...form, farmerOrganicCert: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Aggregator/FPO Organic Cert?</Label><SelectWithOthers value={form.aggregatorOrganicCert ?? ""} onChange={(v) => setForm({ ...form, aggregatorOrganicCert: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Processing Unit Organic Cert?</Label><SelectWithOthers value={form.processingUnitOrganicCert ?? ""} onChange={(v) => setForm({ ...form, processingUnitOrganicCert: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Certifying Body</Label><Input value={form.certifyingBodyName ?? ""} onChange={(e) => setForm({ ...form, certifyingBodyName: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Certs Valid for Export?</Label><SelectWithOthers value={form.certsValidForExport ?? ""} onChange={(v) => setForm({ ...form, certsValidForExport: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-            </div>
-            <div className="mt-4"><Label className="mb-2 block text-sm">Organic Certificates by Market</Label>
-            <div className="rounded-md border border-slate-200 overflow-hidden"><table className="w-full text-xs"><thead className="bg-slate-50"><tr><th className="px-3 py-2 text-left font-medium text-slate-500 w-1/3">Market / Standard</th><th className="px-3 py-2 text-left font-medium text-slate-500">Certificate Number</th><th className="px-3 py-2 text-left font-medium text-slate-500">Expiry Date</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">{(form.organicCertsByMarket ?? ORGANIC_CERT_MARKETS.map(m => ({ market: m, certNumber: "", expiryDate: "" }))).map((row, i) => (
-              <tr key={row.market}><td className="px-3 py-1.5 text-slate-600 font-medium">{row.market}</td>
-              <td className="px-3 py-1.5"><Input className="h-7 text-xs border-slate-200" value={row.certNumber} onChange={(e) => { const next = [...(form.organicCertsByMarket ?? ORGANIC_CERT_MARKETS.map(m => ({ market: m, certNumber: "", expiryDate: "" })))]; next[i] = { ...next[i], certNumber: e.target.value }; setForm({ ...form, organicCertsByMarket: next }); }} /></td>
-              <td className="px-3 py-1.5"><Input className="h-7 text-xs border-slate-200" value={row.expiryDate} onChange={(e) => { const next = [...(form.organicCertsByMarket ?? ORGANIC_CERT_MARKETS.map(m => ({ market: m, certNumber: "", expiryDate: "" })))]; next[i] = { ...next[i], expiryDate: e.target.value }; setForm({ ...form, organicCertsByMarket: next }); }} /></td>
-              </tr>))}
-            </tbody></table></div></div></div>
-            </>
-            ) : null; })()}
+            {(() => {
+              const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion") || form.organicStatus === "Certified Organic" || form.organicStatus === "In Conversion"; return hasOrganic ? (
+                <>
+                  <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Organic Certification Chain</p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2"><Label>Farmer Organic Cert?</Label><SelectWithOthers value={form.farmerOrganicCert ?? ""} onChange={(v) => setForm({ ...form, farmerOrganicCert: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                      <div className="space-y-2"><Label>Aggregator/FPO Organic Cert?</Label><SelectWithOthers value={form.aggregatorOrganicCert ?? ""} onChange={(v) => setForm({ ...form, aggregatorOrganicCert: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                      <div className="space-y-2"><Label>Processing Unit Organic Cert?</Label><SelectWithOthers value={form.processingUnitOrganicCert ?? ""} onChange={(v) => setForm({ ...form, processingUnitOrganicCert: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                      <div className="space-y-2"><Label>Certifying Body</Label><Input value={form.certifyingBodyName ?? ""} onChange={(e) => setForm({ ...form, certifyingBodyName: e.target.value })} /></div>
+                      <div className="space-y-2 sm:col-span-2"><Label>Certs Valid for Export?</Label><SelectWithOthers value={form.certsValidForExport ?? ""} onChange={(v) => setForm({ ...form, certsValidForExport: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                    </div>
+                    <div className="mt-4"><Label className="mb-2 block text-sm">Organic Certificates by Market</Label>
+                      <div className="rounded-md border border-slate-200 overflow-hidden"><table className="w-full text-xs"><thead className="bg-slate-50"><tr><th className="px-3 py-2 text-left font-medium text-slate-500 w-1/3">Market / Standard</th><th className="px-3 py-2 text-left font-medium text-slate-500">Certificate Number</th><th className="px-3 py-2 text-left font-medium text-slate-500">Expiry Date</th></tr></thead>
+                        <tbody className="divide-y divide-slate-100">{(form.organicCertsByMarket ?? ORGANIC_CERT_MARKETS.map(m => ({ market: m, certNumber: "", expiryDate: "" }))).map((row, i) => (
+                          <tr key={row.market}><td className="px-3 py-1.5 text-slate-600 font-medium">{row.market}</td>
+                            <td className="px-3 py-1.5"><Input className="h-7 text-xs border-slate-200" value={row.certNumber} onChange={(e) => { const next = [...(form.organicCertsByMarket ?? ORGANIC_CERT_MARKETS.map(m => ({ market: m, certNumber: "", expiryDate: "" })))]; next[i] = { ...next[i], certNumber: e.target.value }; setForm({ ...form, organicCertsByMarket: next }); }} /></td>
+                            <td className="px-3 py-1.5"><Input className="h-7 text-xs border-slate-200" value={row.expiryDate} onChange={(e) => { const next = [...(form.organicCertsByMarket ?? ORGANIC_CERT_MARKETS.map(m => ({ market: m, certNumber: "", expiryDate: "" })))]; next[i] = { ...next[i], expiryDate: e.target.value }; setForm({ ...form, organicCertsByMarket: next }); }} /></td>
+                          </tr>))}
+                        </tbody></table></div></div></div>
+                </>
+              ) : null;
+            })()}
 
             <Separator />
 
             {/* ── Lab Testing ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Lab Testing Records</p>
-            <div className="rounded-md border border-slate-200 overflow-hidden mb-4"><table className="w-full text-xs"><thead className="bg-slate-50"><tr><th className="px-3 py-2 text-left font-medium text-slate-500">Test</th><th className="px-3 py-2 text-left font-medium text-slate-500">Last Test Date</th><th className="px-3 py-2 text-left font-medium text-slate-500">Lab Name</th><th className="px-3 py-2 text-left font-medium text-slate-500">Report?</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">{(form.labTestingRecords ?? LAB_TEST_TYPES.map(t => ({ testType: t, lastTestDate: "", labName: "", reportAttached: "" }))).map((row, i) => (
-              <tr key={row.testType}><td className="px-3 py-1.5 text-slate-600 font-medium">{row.testType}</td>
-              <td className="px-3 py-1.5"><Input className="h-7 text-xs border-slate-200" value={row.lastTestDate} onChange={(e) => { const next = [...(form.labTestingRecords ?? LAB_TEST_TYPES.map(t => ({ testType: t, lastTestDate: "", labName: "", reportAttached: "" })))]; next[i] = { ...next[i], lastTestDate: e.target.value }; setForm({ ...form, labTestingRecords: next }); }} /></td>
-              <td className="px-3 py-1.5"><Input className="h-7 text-xs border-slate-200" value={row.labName} onChange={(e) => { const next = [...(form.labTestingRecords ?? LAB_TEST_TYPES.map(t => ({ testType: t, lastTestDate: "", labName: "", reportAttached: "" })))]; next[i] = { ...next[i], labName: e.target.value }; setForm({ ...form, labTestingRecords: next }); }} /></td>
-              <td className="px-3 py-1.5"><SelectWithOthers value={row.reportAttached} onChange={(v) => { const next = [...(form.labTestingRecords ?? LAB_TEST_TYPES.map(t => ({ testType: t, lastTestDate: "", labName: "", reportAttached: "" })))]; next[i] = { ...next[i], reportAttached: v }; setForm({ ...form, labTestingRecords: next }); }} options={["Yes","No"]} placeholder="Y/N" /></td>
-              </tr>))}
-            </tbody></table></div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>GMO-Free Declaration?</Label><SelectWithOthers value={form.gmoFreeDeclaration ?? ""} onChange={(v) => setForm({ ...form, gmoFreeDeclaration: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Irradiation-Free Declaration?</Label><SelectWithOthers value={form.irradiationFreeDeclaration ?? ""} onChange={(v) => setForm({ ...form, irradiationFreeDeclaration: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Food Contact Compliance?</Label><SelectWithOthers value={form.foodContactCompliance ?? ""} onChange={(v) => setForm({ ...form, foodContactCompliance: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Compostability Certificate?</Label><SelectWithOthers value={form.compostabilityCert ?? ""} onChange={(v) => setForm({ ...form, compostabilityCert: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Migration Test Report?</Label><SelectWithOthers value={form.migrationTestReport ?? ""} onChange={(v) => setForm({ ...form, migrationTestReport: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-            </div></div>
+              <div className="rounded-md border border-slate-200 overflow-hidden mb-4"><table className="w-full text-xs"><thead className="bg-slate-50"><tr><th className="px-3 py-2 text-left font-medium text-slate-500">Test</th><th className="px-3 py-2 text-left font-medium text-slate-500">Last Test Date</th><th className="px-3 py-2 text-left font-medium text-slate-500">Lab Name</th><th className="px-3 py-2 text-left font-medium text-slate-500">Report?</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">{(form.labTestingRecords ?? LAB_TEST_TYPES.map(t => ({ testType: t, lastTestDate: "", labName: "", reportAttached: "" }))).map((row, i) => (
+                  <tr key={row.testType}><td className="px-3 py-1.5 text-slate-600 font-medium">{row.testType}</td>
+                    <td className="px-3 py-1.5"><Input className="h-7 text-xs border-slate-200" value={row.lastTestDate} onChange={(e) => { const next = [...(form.labTestingRecords ?? LAB_TEST_TYPES.map(t => ({ testType: t, lastTestDate: "", labName: "", reportAttached: "" })))]; next[i] = { ...next[i], lastTestDate: e.target.value }; setForm({ ...form, labTestingRecords: next }); }} /></td>
+                    <td className="px-3 py-1.5"><Input className="h-7 text-xs border-slate-200" value={row.labName} onChange={(e) => { const next = [...(form.labTestingRecords ?? LAB_TEST_TYPES.map(t => ({ testType: t, lastTestDate: "", labName: "", reportAttached: "" })))]; next[i] = { ...next[i], labName: e.target.value }; setForm({ ...form, labTestingRecords: next }); }} /></td>
+                    <td className="px-3 py-1.5"><SelectWithOthers value={row.reportAttached} onChange={(v) => { const next = [...(form.labTestingRecords ?? LAB_TEST_TYPES.map(t => ({ testType: t, lastTestDate: "", labName: "", reportAttached: "" })))]; next[i] = { ...next[i], reportAttached: v }; setForm({ ...form, labTestingRecords: next }); }} options={["Yes", "No"]} placeholder="Y/N" /></td>
+                  </tr>))}
+                </tbody></table></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label>GMO-Free Declaration?</Label><SelectWithOthers value={form.gmoFreeDeclaration ?? ""} onChange={(v) => setForm({ ...form, gmoFreeDeclaration: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>Irradiation-Free Declaration?</Label><SelectWithOthers value={form.irradiationFreeDeclaration ?? ""} onChange={(v) => setForm({ ...form, irradiationFreeDeclaration: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>Food Contact Compliance?</Label><SelectWithOthers value={form.foodContactCompliance ?? ""} onChange={(v) => setForm({ ...form, foodContactCompliance: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>Compostability Certificate?</Label><SelectWithOthers value={form.compostabilityCert ?? ""} onChange={(v) => setForm({ ...form, compostabilityCert: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Migration Test Report?</Label><SelectWithOthers value={form.migrationTestReport ?? ""} onChange={(v) => setForm({ ...form, migrationTestReport: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+              </div></div>
 
             <Separator />
 
             {/* ── Branding ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Branding & Private Label</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Export Under</Label><SelectWithOthers value={form.exportBrand ?? ""} onChange={(v) => setForm({ ...form, exportBrand: v })} options={["Own Brand","Buyer's Private Label","Elan Brand","White Label / Unbranded"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Claims Approved Markets</Label><Input value={form.claimsApprovedMarkets ?? ""} onChange={(e) => setForm({ ...form, claimsApprovedMarkets: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Packaging Compliance Regions</Label><MultiSelectDropdown value={form.packagingComplianceRegions ?? ""} onChange={(v) => setForm({ ...form, packagingComplianceRegions: v })} options={["India (FSSAI)","EU (Reg 1169/2011)","USA (FDA 21 CFR)","UK (FSA)","GCC / GSO","Australia / NZ (FSANZ)","Japan (JAS / MHLW)","Canada (CFIA)"]} placeholder="Select regions…" /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Health / Nutrition Claims</Label><Textarea value={form.healthNutritionClaims ?? ""} onChange={(e) => setForm({ ...form, healthNutritionClaims: e.target.value })} rows={2} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Working With Our Brands</Label><Textarea value={form.workingWithOurBrands ?? ""} onChange={(e) => setForm({ ...form, workingWithOurBrands: e.target.value })} rows={2} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Other Brands</Label><Textarea value={form.otherBrands ?? ""} onChange={(e) => setForm({ ...form, otherBrands: e.target.value })} rows={2} /></div>
-            </div></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label>Export Under</Label><SelectWithOthers value={form.exportBrand ?? ""} onChange={(v) => setForm({ ...form, exportBrand: v })} options={["Own Brand", "Buyer's Private Label", "Elan Brand", "White Label / Unbranded"]} placeholder="Select…" /></div>
+                <div className="space-y-2"><Label>Claims Approved Markets</Label><Input value={form.claimsApprovedMarkets ?? ""} onChange={(e) => setForm({ ...form, claimsApprovedMarkets: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Packaging Compliance Regions</Label><MultiSelectDropdown value={form.packagingComplianceRegions ?? ""} onChange={(v) => setForm({ ...form, packagingComplianceRegions: v })} options={["India (FSSAI)", "EU (Reg 1169/2011)", "USA (FDA 21 CFR)", "UK (FSA)", "GCC / GSO", "Australia / NZ (FSANZ)", "Japan (JAS / MHLW)", "Canada (CFIA)"]} placeholder="Select regions…" /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Health / Nutrition Claims</Label><Textarea value={form.healthNutritionClaims ?? ""} onChange={(e) => setForm({ ...form, healthNutritionClaims: e.target.value })} rows={2} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Working With Our Brands</Label><Textarea value={form.workingWithOurBrands ?? ""} onChange={(e) => setForm({ ...form, workingWithOurBrands: e.target.value })} rows={2} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Other Brands</Label><Textarea value={form.otherBrands ?? ""} onChange={(e) => setForm({ ...form, otherBrands: e.target.value })} rows={2} /></div>
+              </div></div>
 
             <Separator />
 
             {/* ── Processing Compliance (only when organic) ── */}
-            {(() => { const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion") || form.organicStatus === "Certified Organic" || form.organicStatus === "In Conversion"; return hasOrganic ? (
-            <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Processing Compliance</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Organic Segregation SOP?</Label><SelectWithOthers value={form.organicSegregationSop ?? ""} onChange={(v) => setForm({ ...form, organicSegregationSop: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Cleaning & Line Clearance SOP?</Label><SelectWithOthers value={form.cleaningLinelearanceSop ?? ""} onChange={(v) => setForm({ ...form, cleaningLinelearanceSop: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>No Prohibited Processing Aids?</Label><SelectWithOthers value={form.noProhibitedAids ?? ""} onChange={(v) => setForm({ ...form, noProhibitedAids: v })} options={["Yes","No"]} placeholder="Select…" /></div>
-            </div></div>
-            ) : null; })()}
+            {(() => {
+              const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion") || form.organicStatus === "Certified Organic" || form.organicStatus === "In Conversion"; return hasOrganic ? (
+                <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Processing Compliance</p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2"><Label>Organic Segregation SOP?</Label><SelectWithOthers value={form.organicSegregationSop ?? ""} onChange={(v) => setForm({ ...form, organicSegregationSop: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                    <div className="space-y-2"><Label>Cleaning & Line Clearance SOP?</Label><SelectWithOthers value={form.cleaningLinelearanceSop ?? ""} onChange={(v) => setForm({ ...form, cleaningLinelearanceSop: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                    <div className="space-y-2 sm:col-span-2"><Label>No Prohibited Processing Aids?</Label><SelectWithOthers value={form.noProhibitedAids ?? ""} onChange={(v) => setForm({ ...form, noProhibitedAids: v })} options={["Yes", "No"]} placeholder="Select…" /></div>
+                  </div></div>
+              ) : null;
+            })()}
 
             <Separator />
 
             {/* ── Documents & Remarks ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Documents & Remarks</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Product Catalogs</Label>
-                <div className="flex flex-col gap-2">
-                  <input type="file" accept="application/pdf,.doc,.docx" multiple className="hidden" id="multi-catalog-upload" onChange={(e) => { if (e.target.files) setCatalogFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
-                  <Button type="button" variant="outline" onClick={() => document.getElementById("multi-catalog-upload")?.click()} className="w-full justify-start"><Upload className="mr-2 h-4 w-4 shrink-0" /><span>Upload Product Catalogs</span></Button>
-                  {(form.productCatalogs || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogs || []).map((cat, idx) => (<div key={`cat-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={cat.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{cat.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogs || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogs: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
-                  {catalogFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogFiles.map((f, idx) => (<div key={`pend-cat-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Product Catalogs</Label>
+                  <div className="flex flex-col gap-2">
+                    <input type="file" accept="application/pdf,.doc,.docx" multiple className="hidden" id="multi-catalog-upload" onChange={(e) => { if (e.target.files) setCatalogFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                    <Button type="button" variant="outline" onClick={() => document.getElementById("multi-catalog-upload")?.click()} className="w-full justify-start"><Upload className="mr-2 h-4 w-4 shrink-0" /><span>Upload Product Catalogs</span></Button>
+                    {(form.productCatalogs || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogs || []).map((cat, idx) => (<div key={`cat-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={cat.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{cat.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogs || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogs: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
+                    {catalogFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogFiles.map((f, idx) => (<div key={`pend-cat-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Upload Documents</Label>
-                <div className="flex flex-col gap-2">
-                  <input type="file" accept="application/pdf" multiple className="hidden" id="documents-upload" onChange={(e) => { if (e.target.files) setDocumentFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
-                  <Button type="button" variant="outline" onClick={() => document.getElementById("documents-upload")?.click()} className="w-full justify-start"><Upload className="mr-2 h-4 w-4 shrink-0" /><span>Add Document PDFs</span></Button>
-                  {form.documents && form.documents.length > 0 && (<div className="flex flex-col gap-1 mt-2">{form.documents.map((doc, idx) => (<div key={`stored-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{doc.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...form.documents!]; updated.splice(idx, 1); setForm({ ...form, documents: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
-                  {documentFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{documentFiles.map((f, idx) => (<div key={`pending-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setDocumentFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-4 w-4" /></button></div>))}</div>)}
+                <div className="space-y-2">
+                  <Label>Upload Documents</Label>
+                  <div className="flex flex-col gap-2">
+                    <input type="file" accept="application/pdf" multiple className="hidden" id="documents-upload" onChange={(e) => { if (e.target.files) setDocumentFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                    <Button type="button" variant="outline" onClick={() => document.getElementById("documents-upload")?.click()} className="w-full justify-start"><Upload className="mr-2 h-4 w-4 shrink-0" /><span>Add Document PDFs</span></Button>
+                    {form.documents && form.documents.length > 0 && (<div className="flex flex-col gap-1 mt-2">{form.documents.map((doc, idx) => (<div key={`stored-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{doc.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...form.documents!]; updated.splice(idx, 1); setForm({ ...form, documents: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
+                    {documentFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{documentFiles.map((f, idx) => (<div key={`pending-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setDocumentFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-4 w-4" /></button></div>))}</div>)}
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-2 sm:col-span-2"><Label>Factory Videos Shared</Label><Input value={form.factoryVideosShared ?? ""} onChange={(e) => setForm({ ...form, factoryVideosShared: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Warehouse Videos Shared</Label><Input value={form.warehouseVideosShared ?? ""} onChange={(e) => setForm({ ...form, warehouseVideosShared: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Remarks</Label><Textarea value={form.remarks ?? ""} onChange={(e) => setForm({ ...form, remarks: e.target.value })} rows={3} /></div>
-            </div></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Factory Videos Shared</Label><Input value={form.factoryVideosShared ?? ""} onChange={(e) => setForm({ ...form, factoryVideosShared: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Warehouse Videos Shared</Label><Input value={form.warehouseVideosShared ?? ""} onChange={(e) => setForm({ ...form, warehouseVideosShared: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Remarks</Label><Textarea value={form.remarks ?? ""} onChange={(e) => setForm({ ...form, remarks: e.target.value })} rows={3} /></div>
+              </div></div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
               <Button type="button" variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50" onClick={() => setDialogOpen(false)}>Cancel</Button>
@@ -1134,36 +1171,36 @@ export default function SuppliersPage() {
       >
         <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
           <div className="flex items-center gap-4 mb-6">
-              <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-                  <AlertCircle className="h-6 w-6 text-rose-600" />
-              </div>
-              <div>
-                  <DialogTitle className="text-lg font-bold text-slate-900">Delete Supplier</DialogTitle>
-                  <DialogDescription className="text-slate-500 mt-1">This will permanently remove the record.</DialogDescription>
-              </div>
+            <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+              <AlertCircle className="h-6 w-6 text-rose-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900">Delete Supplier</DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">This will permanently remove the record.</DialogDescription>
+            </div>
           </div>
           {supplierToDelete?.company && (
-              <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-md border border-slate-100 mb-6 font-medium">
-                  Company: <span className="font-bold">{supplierToDelete.company}</span>
-              </p>
+            <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-md border border-slate-100 mb-6 font-medium">
+              Company: <span className="font-bold">{supplierToDelete.company}</span>
+            </p>
           )}
           <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
-                  Cancel
-              </Button>
-              <Button 
-                 variant="destructive" 
-                 className="bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200"
-                 onClick={() => {
-                  if (supplierToDelete) {
-                    deleteMutation.mutate(supplierToDelete.id);
-                  }
-                  setDeleteDialogOpen(false);
-                  setSupplierToDelete(null);
-                }}
-               >
-                  Yes, delete supplier
-              </Button>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200"
+              onClick={() => {
+                if (supplierToDelete) {
+                  deleteMutation.mutate(supplierToDelete.id);
+                }
+                setDeleteDialogOpen(false);
+                setSupplierToDelete(null);
+              }}
+            >
+              Yes, delete supplier
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

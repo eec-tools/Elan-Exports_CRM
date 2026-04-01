@@ -48,6 +48,7 @@ interface Supplier {
   latestQuotation?: string;
   reasonInactive?: string;
   dateMarkedInactive?: string;
+  dealStage?: string;
   reactivationPotential?: string;
   notes?: string;
   supplierStage?: string;
@@ -67,6 +68,19 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
   reactivationPotential: "",
   notes: "",
 };
+
+const DEAL_STAGES = [
+  "Communication",
+  "Sampling",
+  "Quotation",
+  "Negotiation with EEC",
+  "Price quotation to Buyer after EEC approval",
+  "Negotiation with buyer",
+  "Price approval by buyer",
+  "Quotation send to the supplier from buyer end",
+  "Orders confirmed from buyers end",
+  "Timeline (Product shipping.. etc) should be established from suppliers end",
+];
 
 export default function OldSuppliersPage() {
   const { hasEditPermission } = useAuth();
@@ -91,16 +105,16 @@ export default function OldSuppliersPage() {
     queryKey: ["old-suppliers", search, statusFilter, countryFilter, categoryFilter, managerFilter, page],
     queryFn: () =>
       api
-        .get("/old-suppliers", { 
-          params: { 
+        .get("/old-suppliers", {
+          params: {
             search,
             status: statusFilter !== "all" ? statusFilter : undefined,
             country: countryFilter !== "all" ? countryFilter : undefined,
             productCategory: categoryFilter !== "all" ? categoryFilter : undefined,
             accountManager: managerFilter !== "all" ? managerFilter : undefined,
-            page, 
-            limit: 20 
-          } 
+            page,
+            limit: 20
+          }
         })
         .then((r) => r.data),
   });
@@ -320,6 +334,7 @@ export default function OldSuppliersPage() {
                 <th className="px-5 py-3.5 font-semibold">Country</th>
                 <th className="px-5 py-3.5 font-semibold">Account Manager</th>
                 <th className="px-5 py-3.5 font-semibold">Current Status</th>
+                <th className="px-5 py-3.5 font-semibold">Deal Stage</th>
                 <th className="px-5 py-3.5 font-semibold">Certifications</th>
                 <th className="px-5 py-3.5 font-semibold">Reason Inactive</th>
                 <th className="px-5 py-3.5 font-semibold">Reactivation Potential</th>
@@ -330,16 +345,16 @@ export default function OldSuppliersPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading && suppliers.length === 0 ? (
-                 <tr>
-                 <td colSpan={canEdit ? 11 : 10} className="h-32 text-center">
-                   <div className="flex justify-center">
-                     <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
-                   </div>
-                 </td>
-               </tr>
+                <tr>
+                  <td colSpan={canEdit ? 12 : 11} className="h-32 text-center">
+                    <div className="flex justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
+                    </div>
+                  </td>
+                </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 11 : 10} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                  <td colSpan={canEdit ? 12 : 11} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                         <Building2 className="h-6 w-6 text-slate-300" />
@@ -360,25 +375,43 @@ export default function OldSuppliersPage() {
                     <td className="px-5 py-3.5 border-r border-slate-100">{s.country}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.accountManager}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.currentStatus}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
+                      <Select
+                        value={s.dealStage || "Communication"}
+                        onValueChange={(val) => {
+                          updateMutation.mutate({ id: s.id, d: { dealStage: val } });
+                        }}
+                        disabled={updateMutation.isPending}
+                      >
+                        <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DEAL_STAGES.map((stage) => (
+                            <SelectItem key={stage} value={stage}>{stage}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.certifications}>{s.certifications}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reasonInactive}>{s.reasonInactive}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reactivationPotential}>{s.reactivationPotential}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.notes}>{s.notes}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
-                        <Select 
-                            value={s.supplierStage || "Closed"} 
-                            onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
-                            disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
-                        >
-                            <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[110px]">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Onboarding">Onboarding</SelectItem>
-                                <SelectItem value="Signed">Signed</SelectItem>
-                                <SelectItem value="Closed">Closed</SelectItem>
-                            </SelectContent>
-                        </Select>
+                      <Select
+                        value={s.supplierStage || "Closed"}
+                        onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
+                        disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
+                      >
+                        <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[110px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Onboarding">Onboarding</SelectItem>
+                          <SelectItem value="Signed">Signed</SelectItem>
+                          <SelectItem value="Closed">Closed</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </td>
                     {canEdit && (
                       <td className="px-5 py-3.5 text-right font-medium">
@@ -434,17 +467,17 @@ export default function OldSuppliersPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6 bg-white rounded-xl shadow-2xl border-none custom-scrollbar-light">
           <div className="flex items-center gap-4 mb-2">
-             <div className="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center shrink-0 border border-brand-200">
-                 <Building2 className="h-5 w-5 text-brand-600" />
-             </div>
-             <div>
-                 <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
-                   {editing?.id ? "Edit Supplier" : "Register New Supplier"}
-                 </DialogTitle>
-                 <DialogDescription className="text-slate-500 mt-1">
-                   Fill in the details below to {editing?.id ? "update the" : "create a new"} supplier record.
-                 </DialogDescription>
-             </div>
+            <div className="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center shrink-0 border border-brand-200">
+              <Building2 className="h-5 w-5 text-brand-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
+                {editing?.id ? "Edit Supplier" : "Register New Supplier"}
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">
+                Fill in the details below to {editing?.id ? "update the" : "create a new"} supplier record.
+              </DialogDescription>
+            </div>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -591,36 +624,36 @@ export default function OldSuppliersPage() {
       >
         <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
           <div className="flex items-center gap-4 mb-6">
-              <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-                  <AlertCircle className="h-6 w-6 text-rose-600" />
-              </div>
-              <div>
-                  <DialogTitle className="text-lg font-bold text-slate-900">Delete Supplier</DialogTitle>
-                  <DialogDescription className="text-slate-500 mt-1">This will permanently remove the record.</DialogDescription>
-              </div>
+            <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+              <AlertCircle className="h-6 w-6 text-rose-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900">Delete Supplier</DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">This will permanently remove the record.</DialogDescription>
+            </div>
           </div>
           {supplierToDelete?.company && (
-              <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-md border border-slate-100 mb-6 font-medium">
-                  Company: <span className="font-bold">{supplierToDelete.company}</span>
-              </p>
+            <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-md border border-slate-100 mb-6 font-medium">
+              Company: <span className="font-bold">{supplierToDelete.company}</span>
+            </p>
           )}
           <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
-                  Cancel
-              </Button>
-              <Button 
-                 variant="destructive" 
-                 className="bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200"
-                 onClick={() => {
-                  if (supplierToDelete) {
-                    deleteMutation.mutate(supplierToDelete.id);
-                  }
-                  setDeleteDialogOpen(false);
-                  setSupplierToDelete(null);
-                }}
-               >
-                  Yes, delete supplier
-              </Button>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200"
+              onClick={() => {
+                if (supplierToDelete) {
+                  deleteMutation.mutate(supplierToDelete.id);
+                }
+                setDeleteDialogOpen(false);
+                setSupplierToDelete(null);
+              }}
+            >
+              Yes, delete supplier
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

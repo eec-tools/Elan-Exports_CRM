@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { createNotification } from "../services/notificationService.js";
+import { syncDealStageFromDeal } from "../services/dealStageSync.service.js";
 
 const prisma = new PrismaClient();
 
@@ -50,7 +51,7 @@ export const createDeal = async (req: Request, res: Response) => {
         price: price ? parseFloat(price) : null,
         expectedRevenue: expectedRevenue ? parseFloat(expectedRevenue) : null,
         margin: margin ? parseFloat(margin) : 15,
-        stage: stage || "LEAD",
+        stage: stage || "Communication",
         probability: probability ? parseFloat(probability) : 20,
         category,
         riskScore: riskScore || "Medium",
@@ -86,7 +87,7 @@ export const updateDeal = async (req: Request, res: Response) => {
       notes,
     } = req.body;
 
-    const existing = await prisma.deal.findUnique({ where: { id }, select: { stage: true, title: true } });
+    const existing = await prisma.deal.findUnique({ where: { id }, select: { stage: true, title: true, supplier: true } });
 
     const deal = await prisma.deal.update({
       where: { id },
@@ -112,6 +113,7 @@ export const updateDeal = async (req: Request, res: Response) => {
       },
     });
 
+    // If stage changed, sync to suppliers and reports
     if (stage !== undefined && existing?.stage !== stage) {
       await createNotification({
         type: "deal_stage_change",
@@ -122,6 +124,12 @@ export const updateDeal = async (req: Request, res: Response) => {
         entityName: deal.title,
         entityLink: `/deals`,
       });
+
+      // Sync the stage change to all related suppliers and reports
+      const supplierName = supplier !== undefined ? supplier : existing?.supplier;
+      if (supplierName) {
+        await syncDealStageFromDeal(deal.id, supplierName, stage);
+      }
     }
 
     res.json(deal);

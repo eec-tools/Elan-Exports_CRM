@@ -4,64 +4,65 @@ import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
 import { createNotification } from "../services/notificationService.js";
 import { syncSupplierDocsToVault } from "../services/vaultSync.service.js";
+import { syncDealStageFromSupplier } from "../services/dealStageSync.service.js";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 
 // ─── Cloudinary config ──────────────────────────────
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
 const newSupplierCatalogStorage = new CloudinaryStorage({
-  cloudinary,
-  params: async (_req: Express.Request, file: Express.Multer.File) => {
-    let resource_type = "auto";
-    let isRaw = false;
-    if (
-      file.mimetype === "application/pdf" ||
-      file.originalname.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|csv|zip)$/)
-    ) {
-      resource_type = "raw";
-      isRaw = true;
-    }
-    const extMatch = file.originalname.match(/\.[^/.]+$/);
-    const ext = isRaw && extMatch ? extMatch[0] : "";
-    const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
-    return {
-      folder: "elan-new-suppliers",
-      resource_type,
-      public_id: `new_supplier_catalog_${Date.now()}_${baseName}${ext}`,
-    };
-  },
+    cloudinary,
+    params: async (_req: Express.Request, file: Express.Multer.File) => {
+        let resource_type = "auto";
+        let isRaw = false;
+        if (
+            file.mimetype === "application/pdf" ||
+            file.originalname.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|csv|zip)$/)
+        ) {
+            resource_type = "raw";
+            isRaw = true;
+        }
+        const extMatch = file.originalname.match(/\.[^/.]+$/);
+        const ext = isRaw && extMatch ? extMatch[0] : "";
+        const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
+        return {
+            folder: "elan-new-suppliers",
+            resource_type,
+            public_id: `new_supplier_catalog_${Date.now()}_${baseName}${ext}`,
+        };
+    },
 } as any);
 
 export const uploadNewSupplierFile = multer({
-  storage: newSupplierCatalogStorage,
-  limits: { fileSize: 50 * 1024 * 1024 },
+    storage: newSupplierCatalogStorage,
+    limits: { fileSize: 50 * 1024 * 1024 },
 });
 
 /**
  * POST /api/new-suppliers/upload
  */
 export async function uploadNewSupplierCatalog(
-  _req: Request,
-  res: Response,
+    _req: Request,
+    res: Response,
 ): Promise<void> {
-  try {
-    const file = _req.file as any;
-    if (!file) {
-      res.status(400).json({ error: "No file uploaded" });
-      return;
+    try {
+        const file = _req.file as any;
+        if (!file) {
+            res.status(400).json({ error: "No file uploaded" });
+            return;
+        }
+        const fileUrl: string = file.path || file.secure_url || file.url;
+        res.json({ url: fileUrl });
+    } catch (err) {
+        console.error("Upload new supplier catalog error:", err);
+        res.status(500).json({ error: "Internal server error" });
     }
-    const fileUrl: string = file.path || file.secure_url || file.url;
-    res.json({ url: fileUrl });
-  } catch (err) {
-    console.error("Upload new supplier catalog error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
 }
 
 /**
@@ -300,7 +301,7 @@ export async function createNewSupplier(
             }
             if (!reportBuyer) reportBuyer = "Direct";
             const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
-            
+
             let parsedProducts = "";
             const sProducts = (supplier as any).supplierProducts;
             if (Array.isArray(sProducts) && sProducts.length > 0) {
@@ -311,7 +312,7 @@ export async function createNewSupplier(
             const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] New Supplier Onboarded.${notesStr}`;
 
             const existingReport = await (prisma as any).report.findFirst({
-                where: { 
+                where: {
                     productName: { equals: reportProduct, mode: "insensitive" }
                 },
                 orderBy: { createdAt: 'desc' }
@@ -320,7 +321,7 @@ export async function createNewSupplier(
             const mergeStr = (a: string, b: string) => {
                 if (!b || b === "Direct" || b === "N/A") return a;
                 if (!a || a === "Direct" || a === "N/A") return b;
-                const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
+                const s = new Set([...a.split(",").map(x => x.trim()), ...b.split(",").map(x => x.trim())]);
                 return Array.from(s).filter(Boolean).join(", ");
             };
 
@@ -350,7 +351,7 @@ export async function createNewSupplier(
                     }
                 });
             }
-        } catch(e) { console.error("Auto Report Gen Failed", e); }
+        } catch (e) { console.error("Auto Report Gen Failed", e); }
         // -------------------------------------------
 
         // --- VAULT SYNC: auto-create folders ---
@@ -360,8 +361,15 @@ export async function createNewSupplier(
                 productCatalogs: supplier.productCatalogs as any[] ?? [],
                 warehousePhotos: supplier.warehousePhotos as any[] ?? [],
             }, req.user!.id);
-        } catch(e) { console.error("Vault Sync Failed", e); }
+        } catch (e) { console.error("Vault Sync Failed", e); }
         // ---------------------------------------
+
+        // --- AUTO-CREATE DEAL ---
+        try {
+            const { autoCreateDealForSupplier } = await import("../services/dealStageSync.service.js");
+            await autoCreateDealForSupplier(supplier.company, "NewSupplier", supplier);
+        } catch (e) { console.error("Auto Deal Creation Failed", e); }
+        // ------------------------
 
         res.status(201).json(supplier);
     } catch (err) {
@@ -434,6 +442,7 @@ export async function updateNewSupplier(
                     certificates: certificates ?? [],
                     warehousePhotos: warehousePhotos ?? [],
                     videoLinks: videoLinks ?? [],
+                    ...(req.body.dealStage !== undefined && { dealStage: req.body.dealStage }),
                     tradeName, yearEstablished, manufacturingAddress, city, state, postalCode, supplierType,
                     whatsapp, hsCode, organicStatus, ingredientList, allergenDeclaration, shelfLife,
                     storageConditions, packagingType, netWeightVariants, sampleAvailable, sampleLeadTime, sampleCost,
@@ -485,6 +494,11 @@ export async function updateNewSupplier(
             company: supplier.company,
         });
 
+        // Sync deal stage if it changed
+        if (req.body.dealStage && existing.dealStage !== req.body.dealStage) {
+            await syncDealStageFromSupplier(supplier.company, req.body.dealStage, "NewSupplier");
+        }
+
         // --- NEW: AUTO-GENERATE REPORT ---
         const changedNotes = existing.notes !== notes;
         const changedStatus = existing.currentStatus !== currentStatus;
@@ -495,7 +509,7 @@ export async function updateNewSupplier(
             if (changedStatus) parts.push(`Status changed to '${currentStatus}'`);
             if (changedNotes) parts.push(`Notes: ${notes || "(cleared)"}`);
             updatesText += parts.join(" | ");
-            
+
             try {
                 let reportBuyer = supplier.accountManager || existing.accountManager || "";
                 if (!reportBuyer && Array.isArray(incomingIds) && incomingIds.length > 0) {
@@ -504,7 +518,7 @@ export async function updateNewSupplier(
                 }
                 if (!reportBuyer) reportBuyer = "Direct";
                 const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
-                
+
                 let parsedProducts = "";
                 const sProducts = (supplier as any).supplierProducts;
                 const eProducts = (existing as any).supplierProducts;
@@ -516,7 +530,7 @@ export async function updateNewSupplier(
                 const reportProduct = parsedProducts || supplier.product || existing.product || "N/A";
 
                 const existingReport = await (prisma as any).report.findFirst({
-                    where: { 
+                    where: {
                         productName: { equals: reportProduct, mode: "insensitive" }
                     },
                     orderBy: { createdAt: 'desc' }
@@ -525,12 +539,12 @@ export async function updateNewSupplier(
                 const mergeStr = (a: string, b: string) => {
                     if (!b || b === "Direct" || b === "N/A") return a;
                     if (!a || a === "Direct" || a === "N/A") return b;
-                    const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
+                    const s = new Set([...a.split(",").map(x => x.trim()), ...b.split(",").map(x => x.trim())]);
                     return Array.from(s).filter(Boolean).join(", ");
                 };
 
                 const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] ${updatesText}`;
-                
+
                 if (existingReport && reportProduct !== "N/A") {
                     await (prisma as any).report.update({
                         where: { id: existingReport.id },
@@ -557,7 +571,7 @@ export async function updateNewSupplier(
                         }
                     });
                 }
-            } catch(e) { console.error("Auto Report Gen Failed", e); }
+            } catch (e) { console.error("Auto Report Gen Failed", e); }
         }
         // ---------------------------------
 
@@ -568,20 +582,20 @@ export async function updateNewSupplier(
                 productCatalogs: supplier.productCatalogs as any[] ?? [],
                 warehousePhotos: supplier.warehousePhotos as any[] ?? [],
             }, req.user!.id);
-        } catch(e) { console.error("Vault Sync Failed", e); }
+        } catch (e) { console.error("Vault Sync Failed", e); }
         // ---------------------------------------
 
         if (currentStatus && existing.currentStatus !== currentStatus) {
-          await createNotification({
-            type: "status_change",
-            title: "New Supplier Status Updated",
-            message: `${supplier.company} status changed from "${existing.currentStatus}" to "${currentStatus}"`,
-            entityType: "new_supplier",
-            entityId: supplier.id,
-            entityName: supplier.company,
-            entityLink: `/suppliers/new/${supplier.id}`,
-            createdBy: req.user!.id,
-          });
+            await createNotification({
+                type: "status_change",
+                title: "New Supplier Status Updated",
+                message: `${supplier.company} status changed from "${existing.currentStatus}" to "${currentStatus}"`,
+                entityType: "new_supplier",
+                entityId: supplier.id,
+                entityName: supplier.company,
+                entityLink: `/suppliers/new/${supplier.id}`,
+                createdBy: req.user!.id,
+            });
         }
 
         res.json(supplier);
@@ -660,14 +674,14 @@ export async function updateNewSupplierStage(
             });
             await logActivity(req.user!.id, "move_to_suppliers", "new_suppliers", result.id, { company: existing.company });
             await createNotification({
-              type: "stage_change",
-              title: "Supplier Converted to Signed",
-              message: `${existing.company} moved from Onboarding → Signed`,
-              entityType: "supplier",
-              entityId: result.id,
-              entityName: existing.company,
-              entityLink: `/suppliers/signed-contract/${result.id}`,
-              createdBy: req.user!.id,
+                type: "stage_change",
+                title: "Supplier Converted to Signed",
+                message: `${existing.company} moved from Onboarding → Signed`,
+                entityType: "supplier",
+                entityId: result.id,
+                entityName: existing.company,
+                entityLink: `/suppliers/signed-contract/${result.id}`,
+                createdBy: req.user!.id,
             });
             res.json(result);
         } else if (stage === "Closed") {
@@ -694,14 +708,14 @@ export async function updateNewSupplierStage(
             });
             await logActivity(req.user!.id, "move_to_old_suppliers", "new_suppliers", result.id, { company: existing.company });
             await createNotification({
-              type: "stage_change",
-              title: "New Supplier Moved to Closed",
-              message: `${existing.company} moved from Onboarding → Closed`,
-              entityType: "old_supplier",
-              entityId: result.id,
-              entityName: existing.company,
-              entityLink: `/suppliers/old`,
-              createdBy: req.user!.id,
+                type: "stage_change",
+                title: "New Supplier Moved to Closed",
+                message: `${existing.company} moved from Onboarding → Closed`,
+                entityType: "old_supplier",
+                entityId: result.id,
+                entityName: existing.company,
+                entityLink: `/suppliers/old`,
+                createdBy: req.user!.id,
             });
             res.json(result);
         } else {
@@ -754,6 +768,17 @@ export async function deleteNewSupplier(
             company: existing.company,
         });
 
+        // --- DELETE RELATED DEALS ---
+        try {
+            const deletedDeals = await (prisma as any).deal.deleteMany({
+                where: { supplier: existing.company },
+            });
+            if (deletedDeals.count > 0) {
+                console.log(`Deleted ${deletedDeals.count} deal(s) for new supplier: ${existing.company}`);
+            }
+        } catch (e) { console.error("Deal Deletion Failed", e); }
+        // ----------------------------
+
         // --- NEW: AUTO-GENERATE REPORT CLEANUP ---
         try {
             let parsedProducts = "";
@@ -795,7 +820,7 @@ export async function deleteNewSupplier(
                     }
                 }
             }
-        } catch(e) { console.error("Report Cleanup Failed", e); }
+        } catch (e) { console.error("Report Cleanup Failed", e); }
         // ------------------------------------------
 
         res.json({ message: "New supplier deleted" });
@@ -991,7 +1016,7 @@ export async function getNewSupplierFilters(
             (prisma as any).newSupplier.findMany({ select: { createdAt: true } }),
         ]);
 
-        const formattedDates = Array.from(new Set(datesRaw.map((d: any) => 
+        const formattedDates = Array.from(new Set(datesRaw.map((d: any) =>
             new Date(d.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
         ))).filter(Boolean);
 

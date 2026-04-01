@@ -3,6 +3,7 @@ import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
 import { createNotification } from "../services/notificationService.js";
+import { syncDealStageFromSupplier } from "../services/dealStageSync.service.js";
 
 /**
  * GET /api/old-suppliers
@@ -53,16 +54,16 @@ export async function listOldSuppliers(
     if (accountManager && accountManager !== "all") {
       where.accountManager = { equals: accountManager, mode: "insensitive" };
     }
-        const dateFilter: any = {};
-        if (dateFrom && dateFrom !== "all") {
-            dateFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
-        }
-        if (dateTo && dateTo !== "all") {
-            dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
-        }
-        if (Object.keys(dateFilter).length > 0) {
-            where.createdAt = dateFilter;
-        }
+    const dateFilter: any = {};
+    if (dateFrom && dateFrom !== "all") {
+      dateFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+    }
+    if (dateTo && dateTo !== "all") {
+      dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
+    }
+    if (Object.keys(dateFilter).length > 0) {
+      where.createdAt = dateFilter;
+    }
 
     const [suppliers, total] = await Promise.all([
       prisma.oldSupplier.findMany({
@@ -140,6 +141,13 @@ export async function createOldSupplier(
       company: supplier.company,
     });
 
+    // --- AUTO-CREATE DEAL ---
+    try {
+      const { autoCreateDealForSupplier } = await import("../services/dealStageSync.service.js");
+      await autoCreateDealForSupplier(supplier.company, "OldSupplier", supplier);
+    } catch (e) { console.error("Auto Deal Creation Failed", e); }
+    // ------------------------
+
     res.status(201).json(supplier);
   } catch (err) {
     console.error("Create old supplier error:", err);
@@ -175,13 +183,19 @@ export async function updateOldSupplier(
       data: {
         company, productCategory, product, country, accountManager,
         currentStatus, certifications, latestQuotation, reasonInactive,
-        dateMarkedInactive, reactivationPotential, notes
+        dateMarkedInactive, reactivationPotential, notes,
+        ...(req.body.dealStage !== undefined && { dealStage: req.body.dealStage }),
       },
     });
 
     await logActivity(req.user!.id, "update", "old_suppliers", supplier.id, {
       company: supplier.company,
     });
+
+    // Sync deal stage if it changed
+    if (req.body.dealStage && existing.dealStage !== req.body.dealStage) {
+      await syncDealStageFromSupplier(supplier.company, req.body.dealStage, "OldSupplier");
+    }
 
     res.json(supplier);
   } catch (err) {
@@ -297,6 +311,17 @@ export async function deleteOldSupplier(
     await logActivity(req.user!.id, "delete", "old_suppliers", req.params.id, {
       company: existing.company,
     });
+
+    // --- DELETE RELATED DEALS ---
+    try {
+      const deletedDeals = await (prisma as any).deal.deleteMany({
+        where: { supplier: existing.company },
+      });
+      if (deletedDeals.count > 0) {
+        console.log(`Deleted ${deletedDeals.count} deal(s) for old supplier: ${existing.company}`);
+      }
+    } catch (e) { console.error("Deal Deletion Failed", e); }
+    // ----------------------------
 
     res.json({ message: "Old supplier deleted" });
   } catch (err) {

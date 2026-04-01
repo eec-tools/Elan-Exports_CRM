@@ -27,8 +27,6 @@ export async function getDashboardStats(
       totalDeals,
       totalVaultDocs,
       pendingTasks,
-      dealsByStage,
-      pipelineRevenue,
       recentDeals,
       tasksGrouped,
     ] = await Promise.all([
@@ -40,17 +38,9 @@ export async function getDashboardStats(
       safe(() => (prisma as any).vaultDocument.count(), 0),
       safe(() => (prisma as any).dailyTask.count({ where: { status: { not: "Completed" } } }), 0),
       safe(() =>
-        (prisma as any).deal.groupBy({
-          by: ["stage"],
-          _count: { id: true },
-          _sum: { expectedRevenue: true },
-        }), []
-      ),
-      safe(() => (prisma as any).deal.aggregate({ _sum: { expectedRevenue: true } }), { _sum: { expectedRevenue: 0 } }),
-      safe(() =>
         (prisma as any).deal.findMany({
           orderBy: { createdAt: "desc" },
-          take: 2,
+          take: 3,
           select: {
             id: true,
             title: true,
@@ -67,50 +57,33 @@ export async function getDashboardStats(
         (prisma as any).dailyTask.groupBy({
           by: ["owner", "status"],
           _count: { id: true },
-          where: { 
-            owner: { 
+          where: {
+            owner: {
               not: null,
-              notIn: ["", "N/A", "n/a"] 
-            } 
+              notIn: ["", "N/A", "n/a"]
+            }
           },
         }), []
       ),
     ]);
 
-    const STAGE_ORDER = [
-      "LEAD", "RFQ", "SAMPLE", "NEGOTIATION", "CONTRACT", "CLOSED_WON", "CLOSED_LOST",
-    ];
-
-    const stagesRaw = dealsByStage as Array<{ stage: string; _count: { id: number }; _sum: { expectedRevenue: number | null } }>;
-
-    const pipeline = STAGE_ORDER.map((stage) => {
-      const found = stagesRaw.find((d) => d.stage === stage);
-      return {
-        stage,
-        count: found?._count.id ?? 0,
-        revenue: found?._sum.expectedRevenue ?? 0,
-      };
-    }).filter((s) => s.count > 0);
-
-    const revenue = (pipelineRevenue as any)?._sum?.expectedRevenue ?? 0;
-
     // Process Task Analytics
     const rawTasks = tasksGrouped as Array<{ owner: string; status: string; _count: { id: number } }>;
     const taskAnalyticsMap: Record<string, { pending: number; inProgress: number; completed: number; closed: number; total: number }> = {};
-    
+
     for (const item of rawTasks) {
       if (!item.owner) continue;
-      
+
       const owner = item.owner;
       const status = (item.status || "").toLowerCase();
       const count = item._count.id;
-      
+
       if (!taskAnalyticsMap[owner]) {
         taskAnalyticsMap[owner] = { pending: 0, inProgress: 0, completed: 0, closed: 0, total: 0 };
       }
-      
+
       taskAnalyticsMap[owner].total += count;
-      
+
       if (status === "inprogress") {
         taskAnalyticsMap[owner].inProgress += count;
       } else if (status === "completed") {
@@ -121,7 +94,7 @@ export async function getDashboardStats(
         taskAnalyticsMap[owner].pending += count; // handles "not started" and any other unrecognized ones mapped to pending
       }
     }
-    
+
     const taskAnalytics = Object.entries(taskAnalyticsMap)
       .map(([owner, stats]) => ({ owner, ...stats }))
       .sort((a, b) => b.total - a.total); // Sort by total tasks descending
@@ -134,8 +107,6 @@ export async function getDashboardStats(
       totalDeals,
       totalVaultDocs,
       pendingTasks,
-      totalPipelineRevenue: revenue,
-      pipeline,
       recentDeals,
       taskAnalytics,
     });

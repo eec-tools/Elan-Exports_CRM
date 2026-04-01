@@ -14,11 +14,11 @@ import {
     DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import {
     Plus,
@@ -198,6 +198,7 @@ interface Supplier {
     productCatalogs?: ProductCatalogEntry[];
     // Buyer links
     buyerIds?: string[];
+    dealStage?: string;
     // Media & Documents
     certificates?: { name: string; url: string }[];
     warehousePhotos?: { name: string; url: string }[];
@@ -247,6 +248,19 @@ interface LabTestRow {
 
 const ORGANIC_CERT_MARKETS = ["India — NPOP", "USA — USDA Organic (NOP)", "EU — EU Organic (Reg 2018/848)", "UK — UK Organic", "Australia — ACO / NASAA", "Japan — JAS Organic"];
 const LAB_TEST_TYPES = ["Pesticide Residue Analysis", "Heavy Metals Test", "Microbiology Test", "Aflatoxin Test", "Moisture Analysis"];
+
+const DEAL_STAGES = [
+    "Communication",
+    "Sampling",
+    "Quotation",
+    "Negotiation with EEC",
+    "Price quotation to Buyer after EEC approval",
+    "Negotiation with buyer",
+    "Price approval by buyer",
+    "Quotation send to the supplier from buyer end",
+    "Orders confirmed from buyers end",
+    "Timeline (Product shipping.. etc) should be established from suppliers end",
+];
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
     company: "",
@@ -383,9 +397,9 @@ export default function NewSuppliersPage() {
         queryKey: ["new-suppliers", search, statusFilter, countryFilter, categoryFilter, managerFilter, productFilter, certificationFilter, dateFrom, dateTo, page],
         queryFn: () =>
             api
-                .get("/new-suppliers", { 
-                    params: { 
-                        search, 
+                .get("/new-suppliers", {
+                    params: {
+                        search,
                         status: statusFilter !== "all" ? statusFilter : undefined,
                         country: countryFilter !== "all" ? countryFilter : undefined,
                         productCategory: categoryFilter !== "all" ? categoryFilter : undefined,
@@ -394,9 +408,9 @@ export default function NewSuppliersPage() {
                         certifications: certificationFilter !== "all" ? certificationFilter : undefined,
                         dateFrom: dateFrom || undefined,
                         dateTo: dateTo || undefined,
-                        page, 
-                        limit: 20 
-                    } 
+                        page,
+                        limit: 20
+                    }
                 })
                 .then((r) => r.data),
     });
@@ -529,9 +543,9 @@ export default function NewSuppliersPage() {
             }
         }
 
-        const payload = { 
-            ...form, 
-            productCatalog: catalogUrl, 
+        const payload = {
+            ...form,
+            productCatalog: catalogUrl,
             productCatalogs: finalCatalogs,
             certificates: finalCertificates,
             warehousePhotos: finalWarehousePhotos,
@@ -639,7 +653,7 @@ export default function NewSuppliersPage() {
                             className="pl-9 h-9 bg-slate-50 border-slate-200 focus:bg-white focus:ring-brand-500/20 focus:border-brand-500 text-sm"
                         />
                     </div>
-                    
+
                     <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
                         <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
                             <SelectValue placeholder="All Statuses" />
@@ -714,16 +728,16 @@ export default function NewSuppliersPage() {
 
                     <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-md px-2 h-9">
                         <span className="text-xs font-medium text-slate-500">Date:</span>
-                        <input 
-                            type="date" 
-                            value={dateFrom} 
+                        <input
+                            type="date"
+                            value={dateFrom}
                             onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
                             className="text-xs bg-transparent border-none p-0 focus:ring-0 w-24 text-slate-700 outline-none"
                         />
                         <span className="text-slate-300">-</span>
-                        <input 
-                            type="date" 
-                            value={dateTo} 
+                        <input
+                            type="date"
+                            value={dateTo}
                             onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
                             className="text-xs bg-transparent border-none p-0 focus:ring-0 w-24 text-slate-700 outline-none"
                         />
@@ -755,6 +769,7 @@ export default function NewSuppliersPage() {
                                 <th className="px-5 py-3.5 font-semibold">Phone</th>
                                 <th className="px-5 py-3.5 font-semibold">Email</th>
                                 <th className="px-5 py-3.5 font-semibold">Current Status</th>
+                                <th className="px-5 py-3.5 font-semibold">Deal Stage</th>
                                 <th className="px-5 py-3.5 font-semibold">Certifications</th>
                                 <th className="px-5 py-3.5 font-semibold">Notes</th>
                                 <th className="px-5 py-3.5 font-semibold">Stage</th>
@@ -765,7 +780,7 @@ export default function NewSuppliersPage() {
                         <tbody className="divide-y divide-slate-100 text-slate-700">
                             {isLoading && suppliers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={canEdit ? 13 : 12} className="h-32 text-center">
+                                    <td colSpan={canEdit ? 14 : 13} className="h-32 text-center">
                                         <div className="flex justify-center">
                                             <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                                         </div>
@@ -773,7 +788,7 @@ export default function NewSuppliersPage() {
                                 </tr>
                             ) : suppliers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={canEdit ? 13 : 12} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                                    <td colSpan={canEdit ? 14 : 13} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                                         <div className="flex flex-col items-center justify-center gap-3">
                                             <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                                                 <Building2 className="h-6 w-6 text-slate-300" />
@@ -803,6 +818,24 @@ export default function NewSuppliersPage() {
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.phone}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.email}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.currentStatus}</td>
+                                        <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
+                                            <Select
+                                                value={s.dealStage || "Communication"}
+                                                onValueChange={(val) => {
+                                                    updateMutation.mutate({ id: s.id, d: { dealStage: val } });
+                                                }}
+                                                disabled={updateMutation.isPending}
+                                            >
+                                                <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[140px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {DEAL_STAGES.map((stage) => (
+                                                        <SelectItem key={stage} value={stage}>{stage}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.certifications}>{s.certifications}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.notes}>{s.notes}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
@@ -1003,7 +1036,7 @@ export default function NewSuppliersPage() {
                                         <div className="space-y-1.5"><Label className="text-xs">Product Name / Description</Label><Input className="h-8 text-sm" value={prod.product} onChange={(e) => updateProduct(i, "product", e.target.value)} placeholder="e.g. Organic Basmati Rice" /></div>
                                         <div className="space-y-1.5"><Label className="text-xs">Product Category</Label><Input className="h-8 text-sm" value={prod.productCategory} onChange={(e) => updateProduct(i, "productCategory", e.target.value)} placeholder="e.g. Rice, Spices" /></div>
                                         <div className="space-y-1.5"><Label className="text-xs">HS Code (6–8 digit)</Label><Input className="h-8 text-sm" value={prod.hsCode} onChange={(e) => updateProduct(i, "hsCode", e.target.value)} placeholder="e.g. 100630" /></div>
-                                        <div className="space-y-1.5"><Label className="text-xs">Organic Status</Label><SelectWithOthers value={prod.organicStatus} onChange={(v) => updateProduct(i, "organicStatus", v)} options={["Certified Organic","In Conversion","Conventional"]} placeholder="Select…" /></div>
+                                        <div className="space-y-1.5"><Label className="text-xs">Organic Status</Label><SelectWithOthers value={prod.organicStatus} onChange={(v) => updateProduct(i, "organicStatus", v)} options={["Certified Organic", "In Conversion", "Conventional"]} placeholder="Select…" /></div>
                                         <div className="space-y-1.5"><Label className="text-xs">Certifications</Label><Input className="h-8 text-sm" value={prod.certifications} onChange={(e) => updateProduct(i, "certifications", e.target.value)} placeholder="e.g. USDA, EU Organic" /></div>
                                         <div className="space-y-1.5"><Label className="text-xs">Shelf Life (months)</Label><Input className="h-8 text-sm" value={prod.shelfLife} onChange={(e) => updateProduct(i, "shelfLife", e.target.value)} /></div>
                                         <div className="space-y-1.5"><Label className="text-xs">Storage Conditions</Label><Input className="h-8 text-sm" value={prod.storageConditions} onChange={(e) => updateProduct(i, "storageConditions", e.target.value)} /></div>
@@ -1215,70 +1248,72 @@ export default function NewSuppliersPage() {
                         <Separator />
 
                         {/* ── Section 9: Organic Certification Chain (only when organic) ── */}
-                        {(() => { const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion"); return hasOrganic ? (
-                        <><div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Organic Certification Chain</p>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label>Farmer Organic Certification Available?</Label>
-                                    <SelectWithOthers value={form.farmerOrganicCert ?? ""} onChange={(v) => setForm({ ...form, farmerOrganicCert: v })} options={["Yes", "No"]} placeholder="Select…" />
+                        {(() => {
+                            const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion"); return hasOrganic ? (
+                                <><div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Organic Certification Chain</p>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label>Farmer Organic Certification Available?</Label>
+                                            <SelectWithOthers value={form.farmerOrganicCert ?? ""} onChange={(v) => setForm({ ...form, farmerOrganicCert: v })} options={["Yes", "No"]} placeholder="Select…" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Aggregator / FPO Organic Certification Available?</Label>
+                                            <SelectWithOthers value={form.aggregatorOrganicCert ?? ""} onChange={(v) => setForm({ ...form, aggregatorOrganicCert: v })} options={["Yes", "No"]} placeholder="Select…" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Processing Unit Organic Certification Available?</Label>
+                                            <SelectWithOthers value={form.processingUnitOrganicCert ?? ""} onChange={(v) => setForm({ ...form, processingUnitOrganicCert: v })} options={["Yes", "No"]} placeholder="Select…" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Certifying Body Name</Label>
+                                            <Input value={form.certifyingBodyName ?? ""} onChange={(e) => setForm({ ...form, certifyingBodyName: e.target.value })} />
+                                        </div>
+                                        <div className="space-y-2 sm:col-span-2">
+                                            <Label>Certificates Valid for Export (not domestic-only)?</Label>
+                                            <SelectWithOthers value={form.certsValidForExport ?? ""} onChange={(v) => setForm({ ...form, certsValidForExport: v })} options={["Yes", "No"]} placeholder="Select…" />
+                                        </div>
+                                    </div>
+                                    {/* Organic Certs by Market table */}
+                                    <div className="mt-4">
+                                        <Label className="mb-2 block text-sm">Organic Certificates by Market</Label>
+                                        <div className="rounded-md border border-slate-200 overflow-hidden">
+                                            <table className="w-full text-xs">
+                                                <thead className="bg-slate-50">
+                                                    <tr>
+                                                        <th className="px-3 py-2 text-left font-medium text-slate-500 w-1/3">Market / Standard</th>
+                                                        <th className="px-3 py-2 text-left font-medium text-slate-500">Certificate Number</th>
+                                                        <th className="px-3 py-2 text-left font-medium text-slate-500">Expiry Date</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {(form.organicCertsByMarket ?? []).map((row, i) => (
+                                                        <tr key={row.market}>
+                                                            <td className="px-3 py-1.5 text-slate-600 font-medium">{row.market}</td>
+                                                            <td className="px-3 py-1.5">
+                                                                <Input className="h-7 text-xs border-slate-200" value={row.certNumber} onChange={(e) => {
+                                                                    const next = [...(form.organicCertsByMarket ?? [])];
+                                                                    next[i] = { ...next[i], certNumber: e.target.value };
+                                                                    setForm({ ...form, organicCertsByMarket: next });
+                                                                }} placeholder="Cert number" />
+                                                            </td>
+                                                            <td className="px-3 py-1.5">
+                                                                <Input className="h-7 text-xs border-slate-200" value={row.expiryDate} onChange={(e) => {
+                                                                    const next = [...(form.organicCertsByMarket ?? [])];
+                                                                    next[i] = { ...next[i], expiryDate: e.target.value };
+                                                                    setForm({ ...form, organicCertsByMarket: next });
+                                                                }} placeholder="DD/MM/YYYY" />
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Aggregator / FPO Organic Certification Available?</Label>
-                                    <SelectWithOthers value={form.aggregatorOrganicCert ?? ""} onChange={(v) => setForm({ ...form, aggregatorOrganicCert: v })} options={["Yes", "No"]} placeholder="Select…" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Processing Unit Organic Certification Available?</Label>
-                                    <SelectWithOthers value={form.processingUnitOrganicCert ?? ""} onChange={(v) => setForm({ ...form, processingUnitOrganicCert: v })} options={["Yes", "No"]} placeholder="Select…" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Certifying Body Name</Label>
-                                    <Input value={form.certifyingBodyName ?? ""} onChange={(e) => setForm({ ...form, certifyingBodyName: e.target.value })} />
-                                </div>
-                                <div className="space-y-2 sm:col-span-2">
-                                    <Label>Certificates Valid for Export (not domestic-only)?</Label>
-                                    <SelectWithOthers value={form.certsValidForExport ?? ""} onChange={(v) => setForm({ ...form, certsValidForExport: v })} options={["Yes", "No"]} placeholder="Select…" />
-                                </div>
-                            </div>
-                            {/* Organic Certs by Market table */}
-                            <div className="mt-4">
-                                <Label className="mb-2 block text-sm">Organic Certificates by Market</Label>
-                                <div className="rounded-md border border-slate-200 overflow-hidden">
-                                    <table className="w-full text-xs">
-                                        <thead className="bg-slate-50">
-                                            <tr>
-                                                <th className="px-3 py-2 text-left font-medium text-slate-500 w-1/3">Market / Standard</th>
-                                                <th className="px-3 py-2 text-left font-medium text-slate-500">Certificate Number</th>
-                                                <th className="px-3 py-2 text-left font-medium text-slate-500">Expiry Date</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {(form.organicCertsByMarket ?? []).map((row, i) => (
-                                                <tr key={row.market}>
-                                                    <td className="px-3 py-1.5 text-slate-600 font-medium">{row.market}</td>
-                                                    <td className="px-3 py-1.5">
-                                                        <Input className="h-7 text-xs border-slate-200" value={row.certNumber} onChange={(e) => {
-                                                            const next = [...(form.organicCertsByMarket ?? [])];
-                                                            next[i] = { ...next[i], certNumber: e.target.value };
-                                                            setForm({ ...form, organicCertsByMarket: next });
-                                                        }} placeholder="Cert number" />
-                                                    </td>
-                                                    <td className="px-3 py-1.5">
-                                                        <Input className="h-7 text-xs border-slate-200" value={row.expiryDate} onChange={(e) => {
-                                                            const next = [...(form.organicCertsByMarket ?? [])];
-                                                            next[i] = { ...next[i], expiryDate: e.target.value };
-                                                            setForm({ ...form, organicCertsByMarket: next });
-                                                        }} placeholder="DD/MM/YYYY" />
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        </>
-                        ) : null; })()}
+                                </>
+                            ) : null;
+                        })()}
 
                         <Separator />
 
@@ -1382,32 +1417,34 @@ export default function NewSuppliersPage() {
                         <Separator />
 
                         {/* ── Section 12: Processing Compliance (only when organic) ── */}
-                        {(() => { const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion"); return hasOrganic ? (
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Processing Compliance</p>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label>Organic & Non-Organic Segregation SOP Available?</Label>
-                                    <SelectWithOthers value={form.organicSegregationSop ?? ""} onChange={(v) => setForm({ ...form, organicSegregationSop: v })} options={["Yes", "No"]} placeholder="Select…" />
+                        {(() => {
+                            const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion"); return hasOrganic ? (
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Processing Compliance</p>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label>Organic & Non-Organic Segregation SOP Available?</Label>
+                                            <SelectWithOthers value={form.organicSegregationSop ?? ""} onChange={(v) => setForm({ ...form, organicSegregationSop: v })} options={["Yes", "No"]} placeholder="Select…" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Cleaning & Line Clearance SOP for Organic Runs?</Label>
+                                            <SelectWithOthers value={form.cleaningLinelearanceSop ?? ""} onChange={(v) => setForm({ ...form, cleaningLinelearanceSop: v })} options={["Yes", "No"]} placeholder="Select…" />
+                                        </div>
+                                        <div className="space-y-2 sm:col-span-2">
+                                            <Label>No Prohibited Processing Aids Confirmation?</Label>
+                                            <SelectWithOthers value={form.noProhibitedAids ?? ""} onChange={(v) => setForm({ ...form, noProhibitedAids: v })} options={["Yes", "No"]} placeholder="Select…" />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Cleaning & Line Clearance SOP for Organic Runs?</Label>
-                                    <SelectWithOthers value={form.cleaningLinelearanceSop ?? ""} onChange={(v) => setForm({ ...form, cleaningLinelearanceSop: v })} options={["Yes", "No"]} placeholder="Select…" />
-                                </div>
-                                <div className="space-y-2 sm:col-span-2">
-                                    <Label>No Prohibited Processing Aids Confirmation?</Label>
-                                    <SelectWithOthers value={form.noProhibitedAids ?? ""} onChange={(v) => setForm({ ...form, noProhibitedAids: v })} options={["Yes", "No"]} placeholder="Select…" />
-                                </div>
-                            </div>
-                        </div>
-                        ) : null; })()}
+                            ) : null;
+                        })()}
 
                         <Separator />
 
                         {/* ── Media & Documents ── */}
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Media & Documents</p>
-                            
+
                             <div className="space-y-6">
                                 {/* Certificates */}
                                 <div>

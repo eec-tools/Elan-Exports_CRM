@@ -46,13 +46,16 @@ interface Deal {
 
 // ─── Stage Config ─────────────────────────────────────────────
 const STAGES = [
-  { id: "LEAD",        label: "LEAD",        color: "#64748b", bg: "#f1f5f9", text: "#334155" },
-  { id: "RFQ",         label: "RFQ",         color: "#3b82f6", bg: "#eff6ff", text: "#1d4ed8" },
-  { id: "NEGOTIATION", label: "NEGOTIATION", color: "#f59e0b", bg: "#fffbeb", text: "#b45309" },
-  { id: "SAMPLING",    label: "SAMPLING",    color: "#8b5cf6", bg: "#f5f3ff", text: "#6d28d9" },
-  { id: "CONFIRMED",   label: "CONFIRMED",   color: "#10b981", bg: "#ecfdf5", text: "#065f46" },
-  { id: "SHIPPED",     label: "SHIPPED",     color: "#06b6d4", bg: "#ecfeff", text: "#0e7490" },
-  { id: "CLOSED",      label: "CLOSED",      color: "#16a34a", bg: "#f0fdf4", text: "#14532d" },
+  { id: "Communication", label: "Communication", color: "#64748b", bg: "#f1f5f9", text: "#334155" },
+  { id: "Sampling", label: "Sampling", color: "#8b5cf6", bg: "#f5f3ff", text: "#6d28d9" },
+  { id: "Quotation", label: "Quotation", color: "#3b82f6", bg: "#eff6ff", text: "#1d4ed8" },
+  { id: "Negotiation with EEC", label: "Negotiation with EEC", color: "#f59e0b", bg: "#fffbeb", text: "#b45309" },
+  { id: "Price quotation to Buyer after EEC approval", label: "Price quotation to Buyer", color: "#06b6d4", bg: "#ecfeff", text: "#0e7490" },
+  { id: "Negotiation with buyer", label: "Negotiation with buyer", color: "#f97316", bg: "#fff7ed", text: "#c2410c" },
+  { id: "Price approval by buyer", label: "Price approval by buyer", color: "#10b981", bg: "#ecfdf5", text: "#065f46" },
+  { id: "Quotation send to the supplier from buyer end", label: "Quotation to supplier", color: "#14b8a6", bg: "#f0fdfa", text: "#115e59" },
+  { id: "Orders confirmed from buyers end", label: "Orders confirmed", color: "#16a34a", bg: "#f0fdf4", text: "#14532d" },
+  { id: "Timeline (Product shipping.. etc) should be established from suppliers end", label: "Timeline established", color: "#22c55e", bg: "#f0fdf4", text: "#166534" },
 ];
 
 const RISK_OPTIONS = ["Low", "Medium", "High"];
@@ -92,7 +95,7 @@ const emptyForm = (): Partial<Deal> => ({
   price: undefined,
   expectedRevenue: undefined,
   margin: 15,
-  stage: "LEAD",
+  stage: "Communication",
   probability: 20,
   category: "",
   riskScore: "Medium",
@@ -151,7 +154,7 @@ export default function DealsPage() {
           : [];
         setBuyerOptions([...new Set(names)].sort());
       })
-      .catch(() => {});
+      .catch(() => { });
     fetch(`${API_BASE}/suppliers?limit=200`, { headers: authHeader() })
       .then((r) => r.json())
       .then((d) => {
@@ -160,7 +163,7 @@ export default function DealsPage() {
           : [];
         setSupplierOptions([...new Set(names)].sort());
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // ─── Stats ───────────────────────────────────────────────────
@@ -396,22 +399,20 @@ export default function DealsPage() {
         <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
           <button
             onClick={() => setView("kanban")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${
-              view === "kanban"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${view === "kanban"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+              }`}
           >
             <LayoutGrid className="h-4 w-4" />
             Kanban
           </button>
           <button
             onClick={() => setView("table")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${
-              view === "table"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${view === "table"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+              }`}
           >
             <List className="h-4 w-4" />
             Table
@@ -618,9 +619,8 @@ function KanbanBoard({
         return (
           <div
             key={stage.id}
-            className={`flex-shrink-0 w-64 flex flex-col rounded-xl border transition-all ${
-              dragOver === stage.id ? "border-brand-400 bg-brand-50/60" : "border-slate-200 bg-slate-50"
-            }`}
+            className={`flex-shrink-0 w-64 flex flex-col rounded-xl border transition-all ${dragOver === stage.id ? "border-brand-400 bg-brand-50/60" : "border-slate-200 bg-slate-50"
+              }`}
             onDragOver={(e) => { e.preventDefault(); onDragOver(stage.id); }}
             onDrop={(e) => onDrop(e, stage.id)}
           >
@@ -760,9 +760,8 @@ function TableView({
               return (
                 <tr
                   key={deal.id}
-                  className={`border-b border-slate-100 hover:bg-brand-50/40 cursor-pointer transition-colors ${
-                    i % 2 === 0 ? "bg-white" : "bg-slate-50/30"
-                  }`}
+                  className={`border-b border-slate-100 hover:bg-brand-50/40 cursor-pointer transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"
+                    }`}
                   onClick={() => onRowClick(deal)}
                 >
                   <td className="px-4 py-3">
@@ -876,13 +875,12 @@ function DetailPanel({
                 <button
                   key={s.id}
                   onClick={() => onStageChange(s.id)}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    isCurrent
-                      ? "text-white shadow-sm"
-                      : isPast
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${isCurrent
+                    ? "text-white shadow-sm"
+                    : isPast
                       ? "text-slate-500 hover:bg-slate-100"
                       : "text-slate-400 hover:bg-slate-50"
-                  }`}
+                    }`}
                   style={isCurrent ? { background: s.color } : {}}
                 >
                   {isCurrent ? (

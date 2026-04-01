@@ -4,6 +4,7 @@ import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
 import { createNotification } from "../services/notificationService.js";
 import { syncSupplierDocsToVault } from "../services/vaultSync.service.js";
+import { syncDealStageFromSupplier } from "../services/dealStageSync.service.js";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -273,8 +274,15 @@ export async function createSupplier(
         warehousePhotos: [],
         contractDocument: contractDoc && contractDoc.url ? contractDoc : null,
       }, req.user!.id);
-    } catch(e) { console.error("Vault Sync Failed", e); }
+    } catch (e) { console.error("Vault Sync Failed", e); }
     // ---------------------------------------
+
+    // --- AUTO-CREATE DEAL ---
+    try {
+      const { autoCreateDealForSupplier } = await import("../services/dealStageSync.service.js");
+      await autoCreateDealForSupplier(supplier.company, "Supplier", supplier);
+    } catch (e) { console.error("Auto Deal Creation Failed", e); }
+    // ------------------------
 
     res.status(201).json(supplier);
   } catch (err) {
@@ -348,6 +356,11 @@ export async function updateSupplier(
     await logActivity(req.user!.id, "update", "suppliers", supplier.id, {
       company: supplier.company,
     });
+
+    // Sync deal stage if it changed
+    if (updateData.dealStage && existing.dealStage !== updateData.dealStage) {
+      await syncDealStageFromSupplier(supplier.company, updateData.dealStage, "Supplier");
+    }
 
     // --- NEW: AUTO-GENERATE REPORT ---
     const changedRemarks = existing.remarks !== updateData.remarks;
@@ -436,7 +449,7 @@ export async function updateSupplier(
         warehousePhotos: [],
         contractDocument: contractDoc && contractDoc.url ? contractDoc : null,
       }, req.user!.id);
-    } catch(e) { console.error("Vault Sync Failed", e); }
+    } catch (e) { console.error("Vault Sync Failed", e); }
     // ---------------------------------------
 
     if (updateData.currentStatus && existing.currentStatus !== updateData.currentStatus) {
@@ -619,6 +632,17 @@ export async function deleteSupplier(
     await logActivity(req.user!.id, "delete", "suppliers", supplierId, {
       company: existing.company,
     });
+
+    // --- DELETE RELATED DEALS ---
+    try {
+      const deletedDeals = await prisma.deal.deleteMany({
+        where: { supplier: existing.company },
+      });
+      if (deletedDeals.count > 0) {
+        console.log(`Deleted ${deletedDeals.count} deal(s) for supplier: ${existing.company}`);
+      }
+    } catch (e) { console.error("Deal Deletion Failed", e); }
+    // ----------------------------
 
     // --- NEW: AUTO-GENERATE REPORT CLEANUP ---
     try {

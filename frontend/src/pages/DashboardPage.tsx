@@ -13,7 +13,6 @@ import {
   ExternalLink,
   TrendingUp,
   Zap,
-  BarChart3,
   CheckCircle2,
   CheckSquare,
   Pencil,
@@ -28,12 +27,6 @@ import {
 } from "lucide-react";
 
 // ─── Types & Configuration ──────────────────────────────────────────
-interface PipelineStage {
-  stage: string;
-  count: number;
-  revenue: number;
-}
-
 interface RecentDeal {
   id: string;
   title: string;
@@ -62,31 +55,9 @@ interface DashboardStats {
   totalDeals: number;
   totalVaultDocs: number;
   pendingTasks: number;
-  totalPipelineRevenue: number;
-  pipeline: PipelineStage[];
   taskAnalytics: TaskAnalyticsOwner[];
   recentDeals: RecentDeal[];
 }
-
-// ─── Helpers ────────────────────────────────────────────────────────
-function formatCurrency(n: number | null | undefined) {
-  const v = n ?? 0;
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}k`;
-  return `$${v.toFixed(0)}`;
-}
-
-
-// ─── Stage config ────────────────────────────────────────────────────
-const STAGE_META: Record<string, { label: string; color: string; bar: string }> = {
-  LEAD:         { label: "Lead",         color: "text-slate-600",   bar: "bg-slate-400" },
-  RFQ:          { label: "RFQ",          color: "text-blue-600",    bar: "bg-blue-500" },
-  SAMPLE:       { label: "Sample",       color: "text-violet-600",  bar: "bg-violet-500" },
-  NEGOTIATION:  { label: "Negotiation",  color: "text-amber-600",   bar: "bg-amber-500" },
-  CONTRACT:     { label: "Contract",     color: "text-emerald-600", bar: "bg-emerald-500" },
-  CLOSED_WON:   { label: "Closed Won",   color: "text-green-600",   bar: "bg-green-500" },
-  CLOSED_LOST:  { label: "Closed Lost",  color: "text-rose-600",    bar: "bg-rose-400" },
-};
 
 
 
@@ -203,12 +174,9 @@ export default function DashboardPage() {
     totalDeals: stats.totalDeals ?? 0,
     totalVaultDocs: stats.totalVaultDocs ?? 0,
     pendingTasks: stats.pendingTasks ?? 0,
-    totalPipelineRevenue: stats.totalPipelineRevenue ?? 0,
-    pipeline: stats.pipeline ?? [],
     taskAnalytics: stats.taskAnalytics ?? [],
     recentDeals: stats.recentDeals ?? [],
   };
-  const maxPipelineCount = Math.max(...(s.pipeline?.map((p) => p.count) ?? [1]), 1);
   const maxTaskCount = Math.max(...(s.taskAnalytics?.map((t) => t.total) ?? [1]), 1);
 
 
@@ -259,34 +227,6 @@ export default function DashboardPage() {
           })}
         </div>
       </div>
-
-
-      {/* <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-brand-900 via-brand-800 to-brand-700 px-6 py-5 text-white shadow-xl">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/5 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-12 left-1/3 h-32 w-32 rounded-full bg-accent/10 blur-3xl" />
-        <div className="pointer-events-none absolute right-1/4 bottom-0 h-24 w-24 rounded-full bg-white/5 blur-2xl" />
-
-        <div className="relative flex gap-4 w-full justify-between items-center sm:flex-row flex-col">
-
-          <div className="flex w-full gap-4 sm:flex-row flex-col">
-            <div className="flex-1 flex flex-col items-center rounded-xl bg-white/10 px-4 py-3 backdrop-blur-sm border border-white/10">
-              <span className="text-2xl font-bold text-white">{s.totalDeals}</span>
-              <span className="text-xs text-brand-300 mt-1">Total Deals</span>
-            </div>
-            <div className="flex-1 flex flex-col items-center rounded-xl bg-white/10 px-4 py-3 backdrop-blur-sm border border-white/10">
-              <span className="text-2xl font-bold" style={{ color: "hsl(42, 85%, 65%)" }}>
-                {formatCurrency(s.totalPipelineRevenue)}
-              </span>
-              <span className="text-xs text-brand-300 mt-1">Pipeline Value</span>
-            </div>
-            <div className="flex-1 flex flex-col items-center rounded-xl bg-white/10 px-4 py-3 backdrop-blur-sm border border-white/10">
-              <span className="text-2xl font-bold text-white">{s.pendingTasks}</span>
-              <span className="text-xs text-brand-300 mt-1">Open Tasks</span>
-            </div>
-          </div>
-        </div>
-      </div> */}
-
       {/* ── Email Follow-ups Due Today ───────────────────────────── */}
       <div className="rounded-xl border border-amber-200 bg-white shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b border-amber-100 px-5 py-4 bg-amber-50">
@@ -341,14 +281,14 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* ── Deal Pipeline ──────────────── */}
+      {/* ── Latest Deals ──────────────── */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div className="flex items-center gap-2">
-            <div className="rounded-md bg-violet-50 p-1.5">
-              <BarChart3 className="h-4 w-4 text-violet-600" />
+            <div className="rounded-md bg-emerald-50 p-1.5">
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
             </div>
-            <h2 className="text-sm font-semibold text-slate-800">Deal Pipeline</h2>
+            <h2 className="text-sm font-semibold text-slate-800">Latest Deals</h2>
           </div>
           <Link to="/deals" className="text-xs text-brand-600 hover:underline font-medium">
             View all
@@ -356,26 +296,42 @@ export default function DashboardPage() {
         </div>
 
         <div className="p-5 space-y-3 overflow-y-auto">
-          {s.pipeline && s.pipeline.length > 0 ? (
-            s.pipeline.map((p) => {
-              const meta = STAGE_META[p.stage] ?? { label: p.stage, color: "text-slate-600", bar: "bg-slate-400" };
-              const pct = Math.round((p.count / maxPipelineCount) * 100);
+          {s.recentDeals && s.recentDeals.length > 0 ? (
+            s.recentDeals.slice(0, 3).map((deal) => {
+              const stageColors: Record<string, { bg: string; text: string }> = {
+                "Communication": { bg: "bg-slate-100", text: "text-slate-700" },
+                "Sampling": { bg: "bg-purple-100", text: "text-purple-700" },
+                "Quotation": { bg: "bg-blue-100", text: "text-blue-700" },
+                "Negotiation with EEC": { bg: "bg-amber-100", text: "text-amber-700" },
+                "Price quotation to Buyer after EEC approval": { bg: "bg-cyan-100", text: "text-cyan-700" },
+                "Negotiation with buyer": { bg: "bg-orange-100", text: "text-orange-700" },
+                "Price approval by buyer": { bg: "bg-emerald-100", text: "text-emerald-700" },
+                "Quotation send to the supplier from buyer end": { bg: "bg-teal-100", text: "text-teal-700" },
+                "Orders confirmed from buyers end": { bg: "bg-green-100", text: "text-green-700" },
+                "Timeline (Product shipping.. etc) should be established from suppliers end": { bg: "bg-lime-100", text: "text-lime-700" },
+              };
+              const colors = stageColors[deal.stage] || { bg: "bg-slate-100", text: "text-slate-700" };
+
               return (
-                <div key={p.stage} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className={`font-medium ${meta.color}`}>{meta.label}</span>
-                    <span className="text-slate-500">
-                      {p.count} deal{p.count !== 1 ? "s" : ""}
-                      {p.revenue ? <span className="text-slate-400 ml-1">· {formatCurrency(p.revenue)}</span> : null}
+                <Link
+                  key={deal.id}
+                  to="/deals"
+                  className="block p-4 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50/30 transition-all duration-200 group"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-slate-800 group-hover:text-brand-700 transition-colors truncate">
+                        {deal.title}
+                      </h3>
+                      {deal.buyer && (
+                        <p className="text-xs text-slate-500 mt-1 truncate">{deal.buyer}</p>
+                      )}
+                    </div>
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${colors.bg} ${colors.text} shrink-0`}>
+                      {deal.stage}
                     </span>
                   </div>
-                  <div className="h-1.5 w-full rounded-full bg-slate-100">
-                    <div
-                      className={`h-1.5 rounded-full ${meta.bar} transition-all duration-500`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
+                </Link>
               );
             })
           ) : (
@@ -413,7 +369,7 @@ export default function DashboardPage() {
                 const inProgressPct = ta.total > 0 ? Math.round((ta.inProgress / ta.total) * 100) : 0;
                 const closedPct = ta.total > 0 ? Math.round((ta.closed / ta.total) * 100) : 0;
                 const pendingPct = ta.total > 0 ? Math.round((ta.pending / ta.total) * 100) : 0;
-                
+
                 return (
                   <div key={ta.owner} className="space-y-1.5 p-4 rounded-lg border border-slate-100 bg-slate-50/50">
                     <div className="flex items-center justify-between text-xs mb-3">
@@ -469,30 +425,30 @@ export default function DashboardPage() {
                 {editingLinks.map((link, idx) => (
                   <div key={link.id} className="flex items-start gap-2 bg-slate-50 p-3 rounded-lg border border-slate-100 relative group">
                     <div className="flex-1 space-y-2">
-                       <input
-                         type="text"
-                         required
-                         value={link.title}
-                         onChange={(e) => {
-                           const newLinks = [...editingLinks];
-                           newLinks[idx].title = e.target.value;
-                           setEditingLinks(newLinks);
-                         }}
-                         className="w-full h-8 rounded-md border border-slate-200 px-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                         placeholder="Link Title (e.g. Google Meet)"
-                       />
-                       <input
-                         type="url"
-                         required
-                         value={link.url}
-                         onChange={(e) => {
-                           const newLinks = [...editingLinks];
-                           newLinks[idx].url = e.target.value;
-                           setEditingLinks(newLinks);
-                         }}
-                         className="w-full h-8 rounded-md border border-slate-200 px-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                         placeholder="URL (e.g. https://...)"
-                       />
+                      <input
+                        type="text"
+                        required
+                        value={link.title}
+                        onChange={(e) => {
+                          const newLinks = [...editingLinks];
+                          newLinks[idx].title = e.target.value;
+                          setEditingLinks(newLinks);
+                        }}
+                        className="w-full h-8 rounded-md border border-slate-200 px-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                        placeholder="Link Title (e.g. Google Meet)"
+                      />
+                      <input
+                        type="url"
+                        required
+                        value={link.url}
+                        onChange={(e) => {
+                          const newLinks = [...editingLinks];
+                          newLinks[idx].url = e.target.value;
+                          setEditingLinks(newLinks);
+                        }}
+                        className="w-full h-8 rounded-md border border-slate-200 px-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                        placeholder="URL (e.g. https://...)"
+                      />
                     </div>
                     <Button
                       type="button"
@@ -509,7 +465,7 @@ export default function DashboardPage() {
                   <p className="text-sm text-slate-500 text-center py-4">No quick links configured.</p>
                 )}
               </div>
-              
+
               <Button
                 type="button"
                 variant="outline"
