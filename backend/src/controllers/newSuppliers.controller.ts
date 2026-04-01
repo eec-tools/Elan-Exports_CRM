@@ -306,7 +306,8 @@ export async function createNewSupplier(
                 parsedProducts = sProducts.map((p: any) => p.product).filter(Boolean).join(", ");
             }
             const reportProduct = parsedProducts || supplier.product || "N/A";
-            const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] New Supplier Onboarded.`;
+            const notesStr = supplier.notes ? ` Notes: ${supplier.notes}` : "";
+            const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] New Supplier Onboarded.${notesStr}`;
 
             const existingReport = await (prisma as any).report.findFirst({
                 where: { 

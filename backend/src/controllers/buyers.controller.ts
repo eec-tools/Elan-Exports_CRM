@@ -276,7 +276,8 @@ export async function createBuyer(
       const mappedSupplier = reportSupplier.split(',').map((b: string) => `${b.trim()}`).join(', ');
       
       let reportProduct = buyer.productCategories || buyer.productCategoryInterest || "General Sourcing Request";
-      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] Buyer Added.`;
+      const notesStr = buyer.notes ? ` Notes: ${buyer.notes}` : "";
+      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] Buyer Added.${notesStr}`;
 
       const existingReport = await prisma.report.findFirst({
           where: { 

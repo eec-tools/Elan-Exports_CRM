@@ -214,7 +214,8 @@ export async function createSupplier(
         parsedProducts = sProducts.map((p: any) => p.product).filter(Boolean).join(", ");
       }
       const reportProduct = parsedProducts || supplier.products || "N/A";
-      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] Supplier Added.`;
+      const remarksStr = supplier.remarks ? ` Remarks: ${supplier.remarks}` : "";
+      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] Supplier Added.${remarksStr}`;
 
       const existingReport = await prisma.report.findFirst({
         where: {
