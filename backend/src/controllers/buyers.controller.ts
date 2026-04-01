@@ -256,6 +256,71 @@ export async function createBuyer(
       name: buyer.name,
     });
 
+    // --- NEW: AUTO-GENERATE REPORT ON CREATE ---
+    try {
+      let reportSupplier = "Direct";
+      const links: { id: string; type: "new" | "signed" }[] =
+        Array.isArray(req.body.supplierLinks) ? req.body.supplierLinks : [];
+      
+      if (links.length > 0) {
+          const firstLink = links[0];
+          if (firstLink.type === "new") {
+             const firstSupplier = await prisma.newSupplier.findUnique({ where: { id: firstLink.id } });
+             if (firstSupplier) reportSupplier = firstSupplier.company || "Direct";
+          } else {
+             const firstSupplier = await prisma.supplier.findUnique({ where: { id: firstLink.id } });
+             if (firstSupplier) reportSupplier = firstSupplier.company || "Direct";
+          }
+      }
+      
+      const mappedSupplier = reportSupplier.split(',').map((b: string) => `${b.trim()}`).join(', ');
+      
+      let reportProduct = buyer.productCategories || buyer.productCategoryInterest || "General Sourcing Request";
+      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] Buyer Added.`;
+
+      const existingReport = await prisma.report.findFirst({
+          where: { 
+              productName: { equals: reportProduct, mode: "insensitive" }
+          },
+          orderBy: { createdAt: 'desc' }
+      });
+
+      const mergeStr = (a: string, b: string) => {
+          if (!b || b === "Direct" || b === "N/A" || b === "General Sourcing Request") return a;
+          if (!a || a === "Direct" || a === "N/A" || a === "General Sourcing Request") return b;
+          const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
+          return Array.from(s).filter(Boolean).join(", ");
+      };
+
+      if (existingReport && reportProduct !== "General Sourcing Request" && reportProduct !== "N/A") {
+          await prisma.report.update({
+              where: { id: existingReport.id },
+              data: {
+                  companyName: mergeStr(existingReport.companyName, mappedSupplier),
+                  buyerName: mergeStr(existingReport.buyerName, buyer.company),
+                  status: mergeStr(existingReport.status, buyer.status || "Pending"),
+                  keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
+                  updateDate: new Date()
+              }
+          });
+      } else {
+          await prisma.report.create({
+            data: {
+              productName: reportProduct,
+              buyerName: buyer.company,
+              companyName: mappedSupplier,
+              status: buyer.status || "Pending",
+              keyUpdates: newUpdatePoint,
+              buyerSupplier: "Buyer",
+              reportDate: new Date(),
+              updateDate: new Date(),
+              createdBy: req.user!.id,
+            }
+          });
+      }
+    } catch(e) { console.error("Auto Report Gen Failed", e); }
+    // -------------------------------------------
+
     res.status(201).json(buyer);
   } catch (err) {
     console.error("Create buyer error:", err);
@@ -359,6 +424,75 @@ export async function updateBuyer(
     await logActivity(req.user!.id, "update", "buyers", buyer.id, {
       company: buyer.company,
     });
+
+    // --- NEW: AUTO-GENERATE REPORT ON UPDATE ---
+    try {
+      let reportSupplier = "Direct";
+      const links: { id: string; type: "new" | "signed" }[] =
+        Array.isArray(req.body.supplierLinks) ? req.body.supplierLinks : [];
+      
+      if (links.length > 0) {
+          const firstLink = links[0];
+          if (firstLink.type === "new") {
+             const firstSupplier = await prisma.newSupplier.findUnique({ where: { id: firstLink.id } });
+             if (firstSupplier) reportSupplier = firstSupplier.company || "Direct";
+          } else {
+             const firstSupplier = await prisma.supplier.findUnique({ where: { id: firstLink.id } });
+             if (firstSupplier) reportSupplier = firstSupplier.company || "Direct";
+          }
+      }
+      
+      const mappedSupplier = reportSupplier.split(',').map((b: string) => `${b.trim()}`).join(', ');
+      
+      let reportProduct = buyer.productCategories || buyer.productCategoryInterest || existing.productCategories || existing.productCategoryInterest || "General Sourcing Request";
+      
+      // We log updates here similar to the existing implementation
+      const statusChanged = req.body.status && req.body.status !== existing.status;
+      const updatesText = statusChanged ? `Status changed to ${req.body.status}` : `Buyer profile updated.`;
+      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] ${updatesText}`;
+
+      const existingReport = await prisma.report.findFirst({
+          where: { 
+              productName: { equals: reportProduct, mode: "insensitive" }
+          },
+          orderBy: { createdAt: 'desc' }
+      });
+
+      const mergeStr = (a: string, b: string) => {
+          if (!b || b === "Direct" || b === "N/A" || b === "General Sourcing Request") return a;
+          if (!a || a === "Direct" || a === "N/A" || a === "General Sourcing Request") return b;
+          const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
+          return Array.from(s).filter(Boolean).join(", ");
+      };
+
+      if (existingReport && reportProduct !== "General Sourcing Request" && reportProduct !== "N/A") {
+          await prisma.report.update({
+              where: { id: existingReport.id },
+              data: {
+                  companyName: mergeStr(existingReport.companyName, mappedSupplier),
+                  buyerName: mergeStr(existingReport.buyerName, buyer.company),
+                  status: mergeStr(existingReport.status, buyer.status || "Status Updated"),
+                  keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
+                  updateDate: new Date()
+              }
+          });
+      } else {
+          await prisma.report.create({
+            data: {
+              productName: reportProduct,
+              buyerName: buyer.company,
+              companyName: mappedSupplier,
+              status: buyer.status || "Status Updated",
+              keyUpdates: newUpdatePoint,
+              buyerSupplier: "Buyer",
+              reportDate: new Date(),
+              updateDate: new Date(),
+              createdBy: req.user!.id,
+            }
+          });
+      }
+    } catch(e) { console.error("Auto Report Gen Failed", e); }
+    // -------------------------------------------
 
     res.json(buyer);
   } catch (err) {

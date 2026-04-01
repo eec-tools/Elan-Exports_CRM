@@ -202,56 +202,61 @@ export async function createSupplier(
       let reportBuyer = supplier.contractBuyer || "";
       const incomingIds: string[] = Array.isArray(req.body.buyerIds) ? req.body.buyerIds : [];
       if (!reportBuyer && incomingIds.length > 0) {
-          const firstBuyer = await prisma.buyer.findUnique({ where: { id: incomingIds[0] } });
-          if (firstBuyer) reportBuyer = firstBuyer.company || firstBuyer.name || "";
+        const firstBuyer = await prisma.buyer.findUnique({ where: { id: incomingIds[0] } });
+        if (firstBuyer) reportBuyer = firstBuyer.company || firstBuyer.name || "";
       }
       if (!reportBuyer) reportBuyer = "Direct";
       const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
-      
-      const reportProduct = supplier.products || "N/A";
+
+      let parsedProducts = "";
+      const sProducts = (supplier as any).supplierProducts;
+      if (Array.isArray(sProducts) && sProducts.length > 0) {
+        parsedProducts = sProducts.map((p: any) => p.product).filter(Boolean).join(", ");
+      }
+      const reportProduct = parsedProducts || supplier.products || "N/A";
       const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] Supplier Added.`;
 
       const existingReport = await prisma.report.findFirst({
-          where: { 
-              productName: { equals: reportProduct, mode: "insensitive" }
-          },
-          orderBy: { createdAt: 'desc' }
+        where: {
+          productName: { equals: reportProduct, mode: "insensitive" }
+        },
+        orderBy: { createdAt: 'desc' }
       });
 
       const mergeStr = (a: string, b: string) => {
-          if (!b || b === "Direct" || b === "N/A") return a;
-          if (!a || a === "Direct" || a === "N/A") return b;
-          const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
-          return Array.from(s).filter(Boolean).join(", ");
+        if (!b || b === "Direct" || b === "N/A") return a;
+        if (!a || a === "Direct" || a === "N/A") return b;
+        const s = new Set([...a.split(",").map(x => x.trim()), ...b.split(",").map(x => x.trim())]);
+        return Array.from(s).filter(Boolean).join(", ");
       };
 
       if (existingReport && reportProduct !== "N/A") {
-          await prisma.report.update({
-              where: { id: existingReport.id },
-              data: {
-                  companyName: mergeStr(existingReport.companyName, supplier.company),
-                  buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
-                  status: mergeStr(existingReport.status, supplier.currentStatus || "Under Review"),
-                  keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
-                  updateDate: new Date()
-              }
-          });
+        await prisma.report.update({
+          where: { id: existingReport.id },
+          data: {
+            companyName: mergeStr(existingReport.companyName, supplier.company),
+            buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
+            status: mergeStr(existingReport.status, supplier.currentStatus || "Under Review"),
+            keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
+            updateDate: new Date()
+          }
+        });
       } else {
-          await prisma.report.create({
-            data: {
-              productName: reportProduct,
-              buyerName: mappedBuyer,
-              companyName: supplier.company,
-              status: supplier.currentStatus || "Under Review",
-              keyUpdates: newUpdatePoint,
-              buyerSupplier: "Supplier",
-              reportDate: new Date(),
-              updateDate: new Date(),
-              createdBy: req.user!.id,
-            }
-          });
+        await prisma.report.create({
+          data: {
+            productName: reportProduct,
+            buyerName: mappedBuyer,
+            companyName: supplier.company,
+            status: supplier.currentStatus || "Under Review",
+            keyUpdates: newUpdatePoint,
+            buyerSupplier: "Supplier",
+            reportDate: new Date(),
+            updateDate: new Date(),
+            createdBy: req.user!.id,
+          }
+        });
       }
-    } catch(e) { console.error("Auto Report Gen Failed", e); }
+    } catch (e) { console.error("Auto Report Gen Failed", e); }
     // -------------------------------------------
 
     res.status(201).json(supplier);
@@ -341,57 +346,65 @@ export async function updateSupplier(
       try {
         let reportBuyer = supplier.contractBuyer || existing.contractBuyer || "";
         if (!reportBuyer && Array.isArray(incomingIds) && incomingIds.length > 0) {
-            const firstBuyer = await prisma.buyer.findUnique({ where: { id: incomingIds[0] } });
-            if (firstBuyer) reportBuyer = firstBuyer.company || firstBuyer.name || "";
+          const firstBuyer = await prisma.buyer.findUnique({ where: { id: incomingIds[0] } });
+          if (firstBuyer) reportBuyer = firstBuyer.company || firstBuyer.name || "";
         }
         if (!reportBuyer) reportBuyer = "Direct";
         const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
-        
-        const reportProduct = supplier.products || existing.products || "N/A";
-        
+
+        let parsedProducts = "";
+        const sProducts = (supplier as any).supplierProducts;
+        const eProducts = (existing as any).supplierProducts;
+        if (Array.isArray(sProducts) && sProducts.length > 0) {
+          parsedProducts = sProducts.map((p: any) => p.product).filter(Boolean).join(", ");
+        } else if (Array.isArray(eProducts) && eProducts.length > 0) {
+          parsedProducts = eProducts.map((p: any) => p.product).filter(Boolean).join(", ");
+        }
+        const reportProduct = parsedProducts || supplier.products || existing.products || "N/A";
+
         const existingReport = await prisma.report.findFirst({
-            where: { 
-                productName: { equals: reportProduct, mode: "insensitive" }
-            },
-            orderBy: { createdAt: 'desc' }
+          where: {
+            productName: { equals: reportProduct, mode: "insensitive" }
+          },
+          orderBy: { createdAt: 'desc' }
         });
 
         const mergeStr = (a: string, b: string) => {
-            if (!b || b === "Direct" || b === "N/A") return a;
-            if (!a || a === "Direct" || a === "N/A") return b;
-            const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
-            return Array.from(s).filter(Boolean).join(", ");
+          if (!b || b === "Direct" || b === "N/A") return a;
+          if (!a || a === "Direct" || a === "N/A") return b;
+          const s = new Set([...a.split(",").map(x => x.trim()), ...b.split(",").map(x => x.trim())]);
+          return Array.from(s).filter(Boolean).join(", ");
         };
 
         const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] ${updatesText}`;
-        
+
         if (existingReport && reportProduct !== "N/A") {
-            await prisma.report.update({
-                where: { id: existingReport.id },
-                data: {
-                    companyName: mergeStr(existingReport.companyName, supplier.company),
-                    buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
-                    status: mergeStr(existingReport.status, updateData.currentStatus || existing.currentStatus || "Status Updated"),
-                    keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
-                    updateDate: new Date()
-                }
-            });
+          await prisma.report.update({
+            where: { id: existingReport.id },
+            data: {
+              companyName: mergeStr(existingReport.companyName, supplier.company),
+              buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
+              status: mergeStr(existingReport.status, updateData.currentStatus || existing.currentStatus || "Status Updated"),
+              keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
+              updateDate: new Date()
+            }
+          });
         } else {
-            await prisma.report.create({
-              data: {
-                productName: reportProduct,
-                buyerName: mappedBuyer,
-                companyName: supplier.company,
-                status: updateData.currentStatus || existing.currentStatus || "Status Updated",
-                keyUpdates: newUpdatePoint,
-                buyerSupplier: "Supplier",
-                reportDate: new Date(),
-                updateDate: new Date(),
-                createdBy: req.user!.id,
-              }
-            });
+          await prisma.report.create({
+            data: {
+              productName: reportProduct,
+              buyerName: mappedBuyer,
+              companyName: supplier.company,
+              status: updateData.currentStatus || existing.currentStatus || "Status Updated",
+              keyUpdates: newUpdatePoint,
+              buyerSupplier: "Supplier",
+              reportDate: new Date(),
+              updateDate: new Date(),
+              createdBy: req.user!.id,
+            }
+          });
         }
-      } catch(e) { console.error("Auto Report Gen Failed", e); }
+      } catch (e) { console.error("Auto Report Gen Failed", e); }
     }
     // ---------------------------------
 
@@ -578,41 +591,41 @@ export async function deleteSupplier(
 
     // --- NEW: AUTO-GENERATE REPORT CLEANUP ---
     try {
-        const reportProduct = existing.products || "N/A";
-        if (reportProduct !== "N/A") {
-            const existingReport = await prisma.report.findFirst({
-                where: { productName: { equals: reportProduct, mode: "insensitive" } },
-                orderBy: { createdAt: 'desc' }
-            });
-            if (existingReport) {
-                const newCompany = existingReport.companyName.split(',').map((x: string) => x.trim()).filter((x: string) => x !== existing.company).join(', ');
-                const newBuyer = existingReport.buyerName.split(',').map((x: string) => x.trim()).filter((x: string) => !x.includes(`(${existing.company})`)).join(', ');
-                const newUpdate = `[${new Date().toLocaleDateString()}] [${existing.company}] Supplier Deleted from System.`;
-                const finalUpdates = existingReport.keyUpdates ? `${newUpdate}\n\n${existingReport.keyUpdates}` : newUpdate;
+      const reportProduct = existing.products || "N/A";
+      if (reportProduct !== "N/A") {
+        const existingReport = await prisma.report.findFirst({
+          where: { productName: { equals: reportProduct, mode: "insensitive" } },
+          orderBy: { createdAt: 'desc' }
+        });
+        if (existingReport) {
+          const newCompany = existingReport.companyName.split(',').map((x: string) => x.trim()).filter((x: string) => x !== existing.company).join(', ');
+          const newBuyer = existingReport.buyerName.split(',').map((x: string) => x.trim()).filter((x: string) => !x.includes(`(${existing.company})`)).join(', ');
+          const newUpdate = `[${new Date().toLocaleDateString()}] [${existing.company}] Supplier Deleted from System.`;
+          const finalUpdates = existingReport.keyUpdates ? `${newUpdate}\n\n${existingReport.keyUpdates}` : newUpdate;
 
-                if (!newCompany) {
-                    await prisma.report.update({
-                        where: { id: existingReport.id },
-                        data: {
-                            companyName: "No Active Suppliers",
-                            buyerName: "None",
-                            status: "System Deleted",
-                            keyUpdates: finalUpdates
-                        }
-                    });
-                } else {
-                    await prisma.report.update({
-                        where: { id: existingReport.id },
-                        data: {
-                            companyName: newCompany,
-                            buyerName: newBuyer || "None",
-                            keyUpdates: finalUpdates
-                        }
-                    });
-                }
-            }
+          if (!newCompany) {
+            await prisma.report.update({
+              where: { id: existingReport.id },
+              data: {
+                companyName: "No Active Suppliers",
+                buyerName: "None",
+                status: "System Deleted",
+                keyUpdates: finalUpdates
+              }
+            });
+          } else {
+            await prisma.report.update({
+              where: { id: existingReport.id },
+              data: {
+                companyName: newCompany,
+                buyerName: newBuyer || "None",
+                keyUpdates: finalUpdates
+              }
+            });
+          }
         }
-    } catch(e) { console.error("Report Cleanup Failed", e); }
+      }
+    } catch (e) { console.error("Report Cleanup Failed", e); }
     // ------------------------------------------
 
     res.json({ message: "Supplier deleted" });
@@ -727,61 +740,76 @@ export async function exportSuppliersCsv(
       "Created At",
     ];
 
-    const rows = suppliers.map((s: any) => [
-      s.company,
-      s.tradeName || "",
-      s.country || "",
-      s.city || "",
-      s.state || "",
-      s.contactPerson || "",
-      s.email || "",
-      s.phone || "",
-      s.whatsapp || "",
-      s.supplierType || "",
-      s.products || "",
-      s.organicStatus || "",
-      s.hsCode || "",
-      s.contractBuyer || "",
-      s.commissionPercent || "",
-      s.approvedConfirmPercent || "",
-      s.lidlFactoryId || "",
-      s.companyAddress || "",
-      s.website || "",
-      s.certifications || "",
-      s.productionCapacity || "",
-      s.annualProductionVolume || "",
-      s.moq || "",
-      s.leadTimeFirstOrder || "",
-      s.leadTimeRepeatOrder || "",
-      s.incotermsSupported || "",
-      s.portsOfExport || "",
-      s.exportingCountries || "",
-      s.targetExportMarkets || "",
-      s.currencyPreferred || "",
-      s.paymentTerms || "",
-      s.samplePolicy || "",
-      s.sampleAvailable || "",
-      s.sampleLeadTime || "",
-      s.sampleCost || "",
-      s.iecNumber || "",
-      s.gstNumber || "",
-      s.fssaiLicense || "",
-      s.apedaNumber || "",
-      s.fdaRegistrationNumber || "",
-      s.haccpAvailable || "",
-      s.isoFsscCertNo || "",
-      s.certifyingBodyName || "",
-      s.workingWithOurBrands || "",
-      s.otherBrands || "",
-      s.exportBrand || "",
-      s.packagingComplianceRegions || "",
-      s.productCatalogShared || "",
-      s.factoryVideosShared || "",
-      s.warehouseVideosShared || "",
-      s.remarks || "",
-      s.currentStatus || "",
-      s.createdAt.toISOString().split("T")[0],
-    ]);
+    const rows = suppliers.map((s: any) => {
+      // Extract product names from supplierProducts JSON array
+      let productNames = "";
+      if (s.supplierProducts && Array.isArray(s.supplierProducts)) {
+        productNames = s.supplierProducts
+          .map((p: any) => p.product)
+          .filter((name: string) => name)
+          .join(", ");
+      }
+      // Fallback to legacy products field if supplierProducts is empty
+      if (!productNames && s.products) {
+        productNames = s.products;
+      }
+
+      return [
+        s.company,
+        s.tradeName || "",
+        s.country || "",
+        s.city || "",
+        s.state || "",
+        s.contactPerson || "",
+        s.email || "",
+        s.phone || "",
+        s.whatsapp || "",
+        s.supplierType || "",
+        productNames,
+        s.organicStatus || "",
+        s.hsCode || "",
+        s.contractBuyer || "",
+        s.commissionPercent || "",
+        s.approvedConfirmPercent || "",
+        s.lidlFactoryId || "",
+        s.companyAddress || "",
+        s.website || "",
+        s.certifications || "",
+        s.productionCapacity || "",
+        s.annualProductionVolume || "",
+        s.moq || "",
+        s.leadTimeFirstOrder || "",
+        s.leadTimeRepeatOrder || "",
+        s.incotermsSupported || "",
+        s.portsOfExport || "",
+        s.exportingCountries || "",
+        s.targetExportMarkets || "",
+        s.currencyPreferred || "",
+        s.paymentTerms || "",
+        s.samplePolicy || "",
+        s.sampleAvailable || "",
+        s.sampleLeadTime || "",
+        s.sampleCost || "",
+        s.iecNumber || "",
+        s.gstNumber || "",
+        s.fssaiLicense || "",
+        s.apedaNumber || "",
+        s.fdaRegistrationNumber || "",
+        s.haccpAvailable || "",
+        s.isoFsscCertNo || "",
+        s.certifyingBodyName || "",
+        s.workingWithOurBrands || "",
+        s.otherBrands || "",
+        s.exportBrand || "",
+        s.packagingComplianceRegions || "",
+        s.productCatalogShared || "",
+        s.factoryVideosShared || "",
+        s.warehouseVideosShared || "",
+        s.remarks || "",
+        s.currentStatus || "",
+        s.createdAt.toISOString().split("T")[0],
+      ];
+    });
 
     const csvContent = [
       headers.join(","),
@@ -879,7 +907,7 @@ export async function getSupplierFilters(
       prisma.supplier.findMany({ select: { createdAt: true } }),
     ]);
 
-    const formattedDates = Array.from(new Set(datesRaw.map(d => 
+    const formattedDates = Array.from(new Set(datesRaw.map(d =>
       new Date(d.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
     ))).filter(Boolean);
 

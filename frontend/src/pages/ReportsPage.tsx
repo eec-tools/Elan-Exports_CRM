@@ -49,7 +49,8 @@ import {
   Clock,
   LayoutGrid,
   Loader2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Briefcase
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -519,8 +520,11 @@ export default function ReportsPage() {
                     <td className="px-5 py-4">
                       <div className="flex flex-col gap-2">
                          <div>
-                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-0.5">BUYER</span>
-                            <span className="font-semibold text-slate-900 truncate block">{item.buyerName}</span>
+                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-0.5 mt-2">BUYER</span>
+                            <span className="font-semibold text-slate-900 truncate flex items-center gap-1.5 block">
+                               <Briefcase className="h-4 w-4 text-slate-400 shrink-0" />
+                               <span className="truncate">{item.buyerName}</span>
+                            </span>
                          </div>
                          <div>
                             <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-0.5 mt-2">SUPPLIER</span>

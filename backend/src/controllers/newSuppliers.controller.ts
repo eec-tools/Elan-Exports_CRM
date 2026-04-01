@@ -300,7 +300,12 @@ export async function createNewSupplier(
             if (!reportBuyer) reportBuyer = "Direct";
             const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
             
-            const reportProduct = supplier.product || "N/A";
+            let parsedProducts = "";
+            const sProducts = (supplier as any).supplierProducts;
+            if (Array.isArray(sProducts) && sProducts.length > 0) {
+                parsedProducts = sProducts.map((p: any) => p.product).filter(Boolean).join(", ");
+            }
+            const reportProduct = parsedProducts || supplier.product || "N/A";
             const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] New Supplier Onboarded.`;
 
             const existingReport = await (prisma as any).report.findFirst({
@@ -488,7 +493,15 @@ export async function updateNewSupplier(
                 if (!reportBuyer) reportBuyer = "Direct";
                 const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
                 
-                const reportProduct = supplier.product || existing.product || "N/A";
+                let parsedProducts = "";
+                const sProducts = (supplier as any).supplierProducts;
+                const eProducts = (existing as any).supplierProducts;
+                if (Array.isArray(sProducts) && sProducts.length > 0) {
+                    parsedProducts = sProducts.map((p: any) => p.product).filter(Boolean).join(", ");
+                } else if (Array.isArray(eProducts) && eProducts.length > 0) {
+                    parsedProducts = eProducts.map((p: any) => p.product).filter(Boolean).join(", ");
+                }
+                const reportProduct = parsedProducts || supplier.product || existing.product || "N/A";
 
                 const existingReport = await (prisma as any).report.findFirst({
                     where: { 
@@ -721,7 +734,12 @@ export async function deleteNewSupplier(
 
         // --- NEW: AUTO-GENERATE REPORT CLEANUP ---
         try {
-            const reportProduct = existing.product || "N/A";
+            let parsedProducts = "";
+            const eProducts = (existing as any).supplierProducts;
+            if (Array.isArray(eProducts) && eProducts.length > 0) {
+                parsedProducts = eProducts.map((p: any) => p.product).filter(Boolean).join(", ");
+            }
+            const reportProduct = parsedProducts || existing.product || "N/A";
             if (reportProduct !== "N/A") {
                 const existingReport = await (prisma as any).report.findFirst({
                     where: { productName: { equals: reportProduct, mode: "insensitive" } },
