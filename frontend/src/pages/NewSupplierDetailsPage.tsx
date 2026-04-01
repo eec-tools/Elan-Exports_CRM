@@ -43,6 +43,8 @@ import {
   MessageSquareText,
   Upload,
   X,
+  Trash2,
+  Plus,
 } from "lucide-react";
 
 interface EmailCampaign {
@@ -147,8 +149,38 @@ interface NewSupplier {
   cleaningLinelearanceSop?: string;
   noProhibitedAids?: string;
   productCatalog?: string;
+  supplierProducts?: SupplierProduct[];
+  productCatalogs?: ProductCatalogEntry[];
   buyerIds?: string[];
 }
+
+interface SupplierProduct {
+  id: string;
+  product: string;
+  productCategory: string;
+  hsCode: string;
+  organicStatus: string;
+  certifications: string;
+  shelfLife: string;
+  storageConditions: string;
+  packagingType: string;
+  netWeightVariants: string;
+  ingredientList: string;
+  allergenDeclaration: string;
+}
+
+interface ProductCatalogEntry {
+  name: string;
+  url: string;
+}
+
+const EMPTY_SUPPLIER_PRODUCT = (): SupplierProduct => ({
+  id: String(Date.now() + Math.random()),
+  product: "", productCategory: "", hsCode: "", organicStatus: "",
+  certifications: "", shelfLife: "", storageConditions: "",
+  packagingType: "", netWeightVariants: "", ingredientList: "",
+  allergenDeclaration: "",
+});
 
 const ORGANIC_CERT_MARKETS = ["India — NPOP", "USA — USDA Organic (NOP)", "EU — EU Organic (Reg 2018/848)", "UK — UK Organic", "Australia — ACO / NASAA", "Japan — JAS Organic"];
 const LAB_TEST_TYPES = ["Pesticide Residue Analysis", "Heavy Metals Test", "Microbiology Test", "Aflatoxin Test", "Moisture Analysis"];
@@ -182,6 +214,22 @@ export default function NewSupplierDetailsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<Partial<NewSupplier>>({});
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
+  const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
+
+  // Product helpers
+  const addProduct = () => {
+    setForm((f) => ({ ...f, supplierProducts: [...(f.supplierProducts || []), EMPTY_SUPPLIER_PRODUCT()] }));
+  };
+  const removeProduct = (idx: number) => {
+    setForm((f) => ({ ...f, supplierProducts: (f.supplierProducts || []).filter((_, i) => i !== idx) }));
+  };
+  const updateProduct = (idx: number, field: keyof SupplierProduct, value: string) => {
+    setForm((f) => {
+      const next = [...(f.supplierProducts || [])];
+      next[idx] = { ...next[idx], [field]: value };
+      return { ...f, supplierProducts: next };
+    });
+  };
 
   const { data: supplier, isLoading } = useQuery<NewSupplier>({
     queryKey: ["new-supplier", id],
@@ -309,14 +357,27 @@ export default function NewSupplierDetailsPage() {
         return;
       }
     }
+    // Upload multi-catalog files
+    const finalCatalogs = [...(form.productCatalogs || [])];
+    if (catalogFiles.length > 0) {
+      for (const file of catalogFiles) {
+        try {
+          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+          finalCatalogs.push({ name: file.name, url: uploadRes.url });
+        } catch {
+          return;
+        }
+      }
+    }
     if (supplier?.id) {
-      updateMutation.mutate({ id: supplier.id, d: { ...form, productCatalog: catalogUrl } });
+      updateMutation.mutate({ id: supplier.id, d: { ...form, productCatalog: catalogUrl, productCatalogs: finalCatalogs } });
     }
   };
 
   const openEdit = () => {
-    setForm(supplier || {});
+    setForm({ ...(supplier || {}), supplierProducts: supplier?.supplierProducts || [], productCatalogs: supplier?.productCatalogs || [] });
     setCatalogFile(null);
+    setCatalogFiles([]);
     setDialogOpen(true);
   };
 
@@ -409,18 +470,30 @@ export default function NewSupplierDetailsPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4" />Product Info</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1">
-            <InfoRow icon={Tag} label="Product Category" value={supplier.productCategory} />
-            <InfoRow icon={Package} label="Product" value={supplier.product} />
-            <InfoRow icon={FileText} label="HS Code" value={supplier.hsCode} />
-            <InfoRow icon={Award} label="Organic Status" value={supplier.organicStatus} />
-            <InfoRow icon={Award} label="Certifications" value={supplier.certifications} />
-            <InfoRow icon={FileText} label="Shelf Life" value={supplier.shelfLife} />
-            <InfoRow icon={FileText} label="Storage Conditions" value={supplier.storageConditions} />
-            <InfoRow icon={Package} label="Packaging Type & Material" value={supplier.packagingType} />
-            <InfoRow icon={Package} label="Net Weight Variants" value={supplier.netWeightVariants} />
-            <InfoRow icon={FileText} label="Ingredient List" value={supplier.ingredientList} />
-            <InfoRow icon={FileText} label="Allergen Declaration" value={supplier.allergenDeclaration} />
+          <CardContent className="space-y-3">
+            {(supplier.supplierProducts ?? []).length > 0 ? (
+              (supplier.supplierProducts ?? []).map((prod, i) => (
+                <div key={prod.id || i} className="border border-slate-200 rounded-lg p-3 bg-slate-50/50 space-y-1">
+                  <p className="text-sm font-semibold text-slate-700">Product #{i + 1}: {prod.product || "Unnamed"}</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <div><span className="text-muted-foreground">Category:</span> {prod.productCategory || "—"}</div>
+                    <div><span className="text-muted-foreground">HS Code:</span> {prod.hsCode || "—"}</div>
+                    <div><span className="text-muted-foreground">Organic:</span> {prod.organicStatus || "—"}</div>
+                    <div><span className="text-muted-foreground">Certs:</span> {prod.certifications || "—"}</div>
+                    <div><span className="text-muted-foreground">Shelf Life:</span> {prod.shelfLife || "—"}</div>
+                    <div><span className="text-muted-foreground">Storage:</span> {prod.storageConditions || "—"}</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <>
+                <InfoRow icon={Tag} label="Product Category" value={supplier.productCategory} />
+                <InfoRow icon={Package} label="Product" value={supplier.product} />
+                <InfoRow icon={FileText} label="HS Code" value={supplier.hsCode} />
+                <InfoRow icon={Award} label="Organic Status" value={supplier.organicStatus} />
+                <InfoRow icon={Award} label="Certifications" value={supplier.certifications} />
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -541,22 +614,32 @@ export default function NewSupplierDetailsPage() {
         </Card>
       </div>
 
-      {/* ── Product Catalog ── */}
-      {supplier.productCatalog && (
+      {/* ── Product Catalogs ── */}
+      {(supplier.productCatalog || (supplier.productCatalogs ?? []).length > 0) && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" />Product Catalog</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" />Product Catalogs</CardTitle>
           </CardHeader>
-          <CardContent>
-            <a
-              href={supplier.productCatalog}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-brand-600 hover:underline text-sm font-medium"
-            >
-              <FileText className="h-4 w-4" />
-              Open Product Catalog (PDF)
-            </a>
+          <CardContent className="space-y-2">
+            {supplier.productCatalog && (
+              <a
+                href={supplier.productCatalog}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-brand-600 hover:underline text-sm font-medium"
+              >
+                <FileText className="h-4 w-4" />
+                Open Product Catalog (PDF)
+              </a>
+            )}
+            {(supplier.productCatalogs ?? []).map((cat, idx) => (
+              <div key={idx} className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-100">
+                <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                <a href={cat.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">
+                  {cat.name}
+                </a>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
@@ -825,21 +908,41 @@ export default function NewSupplierDetailsPage() {
               <div className="space-y-2 sm:col-span-2"><Label>Email</Label><Input type="email" value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
             </div></div>
             <Separator />
-            {/* Products */}
-            <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Products</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Product Category</Label><Input value={form.productCategory ?? ""} onChange={(e) => setForm({ ...form, productCategory: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Product Name / Description</Label><Input value={form.product ?? ""} onChange={(e) => setForm({ ...form, product: e.target.value })} /></div>
-              <div className="space-y-2"><Label>HS Code</Label><Input value={form.hsCode ?? ""} onChange={(e) => setForm({ ...form, hsCode: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Organic Status</Label><SelectWithOthers value={form.organicStatus ?? ""} onChange={(v) => setForm({ ...form, organicStatus: v })} options={["Certified Organic", "In Conversion", "Conventional"]} placeholder="Select…" /></div>
-              <div className="space-y-2"><Label>Certifications</Label><Input value={form.certifications ?? ""} onChange={(e) => setForm({ ...form, certifications: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Shelf Life (months)</Label><Input value={form.shelfLife ?? ""} onChange={(e) => setForm({ ...form, shelfLife: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Storage Conditions</Label><Input value={form.storageConditions ?? ""} onChange={(e) => setForm({ ...form, storageConditions: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Packaging Type & Material</Label><Input value={form.packagingType ?? ""} onChange={(e) => setForm({ ...form, packagingType: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Net Weight Variants</Label><Input value={form.netWeightVariants ?? ""} onChange={(e) => setForm({ ...form, netWeightVariants: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Ingredient List</Label><Textarea value={form.ingredientList ?? ""} onChange={(e) => setForm({ ...form, ingredientList: e.target.value })} rows={2} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Allergen Declaration</Label><Textarea value={form.allergenDeclaration ?? ""} onChange={(e) => setForm({ ...form, allergenDeclaration: e.target.value })} rows={2} /></div>
-            </div></div>
+            {/* Products (Multi-Product) */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Products</p>
+                <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={addProduct}>
+                  <Plus className="h-3.5 w-3.5" /> Add Product
+                </Button>
+              </div>
+              {(form.supplierProducts || []).length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-lg">No products added yet.</p>
+              )}
+              {(form.supplierProducts || []).map((prod, i) => (
+                <div key={prod.id} className="border border-slate-200 rounded-lg p-4 mb-4 bg-slate-50/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-semibold text-slate-700">Product #{i + 1}</p>
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => removeProduct(i)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5"><Label className="text-xs">Product Name</Label><Input className="h-8 text-sm" value={prod.product} onChange={(e) => updateProduct(i, "product", e.target.value)} /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">Product Category</Label><Input className="h-8 text-sm" value={prod.productCategory} onChange={(e) => updateProduct(i, "productCategory", e.target.value)} /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">HS Code</Label><Input className="h-8 text-sm" value={prod.hsCode} onChange={(e) => updateProduct(i, "hsCode", e.target.value)} /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">Organic Status</Label><SelectWithOthers value={prod.organicStatus} onChange={(v) => updateProduct(i, "organicStatus", v)} options={["Certified Organic","In Conversion","Conventional"]} placeholder="Select…" /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">Certifications</Label><Input className="h-8 text-sm" value={prod.certifications} onChange={(e) => updateProduct(i, "certifications", e.target.value)} /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">Shelf Life</Label><Input className="h-8 text-sm" value={prod.shelfLife} onChange={(e) => updateProduct(i, "shelfLife", e.target.value)} /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">Storage Conditions</Label><Input className="h-8 text-sm" value={prod.storageConditions} onChange={(e) => updateProduct(i, "storageConditions", e.target.value)} /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">Packaging Type</Label><Input className="h-8 text-sm" value={prod.packagingType} onChange={(e) => updateProduct(i, "packagingType", e.target.value)} /></div>
+                    <div className="space-y-1.5 sm:col-span-2"><Label className="text-xs">Net Weight Variants</Label><Input className="h-8 text-sm" value={prod.netWeightVariants} onChange={(e) => updateProduct(i, "netWeightVariants", e.target.value)} /></div>
+                    <div className="space-y-1.5 sm:col-span-2"><Label className="text-xs">Ingredient List</Label><Textarea className="text-sm" value={prod.ingredientList} onChange={(e) => updateProduct(i, "ingredientList", e.target.value)} rows={2} /></div>
+                    <div className="space-y-1.5 sm:col-span-2"><Label className="text-xs">Allergen Declaration</Label><Textarea className="text-sm" value={prod.allergenDeclaration} onChange={(e) => updateProduct(i, "allergenDeclaration", e.target.value)} rows={2} /></div>
+                  </div>
+                </div>
+              ))}
+            </div>
             <Separator />
             {/* Samples */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Samples</p>
@@ -964,59 +1067,17 @@ export default function NewSupplierDetailsPage() {
 
             <Separator />
 
-            {/* Product Catalog */}
+            {/* Product Catalogs */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Product Catalog</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Product Catalogs</p>
               <div className="space-y-3">
-                {form.productCatalog && !catalogFile && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <FileText className="h-4 w-4 text-brand-500 shrink-0" />
-                    <a
-                      href={form.productCatalog}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-brand-600 hover:underline truncate"
-                    >
-                      View current catalog
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, productCatalog: "" })}
-                      className="ml-auto text-slate-400 hover:text-rose-500"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center gap-3">
-                  <input
-                    id="catalog-upload-nsd"
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    className="hidden"
-                    onChange={(e) => setCatalogFile(e.target.files?.[0] ?? null)}
-                  />
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-200 text-sm text-slate-600 hover:bg-slate-50"
-                    onClick={() => document.getElementById("catalog-upload-nsd")?.click()}
-                  >
-                    <Upload className="h-4 w-4" />
-                    {catalogFile ? "Change File" : form.productCatalog ? "Replace Catalog" : "Upload Catalog (PDF)"}
-                  </button>
-                  {catalogFile && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <FileText className="h-4 w-4 text-brand-500 shrink-0" />
-                      <span className="truncate max-w-[200px]">{catalogFile.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => setCatalogFile(null)}
-                        className="text-slate-400 hover:text-rose-500"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
+                <div className="flex flex-col gap-2">
+                  <input type="file" accept=".pdf,.doc,.docx" multiple className="hidden" id="multi-catalog-upload-nsd" onChange={(e) => { if (e.target.files) setCatalogFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                  <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200" onClick={() => document.getElementById("multi-catalog-upload-nsd")?.click()}>
+                    <Upload className="h-4 w-4" /> Upload Product Catalogs
+                  </Button>
+                  {(form.productCatalogs || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogs || []).map((cat, idx) => (<div key={`cat-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={cat.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{cat.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogs || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogs: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
+                  {catalogFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogFiles.map((f, idx) => (<div key={`pend-cat-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
                 </div>
               </div>
             </div>

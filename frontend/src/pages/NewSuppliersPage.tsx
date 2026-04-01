@@ -37,7 +37,7 @@ import {
     Mail,
     CheckCircle2,
     Upload,
-    FileText,
+
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -193,9 +193,40 @@ interface Supplier {
     noProhibitedAids?: string;
     // Product Catalog
     productCatalog?: string;
+    // Multi-product & multi-catalog
+    supplierProducts?: SupplierProduct[];
+    productCatalogs?: ProductCatalogEntry[];
     // Buyer links
     buyerIds?: string[];
 }
+
+interface SupplierProduct {
+    id: string;
+    product: string;
+    productCategory: string;
+    hsCode: string;
+    organicStatus: string;
+    certifications: string;
+    shelfLife: string;
+    storageConditions: string;
+    packagingType: string;
+    netWeightVariants: string;
+    ingredientList: string;
+    allergenDeclaration: string;
+}
+
+interface ProductCatalogEntry {
+    name: string;
+    url: string;
+}
+
+const EMPTY_SUPPLIER_PRODUCT = (): SupplierProduct => ({
+    id: String(Date.now() + Math.random()),
+    product: "", productCategory: "", hsCode: "", organicStatus: "",
+    certifications: "", shelfLife: "", storageConditions: "",
+    packagingType: "", netWeightVariants: "", ingredientList: "",
+    allergenDeclaration: "",
+});
 
 interface OrganicCertRow {
     market: string;
@@ -297,6 +328,8 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
     cleaningLinelearanceSop: "",
     noProhibitedAids: "",
     productCatalog: "",
+    supplierProducts: [],
+    productCatalogs: [],
     buyerIds: [],
 };
 
@@ -319,10 +352,26 @@ export default function NewSuppliersPage() {
     const [editing, setEditing] = useState<Partial<Supplier> | null>(null);
     const [form, setForm] = useState<Partial<Supplier>>(EMPTY_SUPPLIER);
     const [catalogFile, setCatalogFile] = useState<File | null>(null);
+    const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(
         null,
     );
+
+    // Product helpers
+    const addProduct = () => {
+        setForm((f) => ({ ...f, supplierProducts: [...(f.supplierProducts || []), EMPTY_SUPPLIER_PRODUCT()] }));
+    };
+    const removeProduct = (idx: number) => {
+        setForm((f) => ({ ...f, supplierProducts: (f.supplierProducts || []).filter((_, i) => i !== idx) }));
+    };
+    const updateProduct = (idx: number, field: keyof SupplierProduct, value: string) => {
+        setForm((f) => {
+            const next = [...(f.supplierProducts || [])];
+            next[idx] = { ...next[idx], [field]: value };
+            return { ...f, supplierProducts: next };
+        });
+    };
 
     const { data, isLoading } = useQuery({
         queryKey: ["new-suppliers", search, statusFilter, countryFilter, categoryFilter, managerFilter, productFilter, certificationFilter, dateFrom, dateTo, page],
@@ -440,7 +489,21 @@ export default function NewSuppliersPage() {
                 return;
             }
         }
-        const payload = { ...form, productCatalog: catalogUrl };
+
+        // Upload new catalog files for multi-catalog
+        const finalCatalogs = [...(form.productCatalogs || [])];
+        if (catalogFiles.length > 0) {
+            for (const file of catalogFiles) {
+                try {
+                    const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+                    finalCatalogs.push({ name: file.name, url: uploadRes.url });
+                } catch {
+                    return;
+                }
+            }
+        }
+
+        const payload = { ...form, productCatalog: catalogUrl, productCatalogs: finalCatalogs };
         console.log("Submitting form with payload:", payload);
         if (editing?.id) {
             updateMutation.mutate({ id: editing.id, d: payload });
@@ -453,13 +516,15 @@ export default function NewSuppliersPage() {
         setEditing(null);
         setForm(EMPTY_SUPPLIER);
         setCatalogFile(null);
+        setCatalogFiles([]);
         setDialogOpen(true);
     };
 
     const openEdit = (s: Supplier) => {
         setEditing(s);
-        setForm(s);
+        setForm({ ...s, supplierProducts: s.supplierProducts || [], productCatalogs: s.productCatalogs || [] });
         setCatalogFile(null);
+        setCatalogFiles([]);
         setDialogOpen(true);
     };
 
@@ -875,63 +940,43 @@ export default function NewSuppliersPage() {
 
                         <Separator />
 
-                        {/* ── Section 3: Products ── */}
+                        {/* ── Section 3: Products (Multi-Product) ── */}
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Products</p>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label>Product Category</Label>
-                                    <Input list="list-category" value={form.productCategory ?? ""} onChange={(e) => setForm({ ...form, productCategory: e.target.value })} />
-                                    <datalist id="list-category">{filters?.productCategories?.map((c: string) => <option key={c} value={c} />)}</datalist>
+                            <div className="flex items-center justify-between mb-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Products</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">Add one block per product this supplier offers</p>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Product Name / Description</Label>
-                                    <Input list="list-products" value={form.product ?? ""} onChange={(e) => setForm({ ...form, product: e.target.value })} />
-                                    <datalist id="list-products">{filters?.products?.map((p: string) => <option key={p} value={p} />)}</datalist>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>HS Code (6–8 digit)</Label>
-                                    <Input value={form.hsCode ?? ""} onChange={(e) => setForm({ ...form, hsCode: e.target.value })} placeholder="e.g. 100630" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Organic Status</Label>
-                                    <SelectWithOthers
-                                        value={form.organicStatus ?? ""}
-                                        onChange={(v) => setForm({ ...form, organicStatus: v })}
-                                        options={["Certified Organic", "In Conversion", "Conventional"]}
-                                        placeholder="Select organic status…"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Certifications</Label>
-                                    <Input list="list-certifications" value={form.certifications ?? ""} onChange={(e) => setForm({ ...form, certifications: e.target.value })} />
-                                    <datalist id="list-certifications">{filters?.certifications?.map((c: string) => <option key={c} value={c} />)}</datalist>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Shelf Life (months)</Label>
-                                    <Input value={form.shelfLife ?? ""} onChange={(e) => setForm({ ...form, shelfLife: e.target.value })} placeholder="e.g. 24" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Storage Conditions</Label>
-                                    <Input value={form.storageConditions ?? ""} onChange={(e) => setForm({ ...form, storageConditions: e.target.value })} placeholder="e.g. Cool & dry, below 25°C" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Packaging Type & Material</Label>
-                                    <Input value={form.packagingType ?? ""} onChange={(e) => setForm({ ...form, packagingType: e.target.value })} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Net Weight Variants Available</Label>
-                                    <Input value={form.netWeightVariants ?? ""} onChange={(e) => setForm({ ...form, netWeightVariants: e.target.value })} placeholder="e.g. 250g, 500g, 1kg, 5kg" />
-                                </div>
-                                <div className="space-y-2 sm:col-span-2">
-                                    <Label>Ingredient List with % Composition</Label>
-                                    <Textarea value={form.ingredientList ?? ""} onChange={(e) => setForm({ ...form, ingredientList: e.target.value })} rows={2} />
-                                </div>
-                                <div className="space-y-2 sm:col-span-2">
-                                    <Label>Allergen Declaration</Label>
-                                    <Textarea value={form.allergenDeclaration ?? ""} onChange={(e) => setForm({ ...form, allergenDeclaration: e.target.value })} rows={2} />
-                                </div>
+                                <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1 shrink-0" onClick={addProduct}>
+                                    <Plus className="h-3.5 w-3.5" /> Add Product
+                                </Button>
                             </div>
+                            {(form.supplierProducts || []).length === 0 && (
+                                <p className="text-sm text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-lg">No products added yet. Click "Add Product" to add one.</p>
+                            )}
+                            {(form.supplierProducts || []).map((prod, i) => (
+                                <div key={prod.id} className="border border-slate-200 rounded-lg p-4 mb-4 bg-slate-50/50">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <p className="text-sm font-semibold text-slate-700">Product #{i + 1}</p>
+                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => removeProduct(i)}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <div className="space-y-1.5"><Label className="text-xs">Product Name / Description</Label><Input className="h-8 text-sm" value={prod.product} onChange={(e) => updateProduct(i, "product", e.target.value)} placeholder="e.g. Organic Basmati Rice" /></div>
+                                        <div className="space-y-1.5"><Label className="text-xs">Product Category</Label><Input className="h-8 text-sm" value={prod.productCategory} onChange={(e) => updateProduct(i, "productCategory", e.target.value)} placeholder="e.g. Rice, Spices" /></div>
+                                        <div className="space-y-1.5"><Label className="text-xs">HS Code (6–8 digit)</Label><Input className="h-8 text-sm" value={prod.hsCode} onChange={(e) => updateProduct(i, "hsCode", e.target.value)} placeholder="e.g. 100630" /></div>
+                                        <div className="space-y-1.5"><Label className="text-xs">Organic Status</Label><SelectWithOthers value={prod.organicStatus} onChange={(v) => updateProduct(i, "organicStatus", v)} options={["Certified Organic","In Conversion","Conventional"]} placeholder="Select…" /></div>
+                                        <div className="space-y-1.5"><Label className="text-xs">Certifications</Label><Input className="h-8 text-sm" value={prod.certifications} onChange={(e) => updateProduct(i, "certifications", e.target.value)} placeholder="e.g. USDA, EU Organic" /></div>
+                                        <div className="space-y-1.5"><Label className="text-xs">Shelf Life (months)</Label><Input className="h-8 text-sm" value={prod.shelfLife} onChange={(e) => updateProduct(i, "shelfLife", e.target.value)} /></div>
+                                        <div className="space-y-1.5"><Label className="text-xs">Storage Conditions</Label><Input className="h-8 text-sm" value={prod.storageConditions} onChange={(e) => updateProduct(i, "storageConditions", e.target.value)} /></div>
+                                        <div className="space-y-1.5"><Label className="text-xs">Packaging Type & Material</Label><Input className="h-8 text-sm" value={prod.packagingType} onChange={(e) => updateProduct(i, "packagingType", e.target.value)} /></div>
+                                        <div className="space-y-1.5 sm:col-span-2"><Label className="text-xs">Net Weight Variants</Label><Input className="h-8 text-sm" value={prod.netWeightVariants} onChange={(e) => updateProduct(i, "netWeightVariants", e.target.value)} placeholder="e.g. 250g, 500g, 1kg, 5kg" /></div>
+                                        <div className="space-y-1.5 sm:col-span-2"><Label className="text-xs">Ingredient List</Label><Textarea className="text-sm" value={prod.ingredientList} onChange={(e) => updateProduct(i, "ingredientList", e.target.value)} rows={2} /></div>
+                                        <div className="space-y-1.5 sm:col-span-2"><Label className="text-xs">Allergen Declaration</Label><Textarea className="text-sm" value={prod.allergenDeclaration} onChange={(e) => updateProduct(i, "allergenDeclaration", e.target.value)} rows={2} /></div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
 
                         <Separator />
@@ -1338,61 +1383,17 @@ export default function NewSuppliersPage() {
 
                         <Separator />
 
-                        {/* ── Product Catalog ── */}
+                        {/* ── Product Catalogs ── */}
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Product Catalog</p>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Product Catalogs</p>
                             <div className="space-y-3">
-                                {form.productCatalog && !catalogFile && (
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <FileText className="h-4 w-4 text-brand-500 shrink-0" />
-                                        <a
-                                            href={form.productCatalog}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-brand-600 hover:underline truncate"
-                                        >
-                                            View current catalog
-                                        </a>
-                                        <button
-                                            type="button"
-                                            onClick={() => setForm({ ...form, productCatalog: "" })}
-                                            className="ml-auto text-slate-400 hover:text-rose-500"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        id="catalog-upload-ns"
-                                        type="file"
-                                        accept=".pdf,.doc,.docx"
-                                        className="hidden"
-                                        onChange={(e) => setCatalogFile(e.target.files?.[0] ?? null)}
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="gap-2 text-slate-600 border-slate-200"
-                                        onClick={() => document.getElementById("catalog-upload-ns")?.click()}
-                                    >
-                                        <Upload className="h-4 w-4" />
-                                        {catalogFile ? "Change File" : form.productCatalog ? "Replace Catalog" : "Upload Catalog (PDF)"}
+                                <div className="flex flex-col gap-2">
+                                    <input type="file" accept=".pdf,.doc,.docx" multiple className="hidden" id="multi-catalog-upload-ns" onChange={(e) => { if (e.target.files) setCatalogFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                                    <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200" onClick={() => document.getElementById("multi-catalog-upload-ns")?.click()}>
+                                        <Upload className="h-4 w-4" /> Upload Product Catalogs
                                     </Button>
-                                    {catalogFile && (
-                                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                                            <FileText className="h-4 w-4 text-brand-500 shrink-0" />
-                                            <span className="truncate max-w-[200px]">{catalogFile.name}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => setCatalogFile(null)}
-                                                className="text-slate-400 hover:text-rose-500"
-                                            >
-                                                <X className="h-3.5 w-3.5" />
-                                            </button>
-                                        </div>
-                                    )}
+                                    {(form.productCatalogs || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogs || []).map((cat, idx) => (<div key={`cat-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={cat.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{cat.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogs || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogs: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
+                                    {catalogFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogFiles.map((f, idx) => (<div key={`pend-cat-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
                                 </div>
                             </div>
                         </div>

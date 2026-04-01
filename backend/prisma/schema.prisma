@@ -231,6 +231,8 @@ model Supplier {
   organicSegregationSop       String?                @map("organic_segregation_sop")
   cleaningLinelearanceSop     String?                @map("cleaning_linelearance_sop")
   noProhibitedAids            String?                @map("no_prohibited_aids")
+  supplierProducts              Json?                  @default("[]") @map("supplier_products")
+  productCatalogs               Json?                  @default("[]") @map("product_catalogs")
   buyerIds                    Json                   @default("[]") @map("buyer_ids")
 
   @@map("suppliers")
@@ -379,6 +381,8 @@ model NewSupplier {
   cleaningLinelearanceSop     String?                   @map("cleaning_linelearance_sop")
   noProhibitedAids            String?                   @map("no_prohibited_aids")
   productCatalog              String?                   @map("product_catalog")
+  supplierProducts              Json?                     @default("[]") @map("supplier_products")
+  productCatalogs               Json?                     @default("[]") @map("product_catalogs")
   buyerIds                    Json                      @default("[]") @map("buyer_ids")
 
   @@map("new_suppliers")
