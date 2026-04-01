@@ -383,6 +383,9 @@ model NewSupplier {
   productCatalog              String?                   @map("product_catalog")
   supplierProducts              Json?                     @default("[]") @map("supplier_products")
   productCatalogs               Json?                     @default("[]") @map("product_catalogs")
+  certificates                  Json?                     @default("[]") @map("certificates")
+  warehousePhotos               Json?                     @default("[]") @map("warehouse_photos")
+  videoLinks                    Json?                     @default("[]") @map("video_links")
   buyerIds                    Json                      @default("[]") @map("buyer_ids")
 
   @@map("new_suppliers")
