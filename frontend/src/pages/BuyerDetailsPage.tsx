@@ -964,39 +964,47 @@ export default function BuyerDetailsPage() {
       )}
 
       {/* ── Suppliers in Talks With ── */}
-      {(buyer.supplierLinks ?? []).length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              Suppliers in Talks With
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {(buyer.supplierLinks ?? []).map((link) => {
-                const found = allSupplierOptions.find((s) => s.id === link.id);
-                const path =
-                  link.type === "new"
-                    ? `/suppliers/new/${link.id}`
-                    : `/suppliers/signed-contract/${link.id}`;
-                const label = found
-                  ? found.label
-                  : `${link.id.slice(0, 8)} (${link.type === "new" ? "New" : "Signed"})`;
-                return (
-                  <Link
-                    key={`${link.id}-${link.type}`}
-                    to={path}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
-                  >
-                    {label}
-                  </Link>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {(() => {
+        const validLinks = (buyer.supplierLinks ?? []).filter((link) => {
+          if (suppliersListLoading) return true;
+          return allSupplierOptions.some((s) => s.id === link.id);
+        });
+        if (validLinks.length === 0) return null;
+
+        return (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Suppliers in Talks With
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {validLinks.map((link) => {
+                  const found = allSupplierOptions.find((s) => s.id === link.id);
+                  const path =
+                    link.type === "new"
+                      ? `/suppliers/new/${link.id}`
+                      : `/suppliers/signed-contract/${link.id}`;
+                  const label = found
+                    ? found.label
+                    : `${link.id.slice(0, 8)} (${link.type === "new" ? "New" : "Signed"})`;
+                  return (
+                    <Link
+                      key={`${link.id}-${link.type}`}
+                      to={path}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* ── Edit Dialog ── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
