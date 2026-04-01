@@ -1177,8 +1177,9 @@ export default function NewSuppliersPage() {
 
                         <Separator />
 
-                        {/* ── Section 9: Organic Certification Chain ── */}
-                        <div>
+                        {/* ── Section 9: Organic Certification Chain (only when organic) ── */}
+                        {(() => { const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion"); return hasOrganic ? (
+                        <><div>
                             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Organic Certification Chain</p>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
@@ -1239,6 +1240,8 @@ export default function NewSuppliersPage() {
                                 </div>
                             </div>
                         </div>
+                        </>
+                        ) : null; })()}
 
                         <Separator />
 
@@ -1341,7 +1344,8 @@ export default function NewSuppliersPage() {
 
                         <Separator />
 
-                        {/* ── Section 12: Processing Compliance ── */}
+                        {/* ── Section 12: Processing Compliance (only when organic) ── */}
+                        {(() => { const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion"); return hasOrganic ? (
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Processing Compliance</p>
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -1359,6 +1363,7 @@ export default function NewSuppliersPage() {
                                 </div>
                             </div>
                         </div>
+                        ) : null; })()}
 
                         <Separator />
 

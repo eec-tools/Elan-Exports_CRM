@@ -987,7 +987,8 @@ export default function SupplierDetailsPage() {
         </Card>
       </div>
 
-      {/* Organic Certification Chain */}
+      {/* Organic Certification Chain (only when organic) */}
+      {(() => { const hasOrganic = (supplier.supplierProducts ?? []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion") || supplier.organicStatus === "Certified Organic" || supplier.organicStatus === "In Conversion"; return hasOrganic ? (
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><Award className="h-4 w-4" />Organic Certification Chain</CardTitle></CardHeader>
         <CardContent>
@@ -1015,6 +1016,7 @@ export default function SupplierDetailsPage() {
           )}
         </CardContent>
       </Card>
+      ) : null; })()}
 
       {/* Lab Testing Records */}
       <Card>
@@ -1055,6 +1057,8 @@ export default function SupplierDetailsPage() {
             {supplier.healthNutritionClaims && (<div className="py-2"><p className="text-xs text-muted-foreground">Health / Nutrition Claims</p><p className="text-sm font-medium whitespace-pre-wrap">{supplier.healthNutritionClaims}</p></div>)}
           </CardContent>
         </Card>
+        {/* Processing Compliance (only when organic) */}
+        {(() => { const hasOrganic = (supplier.supplierProducts ?? []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion") || supplier.organicStatus === "Certified Organic" || supplier.organicStatus === "In Conversion"; return hasOrganic ? (
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><ShieldCheck className="h-4 w-4" />Processing Compliance</CardTitle></CardHeader>
           <CardContent className="space-y-1">
@@ -1063,6 +1067,7 @@ export default function SupplierDetailsPage() {
             <InfoRow icon={ShieldCheck} label="No Prohibited Processing Aids?" value={supplier.noProhibitedAids} />
           </CardContent>
         </Card>
+        ) : null; })()}
       </div>
 
       {/* ── Certifications & Documents ── */}
@@ -1482,8 +1487,9 @@ export default function SupplierDetailsPage() {
 
             <Separator />
 
-            {/* ── Organic Chain ── */}
-            <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Organic Certification Chain</p>
+            {/* ── Organic Chain (only when organic) ── */}
+            {(() => { const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion") || form.organicStatus === "Certified Organic" || form.organicStatus === "In Conversion"; return hasOrganic ? (
+            <><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Organic Certification Chain</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2"><Label>Farmer Organic Cert?</Label><SelectWithOthers value={form.farmerOrganicCert ?? ""} onChange={(v) => setForm({ ...form, farmerOrganicCert: v })} options={["Yes","No"]} placeholder="Select…" /></div>
               <div className="space-y-2"><Label>Aggregator/FPO Organic Cert?</Label><SelectWithOthers value={form.aggregatorOrganicCert ?? ""} onChange={(v) => setForm({ ...form, aggregatorOrganicCert: v })} options={["Yes","No"]} placeholder="Select…" /></div>
@@ -1499,6 +1505,8 @@ export default function SupplierDetailsPage() {
               <td className="px-3 py-1.5"><Input className="h-7 text-xs border-slate-200" value={row.expiryDate} onChange={(e) => { const next = [...(form.organicCertsByMarket ?? ORGANIC_CERT_MARKETS.map(m => ({ market: m, certNumber: "", expiryDate: "" })))]; next[i] = { ...next[i], expiryDate: e.target.value }; setForm({ ...form, organicCertsByMarket: next }); }} /></td>
               </tr>))}
             </tbody></table></div></div></div>
+            </>
+            ) : null; })()}
 
             <Separator />
 
@@ -1535,13 +1543,15 @@ export default function SupplierDetailsPage() {
 
             <Separator />
 
-            {/* ── Processing Compliance ── */}
+            {/* ── Processing Compliance (only when organic) ── */}
+            {(() => { const hasOrganic = (form.supplierProducts || []).some(p => p.organicStatus === "Certified Organic" || p.organicStatus === "In Conversion") || form.organicStatus === "Certified Organic" || form.organicStatus === "In Conversion"; return hasOrganic ? (
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Processing Compliance</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2"><Label>Organic Segregation SOP?</Label><SelectWithOthers value={form.organicSegregationSop ?? ""} onChange={(v) => setForm({ ...form, organicSegregationSop: v })} options={["Yes","No"]} placeholder="Select…" /></div>
               <div className="space-y-2"><Label>Cleaning & Line Clearance SOP?</Label><SelectWithOthers value={form.cleaningLinelearanceSop ?? ""} onChange={(v) => setForm({ ...form, cleaningLinelearanceSop: v })} options={["Yes","No"]} placeholder="Select…" /></div>
               <div className="space-y-2 sm:col-span-2"><Label>No Prohibited Processing Aids?</Label><SelectWithOthers value={form.noProhibitedAids ?? ""} onChange={(v) => setForm({ ...form, noProhibitedAids: v })} options={["Yes","No"]} placeholder="Select…" /></div>
             </div></div>
+            ) : null; })()}
 
             <Separator />
 
