@@ -66,14 +66,17 @@ jobs:
     steps:
       - name: SSH into EC2 and deploy
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: GH_PAT
           script: |
             set -e
             cd ${{ secrets.EC2_REPO_PATH }}
-            git pull origin main
+            git pull https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git main
             cd backend
             npm ci --omit=dev
             npx prisma migrate deploy
