@@ -81,4 +81,4 @@ git commit -m "fix: production CORS configuration and security improvements"
 git push
 ```
 
-Render will automatically redeploy when you push to your main branch.
+Render will automatically redeploy when you push to your main branch
