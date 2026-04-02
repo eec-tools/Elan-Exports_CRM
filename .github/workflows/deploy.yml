@@ -104,8 +104,7 @@ jobs:
             cd ${{ secrets.EC2_REPO_PATH }}/backend
             npm ci --omit=dev
             npx prisma migrate deploy
-            pm2 restart ${{ secrets.EC2_PM2_NAME }} --update-env
-            pm2 env ${{ secrets.EC2_PM2_NAME }} | grep FRONTEND_URL || true
+            pm2 restart backend --update-env
 
   deploy-frontend:
     name: Deploy Frontend to S3
