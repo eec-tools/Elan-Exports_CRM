@@ -1152,7 +1152,7 @@ export default function SuppliersPage() {
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
               <Button type="button" variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm" disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button type="submit" className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm" disabled={createMutation.isPending || updateMutation.isPending || uploadCatalogMutation.isPending}>
                 {(createMutation.isPending || updateMutation.isPending || uploadCatalogMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editing?.id ? "Update Supplier" : "Create Supplier"}
               </Button>

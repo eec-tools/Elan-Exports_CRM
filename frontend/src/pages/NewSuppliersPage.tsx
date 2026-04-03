@@ -517,7 +517,7 @@ export default function NewSuppliersPage() {
                 try {
                     const uploadRes = await uploadCatalogMutation.mutateAsync(file);
                     finalCatalogs.push({ name: file.name, url: uploadRes.url });
-                } catch { }
+                } catch (error) { console.error('Upload failed', error); }
             }
         }
 
@@ -528,7 +528,7 @@ export default function NewSuppliersPage() {
                 try {
                     const uploadRes = await uploadCatalogMutation.mutateAsync(file);
                     finalCertificates.push({ name: file.name, url: uploadRes.url });
-                } catch { }
+                } catch (error) { console.error('Upload failed', error); }
             }
         }
 
@@ -539,7 +539,7 @@ export default function NewSuppliersPage() {
                 try {
                     const uploadRes = await uploadCatalogMutation.mutateAsync(file);
                     finalWarehousePhotos.push({ name: file.name, url: uploadRes.url });
-                } catch { }
+                } catch (error) { console.error('Upload failed', error); }
             }
         }
 
@@ -1563,9 +1563,9 @@ export default function NewSuppliersPage() {
                             <Button
                                 type="submit"
                                 className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm"
-                                disabled={createMutation.isPending || updateMutation.isPending}
+                                disabled={createMutation.isPending || updateMutation.isPending || uploadCatalogMutation.isPending}
                             >
-                                {(createMutation.isPending || updateMutation.isPending) && (
+                                {(createMutation.isPending || updateMutation.isPending || uploadCatalogMutation.isPending) && (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 )}
                                 {editing?.id ? "Update Supplier" : "Create Supplier"}

@@ -2095,9 +2095,9 @@ export default function BuyerDetailsPage() {
               <Button
                 type="submit"
                 className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm"
-                disabled={updateMutation.isPending}
+                disabled={updateMutation.isPending || uploadCatalogMutation.isPending}
               >
-                {updateMutation.isPending && (
+                {(updateMutation.isPending || uploadCatalogMutation.isPending) && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 Save Changes

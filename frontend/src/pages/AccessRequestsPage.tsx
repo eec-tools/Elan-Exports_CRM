@@ -248,6 +248,7 @@ export default function AccessRequestsPage() {
                                              size="icon"
                                              className="h-8 w-8 text-slate-400 hover:text-brand-600 hover:bg-brand-50"
                                              onClick={() => reviewMutation.mutate({ id: r.id, status: "approved" })}
+                                             disabled={reviewMutation.isPending}
                                              title="Approve access"
                                           >
                                              <CheckCircle className="h-5 w-5" />
@@ -257,6 +258,7 @@ export default function AccessRequestsPage() {
                                              size="icon"
                                              className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                                              onClick={() => reviewMutation.mutate({ id: r.id, status: "rejected" })}
+                                             disabled={reviewMutation.isPending}
                                              title="Deny access"
                                           >
                                              <XCircle className="h-5 w-5" />

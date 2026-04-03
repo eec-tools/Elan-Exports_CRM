@@ -371,7 +371,7 @@ export default function NewSupplierDetailsPage() {
         try {
           const uploadRes = await uploadCatalogMutation.mutateAsync(file);
           finalCatalogs.push({ name: file.name, url: uploadRes.url });
-        } catch { }
+        } catch (error) { console.error('Upload failed', error); }
       }
     }
 
@@ -382,7 +382,7 @@ export default function NewSupplierDetailsPage() {
         try {
           const uploadRes = await uploadCatalogMutation.mutateAsync(file);
           finalCertificates.push({ name: file.name, url: uploadRes.url });
-        } catch { }
+        } catch (error) { console.error('Upload failed', error); }
       }
     }
 
@@ -393,7 +393,7 @@ export default function NewSupplierDetailsPage() {
         try {
           const uploadRes = await uploadCatalogMutation.mutateAsync(file);
           finalWarehousePhotos.push({ name: file.name, url: uploadRes.url });
-        } catch { }
+        } catch (error) { console.error('Upload failed', error); }
       }
     }
     if (supplier?.id) {
@@ -1263,8 +1263,8 @@ export default function NewSupplierDetailsPage() {
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm" disabled={updateMutation.isPending}>
-                {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm" disabled={updateMutation.isPending || uploadCatalogMutation.isPending}>
+                {(updateMutation.isPending || uploadCatalogMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
               </Button>
             </div>
