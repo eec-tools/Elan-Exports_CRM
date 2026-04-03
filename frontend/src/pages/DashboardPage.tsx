@@ -24,6 +24,7 @@ import {
   Layout,
   Bell,
   Mail,
+  ChevronRight,
 } from "lucide-react";
 
 // ─── Types & Configuration ──────────────────────────────────────────
@@ -45,6 +46,32 @@ interface TaskAnalyticsOwner {
   completed: number;
   closed: number;
   total: number;
+}
+
+const STAGES = [
+  { id: "Communication", label: "Communication", color: "#64748b", bg: "#f1f5f9", text: "#334155" },
+  { id: "Sampling", label: "Sampling", color: "#8b5cf6", bg: "#f5f3ff", text: "#6d28d9" },
+  { id: "Quotation", label: "Quotation", color: "#3b82f6", bg: "#eff6ff", text: "#1d4ed8" },
+  { id: "Negotiation with EEC", label: "Negotiation with EEC", color: "#f59e0b", bg: "#fffbeb", text: "#b45309" },
+  { id: "Price quotation to Buyer after EEC approval", label: "Price quotation to Buyer", color: "#06b6d4", bg: "#ecfeff", text: "#0e7490" },
+  { id: "Negotiation with buyer", label: "Negotiation with buyer", color: "#f97316", bg: "#fff7ed", text: "#c2410c" },
+  { id: "Price approval by buyer", label: "Price approval by buyer", color: "#10b981", bg: "#ecfdf5", text: "#065f46" },
+  { id: "Quotation send to the supplier from buyer end", label: "Quotation to supplier", color: "#14b8a6", bg: "#f0fdfa", text: "#115e59" },
+  { id: "Orders confirmed from buyers end", label: "Orders confirmed", color: "#16a34a", bg: "#f0fdf4", text: "#14532d" },
+  { id: "Timeline (Product shipping.. etc) should be established from suppliers end", label: "Timeline established", color: "#22c55e", bg: "#f0fdf4", text: "#166534" },
+];
+
+function riskColor(risk?: string) {
+  if (risk === "Low") return "#10b981";
+  if (risk === "High") return "#ef4444";
+  return "#f59e0b";
+}
+
+function fmtMoney(v?: number) {
+  if (!v) return "—";
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
+  return `$${v.toLocaleString()}`;
 }
 
 interface DashboardStats {
@@ -104,19 +131,6 @@ const getColorForLink = (title: string) => {
   if (t.includes("calendar")) return { text: "text-amber-600", bg: "bg-amber-50", hover: "group-hover:bg-amber-100", borderHover: "hover:border-amber-200" };
   return { text: "text-slate-600", bg: "bg-slate-50", hover: "group-hover:bg-slate-100", borderHover: "hover:border-slate-300" };
 };
-
-const STAGES = [
-  { id: "Communication", label: "Communication", color: "#64748b", bg: "#f1f5f9", text: "#334155" },
-  { id: "Sampling", label: "Sampling", color: "#8b5cf6", bg: "#f5f3ff", text: "#6d28d9" },
-  { id: "Quotation", label: "Quotation", color: "#3b82f6", bg: "#eff6ff", text: "#1d4ed8" },
-  { id: "Negotiation with EEC", label: "Negotiation with EEC", color: "#f59e0b", bg: "#fffbeb", text: "#b45309" },
-  { id: "Price quotation to Buyer after EEC approval", label: "Price quotation to Buyer", color: "#06b6d4", bg: "#ecfeff", text: "#0e7490" },
-  { id: "Negotiation with buyer", label: "Negotiation with buyer", color: "#f97316", bg: "#fff7ed", text: "#c2410c" },
-  { id: "Price approval by buyer", label: "Price approval by buyer", color: "#10b981", bg: "#ecfdf5", text: "#065f46" },
-  { id: "Quotation send to the supplier from buyer end", label: "Quotation to supplier", color: "#14b8a6", bg: "#f0fdfa", text: "#115e59" },
-  { id: "Orders confirmed from buyers end", label: "Orders confirmed", color: "#16a34a", bg: "#f0fdf4", text: "#14532d" },
-  { id: "Timeline (Product shipping.. etc) should be established from suppliers end", label: "Timeline established", color: "#22c55e", bg: "#f0fdf4", text: "#166534" },
-];
 
 // ─── Component ──────────────────────────────────────────────────────
 export default function DashboardPage() {
@@ -308,23 +322,32 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="p-5 overflow-x-auto">
-          {s.recentDeals && s.recentDeals.length > 0 ? (
-            <div className="flex gap-4 min-w-max pb-2">
-              {(() => {
-                const deals = s.recentDeals.slice(0, 3);
-                const activeStageIds = new Set(deals.map(d => d.stage));
-                const activeStages = STAGES.filter(stage => activeStageIds.has(stage.id));
+        <div className="p-5">
+          {(() => {
+            const topDeals = s.recentDeals?.slice(0, 3) || [];
+            if (topDeals.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center py-8 text-center h-full">
+                  <TrendingUp className="h-8 w-8 text-slate-200 mb-2" />
+                  <p className="text-sm text-slate-400">No deals yet</p>
+                  <Link to="/deals" className="mt-2 text-xs text-brand-600 hover:underline">
+                    Add your first deal →
+                  </Link>
+                </div>
+              );
+            }
 
-                return activeStages.map(stage => {
-                  const stageDeals = deals.filter(d => d.stage === stage.id);
+            return (
+              <div className="flex gap-4 overflow-x-auto pb-2 min-h-[160px]">
+                {STAGES.map(stage => {
+                  const stageDeals = topDeals.filter(d => d.stage === stage.id);
                   return (
-                    <div key={stage.id} className="w-64 flex flex-col rounded-xl border border-slate-200 bg-slate-50 flex-shrink-0">
+                    <div key={stage.id} className="shrink-0 w-64 flex flex-col rounded-xl border border-slate-200 bg-slate-50">
                       <div
                         className="flex items-center justify-between px-3 py-2.5 rounded-t-xl"
                         style={{ borderTop: `3px solid ${stage.color}`, background: stage.bg }}
                       >
-                        <span className="text-xs font-bold uppercase tracking-wider truncate mr-2" style={{ color: stage.text }} title={stage.label}>
+                        <span className="text-xs font-bold uppercase tracking-wider line-clamp-1" style={{ color: stage.text }} title={stage.label}>
                           {stage.label}
                         </span>
                         <span
@@ -334,41 +357,54 @@ export default function DashboardPage() {
                           {stageDeals.length}
                         </span>
                       </div>
-                      <div className="flex flex-col gap-2 p-2 min-h-[100px]">
+                      <div className="flex flex-col gap-2 p-2">
                         {stageDeals.map(deal => (
-                          <div key={deal.id} className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm transition-all group">
-                            <p className="text-sm font-semibold text-slate-800 leading-tight mb-1">{deal.title}</p>
-                            {deal.buyer && <p className="text-xs text-slate-500 mb-2 truncate">{deal.buyer}</p>}
+                          <Link
+                            key={deal.id}
+                            to="/deals"
+                            className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 transition-all group block"
+                          >
+                            <div className="flex items-start justify-between gap-1 mb-1">
+                              <p className="text-sm font-semibold text-slate-800 leading-tight line-clamp-2 group-hover:text-brand-700 transition-colors">
+                                {deal.title}
+                              </p>
+                              <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0 mt-0.5 group-hover:text-brand-500 transition-colors" />
+                            </div>
+                            {deal.buyer && (
+                              <p className="text-xs text-slate-500 mb-2 truncate">{deal.buyer}</p>
+                            )}
                             <div className="flex items-center justify-between mt-2">
                               {deal.expectedRevenue ? (
-                                <span className="text-sm font-bold" style={{ color: stage.color }}>${deal.expectedRevenue >= 1_000_000 ? (deal.expectedRevenue / 1_000_000).toFixed(1) + 'M' : deal.expectedRevenue >= 1_000 ? (deal.expectedRevenue / 1_000).toFixed(0) + 'K' : deal.expectedRevenue.toLocaleString()}</span>
-                              ) : <span className="text-xs text-slate-400">No revenue</span>}
+                                <span className="text-sm font-bold" style={{ color: stage.color }}>
+                                  {fmtMoney(deal.expectedRevenue)}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-400">No revenue</span>
+                              )}
                               {deal.probability !== undefined && (
-                                <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{deal.probability}%</span>
+                                <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {deal.probability}%
+                                </span>
                               )}
                             </div>
                             {deal.riskScore && (
                               <div className="flex items-center gap-1 mt-1.5">
-                                <span className="text-[10px] uppercase font-bold text-slate-400" style={{ color: deal.riskScore === 'Low' ? '#10b981' : deal.riskScore === 'High' ? '#ef4444' : '#f59e0b' }}>{deal.riskScore} RISK</span>
+                                <div
+                                  className="h-2 w-2 rounded-full"
+                                  style={{ background: riskColor(deal.riskScore) }}
+                                />
+                                <span className="text-xs text-slate-400">{deal.riskScore} risk</span>
                               </div>
                             )}
-                          </div>
+                          </Link>
                         ))}
                       </div>
                     </div>
                   );
-                });
-              })()}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center h-full">
-              <TrendingUp className="h-8 w-8 text-slate-200 mb-2" />
-              <p className="text-sm text-slate-400">No deals yet</p>
-              <Link to="/deals" className="mt-2 text-xs text-brand-600 hover:underline">
-                Add your first deal →
-              </Link>
-            </div>
-          )}
+                })}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

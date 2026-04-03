@@ -202,7 +202,6 @@ const ORGANIC_CERT_MARKETS = ["India — NPOP", "USA — USDA Organic (NOP)", "E
 const LAB_TEST_TYPES = ["Pesticide Residue Analysis", "Heavy Metals Test", "Microbiology Test", "Aflatoxin Test", "Moisture Analysis"];
 
 const DEAL_STAGES = [
-  "No Ongoing Deal",
   "Communication",
   "Sampling",
   "Quotation",
@@ -264,7 +263,6 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
   contactPerson: "",
   email: "",
   currentStatus: "Under Review",
-  dealStage: "No Ongoing Deal",
   supplierProducts: [],
   productCatalogs: [],
 };
@@ -360,7 +358,6 @@ export default function SuppliersPage() {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-stats"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["buyer"] });
       queryClient.invalidateQueries({ queryKey: ["buyers"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-filters"] });
@@ -377,7 +374,6 @@ export default function SuppliersPage() {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-stats"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-filters"] });
-      queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["buyer"] });
       queryClient.invalidateQueries({ queryKey: ["buyers"] });
       setDialogOpen(false);
@@ -407,7 +403,6 @@ export default function SuppliersPage() {
       queryClient.invalidateQueries({ queryKey: ["old-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-stats"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["buyer"] });
       queryClient.invalidateQueries({ queryKey: ["buyers"] });
       toast.success(`Supplier moved to ${variables.stage}`);
@@ -711,8 +706,8 @@ export default function SuppliersPage() {
                 <th className="px-5 py-3.5 font-semibold">Certifications</th>
                 <th className="px-5 py-3.5 font-semibold">Remarks</th>
                 <th className="px-5 py-3.5 font-semibold">Status</th>
+                <th className="px-5 py-3.5 font-semibold">Deal Stage</th>
                 <th className="px-5 py-3.5 font-semibold">Stage</th>
-                <th className="px-5 py-3.5 font-semibold">Deals Stage</th>
                 <th className="px-5 py-3.5 font-semibold">Intro Email</th>
                 {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
               </tr>
@@ -765,23 +760,7 @@ export default function SuppliersPage() {
                     </td>
                     <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
                       <Select
-                        value={s.supplierStage || "Signed"}
-                        onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
-                        disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
-                      >
-                        <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[110px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Onboarding">Onboarding</SelectItem>
-                          <SelectItem value="Signed">Signed</SelectItem>
-                          <SelectItem value="Closed">Closed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
-                      <Select
-                        value={s.dealStage || "No Ongoing Deal"}
+                        value={s.dealStage || "Communication"}
                         onValueChange={(val) => {
                           updateMutation.mutate({ id: s.id, d: { dealStage: val } });
                         }}
@@ -794,6 +773,22 @@ export default function SuppliersPage() {
                           {DEAL_STAGES.map((stage) => (
                             <SelectItem key={stage} value={stage}>{stage}</SelectItem>
                           ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
+                      <Select
+                        value={s.supplierStage || "Signed"}
+                        onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
+                        disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
+                      >
+                        <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[110px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Onboarding">Onboarding</SelectItem>
+                          <SelectItem value="Signed">Signed</SelectItem>
+                          <SelectItem value="Closed">Closed</SelectItem>
                         </SelectContent>
                       </Select>
                     </td>
@@ -900,16 +895,6 @@ export default function SuppliersPage() {
                     <SelectContent>
                       <SelectItem value="Signed">Signed</SelectItem><SelectItem value="Active">Active</SelectItem><SelectItem value="Inactive">Inactive</SelectItem><SelectItem value="Under Review">Under Review</SelectItem>
                       {filters?.statuses?.filter((s: string) => !["Signed", "Active", "Inactive", "Under Review"].includes(s)).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2"><Label>Deals Stage</Label>
-                  <Select value={form.dealStage ?? "No Ongoing Deal"} onValueChange={(v) => setForm({ ...form, dealStage: v })}>
-                    <SelectTrigger className="bg-white"><SelectValue placeholder="Select Deal Stage" /></SelectTrigger>
-                    <SelectContent>
-                      {DEAL_STAGES.map((stage) => (
-                        <SelectItem key={stage} value={stage}>{stage}</SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>

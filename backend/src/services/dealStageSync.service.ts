@@ -7,7 +7,6 @@ const prisma = new PrismaClient();
  * Valid deal stages in order
  */
 export const DEAL_STAGES = [
-    "No Ongoing Deal",
     "Communication",
     "Sampling",
     "Quotation",

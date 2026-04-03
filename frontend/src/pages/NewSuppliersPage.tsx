@@ -250,7 +250,6 @@ const ORGANIC_CERT_MARKETS = ["India — NPOP", "USA — USDA Organic (NOP)", "E
 const LAB_TEST_TYPES = ["Pesticide Residue Analysis", "Heavy Metals Test", "Microbiology Test", "Aflatoxin Test", "Moisture Analysis"];
 
 const DEAL_STAGES = [
-    "No Ongoing Deal",
     "Communication",
     "Sampling",
     "Quotation",
@@ -350,7 +349,6 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
     supplierProducts: [],
     productCatalogs: [],
     buyerIds: [],
-    dealStage: "No Ongoing Deal",
 };
 
 export default function NewSuppliersPage() {
@@ -444,7 +442,6 @@ export default function NewSuppliersPage() {
             queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
             queryClient.invalidateQueries({ queryKey: ["new-supplier-filters"] });
             queryClient.invalidateQueries({ queryKey: ["buyers-list"] });
-            queryClient.invalidateQueries({ queryKey: ["deals"] });
             setDialogOpen(false);
             toast.success("Supplier created");
         },
@@ -459,7 +456,6 @@ export default function NewSuppliersPage() {
             queryClient.invalidateQueries({ queryKey: ["new-supplier-filters"] });
             queryClient.invalidateQueries({ queryKey: ["buyer"] });
             queryClient.invalidateQueries({ queryKey: ["buyers"] });
-            queryClient.invalidateQueries({ queryKey: ["deals"] });
             setDialogOpen(false);
             toast.success("Supplier updated");
         },
@@ -485,7 +481,6 @@ export default function NewSuppliersPage() {
             queryClient.invalidateQueries({ queryKey: ["suppliers"] });
             queryClient.invalidateQueries({ queryKey: ["old-suppliers"] });
             queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-            queryClient.invalidateQueries({ queryKey: ["deals"] });
             toast.success(`Supplier moved to ${variables.stage}`);
         },
         onError: () => toast.error("Failed to update supplier stage"),
@@ -774,10 +769,10 @@ export default function NewSuppliersPage() {
                                 <th className="px-5 py-3.5 font-semibold">Phone</th>
                                 <th className="px-5 py-3.5 font-semibold">Email</th>
                                 <th className="px-5 py-3.5 font-semibold">Current Status</th>
+                                <th className="px-5 py-3.5 font-semibold">Deal Stage</th>
                                 <th className="px-5 py-3.5 font-semibold">Certifications</th>
                                 <th className="px-5 py-3.5 font-semibold">Notes</th>
                                 <th className="px-5 py-3.5 font-semibold">Stage</th>
-                                <th className="px-5 py-3.5 font-semibold">Deals Stage</th>
                                 <th className="px-5 py-3.5 font-semibold">Intro Email</th>
                                 {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
                             </tr>
@@ -823,24 +818,6 @@ export default function NewSuppliersPage() {
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.phone}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.email}</td>
                                         <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.currentStatus}</td>
-                                        <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.certifications}>{s.certifications}</td>
-                                        <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.notes}>{s.notes}</td>
-                                        <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
-                                            <Select
-                                                value={s.supplierStage || "Onboarding"}
-                                                onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
-                                                disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
-                                            >
-                                                <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[110px]">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="Onboarding">Onboarding</SelectItem>
-                                                    <SelectItem value="Signed">Signed</SelectItem>
-                                                    <SelectItem value="Closed">Closed</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </td>
                                         <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
                                             <Select
                                                 value={s.dealStage || "Communication"}
@@ -856,6 +833,24 @@ export default function NewSuppliersPage() {
                                                     {DEAL_STAGES.map((stage) => (
                                                         <SelectItem key={stage} value={stage}>{stage}</SelectItem>
                                                     ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </td>
+                                        <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.certifications}>{s.certifications}</td>
+                                        <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.notes}>{s.notes}</td>
+                                        <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
+                                            <Select
+                                                value={s.supplierStage || "Onboarding"}
+                                                onValueChange={(val) => changeStageMutation.mutate({ id: s.id, stage: val })}
+                                                disabled={changeStageMutation.isPending && changeStageMutation.variables?.id === s.id}
+                                            >
+                                                <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[110px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Onboarding">Onboarding</SelectItem>
+                                                    <SelectItem value="Signed">Signed</SelectItem>
+                                                    <SelectItem value="Closed">Closed</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </td>
