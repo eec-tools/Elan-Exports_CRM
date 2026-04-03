@@ -183,10 +183,10 @@ function validateEnvironment() {
 validateEnvironment();
 
 app.listen(PORT, () => {
-  console.log(`🚀 Élan Exports CRM API running on http://localhost:${PORT}`);
-  console.log(`📚 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`🔒 Allowed origins: ${allowedOrigins.join(", ") || "localhost only"}`);
+  console.log(`Élan Exports CRM API running on http://localhost:${PORT}`);
+  console.log(`Health check: http://localhost:${PORT}/api/health`);
+  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`Allowed origins: ${allowedOrigins.join(", ") || "localhost only"}`);
   startEmailCampaignScheduler();
 });
 
