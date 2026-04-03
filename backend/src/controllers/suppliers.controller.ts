@@ -210,21 +210,19 @@ export async function createSupplier(
       if (!reportBuyer) reportBuyer = "Direct";
       const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
 
-      let parsedProducts = "";
       const sProducts = (supplier as any).supplierProducts;
+      let productsToReport: {name: string, imageUrl: string | null}[] = [];
       if (Array.isArray(sProducts) && sProducts.length > 0) {
-        parsedProducts = sProducts.map((p: any) => p.product).filter(Boolean).join(", ");
+        productsToReport = sProducts.map((p: any) => ({
+            name: p.product || "Unnamed Product",
+            imageUrl: p.imageUrl || null
+        }));
+      } else {
+        productsToReport = [{ name: supplier.products || "N/A", imageUrl: null }];
       }
-      const reportProduct = parsedProducts || supplier.products || "N/A";
+
       const remarksStr = supplier.remarks ? ` Remarks: ${supplier.remarks}` : "";
       const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] Supplier Added.${remarksStr}`;
-
-      const existingReport = await prisma.report.findFirst({
-        where: {
-          productName: { equals: reportProduct, mode: "insensitive" }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
 
       const mergeStr = (a: string, b: string) => {
         if (!b || b === "Direct" || b === "N/A") return a;
@@ -233,31 +231,45 @@ export async function createSupplier(
         return Array.from(s).filter(Boolean).join(", ");
       };
 
-      if (existingReport && reportProduct !== "N/A") {
-        await prisma.report.update({
-          where: { id: existingReport.id },
-          data: {
-            companyName: mergeStr(existingReport.companyName, supplier.company),
-            buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
-            status: mergeStr(existingReport.status, supplier.currentStatus || "Under Review"),
-            keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
-            updateDate: new Date()
+      for (const prod of productsToReport) {
+          const reportProduct = prod.name;
+          const productImage = prod.imageUrl;
+
+          const existingReport = await prisma.report.findFirst({
+            where: {
+              productName: { equals: reportProduct, mode: "insensitive" }
+            },
+            orderBy: { createdAt: 'desc' }
+          });
+
+          if (existingReport && reportProduct !== "N/A") {
+            await prisma.report.update({
+              where: { id: existingReport.id },
+              data: {
+                companyName: mergeStr(existingReport.companyName, supplier.company),
+                buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
+                status: mergeStr(existingReport.status, supplier.currentStatus || "Under Review"),
+                keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
+                updateDate: new Date(),
+                ...(productImage && !existingReport.productImageUrl && { productImageUrl: productImage }),
+              }
+            });
+          } else {
+            await prisma.report.create({
+              data: {
+                productName: reportProduct,
+                productImageUrl: productImage,
+                buyerName: mappedBuyer,
+                companyName: supplier.company,
+                status: supplier.currentStatus || "Under Review",
+                keyUpdates: newUpdatePoint,
+                buyerSupplier: "Supplier",
+                reportDate: new Date(),
+                updateDate: new Date(),
+                createdBy: req.user!.id,
+              }
+            });
           }
-        });
-      } else {
-        await prisma.report.create({
-          data: {
-            productName: reportProduct,
-            buyerName: mappedBuyer,
-            companyName: supplier.company,
-            status: supplier.currentStatus || "Under Review",
-            keyUpdates: newUpdatePoint,
-            buyerSupplier: "Supplier",
-            reportDate: new Date(),
-            updateDate: new Date(),
-            createdBy: req.user!.id,
-          }
-        });
       }
     } catch (e) { console.error("Auto Report Gen Failed", e); }
     // -------------------------------------------
@@ -382,22 +394,22 @@ export async function updateSupplier(
         if (!reportBuyer) reportBuyer = "Direct";
         const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
 
-        let parsedProducts = "";
         const sProducts = (supplier as any).supplierProducts;
         const eProducts = (existing as any).supplierProducts;
+        let productsToReport: {name: string, imageUrl: string | null}[] = [];
         if (Array.isArray(sProducts) && sProducts.length > 0) {
-          parsedProducts = sProducts.map((p: any) => p.product).filter(Boolean).join(", ");
+            productsToReport = sProducts.map((p: any) => ({
+                name: p.product || "Unnamed Product",
+                imageUrl: p.imageUrl || null
+            }));
         } else if (Array.isArray(eProducts) && eProducts.length > 0) {
-          parsedProducts = eProducts.map((p: any) => p.product).filter(Boolean).join(", ");
+            productsToReport = eProducts.map((p: any) => ({
+                name: p.product || "Unnamed Product",
+                imageUrl: p.imageUrl || null
+            }));
+        } else {
+            productsToReport = [{ name: supplier.products || existing.products || "N/A", imageUrl: null }];
         }
-        const reportProduct = parsedProducts || supplier.products || existing.products || "N/A";
-
-        const existingReport = await prisma.report.findFirst({
-          where: {
-            productName: { equals: reportProduct, mode: "insensitive" }
-          },
-          orderBy: { createdAt: 'desc' }
-        });
 
         const mergeStr = (a: string, b: string) => {
           if (!b || b === "Direct" || b === "N/A") return a;
@@ -408,31 +420,45 @@ export async function updateSupplier(
 
         const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] ${updatesText}`;
 
-        if (existingReport && reportProduct !== "N/A") {
-          await prisma.report.update({
-            where: { id: existingReport.id },
-            data: {
-              companyName: mergeStr(existingReport.companyName, supplier.company),
-              buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
-              status: mergeStr(existingReport.status, updateData.currentStatus || existing.currentStatus || "Status Updated"),
-              keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
-              updateDate: new Date()
+        for (const prod of productsToReport) {
+            const reportProduct = prod.name;
+            const productImage = prod.imageUrl;
+
+            const existingReport = await prisma.report.findFirst({
+              where: {
+                productName: { equals: reportProduct, mode: "insensitive" }
+              },
+              orderBy: { createdAt: 'desc' }
+            });
+
+            if (existingReport && reportProduct !== "N/A") {
+              await prisma.report.update({
+                where: { id: existingReport.id },
+                data: {
+                  companyName: mergeStr(existingReport.companyName, supplier.company),
+                  buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
+                  status: mergeStr(existingReport.status, updateData.currentStatus || existing.currentStatus || "Status Updated"),
+                  keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
+                  updateDate: new Date(),
+                  ...(productImage && { productImageUrl: productImage }),
+                }
+              });
+            } else {
+              await prisma.report.create({
+                data: {
+                  productName: reportProduct,
+                  productImageUrl: productImage,
+                  buyerName: mappedBuyer,
+                  companyName: supplier.company,
+                  status: updateData.currentStatus || existing.currentStatus || "Status Updated",
+                  keyUpdates: newUpdatePoint,
+                  buyerSupplier: "Supplier",
+                  reportDate: new Date(),
+                  updateDate: new Date(),
+                  createdBy: req.user!.id,
+                }
+              });
             }
-          });
-        } else {
-          await prisma.report.create({
-            data: {
-              productName: reportProduct,
-              buyerName: mappedBuyer,
-              companyName: supplier.company,
-              status: updateData.currentStatus || existing.currentStatus || "Status Updated",
-              keyUpdates: newUpdatePoint,
-              buyerSupplier: "Supplier",
-              reportDate: new Date(),
-              updateDate: new Date(),
-              createdBy: req.user!.id,
-            }
-          });
         }
       } catch (e) { console.error("Auto Report Gen Failed", e); }
     }

@@ -218,6 +218,7 @@ interface SupplierProduct {
     netWeightVariants: string;
     ingredientList: string;
     allergenDeclaration: string;
+    imageUrl?: string;
 }
 
 interface ProductCatalogEntry {
@@ -230,7 +231,7 @@ const EMPTY_SUPPLIER_PRODUCT = (): SupplierProduct => ({
     product: "", productCategory: "", hsCode: "", organicStatus: "",
     certifications: "", shelfLife: "", storageConditions: "",
     packagingType: "", netWeightVariants: "", ingredientList: "",
-    allergenDeclaration: "",
+    allergenDeclaration: "", imageUrl: "",
 });
 
 interface OrganicCertRow {
@@ -374,6 +375,7 @@ export default function NewSuppliersPage() {
     const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
     const [certificateFiles, setCertificateFiles] = useState<File[]>([]);
     const [warehousePhotoFiles, setWarehousePhotoFiles] = useState<File[]>([]);
+    const [productImageFiles, setProductImageFiles] = useState<Record<number, File>>({});
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(
         null,
@@ -544,8 +546,21 @@ export default function NewSuppliersPage() {
             }
         }
 
+        // Upload product images
+        const finalProducts = [...(form.supplierProducts || [])];
+        for (const [idxStr, file] of Object.entries(productImageFiles)) {
+            const idx = parseInt(idxStr);
+            if (idx >= 0 && idx < finalProducts.length) {
+                try {
+                    const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+                    finalProducts[idx] = { ...finalProducts[idx], imageUrl: uploadRes.url };
+                } catch (error) { console.error('Product image upload failed', error); }
+            }
+        }
+
         const payload = {
             ...form,
+            supplierProducts: finalProducts,
             productCatalog: catalogUrl,
             productCatalogs: finalCatalogs,
             certificates: finalCertificates,
@@ -567,6 +582,7 @@ export default function NewSuppliersPage() {
         setCatalogFiles([]);
         setCertificateFiles([]);
         setWarehousePhotoFiles([]);
+        setProductImageFiles({});
         setDialogOpen(true);
     };
 
@@ -577,6 +593,7 @@ export default function NewSuppliersPage() {
         setCatalogFiles([]);
         setCertificateFiles([]);
         setWarehousePhotoFiles([]);
+        setProductImageFiles({});
         setDialogOpen(true);
     };
 
@@ -1032,6 +1049,48 @@ export default function NewSuppliersPage() {
                                         <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => removeProduct(i)}>
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
+                                    </div>
+                                    {/* Product Image Upload */}
+                                    <div className="mb-4">
+                                        <Label className="text-xs mb-1.5 block">Product Image</Label>
+                                        <div className="flex items-center gap-4">
+                                            <div className="relative group h-24 w-24 rounded-lg border-2 border-dashed border-slate-300 bg-white flex items-center justify-center overflow-hidden hover:border-brand-500 transition-colors shrink-0">
+                                                {productImageFiles[i] ? (
+                                                    <img src={URL.createObjectURL(productImageFiles[i])} alt="Preview" className="h-full w-full object-cover" />
+                                                ) : prod.imageUrl ? (
+                                                    <img src={prod.imageUrl} alt={prod.product || 'Product'} className="h-full w-full object-cover" />
+                                                ) : (
+                                                    <div className="flex flex-col items-center text-slate-400 p-1 text-center">
+                                                        <Upload className="h-6 w-6 mb-1 opacity-50" />
+                                                        <span className="text-[9px] uppercase font-bold tracking-wider">No Image</span>
+                                                    </div>
+                                                )}
+                                                <label className="absolute inset-0 bg-slate-900/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                                    <span className="text-white text-xs font-bold">Upload</span>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        className="hidden"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+                                                            if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
+                                                            setProductImageFiles(prev => ({ ...prev, [i]: file }));
+                                                        }}
+                                                    />
+                                                </label>
+                                            </div>
+                                            {(productImageFiles[i] || prod.imageUrl) && (
+                                                <Button type="button" variant="ghost" size="sm" className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-7 px-2"
+                                                    onClick={() => {
+                                                        setProductImageFiles(prev => { const n = {...prev}; delete n[i]; return n; });
+                                                        updateProduct(i, 'imageUrl' as any, '');
+                                                    }}
+                                                >
+                                                    <X className="h-3 w-3 mr-1" /> Remove
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="grid gap-3 sm:grid-cols-2">
                                         <div className="space-y-1.5"><Label className="text-xs">Product Name / Description</Label><Input className="h-8 text-sm" value={prod.product} onChange={(e) => updateProduct(i, "product", e.target.value)} placeholder="e.g. Organic Basmati Rice" /></div>

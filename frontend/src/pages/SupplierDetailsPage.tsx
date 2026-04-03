@@ -77,6 +77,7 @@ interface SupplierProduct {
   netWeightVariants: string;
   ingredientList: string;
   allergenDeclaration: string;
+  imageUrl?: string;
 }
 
 interface ProductCatalogEntry {
@@ -89,7 +90,7 @@ const EMPTY_SUPPLIER_PRODUCT = (): SupplierProduct => ({
   product: "", productCategory: "", hsCode: "", organicStatus: "",
   certifications: "", shelfLife: "", storageConditions: "",
   packagingType: "", netWeightVariants: "", ingredientList: "",
-  allergenDeclaration: "",
+  allergenDeclaration: "", imageUrl: "",
 });
 interface Supplier {
   id: string;
@@ -275,6 +276,7 @@ export default function SupplierDetailsPage() {
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
+  const [productImageFiles, setProductImageFiles] = useState<Record<number, File>>({});
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [uploadingContract, setUploadingContract] = useState(false);
 
@@ -489,7 +491,19 @@ export default function SupplierDetailsPage() {
       }
     }
 
-    const payload = { ...form, productCatalogShared: catalogUrl, documents: finalDocuments, productCatalogs: finalCatalogs };
+    // Upload product images
+    const finalProducts = [...(form.supplierProducts || [])];
+    for (const [idxStr, file] of Object.entries(productImageFiles)) {
+      const idx = parseInt(idxStr);
+      if (idx >= 0 && idx < finalProducts.length) {
+        try {
+          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+          finalProducts[idx] = { ...finalProducts[idx], imageUrl: uploadRes.url };
+        } catch (error) { console.error('Product image upload failed', error); }
+      }
+    }
+
+    const payload = { ...form, supplierProducts: finalProducts, productCatalogShared: catalogUrl, documents: finalDocuments, productCatalogs: finalCatalogs };
 
     if (supplier?.id) {
       updateMutation.mutate({ id: supplier.id, d: payload });
@@ -515,6 +529,7 @@ export default function SupplierDetailsPage() {
     setCatalogFile(null);
     setDocumentFiles([]);
     setCatalogFiles([]);
+    setProductImageFiles({});
     setDialogOpen(true);
   };
 
@@ -755,15 +770,29 @@ export default function SupplierDetailsPage() {
           <CardContent className="space-y-3">
             {(supplier.supplierProducts ?? []).length > 0 ? (
               (supplier.supplierProducts ?? []).map((prod, i) => (
-                <div key={prod.id || i} className="border border-slate-200 rounded-lg p-3 bg-slate-50/50 space-y-1">
-                  <p className="text-sm font-semibold text-slate-700">Product #{i + 1}: {prod.product || "Unnamed"}</p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    <div><span className="text-muted-foreground">Category:</span> {prod.productCategory || "—"}</div>
-                    <div><span className="text-muted-foreground">HS Code:</span> {prod.hsCode || "—"}</div>
-                    <div><span className="text-muted-foreground">Organic:</span> {prod.organicStatus || "—"}</div>
-                    <div><span className="text-muted-foreground">Certs:</span> {prod.certifications || "—"}</div>
-                    <div><span className="text-muted-foreground">Shelf Life:</span> {prod.shelfLife || "—"}</div>
-                    <div><span className="text-muted-foreground">Storage:</span> {prod.storageConditions || "—"}</div>
+                <div key={prod.id || i} className="border border-slate-200 rounded-lg p-3 bg-slate-50/50 space-y-2">
+                  <div className="flex items-start gap-3">
+                    {/* Product Image */}
+                    {prod.imageUrl ? (
+                      <a href={prod.imageUrl} target="_blank" rel="noopener noreferrer" className="block w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:ring-2 ring-brand-500 ring-offset-1 transition-all shrink-0">
+                        <img src={prod.imageUrl} alt={prod.product || 'Product'} className="w-full h-full object-cover" />
+                      </a>
+                    ) : (
+                      <div className="w-16 h-16 rounded-md border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0">
+                        <Package className="h-6 w-6 text-slate-300" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-700">Product #{i + 1}: {prod.product || "Unnamed"}</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-1">
+                        <div><span className="text-muted-foreground">Category:</span> {prod.productCategory || "—"}</div>
+                        <div><span className="text-muted-foreground">HS Code:</span> {prod.hsCode || "—"}</div>
+                        <div><span className="text-muted-foreground">Organic:</span> {prod.organicStatus || "—"}</div>
+                        <div><span className="text-muted-foreground">Certs:</span> {prod.certifications || "—"}</div>
+                        <div><span className="text-muted-foreground">Shelf Life:</span> {prod.shelfLife || "—"}</div>
+                        <div><span className="text-muted-foreground">Storage:</span> {prod.storageConditions || "—"}</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))
@@ -1359,6 +1388,48 @@ export default function SupplierDetailsPage() {
                     <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => removeProduct(i)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                  </div>
+                  {/* Product Image Upload */}
+                  <div className="mb-4">
+                    <Label className="text-xs mb-1.5 block">Product Image</Label>
+                    <div className="flex items-center gap-4">
+                      <div className="relative group h-24 w-24 rounded-lg border-2 border-dashed border-slate-300 bg-white flex items-center justify-center overflow-hidden hover:border-brand-500 transition-colors shrink-0">
+                        {productImageFiles[i] ? (
+                          <img src={URL.createObjectURL(productImageFiles[i])} alt="Preview" className="h-full w-full object-cover" />
+                        ) : prod.imageUrl ? (
+                          <img src={prod.imageUrl} alt={prod.product || 'Product'} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex flex-col items-center text-slate-400 p-1 text-center">
+                            <Upload className="h-6 w-6 mb-1 opacity-50" />
+                            <span className="text-[9px] uppercase font-bold tracking-wider">No Image</span>
+                          </div>
+                        )}
+                        <label className="absolute inset-0 bg-slate-900/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                          <span className="text-white text-xs font-bold">Upload</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
+                              setProductImageFiles(prev => ({ ...prev, [i]: file }));
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {(productImageFiles[i] || prod.imageUrl) && (
+                        <Button type="button" variant="ghost" size="sm" className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-7 px-2"
+                          onClick={() => {
+                            setProductImageFiles(prev => { const n = {...prev}; delete n[i]; return n; });
+                            updateProduct(i, 'imageUrl' as any, '');
+                          }}
+                        >
+                          <X className="h-3 w-3 mr-1" /> Remove
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1.5"><Label className="text-xs">Product Name</Label><Input className="h-8 text-sm" value={prod.product} onChange={(e) => updateProduct(i, "product", e.target.value)} /></div>
