@@ -212,6 +212,7 @@ const DEAL_STAGES = [
   "Quotation send to the supplier from buyer end",
   "Orders confirmed from buyers end",
   "Timeline (Product shipping.. etc) should be established from suppliers end",
+  "No Ongoing Deal",
 ];
 
 const FOLLOWUP_LABELS: Record<number, string> = {
