@@ -234,7 +234,7 @@ model Supplier {
   supplierProducts              Json?                  @default("[]") @map("supplier_products")
   productCatalogs               Json?                  @default("[]") @map("product_catalogs")
   buyerIds                    Json                   @default("[]") @map("buyer_ids")
-  dealStage                   String                 @default("Communication") @map("deal_stage")
+  dealStage                   String                 @default("No Ongoing Deal") @map("deal_stage")
 
   @@map("suppliers")
 }
@@ -615,3 +615,4 @@ enum ComplianceStatus {
   PENDING
   MISSING
 }
+

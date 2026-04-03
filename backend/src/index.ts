@@ -45,7 +45,10 @@ app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  res.setHeader(
+    "Strict-Transport-Security",
+    "max-age=31536000; includeSubDomains",
+  );
   next();
 });
 
@@ -143,7 +146,8 @@ app.get("/api/health", async (_req, res) => {
     environment: process.env.NODE_ENV || "development",
     uptime: process.uptime(),
     cors: {
-      allowedOrigins: allowedOrigins.length > 0 ? allowedOrigins : ["localhost only"],
+      allowedOrigins:
+        allowedOrigins.length > 0 ? allowedOrigins : ["localhost only"],
     },
   };
 
@@ -171,23 +175,55 @@ function validateEnvironment() {
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
-    console.error(`❌ Missing required environment variables: ${missing.join(", ")}`);
+    console.error(
+      `❌ Missing required environment variables: ${missing.join(", ")}`,
+    );
     process.exit(1);
   }
 
   if (process.env.NODE_ENV === "production" && !process.env.FRONTEND_URL) {
-    console.warn("⚠️  Warning: FRONTEND_URL not set in production. CORS may not work correctly.");
+    console.warn(
+      "⚠️  Warning: FRONTEND_URL not set in production. CORS may not work correctly.",
+    );
   }
 }
 
 validateEnvironment();
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Élan Exports CRM API running on http://localhost:${PORT}`);
   console.log(`📚 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`🔒 Allowed origins: ${allowedOrigins.join(", ") || "localhost only"}`);
+  console.log(
+    `🔒 Allowed origins: ${allowedOrigins.join(", ") || "localhost only"}`,
+  );
   startEmailCampaignScheduler();
+
+  // One-time migration: update default dealStage from "Communication" to "No Ongoing Deal"
+  try {
+    const db = (await import("./config/db.js")).default;
+    const [s1, s2, s3] = await Promise.all([
+      db.supplier.updateMany({
+        where: { dealStage: "Communication" },
+        data: { dealStage: "No Ongoing Deal" },
+      }),
+      db.newSupplier.updateMany({
+        where: { dealStage: "Communication" },
+        data: { dealStage: "No Ongoing Deal" },
+      }),
+      db.oldSupplier.updateMany({
+        where: { dealStage: "Communication" },
+        data: { dealStage: "No Ongoing Deal" },
+      }),
+    ]);
+    const total = s1.count + s2.count + s3.count;
+    if (total > 0)
+      console.log(
+        `✅ Migrated ${total} supplier(s) dealStage → "No Ongoing Deal"`,
+      );
+  } catch (err) {
+    console.warn("⚠️  Deal stage migration skipped:", (err as Error).message);
+  }
 });
 
 // Graceful shutdown

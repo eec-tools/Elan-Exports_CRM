@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001/api";
 
@@ -104,8 +105,17 @@ const emptyForm = (): Partial<Deal> => ({
 
 // ─── Main Page ────────────────────────────────────────────────
 export default function DealsPage() {
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: deals = [], isLoading: loading } = useQuery({
+    queryKey: ["deals"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/deals`, { headers: authHeader() });
+      if (!res.ok) throw new Error("Failed to fetch deals");
+      const d = await res.json();
+      return Array.isArray(d) ? d : [];
+    }
+  });
+
   const [view, setView] = useState<"kanban" | "table">("kanban");
 
   // Buyer / Supplier options fetched from real data
@@ -130,21 +140,7 @@ export default function DealsPage() {
   const [dragOver, setDragOver] = useState<string | null>(null);
 
   // ─── Fetch ───────────────────────────────────────────────────
-  async function fetchDeals() {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/deals`, { headers: authHeader() });
-      const data = await res.json();
-      setDeals(Array.isArray(data) ? data : []);
-    } catch {
-      toast.error("Failed to load deals");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    fetchDeals();
     // Fetch buyer & supplier names for dropdowns
     fetch(`${API_BASE}/buyers?limit=200`, { headers: authHeader() })
       .then((r) => r.json())
@@ -195,7 +191,7 @@ export default function DealsPage() {
         body: JSON.stringify(form),
       });
       if (!res.ok) throw new Error();
-      await fetchDeals();
+      await queryClient.invalidateQueries({ queryKey: ["deals"] });
       setShowNewDeal(false);
       setForm(emptyForm());
       toast.success("Deal created!");
@@ -218,7 +214,10 @@ export default function DealsPage() {
       });
       if (!res.ok) throw new Error();
       const updated = await res.json();
-      setDeals((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+      queryClient.setQueryData(["deals"], (old: Deal[] | undefined) => old?.map((d) => d.id === updated.id ? updated : d) || []);
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
       setSelectedDeal(updated);
       setEditMode(false);
       toast.success("Deal updated!");
@@ -239,7 +238,10 @@ export default function DealsPage() {
       });
       if (!res.ok) throw new Error();
       const updated = await res.json();
-      setDeals((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+      queryClient.setQueryData(["deals"], (old: Deal[] | undefined) => old?.map((d) => d.id === updated.id ? updated : d) || []);
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
       if (selectedDeal?.id === dealId) setSelectedDeal(updated);
     } catch {
       toast.error("Failed to move deal");
@@ -255,7 +257,10 @@ export default function DealsPage() {
         headers: authHeader(),
       });
       if (!res.ok) throw new Error();
-      setDeals((prev) => prev.filter((d) => d.id !== deal.id));
+      queryClient.setQueryData(["deals"], (old: Deal[] | undefined) => old?.filter((d) => d.id !== deal.id) || []);
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
       setDeleteTarget(null);
       if (selectedDeal?.id === deal.id) setSelectedDeal(null);
       toast.success("Deal deleted");

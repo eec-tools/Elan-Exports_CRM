@@ -105,6 +105,19 @@ const getColorForLink = (title: string) => {
   return { text: "text-slate-600", bg: "bg-slate-50", hover: "group-hover:bg-slate-100", borderHover: "hover:border-slate-300" };
 };
 
+const STAGES = [
+  { id: "Communication", label: "Communication", color: "#64748b", bg: "#f1f5f9", text: "#334155" },
+  { id: "Sampling", label: "Sampling", color: "#8b5cf6", bg: "#f5f3ff", text: "#6d28d9" },
+  { id: "Quotation", label: "Quotation", color: "#3b82f6", bg: "#eff6ff", text: "#1d4ed8" },
+  { id: "Negotiation with EEC", label: "Negotiation with EEC", color: "#f59e0b", bg: "#fffbeb", text: "#b45309" },
+  { id: "Price quotation to Buyer after EEC approval", label: "Price quotation to Buyer", color: "#06b6d4", bg: "#ecfeff", text: "#0e7490" },
+  { id: "Negotiation with buyer", label: "Negotiation with buyer", color: "#f97316", bg: "#fff7ed", text: "#c2410c" },
+  { id: "Price approval by buyer", label: "Price approval by buyer", color: "#10b981", bg: "#ecfdf5", text: "#065f46" },
+  { id: "Quotation send to the supplier from buyer end", label: "Quotation to supplier", color: "#14b8a6", bg: "#f0fdfa", text: "#115e59" },
+  { id: "Orders confirmed from buyers end", label: "Orders confirmed", color: "#16a34a", bg: "#f0fdf4", text: "#14532d" },
+  { id: "Timeline (Product shipping.. etc) should be established from suppliers end", label: "Timeline established", color: "#22c55e", bg: "#f0fdf4", text: "#166534" },
+];
+
 // ─── Component ──────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -295,45 +308,58 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="p-5 space-y-3 overflow-y-auto">
+        <div className="p-5 overflow-x-auto">
           {s.recentDeals && s.recentDeals.length > 0 ? (
-            s.recentDeals.slice(0, 3).map((deal) => {
-              const stageColors: Record<string, { bg: string; text: string }> = {
-                "Communication": { bg: "bg-slate-100", text: "text-slate-700" },
-                "Sampling": { bg: "bg-purple-100", text: "text-purple-700" },
-                "Quotation": { bg: "bg-blue-100", text: "text-blue-700" },
-                "Negotiation with EEC": { bg: "bg-amber-100", text: "text-amber-700" },
-                "Price quotation to Buyer after EEC approval": { bg: "bg-cyan-100", text: "text-cyan-700" },
-                "Negotiation with buyer": { bg: "bg-orange-100", text: "text-orange-700" },
-                "Price approval by buyer": { bg: "bg-emerald-100", text: "text-emerald-700" },
-                "Quotation send to the supplier from buyer end": { bg: "bg-teal-100", text: "text-teal-700" },
-                "Orders confirmed from buyers end": { bg: "bg-green-100", text: "text-green-700" },
-                "Timeline (Product shipping.. etc) should be established from suppliers end": { bg: "bg-lime-100", text: "text-lime-700" },
-              };
-              const colors = stageColors[deal.stage] || { bg: "bg-slate-100", text: "text-slate-700" };
+            <div className="flex gap-4 min-w-max pb-2">
+              {(() => {
+                const deals = s.recentDeals.slice(0, 3);
+                const activeStageIds = new Set(deals.map(d => d.stage));
+                const activeStages = STAGES.filter(stage => activeStageIds.has(stage.id));
 
-              return (
-                <Link
-                  key={deal.id}
-                  to="/deals"
-                  className="block p-4 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50/30 transition-all duration-200 group"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-slate-800 group-hover:text-brand-700 transition-colors truncate">
-                        {deal.title}
-                      </h3>
-                      {deal.buyer && (
-                        <p className="text-xs text-slate-500 mt-1 truncate">{deal.buyer}</p>
-                      )}
+                return activeStages.map(stage => {
+                  const stageDeals = deals.filter(d => d.stage === stage.id);
+                  return (
+                    <div key={stage.id} className="w-64 flex flex-col rounded-xl border border-slate-200 bg-slate-50 flex-shrink-0">
+                      <div
+                        className="flex items-center justify-between px-3 py-2.5 rounded-t-xl"
+                        style={{ borderTop: `3px solid ${stage.color}`, background: stage.bg }}
+                      >
+                        <span className="text-xs font-bold uppercase tracking-wider truncate mr-2" style={{ color: stage.text }} title={stage.label}>
+                          {stage.label}
+                        </span>
+                        <span
+                          className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0"
+                          style={{ background: stage.color + "22", color: stage.color }}
+                        >
+                          {stageDeals.length}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-2 p-2 min-h-[100px]">
+                        {stageDeals.map(deal => (
+                          <div key={deal.id} className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm transition-all group">
+                            <p className="text-sm font-semibold text-slate-800 leading-tight mb-1">{deal.title}</p>
+                            {deal.buyer && <p className="text-xs text-slate-500 mb-2 truncate">{deal.buyer}</p>}
+                            <div className="flex items-center justify-between mt-2">
+                              {deal.expectedRevenue ? (
+                                <span className="text-sm font-bold" style={{ color: stage.color }}>${deal.expectedRevenue >= 1_000_000 ? (deal.expectedRevenue / 1_000_000).toFixed(1) + 'M' : deal.expectedRevenue >= 1_000 ? (deal.expectedRevenue / 1_000).toFixed(0) + 'K' : deal.expectedRevenue.toLocaleString()}</span>
+                              ) : <span className="text-xs text-slate-400">No revenue</span>}
+                              {deal.probability !== undefined && (
+                                <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{deal.probability}%</span>
+                              )}
+                            </div>
+                            {deal.riskScore && (
+                              <div className="flex items-center gap-1 mt-1.5">
+                                <span className="text-[10px] uppercase font-bold text-slate-400" style={{ color: deal.riskScore === 'Low' ? '#10b981' : deal.riskScore === 'High' ? '#ef4444' : '#f59e0b' }}>{deal.riskScore} RISK</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${colors.bg} ${colors.text} shrink-0`}>
-                      {deal.stage}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })
+                  );
+                });
+              })()}
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center h-full">
               <TrendingUp className="h-8 w-8 text-slate-200 mb-2" />
