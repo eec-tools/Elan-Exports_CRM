@@ -153,6 +153,7 @@ interface NewSupplier {
   productCatalog?: string;
   supplierProducts?: SupplierProduct[];
   productCatalogs?: ProductCatalogEntry[];
+  productCatalogImages?: ProductCatalogEntry[];
   buyerIds?: string[];
   certificates?: { name: string; url: string }[];
   warehousePhotos?: { name: string; url: string }[];
@@ -221,6 +222,7 @@ export default function NewSupplierDetailsPage() {
   const [form, setForm] = useState<Partial<NewSupplier>>({});
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
   const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
+  const [catalogImageFiles, setCatalogImageFiles] = useState<File[]>([]);
   const [certificateFiles, setCertificateFiles] = useState<File[]>([]);
   const [warehousePhotoFiles, setWarehousePhotoFiles] = useState<File[]>([]);
   const [productImageFiles, setProductImageFiles] = useState<Record<number, File>>({});
@@ -377,6 +379,17 @@ export default function NewSupplierDetailsPage() {
       }
     }
 
+    // Upload multi-catalog image files
+    const finalCatalogImages = [...(form.productCatalogImages || [])];
+    if (catalogImageFiles.length > 0) {
+      for (const file of catalogImageFiles) {
+        try {
+          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+          finalCatalogImages.push({ name: file.name, url: uploadRes.url });
+        } catch (error) { console.error('Upload failed', error); }
+      }
+    }
+
     // Upload new certificate files
     const finalCertificates = [...(form.certificates || [])];
     if (certificateFiles.length > 0) {
@@ -417,6 +430,7 @@ export default function NewSupplierDetailsPage() {
           supplierProducts: finalProducts,
           productCatalog: catalogUrl, 
           productCatalogs: finalCatalogs,
+          productCatalogImages: finalCatalogImages,
           certificates: finalCertificates,
           warehousePhotos: finalWarehousePhotos,
         } 
@@ -424,10 +438,25 @@ export default function NewSupplierDetailsPage() {
     }
   };
 
+  const handleDeleteCatalog = (index: number) => {
+    if (!supplier?.productCatalogs || !supplier?.id) return;
+    const finalCatalogs = [...supplier.productCatalogs];
+    finalCatalogs.splice(index, 1);
+    updateMutation.mutate({ id: supplier.id, d: { productCatalogs: finalCatalogs } });
+  };
+
+  const handleDeleteCatalogImage = (index: number) => {
+    if (!supplier?.productCatalogImages || !supplier?.id) return;
+    const finalImages = [...supplier.productCatalogImages];
+    finalImages.splice(index, 1);
+    updateMutation.mutate({ id: supplier.id, d: { productCatalogImages: finalImages } });
+  };
+
   const openEdit = () => {
-    setForm({ ...(supplier || {}), supplierProducts: supplier?.supplierProducts || [], productCatalogs: supplier?.productCatalogs || [], certificates: supplier?.certificates || [], warehousePhotos: supplier?.warehousePhotos || [], videoLinks: supplier?.videoLinks || [] });
+    setForm({ ...(supplier || {}), supplierProducts: supplier?.supplierProducts || [], productCatalogs: supplier?.productCatalogs || [], productCatalogImages: supplier?.productCatalogImages || [], certificates: supplier?.certificates || [], warehousePhotos: supplier?.warehousePhotos || [], videoLinks: supplier?.videoLinks || [] });
     setCatalogFile(null);
     setCatalogFiles([]);
+    setCatalogImageFiles([]);
     setCertificateFiles([]);
     setWarehousePhotoFiles([]);
     setProductImageFiles({});
@@ -684,29 +713,80 @@ export default function NewSupplierDetailsPage() {
       </div>
 
       {/* ── Product Catalogs ── */}
-      {(supplier.productCatalog || (supplier.productCatalogs ?? []).length > 0) && (
+      {(supplier.productCatalog || (supplier.productCatalogs ?? []).length > 0 || (supplier.productCatalogImages ?? []).length > 0) && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" />Product Catalogs</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {supplier.productCatalog && (
-              <a
-                href={supplier.productCatalog}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-brand-600 hover:underline text-sm font-medium"
-              >
-                <FileText className="h-4 w-4" />
-                Open Product Catalog (PDF)
-              </a>
+              <div className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-100 group">
+                <a
+                  href={supplier.productCatalog}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-brand-600 hover:underline text-sm font-medium"
+                >
+                  <FileText className="h-4 w-4" />
+                  Open Product Catalog (PDF)
+                </a>
+                <PermissionGate permission="suppliers" editOnly>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    onClick={() => {
+                        if(supplier.id) {
+                           updateMutation.mutate({ id: supplier.id, d: { productCatalog: "" } });
+                        }
+                    }}
+                    title="Delete Legacy Catalog"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </PermissionGate>
+              </div>
             )}
             {(supplier.productCatalogs ?? []).map((cat, idx) => (
-              <div key={idx} className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-100">
-                <FileText className="h-4 w-4 text-brand-500 shrink-0" />
-                <a href={cat.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">
-                  {cat.name}
-                </a>
+              <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-100 group">
+                <div className="flex items-center gap-2 truncate">
+                  <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                  <a href={cat.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">
+                    {cat.name}
+                  </a>
+                </div>
+                <PermissionGate permission="suppliers" editOnly>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    onClick={() => handleDeleteCatalog(idx)}
+                    title="Delete Catalog"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </PermissionGate>
+              </div>
+            ))}
+            {(supplier.productCatalogImages ?? []).map((img, idx) => (
+              <div key={`img-${idx}`} className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-100 group">
+                <div className="flex items-center gap-2 truncate">
+                  <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                  <a href={img.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">
+                    {img.name} (Image)
+                  </a>
+                </div>
+                <PermissionGate permission="suppliers" editOnly>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    onClick={() => handleDeleteCatalogImage(idx)}
+                    title="Delete Image"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </PermissionGate>
               </div>
             ))}
           </CardContent>
@@ -1304,10 +1384,21 @@ export default function NewSupplierDetailsPage() {
                 <div className="flex flex-col gap-2">
                   <input type="file" accept=".pdf,.doc,.docx" multiple className="hidden" id="multi-catalog-upload-nsd" onChange={(e) => { if (e.target.files) setCatalogFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
                   <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200" onClick={() => document.getElementById("multi-catalog-upload-nsd")?.click()}>
-                    <Upload className="h-4 w-4" /> Upload Product Catalogs
+                    <Upload className="h-4 w-4" /> Upload Product Catalogs (PDFs)
                   </Button>
                   {(form.productCatalogs || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogs || []).map((cat, idx) => (<div key={`cat-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={cat.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{cat.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogs || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogs: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
                   {catalogFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogFiles.map((f, idx) => (<div key={`pend-cat-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
+                </div>
+
+                {/* Multi Product Catalog Images */}
+                <div className="flex flex-col gap-2 p-3 bg-slate-50/50 rounded-lg border border-slate-200/60 transition-colors hover:border-slate-300">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Product Catalog Images <span className="text-slate-400 text-[10px] ml-1 font-normal lowercase">(Optional)</span></label>
+                  <input type="file" accept=".png,.jpg,.jpeg,.webp" multiple className="hidden" id="multi-catalog-img-upload-nsd" onChange={(e) => { if (e.target.files) setCatalogImageFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                  <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200" onClick={() => document.getElementById("multi-catalog-img-upload-nsd")?.click()}>
+                    <Upload className="h-4 w-4" /> Upload Product Catalogs (Images)
+                  </Button>
+                  {(form.productCatalogImages || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogImages || []).map((img, idx) => (<div key={`catimg-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={img.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{img.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogImages || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogImages: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
+                  {catalogImageFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogImageFiles.map((f, idx) => (<div key={`pend-catimg-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogImageFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
                 </div>
               </div>
             </div>

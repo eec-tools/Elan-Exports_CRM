@@ -197,6 +197,7 @@ interface Supplier {
   noProhibitedAids?: string;
   supplierProducts?: SupplierProduct[];
   productCatalogs?: ProductCatalogEntry[];
+  productCatalogImages?: ProductCatalogEntry[];
 }
 
 const ORGANIC_CERT_MARKETS = ["India — NPOP", "USA — USDA Organic (NOP)", "EU — EU Organic (Reg 2018/848)", "UK — UK Organic", "Australia — ACO / NASAA", "Japan — JAS Organic"];
@@ -267,6 +268,7 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
   currentStatus: "Under Review",
   supplierProducts: [],
   productCatalogs: [],
+  productCatalogImages: [],
 };
 
 export default function SuppliersPage() {
@@ -292,6 +294,7 @@ export default function SuppliersPage() {
 
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
+  const [catalogImageFiles, setCatalogImageFiles] = useState<File[]>([]);
   const [productImageFiles, setProductImageFiles] = useState<Record<number, File>>({});
 
   // Product helpers
@@ -441,16 +444,25 @@ export default function SuppliersPage() {
       }
     }
 
-    // Upload new catalog files for multi-catalog
+    // Upload multi-catalog files
     const finalCatalogs = [...(form.productCatalogs || [])];
     if (catalogFiles.length > 0) {
       for (const file of catalogFiles) {
         try {
           const uploadRes = await uploadCatalogMutation.mutateAsync(file);
           finalCatalogs.push({ name: file.name, url: uploadRes.url });
-        } catch {
-          return;
-        }
+        } catch (error) { console.error('Upload failed', error); }
+      }
+    }
+
+    // Upload multi-catalog image files
+    const finalCatalogImages = [...(form.productCatalogImages || [])];
+    if (catalogImageFiles.length > 0) {
+      for (const file of catalogImageFiles) {
+        try {
+          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+          finalCatalogImages.push({ name: file.name, url: uploadRes.url });
+        } catch (error) { console.error('Upload failed', error); }
       }
     }
 
@@ -466,7 +478,7 @@ export default function SuppliersPage() {
       }
     }
 
-    const payload = { ...form, supplierProducts: finalProducts, documents: finalDocuments, productCatalogs: finalCatalogs };
+    const payload = { ...form, supplierProducts: finalProducts, documents: finalDocuments, productCatalogs: finalCatalogs, productCatalogImages: finalCatalogImages };
 
     if (editing?.id) {
       updateMutation.mutate({ id: editing.id, d: payload });
@@ -480,15 +492,17 @@ export default function SuppliersPage() {
     setForm(EMPTY_SUPPLIER);
     setDocumentFiles([]);
     setCatalogFiles([]);
+    setCatalogImageFiles([]);
     setProductImageFiles({});
     setDialogOpen(true);
   };
 
   const openEdit = (s: Supplier) => {
     setEditing(s);
-    setForm({ ...s, supplierProducts: s.supplierProducts || [], productCatalogs: s.productCatalogs || [] });
+    setForm({ ...s, supplierProducts: s.supplierProducts || [], productCatalogs: s.productCatalogs || [], productCatalogImages: s.productCatalogImages || [] });
     setDocumentFiles([]);
     setCatalogFiles([]);
+    setCatalogImageFiles([]);
     setProductImageFiles({});
     setDialogOpen(true);
   };
@@ -1193,6 +1207,16 @@ export default function SuppliersPage() {
                     <Button type="button" variant="outline" onClick={() => document.getElementById("multi-catalog-upload")?.click()} className="w-full justify-start"><Upload className="mr-2 h-4 w-4 shrink-0" /><span>Upload Product Catalogs</span></Button>
                     {(form.productCatalogs || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogs || []).map((cat, idx) => (<div key={`cat-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={cat.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{cat.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogs || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogs: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
                     {catalogFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogFiles.map((f, idx) => (<div key={`pend-cat-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
+                  </div>
+                </div>
+                {/* Multi Product Catalog Images */}
+                <div className="space-y-2">
+                  <Label>Product Catalog Images</Label>
+                  <div className="flex flex-col gap-2">
+                    <input type="file" accept=".png,.jpg,.jpeg,.webp" multiple className="hidden" id="multi-catalog-img-upload" onChange={(e) => { if (e.target.files) setCatalogImageFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                    <Button type="button" variant="outline" onClick={() => document.getElementById("multi-catalog-img-upload")?.click()} className="w-full justify-start"><Upload className="mr-2 h-4 w-4 shrink-0" /><span>Upload Catalog Images</span></Button>
+                    {(form.productCatalogImages || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogImages || []).map((img, idx) => (<div key={`catimg-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={img.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{img.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogImages || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogImages: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
+                    {catalogImageFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogImageFiles.map((f, idx) => (<div key={`pend-catimg-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogImageFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
                   </div>
                 </div>
                 <div className="space-y-2">

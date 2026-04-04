@@ -70,6 +70,7 @@ interface DocEntry {
 interface SupplierDocs {
   certificates?: DocEntry[];
   productCatalogs?: DocEntry[];
+  productCatalogImages?: DocEntry[];
   warehousePhotos?: DocEntry[];
   contractDocument?: { name: string; url: string } | null;
 }
@@ -92,6 +93,9 @@ export async function syncSupplierDocsToVault(
   }
   if (docs.productCatalogs && docs.productCatalogs.length > 0) {
     docCategories.push({ categoryName: "Product Catalogs", items: docs.productCatalogs });
+  }
+  if (docs.productCatalogImages && docs.productCatalogImages.length > 0) {
+    docCategories.push({ categoryName: "Product Catalog Images", items: docs.productCatalogImages });
   }
   if (docs.warehousePhotos && docs.warehousePhotos.length > 0) {
     docCategories.push({ categoryName: "Warehouse Photos", items: docs.warehousePhotos });

@@ -280,9 +280,11 @@ export async function createSupplier(
       const supplierProducts = (supplier as any).supplierProducts;
       const contractDoc = (supplier as any).contractDocument;
       const productCatalogs = (supplier as any).productCatalogs;
+      const productCatalogImages = (supplier as any).productCatalogImages;
       await syncSupplierDocsToVault(supplier.company, {
         certificates: Array.isArray(docs) ? docs : [],
         productCatalogs: Array.isArray(productCatalogs) ? productCatalogs : [],
+        productCatalogImages: Array.isArray(productCatalogImages) ? productCatalogImages : [],
         warehousePhotos: [],
         contractDocument: contractDoc && contractDoc.url ? contractDoc : null,
       }, req.user!.id);
@@ -469,9 +471,11 @@ export async function updateSupplier(
       const docs = (supplier as any).documents;
       const contractDoc = (supplier as any).contractDocument;
       const productCatalogs = (supplier as any).productCatalogs;
+      const productCatalogImages = (supplier as any).productCatalogImages;
       await syncSupplierDocsToVault(supplier.company, {
         certificates: Array.isArray(docs) ? docs : [],
         productCatalogs: Array.isArray(productCatalogs) ? productCatalogs : [],
+        productCatalogImages: Array.isArray(productCatalogImages) ? productCatalogImages : [],
         warehousePhotos: [],
         contractDocument: contractDoc && contractDoc.url ? contractDoc : null,
       }, req.user!.id);

@@ -217,7 +217,7 @@ export async function createNewSupplier(
             currentStatus, certifications, latestQuotation, reasonInactive,
             dateMarkedInactive, reactivationPotential, notes, phone, email,
             productCatalog, buyerIds: incomingBuyerIds,
-            supplierProducts, productCatalogs,
+            supplierProducts, productCatalogs, productCatalogImages,
             certificates, warehousePhotos, videoLinks,
             // Pass through all remaining supplier info sheet fields
             tradeName, yearEstablished, manufacturingAddress, city, state, postalCode, supplierType,
@@ -250,6 +250,7 @@ export async function createNewSupplier(
                     productCatalog, buyerIds: buyerIdsArr,
                     supplierProducts: supplierProducts ?? [],
                     productCatalogs: productCatalogs ?? [],
+                    productCatalogImages: productCatalogImages ?? [],
                     certificates: certificates ?? [],
                     warehousePhotos: warehousePhotos ?? [],
                     videoLinks: videoLinks ?? [],
@@ -371,6 +372,7 @@ export async function createNewSupplier(
             await syncSupplierDocsToVault(supplier.company, {
                 certificates: supplier.certificates as any[] ?? [],
                 productCatalogs: supplier.productCatalogs as any[] ?? [],
+                productCatalogImages: supplier.productCatalogImages as any[] ?? [],
                 warehousePhotos: supplier.warehousePhotos as any[] ?? [],
             }, req.user!.id);
         } catch (e) { console.error("Vault Sync Failed", e); }
@@ -412,7 +414,7 @@ export async function updateNewSupplier(
             currentStatus, certifications, latestQuotation, reasonInactive,
             dateMarkedInactive, reactivationPotential, notes, phone, email,
             productCatalog, buyerIds: incomingBuyerIds,
-            supplierProducts, productCatalogs,
+            supplierProducts, productCatalogs, productCatalogImages,
             certificates, warehousePhotos, videoLinks,
             tradeName, yearEstablished, manufacturingAddress, city, state, postalCode, supplierType,
             whatsapp, hsCode, organicStatus, ingredientList, allergenDeclaration, shelfLife,
@@ -451,6 +453,7 @@ export async function updateNewSupplier(
                     productCatalog, buyerIds: incomingIds,
                     supplierProducts: supplierProducts ?? [],
                     productCatalogs: productCatalogs ?? [],
+                    productCatalogImages: productCatalogImages ?? [],
                     certificates: certificates ?? [],
                     warehousePhotos: warehousePhotos ?? [],
                     videoLinks: videoLinks ?? [],
@@ -606,6 +609,7 @@ export async function updateNewSupplier(
             await syncSupplierDocsToVault(supplier.company, {
                 certificates: supplier.certificates as any[] ?? [],
                 productCatalogs: supplier.productCatalogs as any[] ?? [],
+                productCatalogImages: supplier.productCatalogImages as any[] ?? [],
                 warehousePhotos: supplier.warehousePhotos as any[] ?? [],
             }, req.user!.id);
         } catch (e) { console.error("Vault Sync Failed", e); }
