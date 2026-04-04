@@ -169,7 +169,14 @@ export default function App() {
                     </PermissionGate>
                   }
                 />
-                <Route path="deals" element={<DealsPage />} />
+                <Route
+                  path="deals"
+                  element={
+                    <PermissionGate permission="analytics">
+                      <DealsPage />
+                    </PermissionGate>
+                  }
+                />
                 <Route path="notifications" element={<NotificationsPage />} />
 
                 {/* Admin-only routes */}

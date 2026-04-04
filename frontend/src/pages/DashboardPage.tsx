@@ -134,7 +134,7 @@ const getColorForLink = (title: string) => {
 
 // ─── Component ──────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
 
   // Quick Links State
@@ -254,159 +254,163 @@ export default function DashboardPage() {
           })}
         </div>
       </div>
-      {/* ── Email Follow-ups Due Today ───────────────────────────── */}
-      <div className="rounded-xl border border-amber-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between border-b border-amber-100 px-5 py-4 bg-amber-50">
-          <div className="flex items-center gap-2">
-            <div className="rounded-md bg-amber-100 p-1.5">
-              <Bell className="h-4 w-4 text-amber-600" />
-            </div>
-            <h2 className="text-sm font-semibold text-slate-800">Email Follow-ups Due Today</h2>
-            {dueCampaigns && dueCampaigns.length > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center rounded-full bg-amber-500 text-white text-xs font-bold h-5 min-w-[20px] px-1.5">
-                {dueCampaigns.length}
-              </span>
-            )}
-          </div>
-          <Link to="/suppliers/signed-contract" className="text-xs text-brand-600 hover:underline font-medium">
-            View all suppliers →
-          </Link>
-        </div>
-        {!dueCampaigns || dueCampaigns.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <CheckCircle2 className="h-8 w-8 text-green-300 mb-2" />
-            <p className="text-sm font-medium text-slate-600">No follow-ups due today</p>
-            <p className="text-xs text-slate-400 mt-0.5">All email campaigns are on track</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {dueCampaigns.map((c) => (
-              <div key={c.supplierId} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="rounded-full bg-amber-100 p-1.5 shrink-0">
-                    <Mail className="h-3.5 w-3.5 text-amber-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{c.supplier.company}</p>
-                    <p className="text-xs text-slate-500 truncate">{c.supplier.contactPerson ?? c.supplier.email ?? "—"}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 ml-4 shrink-0">
-                  <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
-                    Follow-up {c.currentStep}
-                  </span>
-                  <Link
-                    to={`/suppliers/signed-contract/${c.supplier.id}`}
-                    className="text-xs text-brand-600 hover:underline font-medium"
-                  >
-                    Open →
-                  </Link>
-                </div>
+      {hasPermission("analytics") && (
+        /* ── Email Follow-ups Due Today ───────────────────────────── */
+        <div className="rounded-xl border border-amber-200 bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between border-b border-amber-100 px-5 py-4 bg-amber-50">
+            <div className="flex items-center gap-2">
+              <div className="rounded-md bg-amber-100 p-1.5">
+                <Bell className="h-4 w-4 text-amber-600" />
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Latest Deals ──────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <div className="rounded-md bg-emerald-50 p-1.5">
-              <TrendingUp className="h-4 w-4 text-emerald-600" />
+              <h2 className="text-sm font-semibold text-slate-800">Email Follow-ups Due Today</h2>
+              {dueCampaigns && dueCampaigns.length > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center rounded-full bg-amber-500 text-white text-xs font-bold h-5 min-w-[20px] px-1.5">
+                  {dueCampaigns.length}
+                </span>
+              )}
             </div>
-            <h2 className="text-sm font-semibold text-slate-800">Latest Deals</h2>
+            <Link to="/suppliers/signed-contract" className="text-xs text-brand-600 hover:underline font-medium">
+              View all suppliers →
+            </Link>
           </div>
-          <Link to="/deals" className="text-xs text-brand-600 hover:underline font-medium">
-            View all
-          </Link>
+          {!dueCampaigns || dueCampaigns.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <CheckCircle2 className="h-8 w-8 text-green-300 mb-2" />
+              <p className="text-sm font-medium text-slate-600">No follow-ups due today</p>
+              <p className="text-xs text-slate-400 mt-0.5">All email campaigns are on track</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {dueCampaigns.map((c) => (
+                <div key={c.supplierId} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="rounded-full bg-amber-100 p-1.5 shrink-0">
+                      <Mail className="h-3.5 w-3.5 text-amber-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-800 truncate">{c.supplier.company}</p>
+                      <p className="text-xs text-slate-500 truncate">{c.supplier.contactPerson ?? c.supplier.email ?? "—"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 ml-4 shrink-0">
+                    <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                      Follow-up {c.currentStep}
+                    </span>
+                    <Link
+                      to={`/suppliers/signed-contract/${c.supplier.id}`}
+                      className="text-xs text-brand-600 hover:underline font-medium"
+                    >
+                      Open →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+      )}
 
-        <div className="p-5">
-          {(() => {
-            const topDeals = s.recentDeals?.slice(0, 3) || [];
-            if (topDeals.length === 0) {
+      {hasPermission("analytics") && (
+        /* ── Latest Deals ──────────────── */
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div className="flex items-center gap-2">
+              <div className="rounded-md bg-emerald-50 p-1.5">
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
+              </div>
+              <h2 className="text-sm font-semibold text-slate-800">Latest Deals</h2>
+            </div>
+            <Link to="/deals" className="text-xs text-brand-600 hover:underline font-medium">
+              View all
+            </Link>
+          </div>
+
+          <div className="p-5">
+            {(() => {
+              const topDeals = s.recentDeals?.slice(0, 3) || [];
+              if (topDeals.length === 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center py-8 text-center h-full">
+                    <TrendingUp className="h-8 w-8 text-slate-200 mb-2" />
+                    <p className="text-sm text-slate-400">No deals yet</p>
+                    <Link to="/deals" className="mt-2 text-xs text-brand-600 hover:underline">
+                      Add your first deal →
+                    </Link>
+                  </div>
+                );
+              }
+
               return (
-                <div className="flex flex-col items-center justify-center py-8 text-center h-full">
-                  <TrendingUp className="h-8 w-8 text-slate-200 mb-2" />
-                  <p className="text-sm text-slate-400">No deals yet</p>
-                  <Link to="/deals" className="mt-2 text-xs text-brand-600 hover:underline">
-                    Add your first deal →
-                  </Link>
+                <div className="flex gap-4 overflow-x-auto pb-2 min-h-[160px]">
+                  {STAGES.map(stage => {
+                    const stageDeals = topDeals.filter(d => d.stage === stage.id);
+                    return (
+                      <div key={stage.id} className="shrink-0 w-64 flex flex-col rounded-xl border border-slate-200 bg-slate-50">
+                        <div
+                          className="flex items-center justify-between px-3 py-2.5 rounded-t-xl"
+                          style={{ borderTop: `3px solid ${stage.color}`, background: stage.bg }}
+                        >
+                          <span className="text-xs font-bold uppercase tracking-wider line-clamp-1" style={{ color: stage.text }} title={stage.label}>
+                            {stage.label}
+                          </span>
+                          <span
+                            className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0"
+                            style={{ background: stage.color + "22", color: stage.color }}
+                          >
+                            {stageDeals.length}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-2 p-2">
+                          {stageDeals.map(deal => (
+                            <Link
+                              key={deal.id}
+                              to="/deals"
+                              className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 transition-all group block"
+                            >
+                              <div className="flex items-start justify-between gap-1 mb-1">
+                                <p className="text-sm font-semibold text-slate-800 leading-tight line-clamp-2 group-hover:text-brand-700 transition-colors">
+                                  {deal.title}
+                                </p>
+                                <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0 mt-0.5 group-hover:text-brand-500 transition-colors" />
+                              </div>
+                              {deal.buyer && (
+                                <p className="text-xs text-slate-500 mb-2 truncate">{deal.buyer}</p>
+                              )}
+                              <div className="flex items-center justify-between mt-2">
+                                {deal.expectedRevenue ? (
+                                  <span className="text-sm font-bold" style={{ color: stage.color }}>
+                                    {fmtMoney(deal.expectedRevenue)}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-400">No revenue</span>
+                                )}
+                                {deal.probability !== undefined && (
+                                  <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                    {deal.probability}%
+                                  </span>
+                                )}
+                              </div>
+                              {deal.riskScore && (
+                                <div className="flex items-center gap-1 mt-1.5">
+                                  <div
+                                    className="h-2 w-2 rounded-full"
+                                    style={{ background: riskColor(deal.riskScore) }}
+                                  />
+                                  <span className="text-xs text-slate-400">{deal.riskScore} risk</span>
+                                </div>
+                              )}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
-            }
-
-            return (
-              <div className="flex gap-4 overflow-x-auto pb-2 min-h-[160px]">
-                {STAGES.map(stage => {
-                  const stageDeals = topDeals.filter(d => d.stage === stage.id);
-                  return (
-                    <div key={stage.id} className="shrink-0 w-64 flex flex-col rounded-xl border border-slate-200 bg-slate-50">
-                      <div
-                        className="flex items-center justify-between px-3 py-2.5 rounded-t-xl"
-                        style={{ borderTop: `3px solid ${stage.color}`, background: stage.bg }}
-                      >
-                        <span className="text-xs font-bold uppercase tracking-wider line-clamp-1" style={{ color: stage.text }} title={stage.label}>
-                          {stage.label}
-                        </span>
-                        <span
-                          className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0"
-                          style={{ background: stage.color + "22", color: stage.color }}
-                        >
-                          {stageDeals.length}
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-2 p-2">
-                        {stageDeals.map(deal => (
-                          <Link
-                            key={deal.id}
-                            to="/deals"
-                            className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 transition-all group block"
-                          >
-                            <div className="flex items-start justify-between gap-1 mb-1">
-                              <p className="text-sm font-semibold text-slate-800 leading-tight line-clamp-2 group-hover:text-brand-700 transition-colors">
-                                {deal.title}
-                              </p>
-                              <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0 mt-0.5 group-hover:text-brand-500 transition-colors" />
-                            </div>
-                            {deal.buyer && (
-                              <p className="text-xs text-slate-500 mb-2 truncate">{deal.buyer}</p>
-                            )}
-                            <div className="flex items-center justify-between mt-2">
-                              {deal.expectedRevenue ? (
-                                <span className="text-sm font-bold" style={{ color: stage.color }}>
-                                  {fmtMoney(deal.expectedRevenue)}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-slate-400">No revenue</span>
-                              )}
-                              {deal.probability !== undefined && (
-                                <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                                  {deal.probability}%
-                                </span>
-                              )}
-                            </div>
-                            {deal.riskScore && (
-                              <div className="flex items-center gap-1 mt-1.5">
-                                <div
-                                  className="h-2 w-2 rounded-full"
-                                  style={{ background: riskColor(deal.riskScore) }}
-                                />
-                                <span className="text-xs text-slate-400">{deal.riskScore} risk</span>
-                              </div>
-                            )}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
+            })()}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Task Analytics ──────────────── */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
