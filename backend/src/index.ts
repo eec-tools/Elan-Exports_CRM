@@ -100,15 +100,25 @@ app.options("*", cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting - stricter in production
+// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === "production" ? 100 : 200,
+  max: process.env.NODE_ENV === "production" ? 1000 : 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: "Too many requests from this IP, please try again later.",
 });
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // strict limit only on login attempts
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many login attempts, please try again later.",
+});
+
 app.use("/api/", limiter);
+app.use("/api/auth/login", authLimiter);
 
 // Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
