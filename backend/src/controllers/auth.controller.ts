@@ -36,6 +36,8 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    const isAdmin = user.roles.some((r) => r.role === "admin");
+
     const token = signToken({ userId: user.id, email: user.email });
 
     await logActivity(user.id, "login", "auth");
@@ -47,6 +49,9 @@ export async function login(req: Request, res: Response): Promise<void> {
         email: user.email,
         fullName: user.fullName,
         isActive: user.isActive,
+        workStartTime: user.workStartTime,
+        workEndTime: user.workEndTime,
+        minHoursPresent: user.minHoursPresent,
         roles: user.roles.map((r) => r.role),
         permissions: user.permissions.map((p) => ({
           permission: p.permission,
@@ -84,6 +89,9 @@ export async function getMe(req: AuthRequest, res: Response): Promise<void> {
       email: user.email,
       fullName: user.fullName,
       isActive: user.isActive,
+      workStartTime: user.workStartTime,
+      workEndTime: user.workEndTime,
+      minHoursPresent: user.minHoursPresent,
       createdAt: user.createdAt,
       roles: user.roles.map((r) => r.role),
       permissions: user.permissions.map((p) => ({

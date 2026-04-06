@@ -18,6 +18,7 @@ import {
   CalendarCheck,
   TrendingUp,
   Bell,
+  Clock3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -115,6 +116,13 @@ const navItems = [
     to: "/notifications",
     label: "Notifications",
     icon: Bell,
+    perm: null,
+    adminOnly: false,
+  },
+  {
+    to: "/attendance",
+    label: "Attendance Dashboard",
+    icon: Clock3,
     perm: null,
     adminOnly: false,
   },

@@ -28,6 +28,7 @@ import BuyerDetailsPage from "@/pages/BuyerDetailsPage";
 import VaultPage from "@/pages/VaultPage";
 import DealsPage from "@/pages/DealsPage";
 import NotificationsPage from "@/pages/NotificationsPage";
+import AttendanceDashboardPage from "@/pages/AttendanceDashboardPage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient({
@@ -178,6 +179,7 @@ export default function App() {
                   }
                 />
                 <Route path="notifications" element={<NotificationsPage />} />
+                  <Route path="attendance" element={<AttendanceDashboardPage />} />
 
                 {/* Admin-only routes */}
                 <Route element={<AdminRoute />}>

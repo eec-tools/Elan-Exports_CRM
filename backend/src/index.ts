@@ -28,6 +28,9 @@ import introEmailCampaignRoutes from "./routes/introEmailCampaign.routes.js";
 import newSupplierEmailCampaignRoutes from "./routes/newSupplierEmailCampaign.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import { startEmailCampaignScheduler } from "./services/emailCampaignScheduler.js";
+import attendanceRoutes from "./routes/attendance.routes.js";
+import { startAttendanceScheduler } from "./services/attendanceScheduler.js";
+import activityTrackingRoutes from "./routes/activityTracking.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -144,6 +147,8 @@ app.use("/api/compliance", complianceRoutes);
 app.use("/api/intro-campaigns", introEmailCampaignRoutes);
 app.use("/api/new-supplier-campaigns", newSupplierEmailCampaignRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/activity-tracking", activityTrackingRoutes);
 
 // Health check with detailed status
 app.get("/api/health", async (_req, res) => {
@@ -198,6 +203,7 @@ app.listen(PORT, () => {
   console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`Allowed origins: ${allowedOrigins.join(", ") || "localhost only"}`);
   startEmailCampaignScheduler();
+  startAttendanceScheduler();
 });
 
 // Graceful shutdown

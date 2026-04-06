@@ -5,6 +5,11 @@ import { hashPassword } from "../utils/password.js";
 import { logActivity } from "../services/activityLogger.js";
 import { sendCredentialsEmail } from "../services/mailer.js";
 import { Permission, AccessLevel } from "@prisma/client";
+import { isValidWorkWindow } from "../utils/attendance.js";
+
+const DEFAULT_WORK_START = "09:00";
+const DEFAULT_WORK_END = "18:00";
+const DEFAULT_MIN_PRESENT_MINUTES = 420;
 
 /**
  * GET /api/members
@@ -28,6 +33,9 @@ export async function listMembers(
         email: m.email,
         fullName: m.fullName,
         isActive: m.isActive,
+        workStartTime: m.workStartTime,
+        workEndTime: m.workEndTime,
+        minHoursPresent: m.minHoursPresent,
         createdAt: m.createdAt,
         roles: m.roles.map((r) => r.role),
         permissions: m.permissions.map((p) => ({
@@ -51,7 +59,32 @@ export async function createMember(
   res: Response,
 ): Promise<void> {
   try {
-    const { email, fullName, password, role, permissions, assignedCompanies } = req.body;
+    const {
+      email,
+      fullName,
+      password,
+      role,
+      permissions,
+      assignedCompanies,
+      workStartTime,
+      workEndTime,
+      minHoursPresent,
+    } = req.body;
+
+    const effectiveWorkStart = workStartTime ?? DEFAULT_WORK_START;
+    const effectiveWorkEnd = workEndTime ?? DEFAULT_WORK_END;
+    const effectiveMinHoursPresent =
+      typeof minHoursPresent === "number" ? minHoursPresent : DEFAULT_MIN_PRESENT_MINUTES;
+
+    const workSettingsError = isValidWorkWindow(
+      effectiveWorkStart,
+      effectiveWorkEnd,
+      effectiveMinHoursPresent,
+    );
+    if (workSettingsError) {
+      res.status(400).json({ error: workSettingsError });
+      return;
+    }
 
     // Check if email already exists
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -68,6 +101,9 @@ export async function createMember(
         fullName,
         passwordHash,
         assignedCompanies: assignedCompanies || [],
+        workStartTime: effectiveWorkStart,
+        workEndTime: effectiveWorkEnd,
+        minHoursPresent: effectiveMinHoursPresent,
         roles: {
           create: { role: role || "member" },
         },
@@ -96,6 +132,9 @@ export async function createMember(
       email: user.email,
       fullName: user.fullName,
       isActive: user.isActive,
+      workStartTime: user.workStartTime,
+      workEndTime: user.workEndTime,
+      minHoursPresent: user.minHoursPresent,
       roles: user.roles.map((r) => r.role),
       permissions: user.permissions.map((p) => ({
         permission: p.permission,
@@ -118,7 +157,17 @@ export async function updateMember(
 ): Promise<void> {
   try {
     const { id } = req.params;
-    const { email, fullName, password, role, permissions, assignedCompanies } = req.body;
+    const {
+      email,
+      fullName,
+      password,
+      role,
+      permissions,
+      assignedCompanies,
+      workStartTime,
+      workEndTime,
+      minHoursPresent,
+    } = req.body;
 
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
@@ -139,6 +188,21 @@ export async function updateMember(
       ? await hashPassword(password)
       : existing.passwordHash;
 
+    const effectiveWorkStart = workStartTime ?? existing.workStartTime;
+    const effectiveWorkEnd = workEndTime ?? existing.workEndTime;
+    const effectiveMinHoursPresent =
+      typeof minHoursPresent === "number" ? minHoursPresent : existing.minHoursPresent;
+
+    const workSettingsError = isValidWorkWindow(
+      effectiveWorkStart,
+      effectiveWorkEnd,
+      effectiveMinHoursPresent,
+    );
+    if (workSettingsError) {
+      res.status(400).json({ error: workSettingsError });
+      return;
+    }
+
     const updated = await prisma.user.update({
       where: { id },
       data: {
@@ -146,6 +210,9 @@ export async function updateMember(
         fullName: fullName ?? existing.fullName,
         passwordHash,
         assignedCompanies: assignedCompanies !== undefined ? assignedCompanies : existing.assignedCompanies,
+        workStartTime: effectiveWorkStart,
+        workEndTime: effectiveWorkEnd,
+        minHoursPresent: effectiveMinHoursPresent,
         roles: {
           deleteMany: {},
           create: { role: role || "member" },
@@ -176,6 +243,9 @@ export async function updateMember(
       email: updated.email,
       fullName: updated.fullName,
       isActive: updated.isActive,
+      workStartTime: updated.workStartTime,
+      workEndTime: updated.workEndTime,
+      minHoursPresent: updated.minHoursPresent,
       roles: updated.roles.map((r) => r.role),
       permissions: updated.permissions.map((p) => ({
         permission: p.permission,

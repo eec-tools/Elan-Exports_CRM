@@ -27,6 +27,9 @@ interface Member {
   email: string;
   fullName: string;
   isActive: boolean;
+  workStartTime: string;
+  workEndTime: string;
+  minHoursPresent: number;
   createdAt: string;
   roles: string[];
   permissions: { permission: string; accessLevel: string }[];
@@ -68,6 +71,9 @@ export default function MembersPage() {
   const [newName, setNewName] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("member");
+  const [newWorkStartTime, setNewWorkStartTime] = useState("09:00");
+  const [newWorkEndTime, setNewWorkEndTime] = useState("18:00");
+  const [newMinHoursPresent, setNewMinHoursPresent] = useState(420);
   const [newPerms, setNewPerms] = useState<
     { permission: string; accessLevel: string }[]
   >([]);
@@ -207,6 +213,9 @@ export default function MembersPage() {
       fullName: newName,
       password: newPassword,
       role: newRole,
+      workStartTime: newWorkStartTime,
+      workEndTime: newWorkEndTime,
+      minHoursPresent: newMinHoursPresent,
       permissions: newPerms,
       assignedCompanies: newAssignedCompanies,
     };
@@ -278,6 +287,9 @@ export default function MembersPage() {
                setNewName("");
                setNewPassword("");
                setNewRole("member");
+               setNewWorkStartTime("09:00");
+               setNewWorkEndTime("18:00");
+               setNewMinHoursPresent(420);
                setNewPerms([]);
                setNewAssignedCompanies([]);
                setSendOnSubmit(false);
@@ -324,9 +336,9 @@ export default function MembersPage() {
                   <tr>
                      <th className="px-5 py-3.5 font-semibold">Member Identity</th>
                      <th className="px-5 py-3.5 font-semibold">Role</th>
-                     <th className="px-5 py-3.5 font-semibold max-w-[300px]">Active Permissions</th>
-                     <th className="px-5 py-3.5 font-semibold w-[140px]">Account Status</th>
-                     <th className="px-5 py-3.5 font-semibold text-right w-[120px]">Actions</th>
+                     <th className="px-5 py-3.5 font-semibold max-w-75">Active Permissions</th>
+                     <th className="px-5 py-3.5 font-semibold w-35">Account Status</th>
+                     <th className="px-5 py-3.5 font-semibold text-right w-30">Actions</th>
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -379,7 +391,7 @@ export default function MembersPage() {
                                  </span>
                               )}
                            </td>
-                           <td className="px-5 py-4 max-w-[300px]">
+                           <td className="px-5 py-4 max-w-75">
                               <div className="flex flex-wrap gap-1.5">
                                  {m.roles.includes("admin") ? (
                                     <span className="text-xs text-slate-400 italic">Full System Access</span>
@@ -435,6 +447,9 @@ export default function MembersPage() {
                                        setNewName(m.fullName);
                                        setNewPassword("");
                                        setNewRole(m.roles.includes("admin") ? "admin" : "member");
+                                       setNewWorkStartTime(m.workStartTime || "09:00");
+                                       setNewWorkEndTime(m.workEndTime || "18:00");
+                                       setNewMinHoursPresent(m.minHoursPresent || 420);
                                        setNewPerms(m.permissions || []);
                                        setNewAssignedCompanies(m.assignedCompanies || []);
                                        setSendOnSubmit(false);
@@ -540,6 +555,37 @@ export default function MembersPage() {
                              <SelectItem value="member">Restricted Member</SelectItem>
                            </SelectContent>
                          </Select>
+                       </div>
+                       <div className="space-y-1.5">
+                         <Label className="text-slate-700 font-semibold">Work Start Time</Label>
+                         <Input
+                           type="time"
+                           value={newWorkStartTime}
+                           onChange={(e) => setNewWorkStartTime(e.target.value)}
+                           className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
+                           required
+                         />
+                       </div>
+                       <div className="space-y-1.5">
+                         <Label className="text-slate-700 font-semibold">Work End Time</Label>
+                         <Input
+                           type="time"
+                           value={newWorkEndTime}
+                           onChange={(e) => setNewWorkEndTime(e.target.value)}
+                           className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
+                           required
+                         />
+                       </div>
+                       <div className="space-y-1.5 sm:col-span-2">
+                         <Label className="text-slate-700 font-semibold">Minimum Minutes for Present</Label>
+                         <Input
+                           type="number"
+                           min={60}
+                           value={newMinHoursPresent}
+                           onChange={(e) => setNewMinHoursPresent(Number(e.target.value))}
+                           className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
+                           required
+                         />
                        </div>
                    </div>
 
@@ -657,7 +703,7 @@ export default function MembersPage() {
                      <Button
                        type="submit"
                        disabled={createMutation.isPending || updateMutation.isPending}
-                       className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm min-w-[120px]"
+                       className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm min-w-30"
                      >
                        {createMutation.isPending || updateMutation.isPending ? (
                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
