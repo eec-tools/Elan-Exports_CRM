@@ -642,7 +642,7 @@ export default function AttendanceDashboardPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Attendance & Activity</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Attendance & Activity (Work Is In Progress...)</h1>
           <p className="mt-1 text-sm text-slate-500">Track your work sessions, history, and activity.</p>
         </div>
       </div>

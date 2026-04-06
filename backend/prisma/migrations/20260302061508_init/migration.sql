@@ -1,14 +1,14 @@
--- CreateEnum
-CREATE TYPE "Role" AS ENUM ('admin', 'member');
+-- CreateEnum (idempotent)
+DO $$ BEGIN CREATE TYPE "Role" AS ENUM ('admin', 'member'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- CreateEnum
-CREATE TYPE "Permission" AS ENUM ('buyers', 'suppliers', 'analytics', 'reports');
+-- CreateEnum (idempotent)
+DO $$ BEGIN CREATE TYPE "Permission" AS ENUM ('buyers', 'suppliers', 'analytics', 'reports'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- CreateEnum
-CREATE TYPE "AccessLevel" AS ENUM ('read', 'edit');
+-- CreateEnum (idempotent)
+DO $$ BEGIN CREATE TYPE "AccessLevel" AS ENUM ('read', 'edit'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- CreateTable
-CREATE TABLE "users" (
+CREATE TABLE IF NOT EXISTS "users" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "password_hash" TEXT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE "users" (
 );
 
 -- CreateTable
-CREATE TABLE "user_roles" (
+CREATE TABLE IF NOT EXISTS "user_roles" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
     "role" "Role" NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE "user_roles" (
 );
 
 -- CreateTable
-CREATE TABLE "user_permissions" (
+CREATE TABLE IF NOT EXISTS "user_permissions" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
     "permission" "Permission" NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE "user_permissions" (
 );
 
 -- CreateTable
-CREATE TABLE "buyers" (
+CREATE TABLE IF NOT EXISTS "buyers" (
     "id" TEXT NOT NULL,
     "company" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -72,7 +72,7 @@ CREATE TABLE "buyers" (
 );
 
 -- CreateTable
-CREATE TABLE "suppliers" (
+CREATE TABLE IF NOT EXISTS "suppliers" (
     "id" TEXT NOT NULL,
     "company" TEXT NOT NULL,
     "product_category" TEXT,
@@ -100,7 +100,7 @@ CREATE TABLE "suppliers" (
 );
 
 -- CreateTable
-CREATE TABLE "reports" (
+CREATE TABLE IF NOT EXISTS "reports" (
     "id" TEXT NOT NULL,
     "product_name" TEXT NOT NULL,
     "product_image_url" TEXT,
@@ -119,7 +119,7 @@ CREATE TABLE "reports" (
 );
 
 -- CreateTable
-CREATE TABLE "activity_logs" (
+CREATE TABLE IF NOT EXISTS "activity_logs" (
     "id" TEXT NOT NULL,
     "user_id" TEXT,
     "action" TEXT NOT NULL,
@@ -132,7 +132,7 @@ CREATE TABLE "activity_logs" (
 );
 
 -- CreateTable
-CREATE TABLE "access_requests" (
+CREATE TABLE IF NOT EXISTS "access_requests" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
     "permission" TEXT NOT NULL,
@@ -146,7 +146,7 @@ CREATE TABLE "access_requests" (
 );
 
 -- CreateTable
-CREATE TABLE "app_settings" (
+CREATE TABLE IF NOT EXISTS "app_settings" (
     "id" TEXT NOT NULL,
     "key" TEXT NOT NULL,
     "value" TEXT NOT NULL,
@@ -155,37 +155,37 @@ CREATE TABLE "app_settings" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key" ON "users"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_roles_user_id_role_key" ON "user_roles"("user_id", "role");
+CREATE UNIQUE INDEX IF NOT EXISTS "user_roles_user_id_role_key" ON "user_roles"("user_id", "role");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_permissions_user_id_permission_key" ON "user_permissions"("user_id", "permission");
+CREATE UNIQUE INDEX IF NOT EXISTS "user_permissions_user_id_permission_key" ON "user_permissions"("user_id", "permission");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "app_settings_key_key" ON "app_settings"("key");
+CREATE UNIQUE INDEX IF NOT EXISTS "app_settings_key_key" ON "app_settings"("key");
 
 -- AddForeignKey
-ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "user_permissions" ADD CONSTRAINT "user_permissions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN ALTER TABLE "user_permissions" ADD CONSTRAINT "user_permissions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "buyers" ADD CONSTRAINT "buyers_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN ALTER TABLE "buyers" ADD CONSTRAINT "buyers_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "suppliers" ADD CONSTRAINT "suppliers_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN ALTER TABLE "suppliers" ADD CONSTRAINT "suppliers_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "reports" ADD CONSTRAINT "reports_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN ALTER TABLE "reports" ADD CONSTRAINT "reports_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "activity_logs" ADD CONSTRAINT "activity_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN ALTER TABLE "activity_logs" ADD CONSTRAINT "activity_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "access_requests" ADD CONSTRAINT "access_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN ALTER TABLE "access_requests" ADD CONSTRAINT "access_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "access_requests" ADD CONSTRAINT "access_requests_reviewed_by_fkey" FOREIGN KEY ("reviewed_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN ALTER TABLE "access_requests" ADD CONSTRAINT "access_requests_reviewed_by_fkey" FOREIGN KEY ("reviewed_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
