@@ -225,6 +225,7 @@ export default function NewSupplierDetailsPage() {
   const [catalogImageFiles, setCatalogImageFiles] = useState<File[]>([]);
   const [certificateFiles, setCertificateFiles] = useState<File[]>([]);
   const [warehousePhotoFiles, setWarehousePhotoFiles] = useState<File[]>([]);
+  const [quotationFiles, setQuotationFiles] = useState<File[]>([]);
   const [productImageFiles, setProductImageFiles] = useState<Record<number, File>>({});
 
   // Product helpers
@@ -411,6 +412,18 @@ export default function NewSupplierDetailsPage() {
         } catch (error) { console.error('Upload failed', error); }
       }
     }
+
+    // Upload quotation files
+    const finalQuotations = [...((form as any).quotations || [])];
+    if (quotationFiles.length > 0) {
+      for (const file of quotationFiles) {
+        try {
+          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+          finalQuotations.push({ name: file.name, url: uploadRes.url });
+        } catch (error) { console.error('Upload failed', error); }
+      }
+    }
+
     // Upload product images
     const finalProducts = [...(form.supplierProducts || [])];
     for (const [idxStr, file] of Object.entries(productImageFiles)) {
@@ -428,12 +441,13 @@ export default function NewSupplierDetailsPage() {
         d: { 
           ...form, 
           supplierProducts: finalProducts,
-          productCatalog: catalogUrl, 
+          productCatalog: catalogUrl,
           productCatalogs: finalCatalogs,
           productCatalogImages: finalCatalogImages,
           certificates: finalCertificates,
           warehousePhotos: finalWarehousePhotos,
-        } 
+          quotations: finalQuotations,
+        }
       });
     }
   };
@@ -1400,6 +1414,21 @@ export default function NewSupplierDetailsPage() {
                   {(form.productCatalogImages || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogImages || []).map((img, idx) => (<div key={`catimg-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={img.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{img.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogImages || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogImages: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
                   {catalogImageFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogImageFiles.map((f, idx) => (<div key={`pend-catimg-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogImageFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
                 </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Quotation */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Quotation</p>
+              <div className="flex flex-col gap-2">
+                <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" multiple className="hidden" id="multi-quotation-upload-nsd" onChange={(e) => { if (e.target.files) setQuotationFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200 w-fit" onClick={() => document.getElementById("multi-quotation-upload-nsd")?.click()}>
+                  <Upload className="h-3.5 w-3.5" /> Upload Quotation Files
+                </Button>
+                {((form as any).quotations || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{((form as any).quotations || []).map((doc: any, idx: number) => (<div key={`quot-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{doc.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...((form as any).quotations || [])]; updated.splice(idx, 1); setForm({ ...form, quotations: updated } as any); }}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
+                {quotationFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{quotationFiles.map((f, idx) => (<div key={`pend-quot-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setQuotationFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
               </div>
             </div>
 

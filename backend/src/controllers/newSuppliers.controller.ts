@@ -218,7 +218,7 @@ export async function createNewSupplier(
             dateMarkedInactive, reactivationPotential, notes, phone, email,
             productCatalog, buyerIds: incomingBuyerIds,
             supplierProducts, productCatalogs, productCatalogImages,
-            certificates, warehousePhotos, videoLinks,
+            certificates, warehousePhotos, videoLinks, quotations,
             // Pass through all remaining supplier info sheet fields
             tradeName, yearEstablished, manufacturingAddress, city, state, postalCode, supplierType,
             whatsapp, hsCode, organicStatus, ingredientList, allergenDeclaration, shelfLife,
@@ -254,6 +254,7 @@ export async function createNewSupplier(
                     certificates: certificates ?? [],
                     warehousePhotos: warehousePhotos ?? [],
                     videoLinks: videoLinks ?? [],
+                    quotations: quotations ?? [],
                     tradeName, yearEstablished, manufacturingAddress, city, state, postalCode, supplierType,
                     whatsapp, hsCode, organicStatus, ingredientList, allergenDeclaration, shelfLife,
                     storageConditions, packagingType, netWeightVariants, sampleAvailable, sampleLeadTime, sampleCost,
@@ -374,6 +375,7 @@ export async function createNewSupplier(
                 productCatalogs: supplier.productCatalogs as any[] ?? [],
                 productCatalogImages: supplier.productCatalogImages as any[] ?? [],
                 warehousePhotos: supplier.warehousePhotos as any[] ?? [],
+                quotations: supplier.quotations as any[] ?? [],
             }, req.user!.id);
         } catch (e) { console.error("Vault Sync Failed", e); }
         // ---------------------------------------
@@ -415,7 +417,7 @@ export async function updateNewSupplier(
             dateMarkedInactive, reactivationPotential, notes, phone, email,
             productCatalog, buyerIds: incomingBuyerIds,
             supplierProducts, productCatalogs, productCatalogImages,
-            certificates, warehousePhotos, videoLinks,
+            certificates, warehousePhotos, videoLinks, quotations,
             tradeName, yearEstablished, manufacturingAddress, city, state, postalCode, supplierType,
             whatsapp, hsCode, organicStatus, ingredientList, allergenDeclaration, shelfLife,
             storageConditions, packagingType, netWeightVariants, sampleAvailable, sampleLeadTime, sampleCost,
@@ -457,6 +459,7 @@ export async function updateNewSupplier(
                     certificates: certificates ?? [],
                     warehousePhotos: warehousePhotos ?? [],
                     videoLinks: videoLinks ?? [],
+                    quotations: quotations ?? [],
                     ...(req.body.dealStage !== undefined && { dealStage: req.body.dealStage }),
                     tradeName, yearEstablished, manufacturingAddress, city, state, postalCode, supplierType,
                     whatsapp, hsCode, organicStatus, ingredientList, allergenDeclaration, shelfLife,
@@ -611,6 +614,7 @@ export async function updateNewSupplier(
                 productCatalogs: supplier.productCatalogs as any[] ?? [],
                 productCatalogImages: supplier.productCatalogImages as any[] ?? [],
                 warehousePhotos: supplier.warehousePhotos as any[] ?? [],
+                quotations: supplier.quotations as any[] ?? [],
             }, req.user!.id);
         } catch (e) { console.error("Vault Sync Failed", e); }
         // ---------------------------------------

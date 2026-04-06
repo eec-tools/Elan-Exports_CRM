@@ -73,11 +73,17 @@ interface SupplierDocs {
   productCatalogImages?: DocEntry[];
   warehousePhotos?: DocEntry[];
   contractDocument?: { name: string; url: string } | null;
+  quotations?: DocEntry[];
+}
+
+interface BuyerDocs {
+  productCatalog?: DocEntry;
+  quotations?: DocEntry[];
 }
 
 /**
  * Sync supplier documents to the Vault as a folder structure:
- *   Category Folder → Supplier Name Folder → Files
+ *   Category Folder → Suppliers → Supplier Name Folder → Files
  *
  * Deduplicates by fileUrl to avoid creating duplicates on update.
  */
@@ -106,15 +112,21 @@ export async function syncSupplierDocsToVault(
       items: [docs.contractDocument],
     });
   }
+  if (docs.quotations && docs.quotations.length > 0) {
+    docCategories.push({ categoryName: "Quotation", items: docs.quotations });
+  }
 
   for (const { categoryName, items } of docCategories) {
     // 1. Find/create category folder at root
     const categoryFolder = await findOrCreateFolder(categoryName, null, categoryName, userId);
 
-    // 2. Find/create supplier folder inside category
-    const supplierFolder = await findOrCreateFolder(supplierCompany, categoryFolder.id, categoryName, userId);
+    // 2. Find/create "Suppliers" intermediate folder inside category
+    const suppliersFolder = await findOrCreateFolder("Suppliers", categoryFolder.id, categoryName, userId);
 
-    // 3. Add each file (skip if URL already exists in this supplier folder)
+    // 3. Find/create supplier name folder inside "Suppliers"
+    const supplierFolder = await findOrCreateFolder(supplierCompany, suppliersFolder.id, categoryName, userId);
+
+    // 4. Add each file (skip if URL already exists in this supplier folder)
     for (const item of items) {
       if (!item.url) continue;
 
@@ -140,6 +152,69 @@ export async function syncSupplierDocsToVault(
           fileType: deriveFileTypeFromUrl(item.url),
           isFolder: false,
           parentId: supplierFolder.id,
+          uploadedBy: userId ?? null,
+        },
+      });
+    }
+  }
+}
+
+/**
+ * Sync buyer documents to the Vault as a folder structure:
+ *   Category Folder → Buyers → Buyer Name Folder → Files
+ *
+ * Deduplicates by fileUrl to avoid creating duplicates on update.
+ */
+export async function syncBuyerDocsToVault(
+  buyerCompany: string,
+  docs: BuyerDocs,
+  userId?: string | null,
+) {
+  const docCategories: { categoryName: string; items: DocEntry[] }[] = [];
+
+  if (docs.productCatalog && docs.productCatalog.url) {
+    docCategories.push({ categoryName: "Product Catalogs", items: [docs.productCatalog] });
+  }
+  if (docs.quotations && docs.quotations.length > 0) {
+    docCategories.push({ categoryName: "Quotation", items: docs.quotations });
+  }
+
+  for (const { categoryName, items } of docCategories) {
+    // 1. Find/create category folder at root
+    const categoryFolder = await findOrCreateFolder(categoryName, null, categoryName, userId);
+
+    // 2. Find/create "Buyers" intermediate folder inside category
+    const buyersFolder = await findOrCreateFolder("Buyers", categoryFolder.id, categoryName, userId);
+
+    // 3. Find/create buyer name folder inside "Buyers"
+    const buyerFolder = await findOrCreateFolder(buyerCompany, buyersFolder.id, categoryName, userId);
+
+    // 4. Add each file (skip if URL already exists in this buyer folder)
+    for (const item of items) {
+      if (!item.url) continue;
+
+      const existingFile = await (prisma as any).vaultDocument.findFirst({
+        where: {
+          parentId: buyerFolder.id,
+          fileUrl: item.url,
+          isFolder: false,
+        },
+      });
+
+      if (existingFile) continue; // already synced
+
+      const fileName = item.name || item.label || deriveNameFromUrl(item.url);
+
+      await (prisma as any).vaultDocument.create({
+        data: {
+          name: fileName,
+          category: categoryName,
+          region: "Global",
+          fileUrl: item.url,
+          publicId: `vault_sync_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          fileType: deriveFileTypeFromUrl(item.url),
+          isFolder: false,
+          parentId: buyerFolder.id,
           uploadedBy: userId ?? null,
         },
       });

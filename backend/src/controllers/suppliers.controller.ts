@@ -281,12 +281,14 @@ export async function createSupplier(
       const contractDoc = (supplier as any).contractDocument;
       const productCatalogs = (supplier as any).productCatalogs;
       const productCatalogImages = (supplier as any).productCatalogImages;
+      const quotations = (supplier as any).quotations;
       await syncSupplierDocsToVault(supplier.company, {
         certificates: Array.isArray(docs) ? docs : [],
         productCatalogs: Array.isArray(productCatalogs) ? productCatalogs : [],
         productCatalogImages: Array.isArray(productCatalogImages) ? productCatalogImages : [],
         warehousePhotos: [],
         contractDocument: contractDoc && contractDoc.url ? contractDoc : null,
+        quotations: Array.isArray(quotations) ? quotations : [],
       }, req.user!.id);
     } catch (e) { console.error("Vault Sync Failed", e); }
     // ---------------------------------------
@@ -472,12 +474,14 @@ export async function updateSupplier(
       const contractDoc = (supplier as any).contractDocument;
       const productCatalogs = (supplier as any).productCatalogs;
       const productCatalogImages = (supplier as any).productCatalogImages;
+      const quotations = (supplier as any).quotations;
       await syncSupplierDocsToVault(supplier.company, {
         certificates: Array.isArray(docs) ? docs : [],
         productCatalogs: Array.isArray(productCatalogs) ? productCatalogs : [],
         productCatalogImages: Array.isArray(productCatalogImages) ? productCatalogImages : [],
         warehousePhotos: [],
         contractDocument: contractDoc && contractDoc.url ? contractDoc : null,
+        quotations: Array.isArray(quotations) ? quotations : [],
       }, req.user!.id);
     } catch (e) { console.error("Vault Sync Failed", e); }
     // ---------------------------------------

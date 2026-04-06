@@ -278,6 +278,7 @@ export default function SupplierDetailsPage() {
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
   const [catalogImageFiles, setCatalogImageFiles] = useState<File[]>([]);
+  const [quotationFiles, setQuotationFiles] = useState<File[]>([]);
   const [productImageFiles, setProductImageFiles] = useState<Record<number, File>>({});
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [uploadingContract, setUploadingContract] = useState(false);
@@ -516,6 +517,17 @@ export default function SupplierDetailsPage() {
       }
     }
 
+    // Upload quotation files
+    const finalQuotations = [...((form as any).quotations || [])];
+    if (quotationFiles.length > 0) {
+      for (const file of quotationFiles) {
+        try {
+          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+          finalQuotations.push({ name: file.name, url: uploadRes.url });
+        } catch (error) { console.error('Upload failed', error); }
+      }
+    }
+
     // Upload product images
     const finalProducts = [...(form.supplierProducts || [])];
     for (const [idxStr, file] of Object.entries(productImageFiles)) {
@@ -528,7 +540,7 @@ export default function SupplierDetailsPage() {
       }
     }
 
-    const payload = { ...form, supplierProducts: finalProducts, productCatalogShared: catalogUrl, documents: finalDocuments, productCatalogs: finalCatalogs, productCatalogImages: finalCatalogImages };
+    const payload = { ...form, supplierProducts: finalProducts, productCatalogShared: catalogUrl, documents: finalDocuments, productCatalogs: finalCatalogs, productCatalogImages: finalCatalogImages, quotations: finalQuotations };
 
     if (supplier?.id) {
       updateMutation.mutate({ id: supplier.id, d: payload });
@@ -554,6 +566,7 @@ export default function SupplierDetailsPage() {
     setCatalogFile(null);
     setCatalogFiles([]);
     setCatalogImageFiles([]);
+    setQuotationFiles([]);
     setProductImageFiles({});
     setDialogOpen(true);
   };
@@ -1744,6 +1757,19 @@ export default function SupplierDetailsPage() {
                   {documentFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{documentFiles.map((f, idx) => (<div key={`pending-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setDocumentFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-4 w-4" /></button></div>))}</div>)}
                 </div>
               </div>
+              {/* Quotation */}
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Quotation Files</Label>
+                <div className="flex flex-col gap-2">
+                  <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" multiple className="hidden" id="quotation-upload-edit" onChange={(e) => { if (e.target.files) setQuotationFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                  <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200 w-fit" onClick={() => document.getElementById("quotation-upload-edit")?.click()}>
+                    <Upload className="h-3.5 w-3.5" /> Upload Quotation Files
+                  </Button>
+                  {((form as any).quotations || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{((form as any).quotations || []).map((doc: any, idx: number) => (<div key={`quot-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{doc.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...((form as any).quotations || [])]; updated.splice(idx, 1); setForm({ ...form, quotations: updated } as any); }}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
+                  {quotationFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{quotationFiles.map((f, idx) => (<div key={`pend-quot-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setQuotationFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
+                </div>
+              </div>
+
               <div className="space-y-2 sm:col-span-2"><Label>Factory Videos Shared</Label><Input value={form.factoryVideosShared ?? ""} onChange={(e) => setForm({ ...form, factoryVideosShared: e.target.value })} /></div>
               <div className="space-y-2 sm:col-span-2"><Label>Warehouse Videos Shared</Label><Input value={form.warehouseVideosShared ?? ""} onChange={(e) => setForm({ ...form, warehouseVideosShared: e.target.value })} /></div>
               <div className="space-y-2 sm:col-span-2"><Label>Remarks</Label><Textarea value={form.remarks ?? ""} onChange={(e) => setForm({ ...form, remarks: e.target.value })} rows={3} /></div>

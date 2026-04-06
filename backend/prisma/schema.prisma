@@ -100,6 +100,7 @@ model Buyer {
   tradeFairName             String?   @map("trade_fair_name")
   productCatalog            String?   @map("product_catalog_shared")
   supplierLinks             Json      @default("[]") @map("supplier_links")
+  quotations                Json?     @default("[]") @map("quotations")
   createdBy                 String?   @map("created_by")
   createdAt                 DateTime  @default(now()) @map("created_at")
   updatedAt                 DateTime  @updatedAt @map("updated_at")
@@ -235,6 +236,7 @@ model Supplier {
   supplierProducts           Json?                  @default("[]") @map("supplier_products")
   productCatalogs            Json?                  @default("[]") @map("product_catalogs")
   productCatalogImages       Json?                  @default("[]") @map("product_catalog_images")
+  quotations                 Json?                  @default("[]") @map("quotations")
   buyerIds                   Json                   @default("[]") @map("buyer_ids")
   dealStage                  String                 @default("Communication") @map("deal_stage")
 
@@ -391,6 +393,7 @@ model NewSupplier {
   certificates               Json?                     @default("[]") @map("certificates")
   warehousePhotos            Json?                     @default("[]") @map("warehouse_photos")
   videoLinks                 Json?                     @default("[]") @map("video_links")
+  quotations                 Json?                     @default("[]") @map("quotations")
   buyerIds                   Json                      @default("[]") @map("buyer_ids")
   dealStage                  String                    @default("Communication") @map("deal_stage")
 

@@ -233,6 +233,7 @@ export default function BuyerDetailsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<Partial<Buyer>>({});
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
+  const [quotationFiles, setQuotationFiles] = useState<File[]>([]);
 
   const { data: buyer, isLoading } = useQuery<Buyer>({
     queryKey: ["buyer", id],
@@ -359,8 +360,18 @@ export default function BuyerDetailsPage() {
         return;
       }
     }
+    const finalQuotations = [...((form as any).quotations || [])];
+    if (quotationFiles.length > 0) {
+      for (const file of quotationFiles) {
+        try {
+          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+          finalQuotations.push({ name: file.name, url: uploadRes.url });
+        } catch (error) { console.error('Upload failed', error); }
+      }
+    }
+
     if (buyer?.id) {
-      updateMutation.mutate({ id: buyer.id, d: { ...form, productCatalog: catalogUrl } });
+      updateMutation.mutate({ id: buyer.id, d: { ...form, productCatalog: catalogUrl, quotations: finalQuotations } as any });
     }
   };
 
@@ -371,6 +382,7 @@ export default function BuyerDetailsPage() {
       sourcingRequirements: buyer?.sourcingRequirements || [],
     });
     setCatalogFile(null);
+    setQuotationFiles([]);
     setDialogOpen(true);
   };
 
@@ -2057,6 +2069,21 @@ export default function BuyerDetailsPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* ── Quotation ── */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Quotation</p>
+              <div className="flex flex-col gap-2">
+                <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" multiple className="hidden" id="multi-quotation-upload-buyer" onChange={(e) => { if (e.target.files) setQuotationFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200 w-fit" onClick={() => document.getElementById("multi-quotation-upload-buyer")?.click()}>
+                  <Upload className="h-3.5 w-3.5" /> Upload Quotation Files
+                </Button>
+                {((form as any).quotations || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{((form as any).quotations || []).map((doc: any, idx: number) => (<div key={`quot-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{doc.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...((form as any).quotations || [])]; updated.splice(idx, 1); setForm({ ...form, quotations: updated } as any); }}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
+                {quotationFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{quotationFiles.map((f, idx) => (<div key={`pend-quot-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setQuotationFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
               </div>
             </div>
 

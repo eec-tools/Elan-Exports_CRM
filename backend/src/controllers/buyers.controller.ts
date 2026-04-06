@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
+import { syncBuyerDocsToVault } from "../services/vaultSync.service.js";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -328,6 +329,15 @@ export async function createBuyer(
     } catch(e) { console.error("Auto Report Gen Failed", e); }
     // -------------------------------------------
 
+    // --- VAULT SYNC ---
+    try {
+      await syncBuyerDocsToVault(buyer.company, {
+        productCatalog: buyer.productCatalog ? { url: buyer.productCatalog } : undefined,
+        quotations: Array.isArray((buyer as any).quotations) ? (buyer as any).quotations : [],
+      }, req.user!.id);
+    } catch (e) { console.error("Vault Sync Failed", e); }
+    // ------------------
+
     res.status(201).json(buyer);
   } catch (err) {
     console.error("Create buyer error:", err);
@@ -505,6 +515,15 @@ export async function updateBuyer(
       }
     } catch(e) { console.error("Auto Report Gen Failed", e); }
     // -------------------------------------------
+
+    // --- VAULT SYNC ---
+    try {
+      await syncBuyerDocsToVault(buyer.company, {
+        productCatalog: buyer.productCatalog ? { url: buyer.productCatalog } : undefined,
+        quotations: Array.isArray((buyer as any).quotations) ? (buyer as any).quotations : [],
+      }, req.user!.id);
+    } catch (e) { console.error("Vault Sync Failed", e); }
+    // ------------------
 
     res.json(buyer);
   } catch (err) {

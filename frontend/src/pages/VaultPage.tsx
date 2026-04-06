@@ -128,6 +128,12 @@ const CATEGORY_META: Record<
     gradient: "from-teal-500 to-green-500",
     Icon: Database,
   },
+  Quotation: {
+    color: "text-rose-600",
+    bg: "bg-rose-50",
+    gradient: "from-rose-500 to-pink-500",
+    Icon: FileText,
+  },
 };
 
 const FALLBACK_META = {
@@ -168,6 +174,7 @@ const UPLOAD_CATEGORIES = [
   "Trade Rules",
   "HS Codes",
   "FTA Database",
+  "Quotation",
 ];
 
 // ─── Main Page ───────────────────────────────────────
