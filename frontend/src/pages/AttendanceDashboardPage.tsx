@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import {
   Activity,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Eye,
   Loader2,
@@ -13,10 +11,8 @@ import {
   LogOut,
   Monitor,
   Mouse,
-  PlayCircle,
   Square,
   Timer,
-  TrendingUp,
   Users,
   Zap,
 } from "lucide-react";
