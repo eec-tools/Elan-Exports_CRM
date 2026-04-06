@@ -48,7 +48,7 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
             }
         }
 
-        const [tasks, total] = await Promise.all([
+        const [tasks, total, priorityCounts] = await Promise.all([
             prisma.dailyTask.findMany({
                 where,
                 skip,
@@ -56,7 +56,30 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
                 orderBy: [{ date: "desc" }, { createdAt: "desc" }],
             }),
             prisma.dailyTask.count({ where }),
+            prisma.dailyTask.groupBy({
+                by: ['priority'],
+                _count: {
+                    id: true
+                }
+            })
         ]);
+
+        // Format priority counts
+        const priorityStats = {
+            Urgent: 0,
+            High: 0,
+            Medium: 0,
+            Low: 0,
+            None: 0
+        };
+        
+        priorityCounts.forEach(item => {
+            const priority = item.priority || "None";
+            if (priority in priorityStats) {
+                // @ts-ignore
+                priorityStats[priority] = item._count.id;
+            }
+        });
 
         res.json({
             data: tasks,
@@ -66,6 +89,7 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
                 total,
                 pages: Math.ceil(total / limitNum),
             },
+            priorityStats
         });
     } catch (error) {
         console.error("Error fetching daily tasks:", error);
@@ -84,7 +108,7 @@ export const createTask = async (req: AuthRequest, res: Response) => {
                 company,
                 priority,
                 owner,
-                status: status || "not started",
+                status: status || "Pending",
                 deadline: deadline ? new Date(deadline) : null,
                 notes,
             },

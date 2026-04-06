@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import api from "@/api/client";
 import { toast } from "sonner";
 import {
   Loader2, Plus, RefreshCw, Trash2, ChevronLeft, ChevronRight,
-  Filter, LayoutGrid, AlertCircle, Clock, CheckCircle2, X,
+  Filter, AlertCircle, CheckCircle2, X,
   Calendar, CheckSquare, Flag, Users, Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ interface PaginationData {
 }
 
 const PRIORITY_OPTIONS = ["Urgent", "High", "Medium", "Low"];
-const STATUS_OPTIONS = ["not started", "inprogress", "completed", "closed"];
+const STATUS_OPTIONS = ["Pending", "completed", "closed"];
 const OWNER_OPTIONS = ["vandana", "shirali", "madan", "mohita"];
 const COMPANY_OPTIONS = ["EEC", "MTG", "Skin'd India", "Fresh Food Company"];
 
@@ -52,10 +52,9 @@ const priorityStyles = (p: string | null) => {
 
 const statusStyles = (s: string) => {
     switch (s?.toLowerCase()) {
-        case "inprogress": return "text-amber-700 bg-amber-100 border-amber-200";
-        case "completed": return "text-brand-700 bg-brand-100 border-brand-200";
-        case "closed": return "text-slate-700 bg-slate-200 border-slate-300";
-        case "not started":
+        case "pending": return "text-yellow-700 bg-yellow-100 border-yellow-200";
+        case "completed": return "text-green-700 bg-green-100 border-green-200";
+        case "closed": return "text-red-700 bg-red-100 border-red-200";
         default: return "text-slate-600 bg-slate-100 border-slate-200 text-[11px]";
     }
 };
@@ -63,6 +62,7 @@ const statusStyles = (s: string) => {
 export default function DailyTasksPage() {
     const [tasks, setTasks] = useState<DailyTask[]>([]);
     const [pagination, setPagination] = useState<PaginationData | null>(null);
+    const [priorityStats, setPriorityStats] = useState<Record<string, number>>({ Urgent: 0, High: 0, Medium: 0, Low: 0 });
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -98,6 +98,9 @@ export default function DailyTasksPage() {
             });
             setTasks(res.data.data);
             setPagination(res.data.pagination);
+            if (res.data.priorityStats) {
+                setPriorityStats(res.data.priorityStats);
+            }
         } catch {
             toast.error("Failed to load daily tasks");
         } finally {
@@ -121,7 +124,7 @@ export default function DailyTasksPage() {
             const res = await api.post("/daily-tasks", {
                 date: today,
                 taskText: "",
-                status: "not started"
+                status: "Pending"
             });
             setTasks([res.data, ...tasks]);
             toast.success("New task row added");
@@ -218,16 +221,7 @@ export default function DailyTasksPage() {
         setFilterDateFrom("");
         setFilterDateTo("");
         setPage(1);
-    }
-
-    const stats = useMemo(() => {
-        return {
-            total: pagination?.total || tasks.length,
-            highPriority: tasks.filter(t => t.priority === "Urgent" || t.priority === "High").length,
-            inProgress: tasks.filter(t => t.status?.toLowerCase() === "inprogress").length,
-            completed: tasks.filter(t => t.status?.toLowerCase() === "completed" || t.status?.toLowerCase() === "closed").length,
-        };
-    }, [tasks, pagination]);
+    };
 
     const hasActiveFilters = filterPriority || filterStatus || filterOwner || filterDateFrom || filterDateTo;
 
@@ -263,19 +257,32 @@ export default function DailyTasksPage() {
                 </div>
             </div>
 
-            {/* ── Summary Cards ── */}
+            {/* ── Priority Filter Cards ── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-5">
                 {[
-                    { icon: <LayoutGrid className="h-5 w-5 text-blue-600" />, label: "Tasks Match", value: stats.total, bg: "bg-blue-50" },
-                    { icon: <AlertCircle className="h-5 w-5 text-rose-600" />, label: "High/Urgent (Page)", value: stats.highPriority, bg: "bg-rose-50" },
-                    { icon: <Clock className="h-5 w-5 text-amber-600" />, label: "In Progress (Page)", value: stats.inProgress, bg: "bg-amber-50" },
-                    { icon: <CheckCircle2 className="h-5 w-5 text-brand-600" />, label: "Completed (Page)", value: stats.completed, bg: "bg-brand-50" },
+                    { label: "Urgent", value: priorityStats.Urgent || 0, color: "rose", bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-100" },
+                    { label: "High", value: priorityStats.High || 0, color: "orange", bg: "bg-orange-50", text: "text-orange-600", border: "border-orange-100" },
+                    { label: "Medium", value: priorityStats.Medium || 0, color: "amber", bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-100" },
+                    { label: "Low", value: priorityStats.Low || 0, color: "brand", bg: "bg-brand-50", text: "text-brand-600", border: "border-brand-100" },
                 ].map((s) => (
-                    <div key={s.label} className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
-                        <div className={`rounded-lg p-2.5 ${s.bg}`}>{s.icon}</div>
+                    <div 
+                        key={s.label} 
+                        onClick={() => {
+                            if (filterPriority === s.label) {
+                                setFilterPriority("");
+                            } else {
+                                setFilterPriority(s.label);
+                            }
+                            setPage(1);
+                        }}
+                        className={`rounded-xl border ${filterPriority === s.label ? 'ring-2 ring-brand-500 shadow-md' : 'border-slate-100 shadow-sm'} ${s.bg} p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all`}
+                    >
+                        <div className={`rounded-lg p-2.5 bg-white`}>
+                            <Flag className={`h-5 w-5 ${s.text}`} />
+                        </div>
                         <div>
-                            <p className="text-xs text-slate-500 font-medium">{s.label}</p>
-                            <p className="text-xl font-bold text-slate-800">{s.value}</p>
+                            <p className="text-xs text-slate-500 font-medium">Priority: {s.label}</p>
+                            <p className={`text-xl font-bold ${s.text}`}>{s.value}</p>
                         </div>
                     </div>
                 ))}
@@ -540,8 +547,8 @@ export default function DailyTasksPage() {
                                                 <div className="px-4 py-2.5">
                                                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusStyles(task.status)} capitalize`}>
                                                         {task.status?.toLowerCase() === "completed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                                                        {task.status?.toLowerCase() === "inprogress" && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                                                        {task.status || "not started"}
+                                                        {task.status?.toLowerCase() === "pending" && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                                                        {task.status || "Pending"}
                                                     </span>
                                                 </div>
                                             )}
