@@ -606,6 +606,8 @@ enum Permission {
   reports
   vault
   task_tracker
+  email_tracker
+  deals
 }
 
 enum AccessLevel {

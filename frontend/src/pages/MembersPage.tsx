@@ -40,7 +40,15 @@ const PERMISSIONS = [
   "reports",
   "vault",
   "task_tracker",
+  "email_tracker",
+  "deals",
 ];
+
+const formatPermission = (perm: string) => {
+  if (perm === "task_tracker") return "Daily Task Tracker";
+  if (perm === "email_tracker") return "Email Tracker";
+  return perm.replace('_', ' ');
+};
 
 const ALL_COMPANIES = ["EEC", "MTG", "Skin'd India", "Fresh Food Company"];
 
@@ -375,7 +383,7 @@ export default function MembersPage() {
                                  ) : (
                                     m.permissions.map((p) => (
                                        <span key={p.permission} className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-semibold capitalize ${p.accessLevel === 'edit' ? 'bg-brand-50 text-brand-700 border-brand-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                                          {p.permission}
+                                          {formatPermission(p.permission)}
                                           {p.accessLevel === "read" ? <span className="ml-1 text-slate-400">R</span> : <span className="ml-1 text-brand-500">W</span>}
                                        </span>
                                     ))
@@ -568,7 +576,7 @@ export default function MembersPage() {
                                    className="data-[state=checked]:bg-brand-500 shrink-0"
                                    onCheckedChange={() => togglePerm(perm)}
                                  />
-                                 <span className="text-[13px] font-semibold tracking-tight capitalize text-slate-800 flex-1">{perm.replace('_', ' ')}</span>
+                                 <span className="text-[13px] font-semibold tracking-tight capitalize text-slate-800 flex-1">{formatPermission(perm)}</span>
                                  
                                  {active && (
                                    <Button

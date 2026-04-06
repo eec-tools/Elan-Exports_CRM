@@ -59,7 +59,7 @@ const navItems = [
     to: "/deals",
     label: "Deals",
     icon: TrendingUp,
-    perm: null,
+    perm: "deals",
     adminOnly: false,
   },
   {
@@ -101,7 +101,7 @@ const navItems = [
     to: "/email-tasks",
     label: "Email Tracker",
     icon: Mail,
-    perm: "task_tracker",
+    perm: "email_tracker",
     adminOnly: false,
   },
   {

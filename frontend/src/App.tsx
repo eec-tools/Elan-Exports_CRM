@@ -155,7 +155,7 @@ export default function App() {
                 <Route
                   path="email-tasks"
                   element={
-                    <PermissionGate permission="task_tracker">
+                    <PermissionGate permission="email_tracker">
                       <EmailTasksPage />
                     </PermissionGate>
                   }
@@ -172,7 +172,7 @@ export default function App() {
                 <Route
                   path="deals"
                   element={
-                    <PermissionGate permission="analytics">
+                    <PermissionGate permission="deals">
                       <DealsPage />
                     </PermissionGate>
                   }
