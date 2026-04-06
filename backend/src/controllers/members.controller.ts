@@ -34,6 +34,7 @@ export async function listMembers(
           permission: p.permission,
           accessLevel: p.accessLevel,
         })),
+        assignedCompanies: m.assignedCompanies || [],
       })),
     );
   } catch (err) {
@@ -50,7 +51,7 @@ export async function createMember(
   res: Response,
 ): Promise<void> {
   try {
-    const { email, fullName, password, role, permissions } = req.body;
+    const { email, fullName, password, role, permissions, assignedCompanies } = req.body;
 
     // Check if email already exists
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -66,6 +67,7 @@ export async function createMember(
         email,
         fullName,
         passwordHash,
+        assignedCompanies: assignedCompanies || [],
         roles: {
           create: { role: role || "member" },
         },
@@ -99,6 +101,7 @@ export async function createMember(
         permission: p.permission,
         accessLevel: p.accessLevel,
       })),
+      assignedCompanies: user.assignedCompanies || [],
     });
   } catch (err) {
     console.error("Create member error:", err);
@@ -115,7 +118,7 @@ export async function updateMember(
 ): Promise<void> {
   try {
     const { id } = req.params;
-    const { email, fullName, password, role, permissions } = req.body;
+    const { email, fullName, password, role, permissions, assignedCompanies } = req.body;
 
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
@@ -142,6 +145,7 @@ export async function updateMember(
         email: email ?? existing.email,
         fullName: fullName ?? existing.fullName,
         passwordHash,
+        assignedCompanies: assignedCompanies !== undefined ? assignedCompanies : existing.assignedCompanies,
         roles: {
           deleteMany: {},
           create: { role: role || "member" },
@@ -177,6 +181,7 @@ export async function updateMember(
         permission: p.permission,
         accessLevel: p.accessLevel,
       })),
+      assignedCompanies: updated.assignedCompanies || [],
     });
   } catch (err) {
     console.error("Update member error:", err);

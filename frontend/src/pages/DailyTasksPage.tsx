@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "@/api/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import {
   Loader2, Plus, RefreshCw, Trash2, ChevronLeft, ChevronRight,
@@ -37,7 +38,7 @@ interface PaginationData {
 const PRIORITY_OPTIONS = ["Urgent", "High", "Medium", "Low"];
 const STATUS_OPTIONS = ["Pending", "completed", "closed"];
 const OWNER_OPTIONS = ["vandana", "shirali", "madan", "mohita"];
-const COMPANY_OPTIONS = ["EEC", "MTG", "Skin'd India", "Fresh Food Company"];
+const ALL_COMPANIES = ["EEC", "MTG", "Skin'd India", "Fresh Food Company"];
 
 // Premium styling helpers
 const priorityStyles = (p: string | null) => {
@@ -60,6 +61,8 @@ const statusStyles = (s: string) => {
 };
 
 export default function DailyTasksPage() {
+    const { user, isAdmin } = useAuth();
+    const companyOptions = isAdmin ? ALL_COMPANIES : (user?.assignedCompanies || []);
     const [tasks, setTasks] = useState<DailyTask[]>([]);
     const [pagination, setPagination] = useState<PaginationData | null>(null);
     const [priorityStats, setPriorityStats] = useState<Record<string, number>>({ Urgent: 0, High: 0, Medium: 0, Low: 0 });
@@ -451,7 +454,7 @@ export default function DailyTasksPage() {
                                                     onBlur={saveEdit}
                                                 >
                                                     <option value="">None</option>
-                                                    {COMPANY_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                                                    {companyOptions.map(o => <option key={o} value={o}>{o}</option>)}
                                                 </select>
                                             ) : (
                                                 <div className="px-4 py-2.5 flex items-center gap-1.5 font-medium text-slate-700">

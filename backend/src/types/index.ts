@@ -12,6 +12,7 @@ export interface AuthUser {
     permission: Permission;
     accessLevel: AccessLevel;
   }[];
+  assignedCompanies: string[];
 }
 
 export interface AuthRequest extends Request<{ id?: string; key?: string }> {

@@ -30,6 +30,7 @@ interface Member {
   createdAt: string;
   roles: string[];
   permissions: { permission: string; accessLevel: string }[];
+  assignedCompanies: string[];
 }
 
 const PERMISSIONS = [
@@ -40,6 +41,8 @@ const PERMISSIONS = [
   "vault",
   "task_tracker",
 ];
+
+const ALL_COMPANIES = ["EEC", "MTG", "Skin'd India", "Fresh Food Company"];
 
 export default function MembersPage() {
   const queryClient = useQueryClient();
@@ -55,6 +58,7 @@ export default function MembersPage() {
   const [newPerms, setNewPerms] = useState<
     { permission: string; accessLevel: string }[]
   >([]);
+  const [newAssignedCompanies, setNewAssignedCompanies] = useState<string[]>([]);
 
   // Passkey state
   const [passkeyDialogOpen, setPasskeyDialogOpen] = useState(false);
@@ -191,6 +195,7 @@ export default function MembersPage() {
       password: newPassword,
       role: newRole,
       permissions: newPerms,
+      assignedCompanies: newAssignedCompanies,
     };
 
     if (editingMember) {
@@ -261,6 +266,7 @@ export default function MembersPage() {
                setNewPassword("");
                setNewRole("member");
                setNewPerms([]);
+               setNewAssignedCompanies([]);
                setSendOnSubmit(false);
                setDialogOpen(true);
              }}
@@ -374,6 +380,16 @@ export default function MembersPage() {
                                        </span>
                                     ))
                                  )}
+                                 {!m.roles.includes("admin") && m.assignedCompanies && m.assignedCompanies.length > 0 && (
+                                    <>
+                                       <span className="text-slate-300 mx-0.5">|</span>
+                                       {m.assignedCompanies.map((c) => (
+                                          <span key={c} className="inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-semibold bg-indigo-50 text-indigo-700 border-indigo-200">
+                                             {c}
+                                          </span>
+                                       ))}
+                                    </>
+                                 )}
                               </div>
                            </td>
                            <td className="px-5 py-4">
@@ -407,6 +423,7 @@ export default function MembersPage() {
                                        setNewPassword("");
                                        setNewRole(m.roles.includes("admin") ? "admin" : "member");
                                        setNewPerms(m.permissions || []);
+                                       setNewAssignedCompanies(m.assignedCompanies || []);
                                        setSendOnSubmit(false);
                                        setDialogOpen(true);
                                     }}
@@ -570,6 +587,34 @@ export default function MembersPage() {
                         </div>
                      </div>
                    )}
+
+                    {/* Company Assignment (Only for members) */}
+                    {newRole === "member" && (
+                      <div className="space-y-4 pt-4 border-t border-slate-100">
+                         <Label className="text-sm border-none font-bold uppercase tracking-wider text-slate-400">Assigned Companies (Daily Tasks)</Label>
+                         <div className="grid sm:grid-cols-2 gap-3 bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                            {ALL_COMPANIES.map((company) => {
+                              const active = newAssignedCompanies.includes(company);
+                              return (
+                                <div key={company} className="flex items-center gap-3 bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm">
+                                  <Switch
+                                    checked={active}
+                                    className="data-[state=checked]:bg-indigo-500 shrink-0"
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setNewAssignedCompanies([...newAssignedCompanies, company]);
+                                      } else {
+                                        setNewAssignedCompanies(newAssignedCompanies.filter(c => c !== company));
+                                      }
+                                    }}
+                                  />
+                                  <span className="text-[13px] font-semibold tracking-tight text-slate-800 flex-1">{company}</span>
+                                </div>
+                              );
+                            })}
+                         </div>
+                      </div>
+                    )}
 
                    <div className="pt-4 border-t border-slate-100 flex items-start gap-3 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/50">
                        <input

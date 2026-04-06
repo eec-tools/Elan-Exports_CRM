@@ -20,6 +20,7 @@ export interface User {
   isActive: boolean;
   roles: string[];
   permissions: Permission[];
+  assignedCompanies: string[];
 }
 
 interface AuthContextType {

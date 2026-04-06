@@ -28,6 +28,16 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
         if (priority) where.priority = priority;
         if (status) where.status = status;
         if (company) where.company = { contains: company, mode: "insensitive" };
+
+        // Non-admin users can only see tasks for their assigned companies
+        const isAdmin = req.user?.roles?.includes("admin");
+        const assignedCompanies = req.user?.assignedCompanies || [];
+        if (!isAdmin && assignedCompanies.length > 0) {
+            where.company = { in: assignedCompanies };
+        } else if (!isAdmin && assignedCompanies.length === 0) {
+            // Non-admin with no assigned companies sees nothing
+            where.company = { in: [] };
+        }
         if (owner) {
             if (owner === "Unassigned") {
                 where.OR = [

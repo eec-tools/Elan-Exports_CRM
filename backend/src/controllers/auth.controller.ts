@@ -52,6 +52,7 @@ export async function login(req: Request, res: Response): Promise<void> {
           permission: p.permission,
           accessLevel: p.accessLevel,
         })),
+        assignedCompanies: user.assignedCompanies || [],
       },
     });
   } catch (err) {
@@ -89,6 +90,7 @@ export async function getMe(req: AuthRequest, res: Response): Promise<void> {
         permission: p.permission,
         accessLevel: p.accessLevel,
       })),
+      assignedCompanies: user.assignedCompanies || [],
     });
   } catch (err) {
     console.error("GetMe error:", err);

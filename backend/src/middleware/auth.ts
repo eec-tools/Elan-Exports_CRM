@@ -51,6 +51,7 @@ export async function authenticate(
         permission: p.permission,
         accessLevel: p.accessLevel,
       })),
+      assignedCompanies: user.assignedCompanies || [],
     };
 
     next();
