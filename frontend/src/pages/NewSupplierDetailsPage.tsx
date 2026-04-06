@@ -158,6 +158,7 @@ interface NewSupplier {
   certificates?: { name: string; url: string }[];
   warehousePhotos?: { name: string; url: string }[];
   videoLinks?: { label: string; url: string }[];
+  quotations?: { name: string; url: string }[];
 }
 
 interface SupplierProduct {
