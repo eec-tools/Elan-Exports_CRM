@@ -8,16 +8,22 @@ datasource db {
 }
 
 model User {
-  id                String             @id @default(uuid())
-  email             String             @unique
-  passwordHash      String             @map("password_hash")
-  fullName          String             @map("full_name")
-  isActive          Boolean            @default(true) @map("is_active")
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-  reviewedRequests  AccessRequest[]    @relation("reviewer")
-  accessRequests    AccessRequest[]    @relation("requester")
+  id                String                @id @default(uuid())
+  email             String                @unique
+  passwordHash      String                @map("password_hash")
+  fullName          String                @map("full_name")
+  workStartTime     String                @default("09:00") @map("work_start_time")
+  workEndTime       String                @default("18:00") @map("work_end_time")
+  minHoursPresent   Int                   @default(420) @map("min_hours_present")
+  isActive          Boolean               @default(true) @map("is_active")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  reviewedRequests  AccessRequest[]       @relation("reviewer")
+  accessRequests    AccessRequest[]       @relation("requester")
   activityLogs      ActivityLog[]
+  attendances       Attendance[]
+  attendanceBeats   AttendanceHeartbeat[]
+  activityEvents    ActivityEvent[]
   buyers            Buyer[]
   deals             Deal[]
   reports           Report[]
@@ -453,6 +459,65 @@ model ActivityLog {
   @@map("activity_logs")
 }
 
+model Attendance {
+  id               String                @id @default(uuid())
+  userId           String                @map("user_id")
+  date             DateTime              @db.Date
+  startTime        DateTime?             @map("start_time")
+  endTime          DateTime?             @map("end_time")
+  totalTimeMinutes Int                   @default(0) @map("total_time_minutes")
+  idleTimeMinutes  Int                   @default(0) @map("idle_time_minutes")
+  realTimeMinutes  Int                   @default(0) @map("real_time_minutes")
+  status           AttendanceStatus      @default(Absent)
+  lateLogin        Boolean               @default(false) @map("late_login")
+  earlyLogout      Boolean               @default(false) @map("early_logout")
+  autoEnded        Boolean               @default(false) @map("auto_ended")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  heartbeats       AttendanceHeartbeat[]
+
+  @@unique([userId, date])
+  @@index([date])
+  @@map("attendances")
+}
+
+model AttendanceHeartbeat {
+  id           String     @id @default(uuid())
+  attendanceId String     @map("attendance_id")
+  userId       String     @map("user_id")
+  timestamp    DateTime
+  createdAt    DateTime   @default(now()) @map("created_at")
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceId, timestamp])
+  @@index([userId, timestamp])
+  @@map("attendance_heartbeats")
+}
+
+model ActivityEvent {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  sessionId     String   @map("session_id")
+  eventType     String   @map("event_type")
+  page          String?
+  details       Json?
+  activeSeconds Int      @default(0) @map("active_seconds")
+  idleSeconds   Int      @default(0) @map("idle_seconds")
+  clickCount    Int      @default(0) @map("click_count")
+  keyCount      Int      @default(0) @map("key_count")
+  scrollDepth   Int      @default(0) @map("scroll_depth")
+  timestamp     DateTime @default(now())
+  createdAt     DateTime @default(now()) @map("created_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, timestamp])
+  @@index([sessionId])
+  @@index([timestamp])
+  @@map("activity_events")
+}
+
 model AccessRequest {
   id         String    @id @default(uuid())
   userId     String    @map("user_id")
@@ -625,4 +690,9 @@ enum ComplianceStatus {
   RECEIVED
   PENDING
   MISSING
+}
+
+enum AttendanceStatus {
+  Present
+  Absent
 }
