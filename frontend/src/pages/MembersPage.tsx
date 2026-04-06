@@ -35,7 +35,9 @@ interface Member {
 
 const PERMISSIONS = [
   "buyers",
-  "suppliers",
+  "new_suppliers",
+  "signed_suppliers",
+  "old_suppliers",
   "analytics",
   "reports",
   "vault",
@@ -47,6 +49,9 @@ const PERMISSIONS = [
 const formatPermission = (perm: string) => {
   if (perm === "task_tracker") return "Daily Task Tracker";
   if (perm === "email_tracker") return "Email Tracker";
+  if (perm === "new_suppliers") return "New Suppliers";
+  if (perm === "signed_suppliers") return "Signed Suppliers";
+  if (perm === "old_suppliers") return "Old Suppliers";
   return perm.replace('_', ' ');
 };
 

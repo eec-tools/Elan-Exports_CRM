@@ -608,6 +608,9 @@ enum Permission {
   task_tracker
   email_tracker
   deals
+  new_suppliers
+  signed_suppliers
+  old_suppliers
 }
 
 enum AccessLevel {

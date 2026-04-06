@@ -98,7 +98,7 @@ export default function App() {
                 <Route
                   path="suppliers/signed-contract"
                   element={
-                    <PermissionGate permission="suppliers">
+                    <PermissionGate permission="signed_suppliers">
                       <SignedContractSuppliersPage />
                     </PermissionGate>
                   }
@@ -106,7 +106,7 @@ export default function App() {
                 <Route
                   path="suppliers/signed-contract/:id"
                   element={
-                    <PermissionGate permission="suppliers">
+                    <PermissionGate permission="signed_suppliers">
                       <SupplierDetailsPage />
                     </PermissionGate>
                   }
@@ -114,7 +114,7 @@ export default function App() {
                 <Route
                   path="suppliers/old"
                   element={
-                    <PermissionGate permission="suppliers">
+                    <PermissionGate permission="old_suppliers">
                       <OldSuppliersPage />
                     </PermissionGate>
                   }
@@ -122,7 +122,7 @@ export default function App() {
                 <Route
                   path="suppliers/new"
                   element={
-                    <PermissionGate permission="suppliers">
+                    <PermissionGate permission="new_suppliers">
                       <NewSuppliersPage />
                     </PermissionGate>
                   }
@@ -130,7 +130,7 @@ export default function App() {
                 <Route
                   path="suppliers/new/:id"
                   element={
-                    <PermissionGate permission="suppliers">
+                    <PermissionGate permission="new_suppliers">
                       <NewSupplierDetailsPage />
                     </PermissionGate>
                   }
