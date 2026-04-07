@@ -794,7 +794,7 @@ export default function VaultPage() {
                 onChange={(e) =>
                   handleFileSelect(e.target.files?.[0] ?? null)
                 }
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.gif,.webp,.zip"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.jfif,.gif,.webp,.zip"
               />
               {uploadFile ? (
                 <div className="flex items-center gap-2">

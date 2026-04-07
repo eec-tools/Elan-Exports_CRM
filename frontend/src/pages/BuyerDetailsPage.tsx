@@ -2078,7 +2078,7 @@ export default function BuyerDetailsPage() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Quotation</p>
               <div className="flex flex-col gap-2">
-                <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" multiple className="hidden" id="multi-quotation-upload-buyer" onChange={(e) => { if (e.target.files) setQuotationFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.jfif" multiple className="hidden" id="multi-quotation-upload-buyer" onChange={(e) => { if (e.target.files) setQuotationFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
                 <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200 w-fit" onClick={() => document.getElementById("multi-quotation-upload-buyer")?.click()}>
                   <Upload className="h-3.5 w-3.5" /> Upload Quotation Files
                 </Button>

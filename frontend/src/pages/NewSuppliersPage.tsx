@@ -1624,7 +1624,7 @@ export default function NewSuppliersPage() {
                                 {/* Multi Product Catalog Images */}
                                 <div className="flex flex-col gap-2 p-3 bg-slate-50/50 rounded-lg border border-slate-200/60 transition-colors hover:border-slate-300">
                                     <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Product Catalog Images <span className="text-slate-400 text-[10px] ml-1 font-normal lowercase">(Optional)</span></label>
-                                    <input type="file" accept=".png,.jpg,.jpeg,.webp,.jfif" multiple className="hidden" id="multi-catalog-image-upload-ns" onChange={(e) => { if (e.target.files) setCatalogImageFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                                    <input type="file" accept=".png,.jpg,.jpeg,.jfif,.webp" multiple className="hidden" id="multi-catalog-image-upload-ns" onChange={(e) => { if (e.target.files) setCatalogImageFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
                                     <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200" onClick={() => document.getElementById("multi-catalog-image-upload-ns")?.click()}>
                                         <Upload className="h-4 w-4" /> Upload Product Catalogs (Images)
                                     </Button>
