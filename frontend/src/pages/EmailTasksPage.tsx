@@ -356,7 +356,7 @@ export default function EmailTasksPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <MailOpen className="h-6 w-6 text-brand-500" />
-            Email Task Tracker
+            Email Task Tracker(Work is in Progress)
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Manage incoming email requests, prioritize tasks, and assign team members.
