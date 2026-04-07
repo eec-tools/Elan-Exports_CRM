@@ -520,8 +520,9 @@ export async function updateNewSupplier(
         // --- NEW: AUTO-GENERATE REPORT ---
         const changedNotes = existing.notes !== notes;
         const changedStatus = existing.currentStatus !== currentStatus;
+        const changedBuyers = JSON.stringify([...(oldIds)].sort()) !== JSON.stringify([...incomingIds].sort());
 
-        if (changedNotes || changedStatus) {
+        if (changedNotes || changedStatus || changedBuyers) {
             let updatesText = "";
             const parts = [];
             if (changedStatus) parts.push(`Status changed to '${currentStatus}'`);
@@ -579,7 +580,7 @@ export async function updateNewSupplier(
                             where: { id: existingReport.id },
                             data: {
                                 companyName: mergeStr(existingReport.companyName, supplier.company),
-                                buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
+                                buyerName: mappedBuyer,
                                 status: mergeStr(existingReport.status, currentStatus || existing.currentStatus || "Status Updated"),
                                 keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
                                 updateDate: new Date(),
