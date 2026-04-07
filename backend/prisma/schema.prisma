@@ -542,20 +542,29 @@ model AppSetting {
 }
 
 model EmailTracker {
-  id              String   @id @default(uuid())
-  dateReceived    DateTime @map("date_received")
-  senderAddress   String   @map("sender_address")
+  id              String    @id @default(uuid())
+  dateReceived    DateTime  @map("date_received")
+  senderAddress   String    @map("sender_address")
   subject         String
   task            String?
-  productCategory String?  @map("product_category")
+  productCategory String?   @map("product_category")
   priority        String?
   respondent      String?
-  status          String   @default("Not Started")
+  status          String    @default("Not Started")
   notes           String?
-  emailLink       String?  @map("email_link")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  emailLink       String?   @map("email_link")
+  // Outlook / Graph API sync fields
+  messageId       String?   @unique @map("message_id")
+  conversationId  String?   @map("conversation_id")
+  bodyPreview     String?   @map("body_preview")
+  importance      String?
+  isRead          Boolean   @default(false) @map("is_read")
+  source          String    @default("manual")
+  syncedAt        DateTime? @map("synced_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
+  @@index([conversationId])
   @@map("email_tracker")
 }
 

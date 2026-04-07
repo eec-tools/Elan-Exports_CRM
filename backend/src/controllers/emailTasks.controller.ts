@@ -2,6 +2,7 @@ import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { logActivity } from "../services/activityLogger.js";
 import { AuthRequest } from "../types/index.js";
+import { syncOutlookEmails, getLastSyncInfo } from "../services/outlookService.js";
 
 const prisma = new PrismaClient();
 
@@ -13,7 +14,8 @@ export const getEmailTasks = async (req: AuthRequest, res: Response) => {
             task,
             priority,
             status,
-            respondent
+            respondent,
+            search,
         } = req.query as Record<string, string>;
 
         const pageNum = Math.max(1, parseInt(page));
@@ -33,6 +35,13 @@ export const getEmailTasks = async (req: AuthRequest, res: Response) => {
             } else {
                 where.respondent = { contains: respondent, mode: "insensitive" };
             }
+        }
+        if (search) {
+            where.OR = [
+                { subject: { contains: search, mode: "insensitive" } },
+                { senderAddress: { contains: search, mode: "insensitive" } },
+                { bodyPreview: { contains: search, mode: "insensitive" } },
+            ];
         }
 
         const [tasks, total] = await Promise.all([
@@ -60,12 +69,14 @@ export const getEmailTasks = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const getEmailTaskStats = async (req: AuthRequest, res: Response) => {
+export const getEmailTaskStats = async (_req: AuthRequest, res: Response) => {
     try {
-        const total = await prisma.emailTracker.count();
-        const newTasks = await prisma.emailTracker.count({ where: { status: "Not Started" } });
-        const inProgress = await prisma.emailTracker.count({ where: { status: "In Progress" } });
-        const completed = await prisma.emailTracker.count({ where: { status: "Completed" } });
+        const [total, newTasks, inProgress, completed] = await Promise.all([
+            prisma.emailTracker.count(),
+            prisma.emailTracker.count({ where: { status: "Not Started" } }),
+            prisma.emailTracker.count({ where: { status: "In Progress" } }),
+            prisma.emailTracker.count({ where: { status: "Completed" } }),
+        ]);
 
         res.json({ total, newTasks, inProgress, completed });
     } catch (error) {
@@ -120,5 +131,33 @@ export const deleteEmailTask = async (req: AuthRequest, res: Response) => {
     } catch (error) {
         console.error("Error deleting email task:", error);
         res.status(500).json({ error: "Failed to delete email task" });
+    }
+};
+
+// ─── Outlook Sync ─────────────────────────────────────────────────────────────
+
+export const triggerSync = async (_req: AuthRequest, res: Response) => {
+    try {
+        const result = await syncOutlookEmails();
+        res.json({
+            success: true,
+            inserted: result.inserted,
+            skipped: result.skipped,
+            errors: result.errors,
+            syncedAt: result.syncedAt,
+        });
+    } catch (err: any) {
+        console.error("Manual sync failed:", err);
+        res.status(500).json({ error: err?.message ?? "Sync failed" });
+    }
+};
+
+export const getSyncStatus = async (_req: AuthRequest, res: Response) => {
+    try {
+        const info = await getLastSyncInfo();
+        res.json(info);
+    } catch (error) {
+        console.error("Error getting sync status:", error);
+        res.status(500).json({ error: "Failed to get sync status" });
     }
 };

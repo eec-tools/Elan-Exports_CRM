@@ -3,7 +3,9 @@ import {
     getEmailTasks,
     updateEmailTask,
     deleteEmailTask,
-    getEmailTaskStats
+    getEmailTaskStats,
+    triggerSync,
+    getSyncStatus,
 } from "../controllers/emailTasks.controller.js";
 import { authenticate } from "../middleware/auth.js";
 
@@ -13,6 +15,8 @@ router.use(authenticate);
 
 router.get("/", getEmailTasks);
 router.get("/stats", getEmailTaskStats);
+router.get("/sync-status", getSyncStatus);
+router.post("/sync", triggerSync);
 router.put("/:id", updateEmailTask);
 router.delete("/:id", deleteEmailTask);
 

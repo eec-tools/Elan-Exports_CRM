@@ -28,6 +28,7 @@ import introEmailCampaignRoutes from "./routes/introEmailCampaign.routes.js";
 import newSupplierEmailCampaignRoutes from "./routes/newSupplierEmailCampaign.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import { startEmailCampaignScheduler } from "./services/emailCampaignScheduler.js";
+import { startEmailSyncScheduler } from "./services/emailSyncScheduler.js";
 import attendanceRoutes from "./routes/attendance.routes.js";
 import { startAttendanceScheduler } from "./services/attendanceScheduler.js";
 import activityTrackingRoutes from "./routes/activityTracking.routes.js";
@@ -44,7 +45,7 @@ const PORT = process.env.PORT || 3001;
 app.set("trust proxy", 1);
 
 // Security headers
-app.use((req, res, next) => {
+app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("X-XSS-Protection", "1; mode=block");
@@ -204,6 +205,7 @@ app.listen(PORT, () => {
   console.log(`Allowed origins: ${allowedOrigins.join(", ") || "localhost only"}`);
   startEmailCampaignScheduler();
   startAttendanceScheduler();
+  startEmailSyncScheduler();
 });
 
 // Graceful shutdown
