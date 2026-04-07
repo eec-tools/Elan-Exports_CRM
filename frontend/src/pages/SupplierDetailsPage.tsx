@@ -1740,7 +1740,7 @@ export default function SupplierDetailsPage() {
                 {/* Multi Product Catalog Images */}
                 <div className="flex flex-col gap-2 p-3 bg-slate-50/50 rounded-lg border border-slate-200/60 transition-colors hover:border-slate-300">
                   <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Product Catalog Images <span className="text-slate-400 text-[10px] ml-1 font-normal lowercase">(Optional)</span></label>
-                  <input type="file" accept=".png,.jpg,.jpeg,.webp" multiple className="hidden" id="multi-catalog-image-upload-detail" onChange={(e) => { if (e.target.files) setCatalogImageFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                  <input type="file" accept=".png,.jpg,.jpeg,.webp,.jfif" multiple className="hidden" id="multi-catalog-image-upload-detail" onChange={(e) => { if (e.target.files) setCatalogImageFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
                   <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200" onClick={() => document.getElementById("multi-catalog-image-upload-detail")?.click()}>
                     <Upload className="h-4 w-4" /> Upload Product Catalogs (Images)
                   </Button>
@@ -1761,7 +1761,7 @@ export default function SupplierDetailsPage() {
               <div className="space-y-2 sm:col-span-2">
                 <Label>Quotation Files</Label>
                 <div className="flex flex-col gap-2">
-                  <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" multiple className="hidden" id="quotation-upload-edit" onChange={(e) => { if (e.target.files) setQuotationFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                  <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.jfif" multiple className="hidden" id="quotation-upload-edit" onChange={(e) => { if (e.target.files) setQuotationFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
                   <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200 w-fit" onClick={() => document.getElementById("quotation-upload-edit")?.click()}>
                     <Upload className="h-3.5 w-3.5" /> Upload Quotation Files
                   </Button>
