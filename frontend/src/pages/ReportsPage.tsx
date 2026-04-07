@@ -525,7 +525,9 @@ export default function ReportsPage() {
                           <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-0.5 mt-2">BUYER</span>
                           <span className="font-semibold text-slate-900 truncate flex items-center gap-1.5 block">
                             <Briefcase className="h-4 w-4 text-slate-400 shrink-0" />
-                            <span className="truncate">{item.buyerName}</span>
+                            <span className={`truncate ${!item.buyerName || item.buyerName === "No buyers introduced" ? "text-slate-400 italic font-normal" : ""}`}>
+                              {item.buyerName || "No buyers introduced"}
+                            </span>
                           </span>
                         </div>
                         <div>
@@ -938,9 +940,12 @@ export default function ReportsPage() {
                     <div>
                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1">Assigned Buyers</p>
                       <p className="text-sm font-medium text-slate-200">
-                        {viewingReport.buyerName.split(',').map((c, i) => (
-                          <span key={i} className="inline-block bg-indigo-900/30 text-indigo-300 px-2 py-1 rounded-md mb-1 mr-1 border border-indigo-800/50">{c.trim()}</span>
-                        ))}
+                        {!viewingReport.buyerName || viewingReport.buyerName === "No buyers introduced"
+                          ? <span className="text-slate-500 italic font-normal">No buyers introduced</span>
+                          : viewingReport.buyerName.split(',').map((c, i) => (
+                              <span key={i} className="inline-block bg-indigo-900/30 text-indigo-300 px-2 py-1 rounded-md mb-1 mr-1 border border-indigo-800/50">{c.trim()}</span>
+                            ))
+                        }
                       </p>
                     </div>
                   </div>

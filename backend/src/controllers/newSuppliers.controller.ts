@@ -295,14 +295,13 @@ export async function createNewSupplier(
 
         // --- NEW: AUTO-GENERATE REPORT ON CREATE ---
         try {
-            let reportBuyer = supplier.accountManager || "";
             const incomingIds: string[] = Array.isArray(req.body.buyerIds) ? req.body.buyerIds : [];
-            if (!reportBuyer && incomingIds.length > 0) {
-                const firstBuyer = await (prisma as any).buyer.findUnique({ where: { id: incomingIds[0] } });
-                if (firstBuyer) reportBuyer = firstBuyer.company || firstBuyer.name || "";
+            let buyerNames: string[] = [];
+            if (incomingIds.length > 0) {
+                const buyers = await (prisma as any).buyer.findMany({ where: { id: { in: incomingIds } }, select: { company: true, name: true } });
+                buyerNames = buyers.map((b: any) => b.company || b.name || "").filter(Boolean);
             }
-            if (!reportBuyer) reportBuyer = "Direct";
-            const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
+            const mappedBuyer = buyerNames.length > 0 ? buyerNames.join(", ") : "No buyers introduced";
 
             const sProducts = (supplier as any).supplierProducts;
             let productsToReport: {name: string, imageUrl: string | null}[] = [];
@@ -318,9 +317,10 @@ export async function createNewSupplier(
             const notesStr = supplier.notes ? ` Notes: ${supplier.notes}` : "";
             const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] New Supplier Onboarded.${notesStr}`;
 
+            const EMPTY_VALS = ["Direct", "N/A", "No buyers introduced"];
             const mergeStr = (a: string, b: string) => {
-                if (!b || b === "Direct" || b === "N/A") return a;
-                if (!a || a === "Direct" || a === "N/A") return b;
+                if (!b || EMPTY_VALS.includes(b)) return a;
+                if (!a || EMPTY_VALS.includes(a)) return b;
                 const s = new Set([...a.split(",").map(x => x.trim()), ...b.split(",").map(x => x.trim())]);
                 return Array.from(s).filter(Boolean).join(", ");
             };
@@ -529,13 +529,12 @@ export async function updateNewSupplier(
             updatesText += parts.join(" | ");
 
             try {
-                let reportBuyer = supplier.accountManager || existing.accountManager || "";
-                if (!reportBuyer && Array.isArray(incomingIds) && incomingIds.length > 0) {
-                    const firstBuyer = await (prisma as any).buyer.findUnique({ where: { id: incomingIds[0] } });
-                    if (firstBuyer) reportBuyer = firstBuyer.company || firstBuyer.name || "";
+                let buyerNames: string[] = [];
+                if (Array.isArray(incomingIds) && incomingIds.length > 0) {
+                    const buyers = await (prisma as any).buyer.findMany({ where: { id: { in: incomingIds } }, select: { company: true, name: true } });
+                    buyerNames = buyers.map((b: any) => b.company || b.name || "").filter(Boolean);
                 }
-                if (!reportBuyer) reportBuyer = "Direct";
-                const mappedBuyer = reportBuyer.split(',').map((b: string) => `${b.trim()} (${supplier.company})`).join(', ');
+                const mappedBuyer = buyerNames.length > 0 ? buyerNames.join(", ") : "No buyers introduced";
 
                 const sProducts = (supplier as any).supplierProducts;
                 const eProducts = (existing as any).supplierProducts;
@@ -554,9 +553,10 @@ export async function updateNewSupplier(
                     productsToReport = [{ name: supplier.product || existing.product || "N/A", imageUrl: null }];
                 }
 
+                const EMPTY_VALS = ["Direct", "N/A", "No buyers introduced"];
                 const mergeStr = (a: string, b: string) => {
-                    if (!b || b === "Direct" || b === "N/A") return a;
-                    if (!a || a === "Direct" || a === "N/A") return b;
+                    if (!b || EMPTY_VALS.includes(b)) return a;
+                    if (!a || EMPTY_VALS.includes(a)) return b;
                     const s = new Set([...a.split(",").map(x => x.trim()), ...b.split(",").map(x => x.trim())]);
                     return Array.from(s).filter(Boolean).join(", ");
                 };
