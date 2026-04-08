@@ -259,23 +259,6 @@ export async function createBuyer(
 
     // --- NEW: AUTO-GENERATE REPORT ON CREATE ---
     try {
-      let reportSupplier = "Direct";
-      const links: { id: string; type: "new" | "signed" }[] =
-        Array.isArray(req.body.supplierLinks) ? req.body.supplierLinks : [];
-      
-      if (links.length > 0) {
-          const firstLink = links[0];
-          if (firstLink.type === "new") {
-             const firstSupplier = await prisma.newSupplier.findUnique({ where: { id: firstLink.id } });
-             if (firstSupplier) reportSupplier = firstSupplier.company || "Direct";
-          } else {
-             const firstSupplier = await prisma.supplier.findUnique({ where: { id: firstLink.id } });
-             if (firstSupplier) reportSupplier = firstSupplier.company || "Direct";
-          }
-      }
-      
-      const mappedSupplier = reportSupplier.split(',').map((b: string) => `${b.trim()}`).join(', ');
-      
       let baseString = buyer.productCategories || buyer.productCategoryInterest || "General Sourcing Request";
       const productsToReport = baseString !== "General Sourcing Request"
           ? baseString.split(",").map((s: string) => s.trim()).filter((s: string) => s.length > 0)
@@ -291,6 +274,31 @@ export async function createBuyer(
           return Array.from(s).filter(Boolean).join(", ");
       };
 
+      const recalculateSuppliersForReport = async (buyerNamesString: string) => {
+          const names = buyerNamesString.split(",").map((x: string) => x.trim()).filter(Boolean);
+          if (names.length === 0) return "Direct";
+          
+          const buyers = await prisma.buyer.findMany({
+              where: { company: { in: names } }
+          });
+          
+          let allSupplierNames = new Set<string>();
+          for (const b of buyers) {
+              const bLinks = Array.isArray(b.supplierLinks) ? b.supplierLinks : [];
+              for (const l of bLinks as any[]) {
+                  if (l.type === "new") {
+                      const s = await prisma.newSupplier.findUnique({ where: { id: l.id } });
+                      if (s) allSupplierNames.add(s.company);
+                  } else {
+                      const s = await prisma.supplier.findUnique({ where: { id: l.id } });
+                      if (s) allSupplierNames.add(s.company);
+                  }
+              }
+          }
+          if (allSupplierNames.size === 0) return "Direct";
+          return Array.from(allSupplierNames).join(", ");
+      };
+
       for (const reportProduct of productsToReport) {
           const existingReport = await prisma.report.findFirst({
               where: {
@@ -300,22 +308,26 @@ export async function createBuyer(
           });
 
           if (existingReport && reportProduct !== "General Sourcing Request" && reportProduct !== "N/A") {
+              const newBuyerName = mergeStr(existingReport.buyerName, buyer.company);
+              const recalculatedSuppliers = await recalculateSuppliersForReport(newBuyerName);
+
               await prisma.report.update({
                   where: { id: existingReport.id },
                   data: {
-                      companyName: mergeStr(existingReport.companyName, mappedSupplier),
-                      buyerName: mergeStr(existingReport.buyerName, buyer.company),
+                      companyName: recalculatedSuppliers,
+                      buyerName: newBuyerName,
                       status: mergeStr(existingReport.status, buyer.status || "Pending"),
                       keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
                       updateDate: new Date()
                   }
               });
           } else {
+              const recalculatedSuppliers = await recalculateSuppliersForReport(buyer.company);
               await prisma.report.create({
                 data: {
                   productName: reportProduct,
                   buyerName: buyer.company,
-                  companyName: mappedSupplier,
+                  companyName: recalculatedSuppliers,
                   status: buyer.status || "Pending",
                   keyUpdates: newUpdatePoint,
                   buyerSupplier: "Buyer",
@@ -444,23 +456,6 @@ export async function updateBuyer(
 
     // --- NEW: AUTO-GENERATE REPORT ON UPDATE ---
     try {
-      let reportSupplier = "Direct";
-      const links: { id: string; type: "new" | "signed" }[] =
-        Array.isArray(req.body.supplierLinks) ? req.body.supplierLinks : [];
-      
-      if (links.length > 0) {
-          const firstLink = links[0];
-          if (firstLink.type === "new") {
-             const firstSupplier = await prisma.newSupplier.findUnique({ where: { id: firstLink.id } });
-             if (firstSupplier) reportSupplier = firstSupplier.company || "Direct";
-          } else {
-             const firstSupplier = await prisma.supplier.findUnique({ where: { id: firstLink.id } });
-             if (firstSupplier) reportSupplier = firstSupplier.company || "Direct";
-          }
-      }
-      
-      const mappedSupplier = reportSupplier.split(',').map((b: string) => `${b.trim()}`).join(', ');
-      
       let baseString = buyer.productCategories || buyer.productCategoryInterest || existing.productCategories || existing.productCategoryInterest || "General Sourcing Request";
       const productsToReport = baseString !== "General Sourcing Request"
           ? baseString.split(",").map((s: string) => s.trim()).filter((s: string) => s.length > 0)
@@ -478,6 +473,31 @@ export async function updateBuyer(
           return Array.from(s).filter(Boolean).join(", ");
       };
 
+      const recalculateSuppliersForReport = async (buyerNamesString: string) => {
+          const names = buyerNamesString.split(",").map((x: string) => x.trim()).filter(Boolean);
+          if (names.length === 0) return "Direct";
+          
+          const buyers = await prisma.buyer.findMany({
+              where: { company: { in: names } }
+          });
+          
+          let allSupplierNames = new Set<string>();
+          for (const b of buyers) {
+              const bLinks = Array.isArray(b.supplierLinks) ? b.supplierLinks : [];
+              for (const l of bLinks as any[]) {
+                  if (l.type === "new") {
+                      const s = await prisma.newSupplier.findUnique({ where: { id: l.id } });
+                      if (s) allSupplierNames.add(s.company);
+                  } else {
+                      const s = await prisma.supplier.findUnique({ where: { id: l.id } });
+                      if (s) allSupplierNames.add(s.company);
+                  }
+              }
+          }
+          if (allSupplierNames.size === 0) return "Direct";
+          return Array.from(allSupplierNames).join(", ");
+      };
+
       for (const reportProduct of productsToReport) {
           const existingReport = await prisma.report.findFirst({
               where: {
@@ -487,22 +507,26 @@ export async function updateBuyer(
           });
 
           if (existingReport && reportProduct !== "General Sourcing Request" && reportProduct !== "N/A") {
+              const newBuyerName = mergeStr(existingReport.buyerName, buyer.company);
+              const recalculatedSuppliers = await recalculateSuppliersForReport(newBuyerName);
+
               await prisma.report.update({
                   where: { id: existingReport.id },
                   data: {
-                      companyName: mergeStr(existingReport.companyName, mappedSupplier),
-                      buyerName: mergeStr(existingReport.buyerName, buyer.company),
+                      companyName: recalculatedSuppliers,
+                      buyerName: newBuyerName,
                       status: mergeStr(existingReport.status, buyer.status || "Status Updated"),
                       keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
                       updateDate: new Date()
                   }
               });
           } else {
+              const recalculatedSuppliers = await recalculateSuppliersForReport(buyer.company);
               await prisma.report.create({
                 data: {
                   productName: reportProduct,
                   buyerName: buyer.company,
-                  companyName: mappedSupplier,
+                  companyName: recalculatedSuppliers,
                   status: buyer.status || "Status Updated",
                   keyUpdates: newUpdatePoint,
                   buyerSupplier: "Buyer",
