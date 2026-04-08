@@ -514,9 +514,15 @@ export default function ReportsPage() {
                             <LayoutGrid className="h-6 w-6 text-slate-300" />
                           </div>
                         )}
-                        <p className="text-[13px] font-bold uppercase tracking-tight text-slate-800 break-words line-clamp-2 pr-2">
-                          {item.productName}
-                        </p>
+                        {item.productName === "General Sourcing Request" ? (
+                          <p className="text-[13px] font-bold uppercase tracking-tight text-slate-400 italic break-words line-clamp-2 pr-2">
+                            No Requirements Yet
+                          </p>
+                        ) : (
+                          <p className="text-[13px] font-bold uppercase tracking-tight text-slate-800 break-words line-clamp-2 pr-2">
+                            {item.productName}
+                          </p>
+                        )}
                       </div>
                     </td>
                     <td className="px-5 py-4">
@@ -534,7 +540,9 @@ export default function ReportsPage() {
                           <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-0.5 mt-2">SUPPLIER</span>
                           <span className="font-semibold text-slate-900 truncate flex items-center gap-1.5 block">
                             <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
-                            <span className="truncate">{item.companyName}</span>
+                            <span className={`truncate ${!item.companyName || item.companyName === "Direct" || item.companyName === "No suppliers introduced" ? "text-slate-400 italic font-normal" : ""}`}>
+                              {!item.companyName || item.companyName === "Direct" ? "No suppliers introduced" : item.companyName}
+                            </span>
                           </span>
                         </div>
                       </div>
@@ -925,16 +933,18 @@ export default function ReportsPage() {
                     Product Specification
                   </span>
                   <h2 className="text-3xl font-bold text-white tracking-tight mb-4">
-                    {viewingReport.productName}
+                    {viewingReport.productName === "General Sourcing Request" ? <span className="text-slate-400 italic font-normal text-2xl">No Requirements Yet</span> : viewingReport.productName}
                   </h2>
 
                   <div className="grid grid-cols-2 gap-6 mt-2">
                     <div>
                       <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1">Suppliers Attached</p>
                       <p className="text-sm font-medium text-slate-200">
-                        {viewingReport.companyName.split(',').map((c, i) => (
-                          <span key={i} className="inline-block bg-slate-800 text-slate-300 px-2 py-1 rounded-md mb-1 mr-1 border border-slate-700">{c.trim()}</span>
-                        ))}
+                        {!viewingReport.companyName || viewingReport.companyName === "Direct" || viewingReport.companyName === "No suppliers introduced"
+                          ? <span className="text-slate-500 italic font-normal">No suppliers introduced</span>
+                          : viewingReport.companyName.split(',').map((c, i) => (
+                              <span key={i} className="inline-block bg-slate-800 text-slate-300 px-2 py-1 rounded-md mb-1 mr-1 border border-slate-700">{c.trim()}</span>
+                            ))}
                       </p>
                     </div>
                     <div>

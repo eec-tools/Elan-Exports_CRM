@@ -17,8 +17,17 @@ import { PermissionGate } from "@/components/PermissionGate";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
 import { SelectWithOthers } from "@/components/SelectWithOthers";
 import { EntityLinkSelect } from "@/components/EntityLinkSelect";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowLeft,
   Loader2,
@@ -47,6 +56,8 @@ import {
   Plus,
   Folder,
   Video,
+  Factory,
+  DollarSign,
 } from "lucide-react";
 
 interface EmailCampaign {
@@ -159,6 +170,15 @@ interface NewSupplier {
   warehousePhotos?: { name: string; url: string }[];
   videoLinks?: { label: string; url: string }[];
   quotations?: { name: string; url: string }[];
+  // EEC Internal Fields
+  vettingScore?: number | null;
+  exclusivityArrangement?: string;
+  eecMarginPercent?: string;
+  blacklistedBuyerIds?: string[];
+  factoryVisitStatus?: string;
+  factoryVisitDate?: string;
+  factoryVisitOutcome?: string;
+  referralSource?: string;
 }
 
 interface SupplierProduct {
@@ -527,6 +547,16 @@ export default function NewSupplierDetailsPage() {
       </div>
 
       <Separator />
+
+      <Tabs defaultValue="details">
+        <TabsList className="mb-2">
+          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="buyers">Buyer Exposure</TabsTrigger>
+          <TabsTrigger value="documents">Document Vault</TabsTrigger>
+        </TabsList>
+
+        {/* ── Details Tab ── */}
+        <TabsContent value="details" className="space-y-6 mt-0">
 
       {/* ── Content Grid ── */}
       <div className="grid gap-6 md:grid-cols-2">
@@ -970,6 +1000,35 @@ export default function NewSupplierDetailsPage() {
         </Card>
       )}
 
+      {/* ── EEC Internal ── */}
+      {(supplier.vettingScore != null || supplier.exclusivityArrangement || supplier.eecMarginPercent || supplier.factoryVisitStatus || supplier.referralSource || (supplier.blacklistedBuyerIds && supplier.blacklistedBuyerIds.length > 0)) && (
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-amber-500" />EEC Internal</CardTitle></CardHeader>
+          <CardContent className="space-y-1">
+            {supplier.vettingScore != null && <InfoRow icon={ShieldCheck} label="Vetting / Reliability Score" value={`${supplier.vettingScore} / 5`} />}
+            <InfoRow icon={ShieldCheck} label="Exclusivity Arrangement" value={supplier.exclusivityArrangement} />
+            <InfoRow icon={DollarSign} label="EEC Internal Margin %" value={supplier.eecMarginPercent} />
+            <InfoRow icon={Factory} label="Factory Visit Status" value={supplier.factoryVisitStatus} />
+            {supplier.factoryVisitDate && <InfoRow icon={Factory} label="Factory Visit Date" value={supplier.factoryVisitDate} />}
+            {supplier.factoryVisitOutcome && <InfoRow icon={Factory} label="Factory Visit Outcome" value={supplier.factoryVisitOutcome} />}
+            <InfoRow icon={Users} label="Referral Source" value={supplier.referralSource} />
+            {supplier.blacklistedBuyerIds && supplier.blacklistedBuyerIds.length > 0 && (
+              <div className="flex items-start gap-3 py-1.5">
+                <Users className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Blacklisted Buyers</p>
+                  <div className="flex flex-wrap gap-1">
+                    {(buyersListData ?? []).filter(b => supplier.blacklistedBuyerIds!.includes(b.id)).map(b => (
+                      <Badge key={b.id} variant="outline" className="text-xs bg-red-50 border-red-200 text-red-700">{b.company}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Intro Email Campaign ── */}
       <Card>
         <CardHeader className="pb-3">
@@ -1100,6 +1159,133 @@ export default function NewSupplierDetailsPage() {
           )}
         </CardContent>
       </Card>
+
+        </TabsContent>
+
+        {/* ── Buyer Exposure Tab ── */}
+        <TabsContent value="buyers" className="mt-0">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Buyer Exposure Log
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(!supplier.buyerIds || supplier.buyerIds.length === 0) ? (
+                <p className="text-sm text-slate-500 py-4 text-center">No buyers linked to this supplier yet.</p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {(buyersListData ?? []).filter(b => (supplier.buyerIds ?? []).includes(b.id)).map(b => (
+                    <div key={b.id} className="flex items-center justify-between py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-brand-50 flex items-center justify-center shrink-0">
+                          <Building2 className="h-4 w-4 text-brand-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{b.company}</p>
+                          <p className="text-xs text-slate-500">{b.name}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-xs">Linked Buyer</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Document Vault Tab ── */}
+        <TabsContent value="documents" className="mt-0">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Document Vault
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(!supplier.certificates || supplier.certificates.length === 0) &&
+               (!supplier.productCatalogs || supplier.productCatalogs.length === 0) &&
+               (!supplier.productCatalogImages || supplier.productCatalogImages.length === 0) &&
+               (!supplier.warehousePhotos || supplier.warehousePhotos.length === 0) &&
+               (!supplier.videoLinks || supplier.videoLinks.length === 0) ? (
+                <p className="text-sm text-slate-500 py-4 text-center">No documents uploaded yet.</p>
+              ) : (
+                <div className="space-y-6">
+                  {supplier.productCatalogs && supplier.productCatalogs.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Product Catalogs</p>
+                      <div className="flex flex-col gap-2">
+                        {supplier.productCatalogs.map((doc, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                            <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">{doc.name}</a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {supplier.productCatalogImages && supplier.productCatalogImages.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Catalog Images</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {supplier.productCatalogImages.map((img, idx) => (
+                          <a key={idx} href={img.url} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border border-slate-200 hover:border-brand-300 transition-colors">
+                            <img src={img.url} alt={img.name} className="w-full h-28 object-cover" />
+                            <p className="text-xs text-slate-600 p-2 truncate">{img.name}</p>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {supplier.certificates && supplier.certificates.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Certificates</p>
+                      <div className="flex flex-col gap-2">
+                        {supplier.certificates.map((doc, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                            <FileText className="h-4 w-4 text-rose-500 shrink-0" />
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">{doc.name}</a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {supplier.warehousePhotos && supplier.warehousePhotos.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Factory & Warehouse Photos</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {supplier.warehousePhotos.map((img, idx) => (
+                          <a key={idx} href={img.url} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border border-slate-200 hover:border-brand-300 transition-colors">
+                            <img src={img.url} alt={img.name} className="w-full h-28 object-cover" />
+                            <p className="text-xs text-slate-600 p-2 truncate">{img.name}</p>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {supplier.videoLinks && supplier.videoLinks.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Video Links</p>
+                      <div className="flex flex-col gap-2">
+                        {supplier.videoLinks.map((v, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                            <Video className="h-4 w-4 text-slate-400 shrink-0" />
+                            <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">{v.label || v.url}</a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+      </Tabs>
 
       {/* ── Edit Dialog ── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -1325,6 +1511,72 @@ export default function NewSupplierDetailsPage() {
               <div className="space-y-2 sm:col-span-2"><Label>No Prohibited Processing Aids?</Label><SelectWithOthers value={form.noProhibitedAids ?? ""} onChange={(v) => setForm({ ...form, noProhibitedAids: v })} options={["Yes","No"]} placeholder="Select…" /></div>
             </div></div>
             ) : null; })()}
+
+            <Separator />
+
+            {/* ── EEC Internal Fields ── */}
+            <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">EEC Internal</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Vetting / Reliability Score (1–5)</Label>
+                <Select value={form.vettingScore != null ? String(form.vettingScore) : ""} onValueChange={(v) => setForm({ ...form, vettingScore: v ? Number(v) : null })}>
+                  <SelectTrigger><SelectValue placeholder="Select score…" /></SelectTrigger>
+                  <SelectContent>{[1,2,3,4,5].map(n => <SelectItem key={n} value={String(n)}>{n} — {["Poor","Below Average","Average","Good","Excellent"][n-1]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Exclusivity Arrangement</Label>
+                <Select value={(form as any).exclusivityArrangement ?? ""} onValueChange={(v) => setForm({ ...form, exclusivityArrangement: v } as any)}>
+                  <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Exclusive">Exclusive</SelectItem>
+                    <SelectItem value="Non-Exclusive">Non-Exclusive</SelectItem>
+                    <SelectItem value="Exclusive for certain markets">Exclusive for certain markets</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>EEC Internal Margin %</Label><Input value={(form as any).eecMarginPercent ?? ""} onChange={(e) => setForm({ ...form, eecMarginPercent: e.target.value } as any)} placeholder="e.g. 12" /></div>
+              <div className="space-y-2">
+                <Label>Referral Source</Label>
+                <Select value={(form as any).referralSource ?? ""} onValueChange={(v) => setForm({ ...form, referralSource: v } as any)}>
+                  <SelectTrigger><SelectValue placeholder="Select source…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Trade Fair">Trade Fair</SelectItem>
+                    <SelectItem value="Inbound Inquiry">Inbound Inquiry</SelectItem>
+                    <SelectItem value="Agent Referral">Agent Referral</SelectItem>
+                    <SelectItem value="Cold Outreach">Cold Outreach</SelectItem>
+                    <SelectItem value="Existing Supplier Referral">Existing Supplier Referral</SelectItem>
+                    <SelectItem value="Online Research">Online Research</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Factory Visit Status</Label>
+                <Select value={(form as any).factoryVisitStatus ?? ""} onValueChange={(v) => setForm({ ...form, factoryVisitStatus: v } as any)}>
+                  <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Not Visited">Not Visited</SelectItem>
+                    <SelectItem value="Physical Visit">Physical Visit</SelectItem>
+                    <SelectItem value="Video Audit">Video Audit</SelectItem>
+                    <SelectItem value="Third-Party Audit">Third-Party Audit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>Factory Visit Date</Label><Input type="date" value={(form as any).factoryVisitDate ?? ""} onChange={(e) => setForm({ ...form, factoryVisitDate: e.target.value } as any)} /></div>
+              <div className="space-y-2 sm:col-span-2"><Label>Factory Visit Outcome</Label><Textarea value={(form as any).factoryVisitOutcome ?? ""} onChange={(e) => setForm({ ...form, factoryVisitOutcome: e.target.value } as any)} rows={2} placeholder="Brief summary of visit findings…" /></div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Blacklisted Buyers <span className="text-xs text-slate-400 font-normal">(never expose this supplier to these buyers)</span></Label>
+                <EntityLinkSelect
+                  selectedIds={(form as any).blacklistedBuyerIds ?? []}
+                  onChange={(ids) => setForm({ ...form, blacklistedBuyerIds: ids } as any)}
+                  options={(buyersListData ?? []).map((b) => ({ id: b.id, label: `${b.company}${b.name ? ` (${b.name})` : ""}` }))}
+                  isLoading={buyersListLoading}
+                  placeholder="Select buyers to blacklist…"
+                />
+              </div>
+            </div></div>
+
             <Separator />
             {/* Additional */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Additional Info</p>

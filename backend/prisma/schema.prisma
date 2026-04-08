@@ -245,6 +245,15 @@ model Supplier {
   quotations                 Json?                  @default("[]") @map("quotations")
   buyerIds                   Json                   @default("[]") @map("buyer_ids")
   dealStage                  String                 @default("Communication") @map("deal_stage")
+  // Section 12 — EEC Internal Fields
+  vettingScore               Int?                   @map("vetting_score")
+  exclusivityArrangement     String?                @map("exclusivity_arrangement")
+  eecMarginPercent           String?                @map("eec_margin_percent")
+  blacklistedBuyerIds        Json                   @default("[]") @map("blacklisted_buyer_ids")
+  factoryVisitStatus         String?                @map("factory_visit_status")
+  factoryVisitDate           String?                @map("factory_visit_date")
+  factoryVisitOutcome        String?                @map("factory_visit_outcome")
+  referralSource             String?                @map("referral_source")
 
   @@map("suppliers")
 }
@@ -402,6 +411,15 @@ model NewSupplier {
   quotations                 Json?                     @default("[]") @map("quotations")
   buyerIds                   Json                      @default("[]") @map("buyer_ids")
   dealStage                  String                    @default("Communication") @map("deal_stage")
+  // Section 12 — EEC Internal Fields
+  vettingScore               Int?                      @map("vetting_score")
+  exclusivityArrangement     String?                   @map("exclusivity_arrangement")
+  eecMarginPercent           String?                   @map("eec_margin_percent")
+  blacklistedBuyerIds        Json                      @default("[]") @map("blacklisted_buyer_ids")
+  factoryVisitStatus         String?                   @map("factory_visit_status")
+  factoryVisitDate           String?                   @map("factory_visit_date")
+  factoryVisitOutcome        String?                   @map("factory_visit_outcome")
+  referralSource             String?                   @map("referral_source")
 
   @@map("new_suppliers")
 }

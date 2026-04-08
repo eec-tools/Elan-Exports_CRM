@@ -39,6 +39,8 @@ import {
   PauseCircle,
   Bell,
   Mail,
+  Star,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -198,6 +200,14 @@ interface Supplier {
   supplierProducts?: SupplierProduct[];
   productCatalogs?: ProductCatalogEntry[];
   productCatalogImages?: ProductCatalogEntry[];
+  vettingScore?: number | null;
+  exclusivityArrangement?: string;
+  eecMarginPercent?: string;
+  blacklistedBuyerIds?: string[];
+  factoryVisitStatus?: string;
+  factoryVisitDate?: string;
+  factoryVisitOutcome?: string;
+  referralSource?: string;
 }
 
 const ORGANIC_CERT_MARKETS = ["India — NPOP", "USA — USDA Organic (NOP)", "EU — EU Organic (Reg 2018/848)", "UK — UK Organic", "Australia — ACO / NASAA", "Japan — JAS Organic"];
@@ -735,6 +745,8 @@ export default function SuppliersPage() {
                 <th className="px-5 py-3.5 font-semibold">Email</th>
                 <th className="px-5 py-3.5 font-semibold">Products</th>
                 <th className="px-5 py-3.5 font-semibold">Certifications</th>
+                <th className="px-5 py-3.5 font-semibold">Vetting</th>
+                <th className="px-5 py-3.5 font-semibold">Cert Expiry</th>
                 <th className="px-5 py-3.5 font-semibold">Remarks</th>
                 <th className="px-5 py-3.5 font-semibold">Status</th>
                 <th className="px-5 py-3.5 font-semibold">Deal Stage</th>
@@ -746,7 +758,7 @@ export default function SuppliersPage() {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading && suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 12 : 11} className="h-32 text-center">
+                  <td colSpan={canEdit ? 14 : 13} className="h-32 text-center">
                     <div className="flex justify-center">
                       <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                     </div>
@@ -754,7 +766,7 @@ export default function SuppliersPage() {
                 </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 12 : 11} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                  <td colSpan={canEdit ? 14 : 13} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                         <Building2 className="h-6 w-6 text-slate-300" />
@@ -782,6 +794,24 @@ export default function SuppliersPage() {
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.email}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.products}>{s.products}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[180px] truncate" title={s.certifications}>{s.certifications}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100">
+                      {s.vettingScore != null ? (
+                        <div className="flex items-center gap-1">
+                          <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400 shrink-0" />
+                          <span className="text-xs font-semibold text-slate-700">{s.vettingScore}/5</span>
+                        </div>
+                      ) : <span className="text-xs text-slate-400">—</span>}
+                    </td>
+                    <td className="px-5 py-3.5 border-r border-slate-100">
+                      {(() => {
+                        if (!s.isoCertValidityDate) return <span className="text-xs text-slate-400">—</span>;
+                        const expiry = new Date(s.isoCertValidityDate);
+                        const daysLeft = Math.ceil((expiry.getTime() - Date.now()) / 86400000);
+                        if (daysLeft < 0) return <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600"><AlertTriangle className="h-3.5 w-3.5" />Expired</span>;
+                        if (daysLeft <= 60) return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600"><AlertTriangle className="h-3.5 w-3.5" />{daysLeft}d left</span>;
+                        return <span className="text-xs text-slate-500">{expiry.toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"2-digit" })}</span>;
+                      })()}
+                    </td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.remarks}>{s.remarks}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusStyles(s.currentStatus)} capitalize`}>
@@ -1194,6 +1224,71 @@ export default function SuppliersPage() {
                   </div></div>
               ) : null;
             })()}
+
+            <Separator />
+
+            {/* ── EEC Internal Fields ── */}
+            <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">EEC Internal</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Vetting / Reliability Score (1–5)</Label>
+                <Select value={form.vettingScore != null ? String(form.vettingScore) : ""} onValueChange={(v) => setForm({ ...form, vettingScore: v ? Number(v) : null })}>
+                  <SelectTrigger><SelectValue placeholder="Select score…" /></SelectTrigger>
+                  <SelectContent>{[1,2,3,4,5].map(n => <SelectItem key={n} value={String(n)}>{n} — {["Poor","Below Average","Average","Good","Excellent"][n-1]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Exclusivity Arrangement</Label>
+                <Select value={form.exclusivityArrangement ?? ""} onValueChange={(v) => setForm({ ...form, exclusivityArrangement: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Exclusive">Exclusive</SelectItem>
+                    <SelectItem value="Non-Exclusive">Non-Exclusive</SelectItem>
+                    <SelectItem value="Exclusive for certain markets">Exclusive for certain markets</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>EEC Internal Margin %</Label><Input value={form.eecMarginPercent ?? ""} onChange={(e) => setForm({ ...form, eecMarginPercent: e.target.value })} placeholder="e.g. 12" /></div>
+              <div className="space-y-2">
+                <Label>Referral Source</Label>
+                <Select value={form.referralSource ?? ""} onValueChange={(v) => setForm({ ...form, referralSource: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select source…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Trade Fair">Trade Fair</SelectItem>
+                    <SelectItem value="Inbound Inquiry">Inbound Inquiry</SelectItem>
+                    <SelectItem value="Agent Referral">Agent Referral</SelectItem>
+                    <SelectItem value="Cold Outreach">Cold Outreach</SelectItem>
+                    <SelectItem value="Existing Supplier Referral">Existing Supplier Referral</SelectItem>
+                    <SelectItem value="Online Research">Online Research</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Factory Visit Status</Label>
+                <Select value={form.factoryVisitStatus ?? ""} onValueChange={(v) => setForm({ ...form, factoryVisitStatus: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Not Visited">Not Visited</SelectItem>
+                    <SelectItem value="Physical Visit">Physical Visit</SelectItem>
+                    <SelectItem value="Video Audit">Video Audit</SelectItem>
+                    <SelectItem value="Third-Party Audit">Third-Party Audit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>Factory Visit Date</Label><Input type="date" value={form.factoryVisitDate ?? ""} onChange={(e) => setForm({ ...form, factoryVisitDate: e.target.value })} /></div>
+              <div className="space-y-2 sm:col-span-2"><Label>Factory Visit Outcome</Label><Textarea value={form.factoryVisitOutcome ?? ""} onChange={(e) => setForm({ ...form, factoryVisitOutcome: e.target.value })} rows={2} placeholder="Brief summary of visit findings…" /></div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Blacklisted Buyers <span className="text-xs text-slate-400 font-normal">(never expose this supplier to these buyers)</span></Label>
+                <EntityLinkSelect
+                  selectedIds={form.blacklistedBuyerIds ?? []}
+                  onChange={(ids) => setForm({ ...form, blacklistedBuyerIds: ids })}
+                  options={(buyersListData ?? []).map((b) => ({ id: b.id, label: `${b.company}${b.name ? ` (${b.name})` : ""}` }))}
+                  isLoading={buyersListLoading}
+                  placeholder="Select buyers to blacklist…"
+                />
+              </div>
+            </div></div>
 
             <Separator />
 

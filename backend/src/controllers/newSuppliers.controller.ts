@@ -235,6 +235,10 @@ export async function createNewSupplier(
             compostabilityCert, migrationTestReport, exportBrand, healthNutritionClaims,
             claimsApprovedMarkets, packagingComplianceRegions, organicSegregationSop,
             cleaningLinelearanceSop, noProhibitedAids,
+            // Section 12 — EEC Internal Fields
+            vettingScore, exclusivityArrangement, eecMarginPercent,
+            blacklistedBuyerIds, factoryVisitStatus, factoryVisitDate,
+            factoryVisitOutcome, referralSource,
         } = req.body;
 
         console.log("Creating new supplier with payload:", req.body);
@@ -270,6 +274,10 @@ export async function createNewSupplier(
                     compostabilityCert, migrationTestReport, exportBrand, healthNutritionClaims,
                     claimsApprovedMarkets, packagingComplianceRegions, organicSegregationSop,
                     cleaningLinelearanceSop, noProhibitedAids,
+                    vettingScore: vettingScore ?? null,
+                    exclusivityArrangement, eecMarginPercent,
+                    blacklistedBuyerIds: Array.isArray(blacklistedBuyerIds) ? blacklistedBuyerIds : [],
+                    factoryVisitStatus, factoryVisitDate, factoryVisitOutcome, referralSource,
                     createdBy: req.user!.id,
                 },
             });
@@ -433,6 +441,10 @@ export async function updateNewSupplier(
             compostabilityCert, migrationTestReport, exportBrand, healthNutritionClaims,
             claimsApprovedMarkets, packagingComplianceRegions, organicSegregationSop,
             cleaningLinelearanceSop, noProhibitedAids,
+            // Section 12 — EEC Internal Fields
+            vettingScore, exclusivityArrangement, eecMarginPercent,
+            blacklistedBuyerIds, factoryVisitStatus, factoryVisitDate,
+            factoryVisitOutcome, referralSource,
         } = req.body;
 
         console.log("Updating new supplier with payload:", req.body);
@@ -476,6 +488,10 @@ export async function updateNewSupplier(
                     compostabilityCert, migrationTestReport, exportBrand, healthNutritionClaims,
                     claimsApprovedMarkets, packagingComplianceRegions, organicSegregationSop,
                     cleaningLinelearanceSop, noProhibitedAids,
+                    vettingScore: vettingScore ?? null,
+                    exclusivityArrangement, eecMarginPercent,
+                    blacklistedBuyerIds: Array.isArray(blacklistedBuyerIds) ? blacklistedBuyerIds : [],
+                    factoryVisitStatus, factoryVisitDate, factoryVisitOutcome, referralSource,
                 },
             });
 
