@@ -264,21 +264,11 @@ export async function createBuyer(
           ? baseString.split(",").map((s: string) => s.trim()).filter((s: string) => s.length > 0)
           : ["General Sourcing Request"];
 
-      const notesStr = buyer.notes ? ` Notes: ${buyer.notes}` : "";
-      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] Buyer Added.${notesStr}`;
-
-      const mergeStr = (a: string, b: string) => {
-          if (!b || b === "Direct" || b === "N/A" || b === "General Sourcing Request") return a;
-          if (!a || a === "Direct" || a === "N/A" || a === "General Sourcing Request") return b;
-          const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
-          return Array.from(s).filter(Boolean).join(", ");
-      };
-
+      // Build rich key update entry for buyer creation
       const recalculateSuppliersForReport = async (buyerNamesString: string) => {
           const names = buyerNamesString.split(",").map((x: string) => x.trim()).filter(Boolean);
           if (names.length === 0) return "Direct";
 
-          // Use case-insensitive lookup for each name individually to avoid PostgreSQL case-sensitivity issues
           const allBuyers: any[] = [];
           for (const name of names) {
               const found = await prisma.buyer.findMany({
@@ -304,34 +294,56 @@ export async function createBuyer(
           return Array.from(allSupplierNames).join(", ");
       };
 
+      const recalculatedSuppliers = await recalculateSuppliersForReport(buyer.company);
+      const productPart = `Products: ${productsToReport.join(", ") || "Not specified"}`;
+      const supplierPart = recalculatedSuppliers !== "Direct"
+          ? `Suppliers in talks: ${recalculatedSuppliers}`
+          : "Sourcing in progress";
+      const statusPart = `Status: ${buyer.status || "Pending"}`;
+      const countryPart = buyer.country ? `Country: ${buyer.country}` : "";
+      const notesPart = buyer.notes ? `Notes: ${buyer.notes}` : "";
+
+      const richParts = [productPart, supplierPart, statusPart];
+      if (countryPart) richParts.push(countryPart);
+      if (notesPart) richParts.push(notesPart);
+
+      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] New buyer added. ${richParts.join(" | ")}`;
+
+      const mergeStr = (a: string, b: string) => {
+          if (!b || b === "Direct" || b === "N/A" || b === "General Sourcing Request") return a;
+          if (!a || a === "Direct" || a === "N/A" || a === "General Sourcing Request") return b;
+          const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
+          return Array.from(s).filter(Boolean).join(", ");
+      };
+
       for (const reportProduct of productsToReport) {
+          // Find report already belonging to this buyer + product
           const existingReport = await prisma.report.findFirst({
               where: {
-                  productName: { equals: reportProduct, mode: "insensitive" }
+                  productName: { equals: reportProduct, mode: "insensitive" },
+                  buyerName: { contains: buyer.company, mode: "insensitive" },
               },
               orderBy: { createdAt: 'desc' }
           });
 
-          if (existingReport && reportProduct !== "General Sourcing Request" && reportProduct !== "N/A") {
+          if (existingReport) {
               const newBuyerName = mergeStr(existingReport.buyerName, buyer.company);
-              const recalculatedSuppliers = await recalculateSuppliersForReport(newBuyerName);
-              // Preserve existing companyName if recalculation returns "Direct" but existing value was not "Direct"
-              const finalCompanyName = (recalculatedSuppliers === "Direct" && existingReport.companyName && existingReport.companyName !== "Direct")
+              const recalcSuppliers = await recalculateSuppliersForReport(newBuyerName);
+              const finalCompanyName = (recalcSuppliers === "Direct" && existingReport.companyName && existingReport.companyName !== "Direct")
                   ? existingReport.companyName
-                  : recalculatedSuppliers;
+                  : recalcSuppliers;
 
               await prisma.report.update({
                   where: { id: existingReport.id },
                   data: {
                       companyName: finalCompanyName,
                       buyerName: newBuyerName,
-                      status: mergeStr(existingReport.status, buyer.status || "Pending"),
+                      status: buyer.status || "Pending",
                       keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
                       updateDate: new Date()
                   }
               });
           } else {
-              const recalculatedSuppliers = await recalculateSuppliersForReport(buyer.company);
               await prisma.report.create({
                 data: {
                   productName: reportProduct,
@@ -501,20 +513,11 @@ export async function updateBuyer(
       if (statusChanged) changeParts.push(`Status changed to ${req.body.status}`);
       if (changeParts.length === 0) changeParts.push("Profile updated");
 
-      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] ${changeParts.join(". ")}.`;
-
-      const mergeStr = (a: string, b: string) => {
-          if (!b || b === "Direct" || b === "N/A" || b === "General Sourcing Request") return a;
-          if (!a || a === "Direct" || a === "N/A" || a === "General Sourcing Request") return b;
-          const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
-          return Array.from(s).filter(Boolean).join(", ");
-      };
-
+      // Recalculate current suppliers for context
       const recalculateSuppliersForReport = async (buyerNamesString: string) => {
           const names = buyerNamesString.split(",").map((x: string) => x.trim()).filter(Boolean);
           if (names.length === 0) return "Direct";
 
-          // Use case-insensitive lookup for each name individually to avoid PostgreSQL case-sensitivity issues
           const allBuyers: any[] = [];
           for (const name of names) {
               const found = await prisma.buyer.findMany({
@@ -539,19 +542,34 @@ export async function updateBuyer(
           if (allSupplierNames.size === 0) return "Direct";
           return Array.from(allSupplierNames).join(", ");
       };
+      const recalculatedSuppliers = await recalculateSuppliersForReport(buyer.company);
+
+      // Append current supplier context
+      if (recalculatedSuppliers && recalculatedSuppliers !== "Direct") {
+        changeParts.push(`Suppliers in talks: ${recalculatedSuppliers}`);
+      }
+
+      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] ${changeParts.join(". ")}.`;
+
+      const mergeStr = (a: string, b: string) => {
+          if (!b || b === "Direct" || b === "N/A" || b === "General Sourcing Request") return a;
+          if (!a || a === "Direct" || a === "N/A" || a === "General Sourcing Request") return b;
+          const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
+          return Array.from(s).filter(Boolean).join(", ");
+      };
 
       for (const reportProduct of productsToReport) {
+          // Find report already belonging to this buyer + product
           const existingReport = await prisma.report.findFirst({
               where: {
-                  productName: { equals: reportProduct, mode: "insensitive" }
+                  productName: { equals: reportProduct, mode: "insensitive" },
+                  buyerName: { contains: buyer.company, mode: "insensitive" },
               },
               orderBy: { createdAt: 'desc' }
           });
 
-          if (existingReport && reportProduct !== "General Sourcing Request" && reportProduct !== "N/A") {
+          if (existingReport) {
               const newBuyerName = mergeStr(existingReport.buyerName, buyer.company);
-              const recalculatedSuppliers = await recalculateSuppliersForReport(newBuyerName);
-              // Preserve existing companyName if recalculation returns "Direct" but existing value was not "Direct"
               const finalCompanyName = (recalculatedSuppliers === "Direct" && existingReport.companyName && existingReport.companyName !== "Direct")
                   ? existingReport.companyName
                   : recalculatedSuppliers;
@@ -561,19 +579,18 @@ export async function updateBuyer(
                   data: {
                       companyName: finalCompanyName,
                       buyerName: newBuyerName,
-                      status: mergeStr(existingReport.status, buyer.status || "Status Updated"),
+                      status: buyer.status || "Pending",
                       keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
                       updateDate: new Date()
                   }
               });
           } else {
-              const recalculatedSuppliers = await recalculateSuppliersForReport(buyer.company);
               await prisma.report.create({
                 data: {
                   productName: reportProduct,
                   buyerName: buyer.company,
                   companyName: recalculatedSuppliers,
-                  status: buyer.status || "Status Updated",
+                  status: buyer.status || "Pending",
                   keyUpdates: newUpdatePoint,
                   buyerSupplier: "Buyer",
                   reportDate: new Date(),

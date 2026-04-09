@@ -97,7 +97,7 @@ type ReportFormValues = z.infer<typeof reportSchema>;
 const PAGE_SIZE = 15;
 
 export default function ReportsPage() {
-  const { hasEditPermission } = useAuth();
+  const { hasEditPermission, isAdmin } = useAuth();
   const canEditReports = hasEditPermission("reports");
   const queryClient = useQueryClient();
 
@@ -108,6 +108,7 @@ export default function ReportsPage() {
   const [viewingReport, setViewingReport] = useState<Report | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
@@ -221,6 +222,19 @@ export default function ReportsPage() {
     },
     onError: (e: any) =>
       toast.error(e.response?.data?.error || "Failed to refresh suppliers"),
+  });
+
+  const mergeMutation = useMutation({
+    mutationFn: () => api.post("/reports/merge-duplicates"),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      const { merged, groupsProcessed } = res.data;
+      toast.success(`Merged ${merged} duplicate row(s) across ${groupsProcessed} group(s)`);
+      setMergeDialogOpen(false);
+    },
+    onError: (e: any) =>
+      toast.error(e.response?.data?.error || "Failed to merge duplicates"),
   });
 
   const openCreate = () => {
@@ -381,6 +395,16 @@ export default function ReportsPage() {
             <Download className="h-4 w-4" />
             Export PDF
           </Button>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              onClick={() => setMergeDialogOpen(true)}
+              className="gap-2 bg-white hover:bg-amber-50 text-amber-700 shadow-sm border-amber-200 hover:border-amber-300 h-9"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Cleanup Duplicates
+            </Button>
+          )}
           {canEditReports && (
             <Button onClick={openCreate} className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9">
               <Plus className="h-4 w-4" />
@@ -914,6 +938,36 @@ export default function ReportsPage() {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Deleting..." : "Yes, delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Merge Duplicates Confirmation Modal ── */}
+      <Dialog open={mergeDialogOpen} onOpenChange={(open) => setMergeDialogOpen(open)}>
+        <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <RefreshCw className="h-6 w-6 text-amber-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900">Cleanup Duplicate Reports</DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">This will merge duplicate report rows (same company + product) into a single row, combining their Key Updates and deleting extras.</DialogDescription>
+            </div>
+          </div>
+          <div className="bg-amber-50 p-3 rounded-md border border-amber-100 mb-6">
+            <p className="text-sm text-amber-800"><strong>Note:</strong> This is a destructive operation. Extra rows will be permanently deleted after their data is merged into the oldest row.</p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setMergeDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+              Cancel
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+              onClick={() => mergeMutation.mutate()}
+              disabled={mergeMutation.isPending}
+            >
+              {mergeMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Merging...</> : "Yes, merge duplicates"}
             </Button>
           </div>
         </DialogContent>

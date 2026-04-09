@@ -380,3 +380,121 @@ export async function exportExcel(
     res.status(500).json({ error: "Internal server error generating Excel" });
   }
 }
+
+/**
+ * POST /api/reports/merge-duplicates
+ * Merges duplicate report rows (same companyName + productName, case-insensitive).
+ * Keeps the oldest row, merges buyerName, concatenates keyUpdates, takes most recent status.
+ */
+export async function mergeDuplicateReports(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const allReports = await prisma.report.findMany({ orderBy: { createdAt: 'asc' } });
+
+    // Group by companyName::productName (case-insensitive key)
+    const groups = new Map<string, typeof allReports>();
+    for (const report of allReports) {
+      const key = `${(report.companyName || "").toLowerCase()}::${(report.productName || "").toLowerCase()}`;
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(report);
+    }
+
+    let mergedCount = 0;
+    const mergeResults: { kept: string; deleted: string[] }[] = [];
+
+    for (const [_key, reports] of groups) {
+      if (reports.length <= 1) continue;
+
+      // Keep the oldest row (first in ASC order)
+      const base = reports[0];
+      const extras = reports.slice(1);
+
+      // Merge buyerName — deduplicated comma list
+      const allBuyerNames = new Set<string>();
+      for (const r of reports) {
+        if (r.buyerName) {
+          for (const name of r.buyerName.split(",").map(s => s.trim()).filter(Boolean)) {
+            allBuyerNames.add(name);
+          }
+        }
+      }
+      const mergedBuyerName = allBuyerNames.size > 0
+        ? Array.from(allBuyerNames).join(", ")
+        : base.buyerName;
+
+      // Concatenate ALL keyUpdates — deduplicate individual lines, sort newest-first
+      const allUpdateLines = new Set<string>();
+      for (const r of reports) {
+        if (r.keyUpdates) {
+          for (const line of r.keyUpdates.split("\n").map(l => l.trim()).filter(Boolean)) {
+            allUpdateLines.add(line);
+          }
+        }
+      }
+      // Sort by date extracted from [DATE] prefix, newest first
+      const sortedLines = Array.from(allUpdateLines).sort((a, b) => {
+        const dateA = a.match(/^\[(.*?)\]/)?.[1] || "";
+        const dateB = b.match(/^\[(.*?)\]/)?.[1] || "";
+        const parsedA = new Date(dateA).getTime() || 0;
+        const parsedB = new Date(dateB).getTime() || 0;
+        return parsedB - parsedA; // newest first
+      });
+      const mergedKeyUpdates = sortedLines.join("\n\n");
+
+      // Take the most recent status and updateDate
+      let latestStatus = base.status;
+      let latestUpdateDate = base.updateDate;
+      for (const r of reports) {
+        if (r.updateDate && (!latestUpdateDate || r.updateDate > latestUpdateDate)) {
+          latestUpdateDate = r.updateDate;
+          latestStatus = r.status;
+        }
+      }
+
+      // Take the most recent product image if base doesn't have one
+      let productImageUrl = base.productImageUrl;
+      if (!productImageUrl) {
+        for (const r of extras) {
+          if (r.productImageUrl) {
+            productImageUrl = r.productImageUrl;
+            break;
+          }
+        }
+      }
+
+      // Update the base row with merged data
+      await prisma.report.update({
+        where: { id: base.id },
+        data: {
+          buyerName: mergedBuyerName,
+          keyUpdates: mergedKeyUpdates || base.keyUpdates,
+          status: latestStatus,
+          updateDate: latestUpdateDate,
+          ...(productImageUrl && { productImageUrl }),
+        },
+      });
+
+      // Delete extra rows
+      const deletedIds = extras.map(r => r.id);
+      await prisma.report.deleteMany({
+        where: { id: { in: deletedIds } },
+      });
+
+      mergedCount += extras.length;
+      mergeResults.push({ kept: base.id, deleted: deletedIds });
+    }
+
+    res.json({
+      merged: mergedCount,
+      groupsProcessed: mergeResults.length,
+      groups: mergeResults,
+    });
+  } catch (err) {
+    console.error("Merge duplicate reports error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}

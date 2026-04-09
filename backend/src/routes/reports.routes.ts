@@ -9,6 +9,7 @@ import {
   exportPdf,
   exportExcel,
   resyncReportSuppliers,
+  mergeDuplicateReports,
 } from "../controllers/reports.controller.js";
 import {
   authenticate,
@@ -63,6 +64,7 @@ router.post(
   upload.single("productImage"),
   createReport,
 );
+router.post("/merge-duplicates", requireEdit("reports"), mergeDuplicateReports);
 router.put(
   "/:id",
   requireEdit("reports"),

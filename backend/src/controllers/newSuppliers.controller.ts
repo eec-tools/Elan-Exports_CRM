@@ -322,8 +322,17 @@ export async function createNewSupplier(
                 productsToReport = [{ name: supplier.product || "N/A", imageUrl: null }];
             }
 
-            const notesStr = supplier.notes ? ` Notes: ${supplier.notes}` : "";
-            const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] New Supplier Onboarded.${notesStr}`;
+            // Build rich key update entry
+            const productPart = productsToReport.map(p => p.name).filter(n => n !== "N/A").join(", ") || "N/A";
+            const buyerPart = mappedBuyer !== "No buyers introduced" ? `Buyers in talks: ${mappedBuyer}` : "No buyers yet";
+            const statusPart = `Status: ${supplier.currentStatus || "Onboarding"}`;
+            const dealPart = `Deal: ${(supplier as any).dealStage || "Communication"}`;
+            const remarksPart = supplier.notes ? `Notes: ${supplier.notes}` : "";
+
+            const richParts = [`Products: ${productPart}`, buyerPart, statusPart, dealPart];
+            if (remarksPart) richParts.push(remarksPart);
+
+            const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] Supplier onboarded. ${richParts.join(" | ")}`;
 
             const EMPTY_VALS = ["Direct", "N/A", "No buyers introduced"];
             const mergeStr = (a: string, b: string) => {
@@ -337,20 +346,23 @@ export async function createNewSupplier(
                 const reportProduct = prod.name;
                 const productImage = prod.imageUrl;
 
+                // Find report already belonging to THIS supplier + product
                 const existingReport = await (prisma as any).report.findFirst({
                     where: {
-                        productName: { equals: reportProduct, mode: "insensitive" }
+                        productName: { equals: reportProduct, mode: "insensitive" },
+                        companyName: { contains: supplier.company, mode: "insensitive" },
                     },
                     orderBy: { createdAt: 'desc' }
                 });
 
-                if (existingReport && reportProduct !== "N/A") {
+                // Only update if this supplier already has a report row
+                if (existingReport) {
                     await (prisma as any).report.update({
                         where: { id: existingReport.id },
                         data: {
                             companyName: mergeStr(existingReport.companyName, supplier.company),
                             buyerName: mergeStr(existingReport.buyerName, mappedBuyer),
-                            status: mergeStr(existingReport.status, supplier.currentStatus || "Onboarding"),
+                            status: supplier.currentStatus || "Onboarding",
                             keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
                             updateDate: new Date(),
                             ...(productImage && !existingReport.productImageUrl && { productImageUrl: productImage }),
@@ -536,15 +548,10 @@ export async function updateNewSupplier(
         // --- NEW: AUTO-GENERATE REPORT ---
         const changedNotes = existing.notes !== notes;
         const changedStatus = existing.currentStatus !== currentStatus;
+        const changedDealStage = (existing as any).dealStage !== req.body.dealStage && req.body.dealStage;
         const changedBuyers = JSON.stringify([...(oldIds)].sort()) !== JSON.stringify([...incomingIds].sort());
 
-        if (changedNotes || changedStatus || changedBuyers) {
-            let updatesText = "";
-            const parts = [];
-            if (changedStatus) parts.push(`Status changed to '${currentStatus}'`);
-            if (changedNotes) parts.push(`Notes: ${notes || "(cleared)"}`);
-            updatesText += parts.join(" | ");
-
+        if (changedNotes || changedStatus || changedDealStage || changedBuyers) {
             try {
                 let buyerNames: string[] = [];
                 if (Array.isArray(incomingIds) && incomingIds.length > 0) {
@@ -552,6 +559,19 @@ export async function updateNewSupplier(
                     buyerNames = buyers.map((b: any) => b.company || b.name || "").filter(Boolean);
                 }
                 const mappedBuyer = buyerNames.length > 0 ? buyerNames.join(", ") : "No buyers introduced";
+
+                // Build rich update parts
+                const richParts: string[] = [];
+                if (changedStatus) richParts.push(`Status: ${existing.currentStatus} → ${currentStatus}`);
+                if (changedDealStage) richParts.push(`Deal: ${(existing as any).dealStage || "Communication"} → ${req.body.dealStage}`);
+                if (changedNotes) richParts.push(`Notes: ${notes || "(cleared)"}`);
+                // Always append current buyers context
+                const buyerContext = mappedBuyer !== "No buyers introduced"
+                    ? `Buyers in talks: ${mappedBuyer}`
+                    : "No active buyers";
+                richParts.push(buyerContext);
+
+                const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] Update. ${richParts.join(" | ")}`;
 
                 const sProducts = (supplier as any).supplierProducts;
                 const eProducts = (existing as any).supplierProducts;
@@ -578,26 +598,27 @@ export async function updateNewSupplier(
                     return Array.from(s).filter(Boolean).join(", ");
                 };
 
-                const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${supplier.company}] ${updatesText}`;
-
                 for (const prod of productsToReport) {
                     const reportProduct = prod.name;
                     const productImage = prod.imageUrl;
 
+                    // Find report already belonging to THIS supplier + product
                     const existingReport = await (prisma as any).report.findFirst({
                         where: {
-                            productName: { equals: reportProduct, mode: "insensitive" }
+                            productName: { equals: reportProduct, mode: "insensitive" },
+                            companyName: { contains: supplier.company, mode: "insensitive" },
                         },
                         orderBy: { createdAt: 'desc' }
                     });
 
-                    if (existingReport && reportProduct !== "N/A") {
+                    // Only update if this supplier already has a report row
+                    if (existingReport) {
                         await (prisma as any).report.update({
                             where: { id: existingReport.id },
                             data: {
                                 companyName: mergeStr(existingReport.companyName, supplier.company),
                                 buyerName: mappedBuyer,
-                                status: mergeStr(existingReport.status, currentStatus || existing.currentStatus || "Status Updated"),
+                                status: currentStatus || existing.currentStatus || "Onboarding",
                                 keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
                                 updateDate: new Date(),
                                 ...(productImage && { productImageUrl: productImage }),
@@ -610,7 +631,7 @@ export async function updateNewSupplier(
                                 productImageUrl: productImage,
                                 buyerName: mappedBuyer,
                                 companyName: supplier.company,
-                                status: currentStatus || existing.currentStatus || "Status Updated",
+                                status: currentStatus || existing.currentStatus || "Onboarding",
                                 keyUpdates: newUpdatePoint,
                                 buyerSupplier: "Supplier",
                                 reportDate: new Date(),
