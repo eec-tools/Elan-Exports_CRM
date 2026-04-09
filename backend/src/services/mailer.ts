@@ -103,3 +103,29 @@ export async function sendCredentialsEmail(
     `,
   });
 }
+
+export async function sendAttendanceCheckoutWarningEmail(params: {
+  to: string;
+  fullName: string;
+  graceMinutes: number;
+}): Promise<void> {
+  const { to, fullName, graceMinutes } = params;
+
+  await transporter.sendMail({
+    from: `"Elan Exports CRM" <${process.env.SMTP_EMAIL}>`,
+    to,
+    subject: "Urgent: Checkout required to avoid absence",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #b91c1c; margin-bottom: 8px;">Checkout Reminder</h2>
+        <p>Hello <strong>${fullName}</strong>,</p>
+        <p>Your work end time has passed, but your attendance is still open.</p>
+        <p style="margin: 14px 0; padding: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;">
+          Please check out within <strong>${graceMinutes} minutes</strong> in the Attendance screen.
+          If you do not check out in time, you will be marked <strong>Absent</strong> automatically.
+        </p>
+        <p>Before checkout, upload at least one work proof file (PDF/image/document).</p>
+      </div>
+    `,
+  });
+}

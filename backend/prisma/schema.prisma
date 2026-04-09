@@ -32,7 +32,7 @@ model User {
   roles             UserRole[]
   vaultDocuments    VaultDocument[]
   notificationReads NotificationRead[]
-  assignedCompanies String[]          @default([]) @map("assigned_companies")
+  assignedCompanies String[]              @default([]) @map("assigned_companies")
 
   @@map("users")
 }
@@ -478,22 +478,24 @@ model ActivityLog {
 }
 
 model Attendance {
-  id               String                @id @default(uuid())
-  userId           String                @map("user_id")
-  date             DateTime              @db.Date
-  startTime        DateTime?             @map("start_time")
-  endTime          DateTime?             @map("end_time")
-  totalTimeMinutes Int                   @default(0) @map("total_time_minutes")
-  idleTimeMinutes  Int                   @default(0) @map("idle_time_minutes")
-  realTimeMinutes  Int                   @default(0) @map("real_time_minutes")
-  status           AttendanceStatus      @default(Absent)
-  lateLogin        Boolean               @default(false) @map("late_login")
-  earlyLogout      Boolean               @default(false) @map("early_logout")
-  autoEnded        Boolean               @default(false) @map("auto_ended")
-  createdAt        DateTime              @default(now()) @map("created_at")
-  updatedAt        DateTime              @updatedAt @map("updated_at")
-  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  heartbeats       AttendanceHeartbeat[]
+  id                     String                @id @default(uuid())
+  userId                 String                @map("user_id")
+  date                   DateTime              @db.Date
+  startTime              DateTime?             @map("start_time")
+  endTime                DateTime?             @map("end_time")
+  checkoutProofs         Json                  @default("[]") @map("checkout_proofs")
+  checkoutReminderSentAt DateTime?             @map("checkout_reminder_sent_at")
+  totalTimeMinutes       Int                   @default(0) @map("total_time_minutes")
+  idleTimeMinutes        Int                   @default(0) @map("idle_time_minutes")
+  realTimeMinutes        Int                   @default(0) @map("real_time_minutes")
+  status                 AttendanceStatus      @default(Absent)
+  lateLogin              Boolean               @default(false) @map("late_login")
+  earlyLogout            Boolean               @default(false) @map("early_logout")
+  autoEnded              Boolean               @default(false) @map("auto_ended")
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  heartbeats             AttendanceHeartbeat[]
 
   @@unique([userId, date])
   @@index([date])

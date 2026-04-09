@@ -101,7 +101,6 @@ export function formatMinutes(minutes: number): string {
 export function isValidWorkWindow(
   workStartTime: string,
   workEndTime: string,
-  minHoursPresent: number,
 ): string | null {
   const start = hhmmToMinutes(workStartTime);
   const end = hhmmToMinutes(workEndTime);
@@ -112,15 +111,6 @@ export function isValidWorkWindow(
 
   if (start >= end) {
     return "work_start_time must be earlier than work_end_time";
-  }
-
-  const windowMinutes = end - start;
-  if (!Number.isInteger(minHoursPresent) || minHoursPresent <= 0) {
-    return "min_hours_present must be a positive integer in minutes";
-  }
-
-  if (minHoursPresent > windowMinutes) {
-    return "min_hours_present cannot exceed the user's working window";
   }
 
   return null;

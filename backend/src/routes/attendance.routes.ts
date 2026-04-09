@@ -7,6 +7,8 @@ import {
   getTodayAttendance,
   heartbeatAttendance,
   startAttendance,
+  uploadAttendanceProof,
+  uploadAttendanceProofFile,
 } from "../controllers/attendance.controller.js";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 
@@ -18,6 +20,7 @@ router.use(authenticate);
 router.get("/today", getTodayAttendance);
 router.post("/start", startAttendance);
 router.post("/end", endAttendance);
+router.post("/upload-proof", uploadAttendanceProofFile.single("file"), uploadAttendanceProof);
 router.post("/heartbeat", heartbeatAttendance);
 router.get("/history", getAttendanceHistory);
 

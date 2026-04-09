@@ -11,9 +11,12 @@ import {
   LogOut,
   Monitor,
   Mouse,
+  Paperclip,
   Square,
   Timer,
+  Upload,
   Users,
+  X,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -44,6 +47,20 @@ interface AttendanceRecord {
   totalTimeLabel: string;
   idleTimeLabel: string;
   realTimeLabel: string;
+  checkoutProofs?: Array<{
+    url: string;
+    name: string;
+    mimeType?: string;
+    size?: number;
+  }>;
+  checkoutProofCount?: number;
+}
+
+interface CheckoutProofUpload {
+  url: string;
+  name: string;
+  mimeType?: string | null;
+  size?: number | null;
 }
 
 interface TodayAttendanceResponse {
@@ -435,34 +452,6 @@ function LiveTimer({ startTime }: { startTime: string }) {
   );
 }
 
-/* ─── Progress Ring ────────────────────────────────── */
-
-function ProgressRing({ value, max, size = 80, strokeWidth = 6 }: { value: number; max: number; size?: number; strokeWidth?: number }) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const pct = Math.min(1, Math.max(0, value / max));
-  const offset = circumference * (1 - pct);
-  const color = pct >= 1 ? "#10b981" : pct >= 0.5 ? "#f59e0b" : "#ef4444";
-
-  return (
-    <svg width={size} height={size} className="transform -rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e2e8f0" strokeWidth={strokeWidth} />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke={color}
-        strokeWidth={strokeWidth}
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
-        className="transition-all duration-700 ease-out"
-      />
-    </svg>
-  );
-}
-
 /* ─── Tab Button ───────────────────────────────────── */
 
 function TabButton({ active, onClick, children, icon: Icon }: {
@@ -560,6 +549,8 @@ export default function AttendanceDashboardPage() {
   const [activityRange, setActivityRange] = useState("7d");
   const [adminHistoryRange, setAdminHistoryRange] = useState("30d");
   const [adminActivityRange, setAdminActivityRange] = useState("7d");
+  const [checkoutProofs, setCheckoutProofs] = useState<CheckoutProofUpload[]>([]);
+  const [isUploadingProofs, setIsUploadingProofs] = useState(false);
 
   // Activity tracking
   useActivityTracker();
@@ -613,6 +604,7 @@ export default function AttendanceDashboardPage() {
     mutationFn: () => api.post("/attendance/start"),
     onSuccess: () => {
       toast.success("✅ Checked in successfully!");
+      setCheckoutProofs([]);
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
     },
@@ -620,14 +612,51 @@ export default function AttendanceDashboardPage() {
   });
 
   const endMutation = useMutation({
-    mutationFn: () => api.post("/attendance/end"),
+    mutationFn: (proofFiles: CheckoutProofUpload[]) => api.post("/attendance/end", { proofFiles }),
     onSuccess: () => {
       toast.success("✅ Checked out successfully!");
+      setCheckoutProofs([]);
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
     },
     onError: (err: unknown) => toast.error(getApiErrorMessage(err, "Could not check out")),
   });
+
+  const handleProofFileSelection = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const incomingFiles = Array.from(files);
+    if (checkoutProofs.length + incomingFiles.length > 10) {
+      toast.error("You can upload a maximum of 10 work proof files.");
+      return;
+    }
+
+    setIsUploadingProofs(true);
+
+    try {
+      const uploaded = await Promise.all(
+        incomingFiles.map(async (file) => {
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await api.post("/attendance/upload-proof", fd, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+          return res.data as CheckoutProofUpload;
+        }),
+      );
+
+      setCheckoutProofs((prev) => [...prev, ...uploaded]);
+      toast.success(`${uploaded.length} proof file${uploaded.length > 1 ? "s" : ""} uploaded.`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not upload work proof files"));
+    } finally {
+      setIsUploadingProofs(false);
+    }
+  }, [checkoutProofs.length]);
+
+  const removeProofAtIndex = useCallback((index: number) => {
+    setCheckoutProofs((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   const heartbeatMutation = useMutation({
     mutationFn: () => api.post("/attendance/heartbeat"),
@@ -645,7 +674,6 @@ export default function AttendanceDashboardPage() {
   const attendance = todayQuery.data?.attendance;
   const isWorking = Boolean(todayQuery.data?.isWorking);
   const isDone = Boolean(attendance?.endTime);
-  const minPresent = todayQuery.data?.minHoursPresent ?? 420;
 
   const checkInStage = !attendance?.startTime ? "not-started" : isWorking ? "working" : "completed";
 
@@ -712,24 +740,9 @@ export default function AttendanceDashboardPage() {
                 )}
 
                 {isDone && (
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <ProgressRing
-                        value={attendance?.realTimeMinutes ?? 0}
-                        max={minPresent}
-                        size={64}
-                        strokeWidth={5}
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-xs font-bold text-slate-600">
-                          {Math.round(((attendance?.realTimeMinutes ?? 0) / minPresent) * 100)}%
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500">Real work time</p>
-                      <p className="text-lg font-bold text-slate-800">{formatMinutes(attendance?.realTimeMinutes ?? 0)}</p>
-                    </div>
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+                    <p className="text-sm text-emerald-700">Total work time</p>
+                    <p className="text-lg font-bold text-emerald-800">{formatMinutes(attendance?.realTimeMinutes ?? 0)}</p>
                   </div>
                 )}
 
@@ -754,14 +767,64 @@ export default function AttendanceDashboardPage() {
                 )}
 
                 {checkInStage === "working" && (
-                  <Button
-                    onClick={() => endMutation.mutate()}
-                    disabled={endMutation.isPending}
-                    className="gap-2 bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-600/20 px-8 py-6 text-base rounded-xl transition-all hover:scale-105"
-                  >
-                    {endMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
-                    Check Out
-                  </Button>
+                  <div className="w-full space-y-3">
+                    <input
+                      id="attendance-proof-upload"
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        void handleProofFileSelection(e.target.files);
+                        e.currentTarget.value = "";
+                      }}
+                    />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isUploadingProofs || checkoutProofs.length >= 10}
+                      onClick={() => document.getElementById("attendance-proof-upload")?.click()}
+                      className="w-full gap-2 border-slate-300 text-slate-700"
+                    >
+                      {isUploadingProofs ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      {isUploadingProofs ? "Uploading..." : "Upload Today's Work Proofs"}
+                    </Button>
+
+                    <div className="text-xs text-slate-500">
+                      Upload at least 1 proof file (PDF/image/doc). Maximum 10 files.
+                    </div>
+
+                    {checkoutProofs.length > 0 && (
+                      <div className="max-h-28 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 space-y-1.5">
+                        {checkoutProofs.map((proof, index) => (
+                          <div key={`${proof.url}-${index}`} className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-1.5 text-xs">
+                            <div className="flex min-w-0 items-center gap-1.5 text-slate-700">
+                              <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{proof.name}</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                              onClick={() => removeProofAtIndex(index)}
+                              aria-label="Remove proof file"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={() => endMutation.mutate(checkoutProofs)}
+                      disabled={endMutation.isPending || isUploadingProofs || checkoutProofs.length < 1}
+                      className="w-full gap-2 bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-600/20 px-8 py-6 text-base rounded-xl transition-all hover:scale-105"
+                    >
+                      {endMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
+                      Check Out
+                    </Button>
+                  </div>
                 )}
 
                 {checkInStage === "completed" && (
@@ -798,7 +861,6 @@ export default function AttendanceDashboardPage() {
                 value={formatMinutes(attendance.realTimeMinutes)}
                 icon={Timer}
                 color="violet"
-                sublabel={`Required: ${formatMinutes(minPresent)}`}
               />
             </div>
           )}
@@ -814,10 +876,6 @@ export default function AttendanceDashboardPage() {
               <div>
                 <span className="text-slate-400">End:</span>{" "}
                 <span className="font-semibold text-slate-700">{todayQuery.data?.workEndTime ?? "18:00"}</span>
-              </div>
-              <div>
-                <span className="text-slate-400">Min. Present:</span>{" "}
-                <span className="font-semibold text-slate-700">{formatMinutes(minPresent)}</span>
               </div>
             </div>
           </div>
@@ -858,14 +916,13 @@ export default function AttendanceDashboardPage() {
                         <th className="px-4 py-3">Check In</th>
                         <th className="px-4 py-3">Check Out</th>
                         <th className="px-4 py-3">Work Time</th>
-                        <th className="px-4 py-3">Idle</th>
                         <th className="px-4 py-3">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(historyQuery.data.records ?? []).length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                          <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
                             No attendance records found for this period.
                           </td>
                         </tr>
@@ -876,7 +933,6 @@ export default function AttendanceDashboardPage() {
                             <td className="px-4 py-3 text-slate-600">{formatDateTime(r.startTime)}</td>
                             <td className="px-4 py-3 text-slate-600">{formatDateTime(r.endTime)}</td>
                             <td className="px-4 py-3 font-semibold text-slate-700">{r.realTimeLabel}</td>
-                            <td className="px-4 py-3 text-slate-500">{r.idleTimeLabel}</td>
                             <td className="px-4 py-3"><StatusPill status={r.status} autoEnded={r.autoEnded} /></td>
                           </tr>
                         ))
@@ -1027,14 +1083,13 @@ export default function AttendanceDashboardPage() {
                         <th className="px-4 py-3">Check In</th>
                         <th className="px-4 py-3">Check Out</th>
                         <th className="px-4 py-3">Work Time</th>
-                        <th className="px-4 py-3">Idle</th>
                         <th className="px-4 py-3">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(adminTodayQuery.data?.rows ?? []).length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                          <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
                             No team members found.
                           </td>
                         </tr>
@@ -1057,7 +1112,6 @@ export default function AttendanceDashboardPage() {
                               )}
                             </td>
                             <td className="px-4 py-3 font-semibold text-slate-700">{row.realTimeLabel}</td>
-                            <td className="px-4 py-3 text-slate-500">{row.idleTimeLabel}</td>
                             <td className="px-4 py-3"><StatusPill status={row.status} autoEnded={row.autoEnded} /></td>
                           </tr>
                         ))

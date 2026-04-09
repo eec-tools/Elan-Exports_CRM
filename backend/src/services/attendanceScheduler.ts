@@ -2,6 +2,8 @@ import cron from "node-cron";
 import { AttendanceStatus } from "@prisma/client";
 import prisma from "../config/db.js";
 import { logActivity } from "./activityLogger.js";
+import { sendAttendanceCheckoutWarningEmail } from "./mailer.js";
+import { broadcastToUser } from "./sse.js";
 import {
   buildWorkDateTime,
   calculateAttendanceSummary,
@@ -9,10 +11,53 @@ import {
   startOfLocalDay,
 } from "../utils/attendance.js";
 
-// ─── Auto-End Open Attendances ────────────────────────
-// If a user checked in but forgot to check out by their work end time,
-// mark them as ABSENT (strict rule per requirement).
-async function autoEndOpenAttendances(): Promise<void> {
+const CHECKOUT_GRACE_MINUTES = 10;
+
+function getReminderDeadline(workEnd: Date): Date {
+  return new Date(workEnd.getTime() + CHECKOUT_GRACE_MINUTES * 60 * 1000);
+}
+
+async function createUserCheckoutReminder(params: {
+  userId: string;
+  fullName: string;
+  attendanceId: string;
+}): Promise<void> {
+  try {
+    const notification = await prisma.notification.create({
+      data: {
+        type: "attendance_checkout_warning",
+        title: "Checkout Reminder",
+        message: "Hurry up! Please check out in the next 10 minutes, otherwise you will be marked absent.",
+        entityType: "attendance",
+        entityId: params.attendanceId,
+        entityName: `${params.fullName} Attendance`,
+        entityLink: "/attendance",
+      },
+    });
+
+    const otherUsers = await prisma.user.findMany({
+      where: { isActive: true, id: { not: params.userId } },
+      select: { id: true },
+    });
+
+    if (otherUsers.length > 0) {
+      await prisma.notificationRead.createMany({
+        data: otherUsers.map((u) => ({
+          notificationId: notification.id,
+          userId: u.id,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    broadcastToUser(params.userId, "notification", notification);
+  } catch (err) {
+    console.error("[AttendanceScheduler] Failed checkout reminder notification:", err);
+  }
+}
+
+// ─── Remind + Auto-End Open Attendances ───────────────
+async function processOpenAttendances(): Promise<void> {
   try {
     const openAttendances = await prisma.attendance.findMany({
       where: {
@@ -22,9 +67,11 @@ async function autoEndOpenAttendances(): Promise<void> {
       include: {
         user: {
           select: {
+            id: true,
+            fullName: true,
+            email: true,
             workStartTime: true,
             workEndTime: true,
-            minHoursPresent: true,
           },
         },
         heartbeats: {
@@ -44,7 +91,6 @@ async function autoEndOpenAttendances(): Promise<void> {
       const ruleError = isValidWorkWindow(
         attendance.user.workStartTime,
         attendance.user.workEndTime,
-        attendance.user.minHoursPresent,
       );
       if (ruleError) continue;
 
@@ -53,38 +99,72 @@ async function autoEndOpenAttendances(): Promise<void> {
       if (!workEnd) continue;
       if (now < workEnd) continue;
 
-      const safeEnd = workEnd < attendance.startTime ? attendance.startTime : workEnd;
+      const reminderDeadline = getReminderDeadline(workEnd);
+
+      // Phase 1: remind user once, then wait up to 10 minutes.
+      if (now < reminderDeadline) {
+        if (!attendance.checkoutReminderSentAt) {
+          await Promise.allSettled([
+            createUserCheckoutReminder({
+              userId: attendance.userId,
+              fullName: attendance.user.fullName,
+              attendanceId: attendance.id,
+            }),
+            attendance.user.email
+              ? sendAttendanceCheckoutWarningEmail({
+                  to: attendance.user.email,
+                  fullName: attendance.user.fullName,
+                  graceMinutes: CHECKOUT_GRACE_MINUTES,
+                })
+              : Promise.resolve(),
+          ]);
+
+          await prisma.attendance.update({
+            where: { id: attendance.id },
+            data: { checkoutReminderSentAt: now },
+          });
+
+          await logActivity(attendance.userId, "attendance_checkout_warning", "attendance", attendance.id, {
+            reminderAt: now.toISOString(),
+            deadline: reminderDeadline.toISOString(),
+          });
+        }
+        continue;
+      }
+
+      // Phase 2: still not checked out after grace period => auto-absent.
+      const safeEnd = reminderDeadline < attendance.startTime ? attendance.startTime : reminderDeadline;
       const summary = calculateAttendanceSummary(
         attendance.startTime,
         safeEnd,
         attendance.heartbeats,
       );
 
-      // STRICT RULE: Forgot to check out = ALWAYS Absent
       await prisma.attendance.update({
         where: { id: attendance.id },
         data: {
           endTime: safeEnd,
           totalTimeMinutes: summary.totalTimeMinutes,
-          idleTimeMinutes: summary.idleTimeMinutes,
-          realTimeMinutes: summary.realTimeMinutes,
+          idleTimeMinutes: 0,
+          realTimeMinutes: summary.totalTimeMinutes,
           status: AttendanceStatus.Absent,
           earlyLogout: false,
           autoEnded: true,
+          checkoutReminderSentAt: attendance.checkoutReminderSentAt ?? now,
         },
       });
 
       await logActivity(attendance.userId, "attendance_auto_end_absent", "attendance", attendance.id, {
         endTime: safeEnd.toISOString(),
         totalTimeMinutes: summary.totalTimeMinutes,
-        idleTimeMinutes: summary.idleTimeMinutes,
-        realTimeMinutes: summary.realTimeMinutes,
+        idleTimeMinutes: 0,
+        realTimeMinutes: summary.totalTimeMinutes,
         status: AttendanceStatus.Absent,
-        reason: "Forgot to check out — auto-ended and marked Absent",
+        reason: `Forgot to check out within ${CHECKOUT_GRACE_MINUTES} minutes after work end — auto-ended and marked Absent`,
       });
     }
   } catch (err) {
-    console.error("[AttendanceScheduler] Failed auto end:", err);
+    console.error("[AttendanceScheduler] Failed open attendance processing:", err);
   }
 }
 
@@ -129,6 +209,8 @@ async function markNoShowAbsent(): Promise<void> {
             date: today,
             startTime: null,
             endTime: null,
+            checkoutProofs: [],
+            checkoutReminderSentAt: null,
             totalTimeMinutes: 0,
             idleTimeMinutes: 0,
             realTimeMinutes: 0,
@@ -195,8 +277,8 @@ async function closePreviousDayOpenAttendances(): Promise<void> {
         data: {
           endTime: safeEnd,
           totalTimeMinutes: summary.totalTimeMinutes,
-          idleTimeMinutes: summary.idleTimeMinutes,
-          realTimeMinutes: summary.realTimeMinutes,
+          idleTimeMinutes: 0,
+          realTimeMinutes: summary.totalTimeMinutes,
           status: AttendanceStatus.Absent,
           earlyLogout: false,
           autoEnded: true,
@@ -209,8 +291,8 @@ async function closePreviousDayOpenAttendances(): Promise<void> {
 }
 
 export function startAttendanceScheduler(): void {
-  // Every minute: auto-end active sessions at work_end_time.
-  cron.schedule("* * * * *", autoEndOpenAttendances);
+  // Every minute: send checkout reminders and auto-end after grace period.
+  cron.schedule("* * * * *", processOpenAttendances);
 
   // Every 5 minutes between 17:00–23:59: mark no-show users as absent
   cron.schedule("*/5 17-23 * * *", markNoShowAbsent);
@@ -221,5 +303,5 @@ export function startAttendanceScheduler(): void {
   // Also mark no-shows right after midnight for any stragglers
   cron.schedule("10 0 * * *", markNoShowAbsent);
 
-  console.log("[AttendanceScheduler] Jobs scheduled (minute auto-end, no-show check, 00:05 cleanup).");
+  console.log("[AttendanceScheduler] Jobs scheduled (reminder+auto-end, no-show check, 00:05 cleanup).");
 }

@@ -1,5 +1,8 @@
 import { AttendanceStatus, Prisma } from "@prisma/client";
-import { Response } from "express";
+import { Request, Response } from "express";
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 import prisma from "../config/db.js";
 import { logActivity } from "../services/activityLogger.js";
 import { AuthRequest } from "../types/index.js";
@@ -10,6 +13,75 @@ import {
   isValidWorkWindow,
   startOfLocalDay,
 } from "../utils/attendance.js";
+
+interface CheckoutProofFile {
+  url: string;
+  name: string;
+  mimeType?: string;
+  size?: number;
+}
+
+const MAX_CHECKOUT_PROOFS = 10;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const attendanceProofStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (_req: Express.Request, file: Express.Multer.File) => {
+    const lowerName = file.originalname.toLowerCase();
+    const isRaw =
+      file.mimetype === "application/pdf" ||
+      lowerName.endsWith(".pdf") ||
+      lowerName.endsWith(".doc") ||
+      lowerName.endsWith(".docx");
+    const resource_type = isRaw ? "raw" : "image";
+    const extMatch = file.originalname.match(/\.[^/.]+$/);
+    const ext = isRaw && extMatch ? extMatch[0] : "";
+    const baseName = file.originalname
+      .replace(/\.[^/.]+$/, "")
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9._-]/g, "");
+
+    return {
+      folder: "elan-attendance-proofs",
+      resource_type,
+      public_id: `attendance_proof_${Date.now()}_${baseName}${ext}`,
+    };
+  },
+} as any);
+
+export const uploadAttendanceProofFile = multer({
+  storage: attendanceProofStorage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+
+function normalizeCheckoutProofs(value: unknown): CheckoutProofFile[] {
+  if (!Array.isArray(value)) return [];
+
+  const result: CheckoutProofFile[] = [];
+
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+
+    const record = item as Record<string, unknown>;
+    const url = typeof record.url === "string" ? record.url.trim() : "";
+    if (!url) continue;
+
+    const name = typeof record.name === "string" && record.name.trim().length > 0
+      ? record.name.trim()
+      : "Work Proof";
+    const mimeType = typeof record.mimeType === "string" ? record.mimeType : undefined;
+    const size = typeof record.size === "number" ? record.size : undefined;
+
+    result.push({ url, name, mimeType, size });
+  }
+
+  return result;
+}
 
 type AttendanceWithBeats = Prisma.AttendanceGetPayload<{
   include: {
@@ -26,6 +98,8 @@ function serializeAttendance(
   workStartTime: string,
   workEndTime: string,
 ) {
+  const checkoutProofs = normalizeCheckoutProofs(attendance.checkoutProofs);
+
   return {
     id: attendance.id,
     userId: attendance.userId,
@@ -39,6 +113,8 @@ function serializeAttendance(
     lateLogin: attendance.lateLogin,
     earlyLogout: attendance.earlyLogout,
     autoEnded: attendance.autoEnded,
+    checkoutProofs,
+    checkoutProofCount: checkoutProofs.length,
     minHoursPresent,
     workStartTime,
     workEndTime,
@@ -81,6 +157,31 @@ async function getTodayAttendanceWithSchedule(userId: string) {
   return { user, attendance, today };
 }
 
+export async function uploadAttendanceProof(req: Request, res: Response): Promise<void> {
+  try {
+    const file = req.file as any;
+    if (!file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+
+    const fileUrl: string = file.path || file.secure_url || file.url;
+    const fileName = file.originalname || "Work Proof";
+    const mimeType = file.mimetype || null;
+    const size = typeof file.size === "number" ? file.size : null;
+
+    res.json({
+      url: fileUrl,
+      name: fileName,
+      mimeType,
+      size,
+    });
+  } catch (err) {
+    console.error("Upload attendance proof error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
 // ─── Check In (Start) ─────────────────────────────────
 export async function startAttendance(req: AuthRequest, res: Response): Promise<void> {
   try {
@@ -104,11 +205,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    const validationError = isValidWorkWindow(
-      user.workStartTime,
-      user.workEndTime,
-      user.minHoursPresent,
-    );
+    const validationError = isValidWorkWindow(user.workStartTime, user.workEndTime);
     if (validationError) {
       res.status(400).json({ error: validationError });
       return;
@@ -152,10 +249,12 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
       update: {
         startTime: effectiveStart,
         endTime: null,
+        checkoutProofs: [] as Prisma.InputJsonValue,
+        checkoutReminderSentAt: null,
         totalTimeMinutes: 0,
         idleTimeMinutes: 0,
         realTimeMinutes: 0,
-        status: AttendanceStatus.Absent,
+        status: AttendanceStatus.Present,
         lateLogin: workStart ? effectiveStart > workStart : false,
         earlyLogout: false,
         autoEnded: false,
@@ -164,7 +263,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
         userId,
         date: today,
         startTime: effectiveStart,
-        status: AttendanceStatus.Absent,
+        status: AttendanceStatus.Present,
         lateLogin: workStart ? effectiveStart > workStart : false,
       },
       include: {
@@ -215,6 +314,16 @@ export async function endAttendance(req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    const proofFiles = normalizeCheckoutProofs(req.body?.proofFiles);
+    if (proofFiles.length < 1) {
+      res.status(400).json({ error: "Please upload at least one work proof file before check-out." });
+      return;
+    }
+    if (proofFiles.length > MAX_CHECKOUT_PROOFS) {
+      res.status(400).json({ error: `Maximum ${MAX_CHECKOUT_PROOFS} work proof files are allowed.` });
+      return;
+    }
+
     const now = new Date();
 
     const summary = calculateAttendanceSummary(
@@ -230,12 +339,11 @@ export async function endAttendance(req: AuthRequest, res: Response): Promise<vo
       data: {
         endTime: now,
         totalTimeMinutes: summary.totalTimeMinutes,
-        idleTimeMinutes: summary.idleTimeMinutes,
-        realTimeMinutes: summary.realTimeMinutes,
-        status:
-          summary.realTimeMinutes >= context.user.minHoursPresent
-            ? AttendanceStatus.Present
-            : AttendanceStatus.Absent,
+        idleTimeMinutes: 0,
+        realTimeMinutes: summary.totalTimeMinutes,
+        checkoutProofs: proofFiles as unknown as Prisma.InputJsonValue,
+        checkoutReminderSentAt: null,
+        status: AttendanceStatus.Present,
         earlyLogout: scheduleEnd ? now < scheduleEnd : false,
         autoEnded: false,
       },
@@ -250,8 +358,9 @@ export async function endAttendance(req: AuthRequest, res: Response): Promise<vo
     await logActivity(userId, "attendance_check_out", "attendance", updated.id, {
       endTime: now.toISOString(),
       totalTimeMinutes: summary.totalTimeMinutes,
-      idleTimeMinutes: summary.idleTimeMinutes,
-      realTimeMinutes: summary.realTimeMinutes,
+      idleTimeMinutes: 0,
+      realTimeMinutes: summary.totalTimeMinutes,
+      proofCount: proofFiles.length,
       status: updated.status,
     });
 
@@ -349,12 +458,9 @@ export async function getTodayAttendance(req: AuthRequest, res: Response): Promi
         ...liveAttendance,
         heartbeats: liveAttendance.heartbeats,
         totalTimeMinutes: summary.totalTimeMinutes,
-        idleTimeMinutes: summary.idleTimeMinutes,
-        realTimeMinutes: summary.realTimeMinutes,
-        status:
-          summary.realTimeMinutes >= context.user.minHoursPresent
-            ? AttendanceStatus.Present
-            : AttendanceStatus.Absent,
+        idleTimeMinutes: 0,
+        realTimeMinutes: summary.totalTimeMinutes,
+        status: AttendanceStatus.Present,
       };
     }
 
@@ -516,12 +622,7 @@ export async function getAdminTodayAttendance(
       const calculatedEnd = attendance.endTime ? attendance.endTime : now;
       const safeEnd = calculatedEnd < attendance.startTime ? attendance.startTime : calculatedEnd;
       const summary = calculateAttendanceSummary(attendance.startTime, safeEnd, attendance.heartbeats);
-      const status =
-        attendance.endTime
-          ? attendance.status
-          : summary.realTimeMinutes >= user.minHoursPresent
-            ? AttendanceStatus.Present
-            : AttendanceStatus.Absent;
+      const status = attendance.endTime ? attendance.status : AttendanceStatus.Present;
 
       return {
         userId: user.id,
@@ -533,16 +634,16 @@ export async function getAdminTodayAttendance(
         startTime: attendance.startTime,
         endTime: attendance.endTime,
         totalTimeMinutes: attendance.endTime ? attendance.totalTimeMinutes : summary.totalTimeMinutes,
-        idleTimeMinutes: attendance.endTime ? attendance.idleTimeMinutes : summary.idleTimeMinutes,
-        realTimeMinutes: attendance.endTime ? attendance.realTimeMinutes : summary.realTimeMinutes,
+        idleTimeMinutes: attendance.endTime ? attendance.idleTimeMinutes : 0,
+        realTimeMinutes: attendance.endTime ? attendance.realTimeMinutes : summary.totalTimeMinutes,
         status,
         lateLogin: attendance.lateLogin,
         earlyLogout: attendance.earlyLogout,
         autoEnded: attendance.autoEnded,
         isWorking: Boolean(attendance.startTime && !attendance.endTime),
         totalTimeLabel: formatMinutes(attendance.endTime ? attendance.totalTimeMinutes : summary.totalTimeMinutes),
-        idleTimeLabel: formatMinutes(attendance.endTime ? attendance.idleTimeMinutes : summary.idleTimeMinutes),
-        realTimeLabel: formatMinutes(attendance.endTime ? attendance.realTimeMinutes : summary.realTimeMinutes),
+        idleTimeLabel: formatMinutes(attendance.endTime ? attendance.idleTimeMinutes : 0),
+        realTimeLabel: formatMinutes(attendance.endTime ? attendance.realTimeMinutes : summary.totalTimeMinutes),
       };
     });
 

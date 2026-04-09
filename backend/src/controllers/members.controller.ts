@@ -79,7 +79,6 @@ export async function createMember(
     const workSettingsError = isValidWorkWindow(
       effectiveWorkStart,
       effectiveWorkEnd,
-      effectiveMinHoursPresent,
     );
     if (workSettingsError) {
       res.status(400).json({ error: workSettingsError });
@@ -196,7 +195,6 @@ export async function updateMember(
     const workSettingsError = isValidWorkWindow(
       effectiveWorkStart,
       effectiveWorkEnd,
-      effectiveMinHoursPresent,
     );
     if (workSettingsError) {
       res.status(400).json({ error: workSettingsError });
