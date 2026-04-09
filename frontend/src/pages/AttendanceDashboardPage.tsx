@@ -81,6 +81,7 @@ interface TodayAttendanceResponse {
   date: string;
   workStartTime: string;
   workEndTime: string;
+  earliestCheckoutTime?: string;
   minHoursPresent: number;
   attendance: AttendanceRecord | null;
   isWorking: boolean;
@@ -362,7 +363,7 @@ function StatCard({ label, value, sublabel, icon: Icon, color = "slate" }: {
 
 export default function AttendanceDashboardPage() {
   const queryClient = useQueryClient();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [activeTab, setActiveTab] = useState<"my" | "history" | "admin" | "admin-history">("my");
   const [historyRange, setHistoryRange] = useState("30d");
   const [adminHistoryRange, setAdminHistoryRange] = useState("30d");
@@ -370,6 +371,7 @@ export default function AttendanceDashboardPage() {
   const [isUploadingProofs, setIsUploadingProofs] = useState(false);
   const [proofViewerOpen, setProofViewerOpen] = useState(false);
   const [selectedProofRecord, setSelectedProofRecord] = useState<HistoryRecord | null>(null);
+  const [loadedDraftKey, setLoadedDraftKey] = useState<string | null>(null);
 
   /* ─── Queries ────────────────────────────────────── */
 
@@ -400,13 +402,27 @@ export default function AttendanceDashboardPage() {
     enabled: isAdmin && activeTab === "admin-history",
   });
 
+  const earliestCheckoutMs = todayQuery.data?.earliestCheckoutTime
+    ? new Date(todayQuery.data.earliestCheckoutTime).getTime()
+    : null;
+  const isCheckoutWindowOpen =
+    typeof earliestCheckoutMs === "number" && !Number.isNaN(earliestCheckoutMs)
+      ? Date.now() >= earliestCheckoutMs
+      : true;
+  const draftStorageKey =
+    user?.id && todayQuery.data?.date
+      ? `attendance-proof-draft:${user.id}:${new Date(todayQuery.data.date).toISOString().slice(0, 10)}`
+      : null;
+
   /* ─── Mutations ──────────────────────────────────── */
 
   const startMutation = useMutation({
     mutationFn: () => api.post("/attendance/start"),
     onSuccess: () => {
       toast.success("Checked in successfully!");
+      if (draftStorageKey) localStorage.removeItem(draftStorageKey);
       setCheckoutProofs([]);
+      setLoadedDraftKey(null);
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
     },
@@ -417,7 +433,9 @@ export default function AttendanceDashboardPage() {
     mutationFn: (proofFiles: CheckoutProofUpload[]) => api.post("/attendance/end", { proofFiles }),
     onSuccess: () => {
       toast.success("Checked out successfully!");
+      if (draftStorageKey) localStorage.removeItem(draftStorageKey);
       setCheckoutProofs([]);
+      setLoadedDraftKey(null);
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
     },
@@ -497,6 +515,37 @@ export default function AttendanceDashboardPage() {
     setSelectedProofRecord(record);
     setProofViewerOpen(true);
   }, []);
+
+  useEffect(() => {
+    if (!draftStorageKey) return;
+
+    if (checkInStage !== "working") {
+      localStorage.removeItem(draftStorageKey);
+      setLoadedDraftKey(null);
+      return;
+    }
+
+    if (loadedDraftKey === draftStorageKey) return;
+
+    try {
+      const raw = localStorage.getItem(draftStorageKey);
+      if (!raw) {
+        setCheckoutProofs([]);
+      } else {
+        const parsed = JSON.parse(raw) as CheckoutProofUpload[];
+        setCheckoutProofs(Array.isArray(parsed) ? parsed.slice(0, 10) : []);
+      }
+    } catch {
+      setCheckoutProofs([]);
+    }
+
+    setLoadedDraftKey(draftStorageKey);
+  }, [draftStorageKey, loadedDraftKey, checkInStage]);
+
+  useEffect(() => {
+    if (!draftStorageKey || checkInStage !== "working") return;
+    localStorage.setItem(draftStorageKey, JSON.stringify(checkoutProofs));
+  }, [checkoutProofs, draftStorageKey, checkInStage]);
 
   /* ─── Render ─────────────────────────────────────── */
 
@@ -614,8 +663,14 @@ export default function AttendanceDashboardPage() {
                     </Button>
 
                     <div className="text-xs text-slate-500">
-                      Upload at least 1 proof file (PDF/image/doc). Maximum 10 files.
+                      Upload at least 1 proof file (PDF/image/doc). Maximum 10 files. Files remain saved here until checkout.
                     </div>
+
+                    {!isCheckoutWindowOpen && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                        Checkout is allowed only in the last 1 hour of your shift. You can check out after {formatDateTime(todayQuery.data?.earliestCheckoutTime ?? null)}.
+                      </div>
+                    )}
 
                     {checkoutProofs.length > 0 && (
                       <div className="max-h-28 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 space-y-1.5">
@@ -640,7 +695,7 @@ export default function AttendanceDashboardPage() {
 
                     <Button
                       onClick={() => endMutation.mutate(checkoutProofs)}
-                      disabled={endMutation.isPending || isUploadingProofs || checkoutProofs.length < 1}
+                      disabled={endMutation.isPending || isUploadingProofs || checkoutProofs.length < 1 || !isCheckoutWindowOpen}
                       className="w-full gap-2 bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-600/20 px-8 py-6 text-base rounded-xl transition-all hover:scale-105"
                     >
                       {endMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}

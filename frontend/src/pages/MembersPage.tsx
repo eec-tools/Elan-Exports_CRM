@@ -29,7 +29,6 @@ interface Member {
   isActive: boolean;
   workStartTime: string;
   workEndTime: string;
-  minHoursPresent: number;
   createdAt: string;
   roles: string[];
   permissions: { permission: string; accessLevel: string }[];
@@ -73,7 +72,6 @@ export default function MembersPage() {
   const [newRole, setNewRole] = useState("member");
   const [newWorkStartTime, setNewWorkStartTime] = useState("09:00");
   const [newWorkEndTime, setNewWorkEndTime] = useState("18:00");
-  const [newMinHoursPresent, setNewMinHoursPresent] = useState(420);
   const [newPerms, setNewPerms] = useState<
     { permission: string; accessLevel: string }[]
   >([]);
@@ -215,7 +213,6 @@ export default function MembersPage() {
       role: newRole,
       workStartTime: newWorkStartTime,
       workEndTime: newWorkEndTime,
-      minHoursPresent: newMinHoursPresent,
       permissions: newPerms,
       assignedCompanies: newAssignedCompanies,
     };
@@ -289,7 +286,6 @@ export default function MembersPage() {
                setNewRole("member");
                setNewWorkStartTime("09:00");
                setNewWorkEndTime("18:00");
-               setNewMinHoursPresent(420);
                setNewPerms([]);
                setNewAssignedCompanies([]);
                setSendOnSubmit(false);
@@ -449,7 +445,6 @@ export default function MembersPage() {
                                        setNewRole(m.roles.includes("admin") ? "admin" : "member");
                                        setNewWorkStartTime(m.workStartTime || "09:00");
                                        setNewWorkEndTime(m.workEndTime || "18:00");
-                                       setNewMinHoursPresent(m.minHoursPresent || 420);
                                        setNewPerms(m.permissions || []);
                                        setNewAssignedCompanies(m.assignedCompanies || []);
                                        setSendOnSubmit(false);
@@ -572,17 +567,6 @@ export default function MembersPage() {
                            type="time"
                            value={newWorkEndTime}
                            onChange={(e) => setNewWorkEndTime(e.target.value)}
-                           className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
-                           required
-                         />
-                       </div>
-                       <div className="space-y-1.5 sm:col-span-2">
-                         <Label className="text-slate-700 font-semibold">Minimum Minutes for Present</Label>
-                         <Input
-                           type="number"
-                           min={60}
-                           value={newMinHoursPresent}
-                           onChange={(e) => setNewMinHoursPresent(Number(e.target.value))}
                            className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
                            required
                          />

@@ -9,7 +9,6 @@ import { isValidWorkWindow } from "../utils/attendance.js";
 
 const DEFAULT_WORK_START = "09:00";
 const DEFAULT_WORK_END = "18:00";
-const DEFAULT_MIN_PRESENT_MINUTES = 420;
 
 /**
  * GET /api/members
@@ -35,7 +34,6 @@ export async function listMembers(
         isActive: m.isActive,
         workStartTime: m.workStartTime,
         workEndTime: m.workEndTime,
-        minHoursPresent: m.minHoursPresent,
         createdAt: m.createdAt,
         roles: m.roles.map((r) => r.role),
         permissions: m.permissions.map((p) => ({
@@ -68,13 +66,10 @@ export async function createMember(
       assignedCompanies,
       workStartTime,
       workEndTime,
-      minHoursPresent,
     } = req.body;
 
     const effectiveWorkStart = workStartTime ?? DEFAULT_WORK_START;
     const effectiveWorkEnd = workEndTime ?? DEFAULT_WORK_END;
-    const effectiveMinHoursPresent =
-      typeof minHoursPresent === "number" ? minHoursPresent : DEFAULT_MIN_PRESENT_MINUTES;
 
     const workSettingsError = isValidWorkWindow(
       effectiveWorkStart,
@@ -102,7 +97,6 @@ export async function createMember(
         assignedCompanies: assignedCompanies || [],
         workStartTime: effectiveWorkStart,
         workEndTime: effectiveWorkEnd,
-        minHoursPresent: effectiveMinHoursPresent,
         roles: {
           create: { role: role || "member" },
         },
@@ -133,7 +127,6 @@ export async function createMember(
       isActive: user.isActive,
       workStartTime: user.workStartTime,
       workEndTime: user.workEndTime,
-      minHoursPresent: user.minHoursPresent,
       roles: user.roles.map((r) => r.role),
       permissions: user.permissions.map((p) => ({
         permission: p.permission,
@@ -165,7 +158,6 @@ export async function updateMember(
       assignedCompanies,
       workStartTime,
       workEndTime,
-      minHoursPresent,
     } = req.body;
 
     const existing = await prisma.user.findUnique({ where: { id } });
@@ -189,8 +181,6 @@ export async function updateMember(
 
     const effectiveWorkStart = workStartTime ?? existing.workStartTime;
     const effectiveWorkEnd = workEndTime ?? existing.workEndTime;
-    const effectiveMinHoursPresent =
-      typeof minHoursPresent === "number" ? minHoursPresent : existing.minHoursPresent;
 
     const workSettingsError = isValidWorkWindow(
       effectiveWorkStart,
@@ -210,7 +200,6 @@ export async function updateMember(
         assignedCompanies: assignedCompanies !== undefined ? assignedCompanies : existing.assignedCompanies,
         workStartTime: effectiveWorkStart,
         workEndTime: effectiveWorkEnd,
-        minHoursPresent: effectiveMinHoursPresent,
         roles: {
           deleteMany: {},
           create: { role: role || "member" },
@@ -243,7 +232,6 @@ export async function updateMember(
       isActive: updated.isActive,
       workStartTime: updated.workStartTime,
       workEndTime: updated.workEndTime,
-      minHoursPresent: updated.minHoursPresent,
       roles: updated.roles.map((r) => r.role),
       permissions: updated.permissions.map((p) => ({
         permission: p.permission,

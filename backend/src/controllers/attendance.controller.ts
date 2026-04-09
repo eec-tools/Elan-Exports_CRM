@@ -1,5 +1,5 @@
 import { AttendanceStatus, Prisma } from "@prisma/client";
-import { Request, Response } from "express";
+import { Response } from "express";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -22,6 +22,7 @@ interface CheckoutProofFile {
 }
 
 const MAX_CHECKOUT_PROOFS = 10;
+const CHECKOUT_EARLY_WINDOW_MINUTES = 60;
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -157,8 +158,30 @@ async function getTodayAttendanceWithSchedule(userId: string) {
   return { user, attendance, today };
 }
 
-export async function uploadAttendanceProof(req: Request, res: Response): Promise<void> {
+export async function uploadAttendanceProof(req: AuthRequest, res: Response): Promise<void> {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const today = startOfLocalDay();
+    const activeAttendance = await prisma.attendance.findUnique({
+      where: {
+        userId_date: {
+          userId,
+          date: today,
+        },
+      },
+      select: { startTime: true, endTime: true },
+    });
+
+    if (!activeAttendance?.startTime || activeAttendance.endTime) {
+      res.status(400).json({ error: "Please check in first to upload work documents." });
+      return;
+    }
+
     const file = req.file as any;
     if (!file) {
       res.status(400).json({ error: "No file uploaded" });
@@ -367,6 +390,21 @@ export async function endAttendance(req: AuthRequest, res: Response): Promise<vo
     );
 
     const scheduleEnd = buildWorkDateTime(context.today, context.user.workEndTime);
+    if (!scheduleEnd) {
+      res.status(400).json({ error: "Invalid work schedule for user" });
+      return;
+    }
+
+    const earliestCheckout = new Date(
+      scheduleEnd.getTime() - CHECKOUT_EARLY_WINDOW_MINUTES * 60 * 1000,
+    );
+    if (now < earliestCheckout) {
+      res.status(400).json({
+        error: `Checkout is allowed only in the last ${CHECKOUT_EARLY_WINDOW_MINUTES} minutes of your shift.`,
+        earliestCheckoutTime: earliestCheckout.toISOString(),
+      });
+      return;
+    }
 
     const updated = await prisma.attendance.update({
       where: { id: context.attendance.id },
@@ -378,7 +416,7 @@ export async function endAttendance(req: AuthRequest, res: Response): Promise<vo
         checkoutProofs: proofFiles as unknown as Prisma.InputJsonValue,
         checkoutReminderSentAt: null,
         status: AttendanceStatus.Present,
-        earlyLogout: false,
+        earlyLogout: now < scheduleEnd,
         autoEnded: false,
       },
       include: {
@@ -520,6 +558,9 @@ export async function getTodayAttendance(req: AuthRequest, res: Response): Promi
       date: context.today,
       workStartTime: context.user.workStartTime,
       workEndTime: context.user.workEndTime,
+      earliestCheckoutTime: new Date(
+        workEnd.getTime() - CHECKOUT_EARLY_WINDOW_MINUTES * 60 * 1000,
+      ).toISOString(),
       minHoursPresent: context.user.minHoursPresent,
       attendance: liveAttendance
         ? serializeAttendance(

@@ -20,7 +20,6 @@ export interface User {
   isActive: boolean;
   workStartTime: string;
   workEndTime: string;
-  minHoursPresent: number;
   roles: string[];
   permissions: Permission[];
   assignedCompanies: string[];
