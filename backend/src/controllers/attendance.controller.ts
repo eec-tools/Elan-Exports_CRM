@@ -232,7 +232,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
           where: { id: existing.id },
           data: {
             startTime: now,
-            lateLogin: workStart ? now > workStart : false,
+            lateLogin: false,
           },
           include: {
             heartbeats: {
@@ -289,7 +289,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
         idleTimeMinutes: 0,
         realTimeMinutes: 0,
         status: AttendanceStatus.Present,
-        lateLogin: workStart ? effectiveStart > workStart : false,
+        lateLogin: false,
         earlyLogout: false,
         autoEnded: false,
       },
@@ -298,7 +298,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
         date: today,
         startTime: effectiveStart,
         status: AttendanceStatus.Present,
-        lateLogin: workStart ? effectiveStart > workStart : false,
+        lateLogin: false,
       },
       include: {
         heartbeats: {
@@ -378,7 +378,7 @@ export async function endAttendance(req: AuthRequest, res: Response): Promise<vo
         checkoutProofs: proofFiles as unknown as Prisma.InputJsonValue,
         checkoutReminderSentAt: null,
         status: AttendanceStatus.Present,
-        earlyLogout: scheduleEnd ? now < scheduleEnd : false,
+        earlyLogout: false,
         autoEnded: false,
       },
       include: {
@@ -488,7 +488,7 @@ export async function getTodayAttendance(req: AuthRequest, res: Response): Promi
           where: { id: liveAttendance.id },
           data: {
             startTime: now,
-            lateLogin: workStart ? now > workStart : false,
+            lateLogin: false,
           },
           include: {
             heartbeats: {

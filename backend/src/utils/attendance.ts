@@ -1,17 +1,6 @@
 import { AttendanceHeartbeat } from "@prisma/client";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
-const ATTENDANCE_TIMEZONE_OFFSET_MINUTES = Number(
-  process.env.ATTENDANCE_TZ_OFFSET_MINUTES ?? 330,
-);
-
-function shiftToAttendanceTz(date: Date): Date {
-  return new Date(date.getTime() + ATTENDANCE_TIMEZONE_OFFSET_MINUTES * 60_000);
-}
-
-function shiftFromAttendanceTz(date: Date): Date {
-  return new Date(date.getTime() - ATTENDANCE_TIMEZONE_OFFSET_MINUTES * 60_000);
-}
 
 export interface ParsedTime {
   hours: number;
@@ -41,18 +30,18 @@ export function hhmmToMinutes(value: string): number | null {
 }
 
 export function startOfLocalDay(input: Date = new Date()): Date {
-  const shifted = shiftToAttendanceTz(new Date(input));
-  shifted.setHours(0, 0, 0, 0);
-  return shiftFromAttendanceTz(shifted);
+  const date = new Date(input);
+  date.setHours(0, 0, 0, 0);
+  return date;
 }
 
 export function buildWorkDateTime(baseDate: Date, hhmm: string): Date | null {
   const parsed = parseHHMM(hhmm);
   if (!parsed) return null;
 
-  const shifted = shiftToAttendanceTz(new Date(baseDate));
-  shifted.setHours(parsed.hours, parsed.minutes, 0, 0);
-  return shiftFromAttendanceTz(shifted);
+  const date = new Date(baseDate);
+  date.setHours(parsed.hours, parsed.minutes, 0, 0);
+  return date;
 }
 
 export function diffMinutes(start: Date, end: Date): number {

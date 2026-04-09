@@ -94,7 +94,7 @@ async function processOpenAttendances(): Promise<void> {
       );
       if (ruleError) continue;
 
-      const day = startOfLocalDay(attendance.date);
+      const day = startOfLocalDay(attendance.startTime);
       const workEnd = buildWorkDateTime(day, attendance.user.workEndTime);
       if (!workEnd) continue;
       if (now < workEnd) continue;

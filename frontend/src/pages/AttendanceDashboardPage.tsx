@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import {
-  Activity,
   Calendar,
   Clock,
   Download,
@@ -12,8 +11,6 @@ import {
   Loader2,
   LogIn,
   LogOut,
-  Monitor,
-  Mouse,
   Paperclip,
   Square,
   Timer,
@@ -155,62 +152,6 @@ interface AdminHistoryResponse {
   records: HistoryRecord[];
 }
 
-interface ActivitySummary {
-  totalActiveSeconds: number;
-  totalIdleSeconds: number;
-  totalClicks: number;
-  totalKeys: number;
-  totalEvents: number;
-  totalActiveLabel: string;
-  totalIdleLabel: string;
-}
-
-interface ActivityPage {
-  page: string;
-  totalActiveSeconds: number;
-  totalIdleSeconds: number;
-  totalClicks: number;
-  totalKeys: number;
-  visitCount: number;
-}
-
-interface DailyActivity {
-  date: string;
-  activeSeconds: number;
-  idleSeconds: number;
-  clicks: number;
-  keys: number;
-  events: number;
-}
-
-interface MyActivityResponse {
-  from: string;
-  to: string;
-  summary: ActivitySummary;
-  pages: ActivityPage[];
-  dailyBreakdown: DailyActivity[];
-}
-
-interface AdminActivityUser {
-  userId: string;
-  fullName: string;
-  email: string;
-  totalActiveSeconds: number;
-  totalIdleSeconds: number;
-  totalClicks: number;
-  totalKeys: number;
-  totalEvents: number;
-  totalActiveLabel: string;
-  totalIdleLabel: string;
-  topPages: Array<{ page: string; visits: number }>;
-}
-
-interface AdminActivityResponse {
-  from: string;
-  to: string;
-  userSummaries: AdminActivityUser[];
-}
-
 interface ApiErrorResponse {
   error?: string;
 }
@@ -242,12 +183,6 @@ function formatDateShort(value: string): string {
 function formatMinutes(minutes: number): string {
   const h = Math.floor(Math.max(0, minutes) / 60);
   const m = Math.max(0, minutes) % 60;
-  return `${h}h ${String(m).padStart(2, "0")}m`;
-}
-
-function formatSeconds(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
   return `${h}h ${String(m).padStart(2, "0")}m`;
 }
 
@@ -287,161 +222,6 @@ function getDateRangeParams(range: string): { from: string; to: string } {
   }
 
   return { from: fromDate.toISOString().split("T")[0], to };
-}
-
-const PAGE_LABELS: Record<string, string> = {
-  "/": "Dashboard",
-  "/buyers": "Buyers",
-  "/suppliers/signed-contract": "Signed Contracts",
-  "/suppliers/new": "New Suppliers",
-  "/suppliers/old": "Old Suppliers",
-  "/deals": "Deals",
-  "/reports": "Reports",
-  "/vault": "Vault",
-  "/members": "Members",
-  "/activity": "Activity",
-  "/email-tasks": "Email Tracker",
-  "/daily-tasks": "Daily Tasks",
-  "/notifications": "Notifications",
-  "/attendance": "Attendance",
-};
-
-function getPageLabel(path: string): string {
-  return PAGE_LABELS[path] || path;
-}
-
-/* ─── Session & Activity Tracker ───────────────────── */
-
-function generateSessionId(): string {
-  // crypto.randomUUID() is only available in secure contexts (HTTPS).
-  // Fall back to a manual implementation for HTTP deployments.
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  // Fallback: generate a UUID-v4-like string
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-function useActivityTracker() {
-  const sessionIdRef = useRef(
-    typeof window !== "undefined"
-      ? sessionStorage.getItem("activity_session_id") ||
-        (() => {
-          const id = generateSessionId();
-          sessionStorage.setItem("activity_session_id", id);
-          return id;
-        })()
-      : ""
-  );
-
-  const statsRef = useRef({
-    clicks: 0,
-    keys: 0,
-    scrollDepth: 0,
-    activeMs: 0,
-    idleMs: 0,
-    lastActivity: Date.now(),
-    page: window.location.pathname,
-  });
-
-  const flushRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const flush = useCallback(async () => {
-    const s = statsRef.current;
-    const now = Date.now();
-    const gap = now - s.lastActivity;
-    if (gap > 120_000) {
-      s.idleMs += gap;
-    } else {
-      s.activeMs += gap;
-    }
-    s.lastActivity = now;
-
-    if (s.activeMs === 0 && s.clicks === 0 && s.keys === 0) return;
-
-    try {
-      await api.post("/activity-tracking/track", {
-        sessionId: sessionIdRef.current,
-        eventType: "heartbeat",
-        page: s.page,
-        activeSeconds: Math.round(s.activeMs / 1000),
-        idleSeconds: Math.round(s.idleMs / 1000),
-        clickCount: s.clicks,
-        keyCount: s.keys,
-        scrollDepth: s.scrollDepth,
-      });
-    } catch {
-      // Best-effort
-    }
-
-    s.clicks = 0;
-    s.keys = 0;
-    s.scrollDepth = 0;
-    s.activeMs = 0;
-    s.idleMs = 0;
-  }, []);
-
-  useEffect(() => {
-    const onActivity = () => {
-      const s = statsRef.current;
-      const now = Date.now();
-      const gap = now - s.lastActivity;
-      if (gap > 120_000) {
-        s.idleMs += gap;
-      } else {
-        s.activeMs += gap;
-      }
-      s.lastActivity = now;
-    };
-
-    const onClick = () => {
-      statsRef.current.clicks++;
-      onActivity();
-    };
-    const onKey = () => {
-      statsRef.current.keys++;
-      onActivity();
-    };
-    const onScroll = () => {
-      const depth = Math.round(
-        ((window.scrollY + window.innerHeight) / document.documentElement.scrollHeight) * 100
-      );
-      statsRef.current.scrollDepth = Math.max(statsRef.current.scrollDepth, depth);
-      onActivity();
-    };
-    const onMouseMove = () => onActivity();
-
-    window.addEventListener("click", onClick);
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll);
-    window.addEventListener("mousemove", onMouseMove);
-
-    // Flush every 30 seconds
-    flushRef.current = setInterval(flush, 30_000);
-
-    // Flush on page unload
-    const onBeforeUnload = () => flush();
-    window.addEventListener("beforeunload", onBeforeUnload);
-
-    return () => {
-      window.removeEventListener("click", onClick);
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("beforeunload", onBeforeUnload);
-      if (flushRef.current) clearInterval(flushRef.current);
-      flush();
-    };
-  }, [flush]);
-
-  // Update page on route change
-  useEffect(() => {
-    statsRef.current.page = window.location.pathname;
-  });
 }
 
 /* ─── Status Pill ──────────────────────────────────── */
@@ -583,18 +363,13 @@ function StatCard({ label, value, sublabel, icon: Icon, color = "slate" }: {
 export default function AttendanceDashboardPage() {
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<"my" | "history" | "activity" | "admin" | "admin-history" | "admin-activity">("my");
+  const [activeTab, setActiveTab] = useState<"my" | "history" | "admin" | "admin-history">("my");
   const [historyRange, setHistoryRange] = useState("30d");
-  const [activityRange, setActivityRange] = useState("7d");
   const [adminHistoryRange, setAdminHistoryRange] = useState("30d");
-  const [adminActivityRange, setAdminActivityRange] = useState("7d");
   const [checkoutProofs, setCheckoutProofs] = useState<CheckoutProofUpload[]>([]);
   const [isUploadingProofs, setIsUploadingProofs] = useState(false);
   const [proofViewerOpen, setProofViewerOpen] = useState(false);
   const [selectedProofRecord, setSelectedProofRecord] = useState<HistoryRecord | null>(null);
-
-  // Activity tracking
-  useActivityTracker();
 
   /* ─── Queries ────────────────────────────────────── */
 
@@ -618,25 +393,11 @@ export default function AttendanceDashboardPage() {
     enabled: activeTab === "history",
   });
 
-  const activityParams = getDateRangeParams(activityRange);
-  const myActivityQuery = useQuery<MyActivityResponse>({
-    queryKey: ["my-activity", activityRange],
-    queryFn: () => api.get("/activity-tracking/my", { params: activityParams }).then((r) => r.data),
-    enabled: activeTab === "activity",
-  });
-
   const adminHistoryParams = getDateRangeParams(adminHistoryRange);
   const adminHistoryQuery = useQuery<AdminHistoryResponse>({
     queryKey: ["admin-attendance-history", adminHistoryRange],
     queryFn: () => api.get("/attendance/admin/history", { params: adminHistoryParams }).then((r) => r.data),
     enabled: isAdmin && activeTab === "admin-history",
-  });
-
-  const adminActivityParams = getDateRangeParams(adminActivityRange);
-  const adminActivityQuery = useQuery<AdminActivityResponse>({
-    queryKey: ["admin-activity", adminActivityRange],
-    queryFn: () => api.get("/activity-tracking/admin", { params: adminActivityParams }).then((r) => r.data),
-    enabled: isAdmin && activeTab === "admin-activity",
   });
 
   /* ─── Mutations ──────────────────────────────────── */
@@ -757,9 +518,6 @@ export default function AttendanceDashboardPage() {
         <TabButton active={activeTab === "history"} onClick={() => setActiveTab("history")} icon={Calendar}>
           My History
         </TabButton>
-        <TabButton active={activeTab === "activity"} onClick={() => setActiveTab("activity")} icon={Activity}>
-          My Activity
-        </TabButton>
         {isAdmin && (
           <>
             <div className="w-px bg-slate-200 mx-1 self-stretch" />
@@ -768,9 +526,6 @@ export default function AttendanceDashboardPage() {
             </TabButton>
             <TabButton active={activeTab === "admin-history"} onClick={() => setActiveTab("admin-history")} icon={Calendar}>
               Team History
-            </TabButton>
-            <TabButton active={activeTab === "admin-activity"} onClick={() => setActiveTab("admin-activity")} icon={Monitor}>
-              Team Activity
             </TabButton>
           </>
         )}
@@ -921,7 +676,6 @@ export default function AttendanceDashboardPage() {
                 value={attendance.autoEnded ? "Auto-Absent" : attendance.status}
                 icon={Eye}
                 color={attendance.status === "Present" ? "emerald" : "rose"}
-                sublabel={attendance.lateLogin ? "Late login" : undefined}
               />
               <StatCard
                 label="Work Time"
@@ -969,8 +723,6 @@ export default function AttendanceDashboardPage() {
                 <StatCard label="Present" value={historyQuery.data.summary.presentDays} icon={Eye} color="emerald" />
                 <StatCard label="Absent" value={historyQuery.data.summary.absentDays} icon={Eye} color="rose" />
                 <StatCard label="Auto-Absent" value={historyQuery.data.summary.autoEndedDays} icon={Zap} color="amber" />
-                <StatCard label="Late Logins" value={historyQuery.data.summary.lateLoginDays} icon={Clock} color="amber" />
-                <StatCard label="Early Exits" value={historyQuery.data.summary.earlyLogoutDays} icon={LogOut} color="blue" />
               </div>
 
               {/* History Table */}
@@ -1013,93 +765,6 @@ export default function AttendanceDashboardPage() {
         </div>
       )}
 
-      {/* ═══ My Activity Tab ═══ */}
-      {activeTab === "activity" && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">My Website Activity</h2>
-            <DateRangePicker value={activityRange} onChange={setActivityRange} />
-          </div>
-
-          {myActivityQuery.isLoading ? (
-            <div className="py-16 text-center">
-              <Loader2 className="mx-auto h-6 w-6 animate-spin text-slate-400" />
-            </div>
-          ) : myActivityQuery.data ? (
-            <>
-              {/* Summary */}
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <StatCard label="Active Time" value={myActivityQuery.data.summary.totalActiveLabel} icon={Timer} color="emerald" />
-                <StatCard label="Idle Time" value={myActivityQuery.data.summary.totalIdleLabel} icon={Clock} color="amber" />
-                <StatCard label="Total Clicks" value={myActivityQuery.data.summary.totalClicks} icon={Mouse} color="blue" />
-                <StatCard label="Keystrokes" value={myActivityQuery.data.summary.totalKeys} icon={Activity} color="violet" />
-              </div>
-
-              {/* Pages Breakdown */}
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-slate-700 mb-4">Pages Visited</h3>
-                <div className="space-y-3">
-                  {myActivityQuery.data.pages.length === 0 ? (
-                    <p className="text-sm text-slate-400 py-4 text-center">No activity data recorded yet.</p>
-                  ) : (
-                    myActivityQuery.data.pages.map((p) => {
-                      const maxTime = myActivityQuery.data!.pages[0]?.totalActiveSeconds || 1;
-                      const pct = Math.round((p.totalActiveSeconds / maxTime) * 100);
-                      return (
-                        <div key={p.page} className="group">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium text-slate-700">{getPageLabel(p.page)}</span>
-                            <span className="text-xs text-slate-500">
-                              {formatSeconds(p.totalActiveSeconds)} · {p.visitCount} visits · {p.totalClicks} clicks
-                            </span>
-                          </div>
-                          <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all duration-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Daily Breakdown */}
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-100">
-                  <h3 className="text-sm font-semibold text-slate-700">Daily Breakdown</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                      <tr>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3">Active Time</th>
-                        <th className="px-4 py-3">Idle Time</th>
-                        <th className="px-4 py-3">Clicks</th>
-                        <th className="px-4 py-3">Keystrokes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {myActivityQuery.data.dailyBreakdown.map((d) => (
-                        <tr key={d.date} className="border-t border-slate-100 hover:bg-slate-50/50">
-                          <td className="px-4 py-3 font-medium text-slate-800">{formatDateShort(d.date)}</td>
-                          <td className="px-4 py-3 text-emerald-600 font-semibold">{formatSeconds(d.activeSeconds)}</td>
-                          <td className="px-4 py-3 text-amber-600">{formatSeconds(d.idleSeconds)}</td>
-                          <td className="px-4 py-3 text-slate-600">{d.clicks}</td>
-                          <td className="px-4 py-3 text-slate-600">{d.keys}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          ) : null}
-        </div>
-      )}
 
       {/* ═══ Admin: Team Today ═══ */}
       {activeTab === "admin" && isAdmin && (
@@ -1223,7 +888,6 @@ export default function AttendanceDashboardPage() {
                         <th className="px-4 py-3">Present</th>
                         <th className="px-4 py-3">Absent</th>
                         <th className="px-4 py-3">Auto-Absent</th>
-                        <th className="px-4 py-3">Late</th>
                         <th className="px-4 py-3">Total Work</th>
                       </tr>
                     </thead>
@@ -1243,9 +907,6 @@ export default function AttendanceDashboardPage() {
                           </td>
                           <td className="px-4 py-3">
                             <span className="font-semibold text-amber-600">{u.autoEndedDays}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-amber-600">{u.lateLoginDays}</span>
                           </td>
                           <td className="px-4 py-3 font-semibold text-slate-700">{formatMinutes(u.totalRealMinutes)}</td>
                         </tr>
@@ -1309,68 +970,6 @@ export default function AttendanceDashboardPage() {
         </div>
       )}
 
-      {/* ═══ Admin: Team Activity ═══ */}
-      {activeTab === "admin-activity" && isAdmin && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Monitor className="h-5 w-5 text-slate-500" />
-              <h2 className="text-lg font-semibold text-slate-900">Team Website Activity</h2>
-            </div>
-            <DateRangePicker value={adminActivityRange} onChange={setAdminActivityRange} />
-          </div>
-
-          {adminActivityQuery.isLoading ? (
-            <div className="py-16 text-center">
-              <Loader2 className="mx-auto h-6 w-6 animate-spin text-slate-400" />
-            </div>
-          ) : adminActivityQuery.data ? (
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3">Member</th>
-                      <th className="px-4 py-3">Active Time</th>
-                      <th className="px-4 py-3">Idle Time</th>
-                      <th className="px-4 py-3">Clicks</th>
-                      <th className="px-4 py-3">Keystrokes</th>
-                      <th className="px-4 py-3">Top Pages</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {adminActivityQuery.data.userSummaries.map((u) => (
-                      <tr key={u.userId} className="border-t border-slate-100 hover:bg-slate-50/50">
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-slate-800">{u.fullName}</p>
-                          <p className="text-xs text-slate-400">{u.email}</p>
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-emerald-600">{u.totalActiveLabel}</td>
-                        <td className="px-4 py-3 text-amber-600">{u.totalIdleLabel}</td>
-                        <td className="px-4 py-3 text-slate-600">{u.totalClicks}</td>
-                        <td className="px-4 py-3 text-slate-600">{u.totalKeys}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {u.topPages.slice(0, 3).map((tp) => (
-                              <span
-                                key={tp.page}
-                                className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
-                              >
-                                {getPageLabel(tp.page)}
-                                <span className="text-slate-400">({tp.visits})</span>
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
 
       <Dialog open={proofViewerOpen} onOpenChange={setProofViewerOpen}>
         <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-white border-slate-200">
