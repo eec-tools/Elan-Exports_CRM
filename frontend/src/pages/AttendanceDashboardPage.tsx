@@ -5,7 +5,10 @@ import {
   Activity,
   Calendar,
   Clock,
+  Download,
   Eye,
+  ExternalLink,
+  FileText,
   Loader2,
   LogIn,
   LogOut,
@@ -22,6 +25,13 @@ import {
 import { toast } from "sonner";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 
 /* ─── Types ────────────────────────────────────────── */
@@ -61,6 +71,13 @@ interface CheckoutProofUpload {
   name: string;
   mimeType?: string | null;
   size?: number | null;
+}
+
+interface AttendanceProofFile {
+  url: string;
+  name: string;
+  mimeType?: string;
+  size?: number;
 }
 
 interface TodayAttendanceResponse {
@@ -204,12 +221,22 @@ function formatDateTime(value: string | null): string {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kolkata",
+  });
 }
 
 function formatDateShort(value: string): string {
   const d = new Date(value);
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  });
 }
 
 function formatMinutes(minutes: number): string {
@@ -226,6 +253,18 @@ function formatSeconds(seconds: number): string {
 
 function getApiErrorMessage(error: unknown, fallback: string): string {
   return (error as AxiosError<ApiErrorResponse>).response?.data?.error || fallback;
+}
+
+function formatFileSize(bytes?: number): string {
+  if (!bytes || bytes <= 0) return "Unknown size";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function isImageProof(file: AttendanceProofFile): boolean {
+  if (file.mimeType?.startsWith("image/")) return true;
+  return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(file.url) || /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(file.name);
 }
 
 function getDateRangeParams(range: string): { from: string; to: string } {
@@ -435,7 +474,7 @@ function LiveTimer({ startTime }: { startTime: string }) {
 
   useEffect(() => {
     const start = new Date(startTime).getTime();
-    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
@@ -551,6 +590,8 @@ export default function AttendanceDashboardPage() {
   const [adminActivityRange, setAdminActivityRange] = useState("7d");
   const [checkoutProofs, setCheckoutProofs] = useState<CheckoutProofUpload[]>([]);
   const [isUploadingProofs, setIsUploadingProofs] = useState(false);
+  const [proofViewerOpen, setProofViewerOpen] = useState(false);
+  const [selectedProofRecord, setSelectedProofRecord] = useState<HistoryRecord | null>(null);
 
   // Activity tracking
   useActivityTracker();
@@ -672,10 +713,29 @@ export default function AttendanceDashboardPage() {
   /* ─── Derived ────────────────────────────────────── */
 
   const attendance = todayQuery.data?.attendance;
-  const isWorking = Boolean(todayQuery.data?.isWorking);
+  const startAtMs = attendance?.startTime ? new Date(attendance.startTime).getTime() : null;
+  const hasStarted =
+    typeof startAtMs === "number" && !Number.isNaN(startAtMs)
+      ? startAtMs <= Date.now()
+      : false;
+  const isWorking = Boolean(todayQuery.data?.isWorking && hasStarted);
+  const isScheduledEarly = Boolean(todayQuery.data?.isWorking && attendance?.startTime && !hasStarted);
   const isDone = Boolean(attendance?.endTime);
 
-  const checkInStage = !attendance?.startTime ? "not-started" : isWorking ? "working" : "completed";
+  const checkInStage = !attendance?.startTime
+    ? "not-started"
+    : isScheduledEarly
+      ? "scheduled"
+      : isWorking
+        ? "working"
+        : "completed";
+
+  const selectedProofs = selectedProofRecord?.checkoutProofs ?? [];
+
+  const openProofViewer = useCallback((record: HistoryRecord) => {
+    setSelectedProofRecord(record);
+    setProofViewerOpen(true);
+  }, []);
 
   /* ─── Render ─────────────────────────────────────── */
 
@@ -684,8 +744,8 @@ export default function AttendanceDashboardPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Attendance & Activity (Work Is In Progress...)</h1>
-          <p className="mt-1 text-sm text-slate-500">Track your work sessions, history, and activity.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Attendance & Activity</h1>
+          <p className="mt-1 text-sm text-slate-500">Track your check-ins, check-outs, and work activity.</p>
         </div>
       </div>
 
@@ -730,10 +790,17 @@ export default function AttendanceDashboardPage() {
                   <div className={`h-3 w-3 rounded-full ${isWorking ? "bg-emerald-500 animate-pulse" : isDone ? "bg-slate-300" : "bg-amber-400"}`} />
                   <span className="text-lg font-bold text-slate-800">
                     {checkInStage === "not-started" && "Ready to Check In"}
+                    {checkInStage === "scheduled" && "Checked In Early"}
                     {checkInStage === "working" && "Currently Working"}
                     {checkInStage === "completed" && "Day Completed ✓"}
                   </span>
                 </div>
+
+                {isScheduledEarly && attendance?.startTime && (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                    You checked in before your schedule. Session will start at {formatDateTime(attendance.startTime)}.
+                  </p>
+                )}
 
                 {isWorking && attendance?.startTime && (
                   <LiveTimer startTime={attendance.startTime} />
@@ -1202,6 +1269,7 @@ export default function AttendanceDashboardPage() {
                         <th className="px-4 py-3">Check In</th>
                         <th className="px-4 py-3">Check Out</th>
                         <th className="px-4 py-3">Work Time</th>
+                        <th className="px-4 py-3">Documents</th>
                         <th className="px-4 py-3">Status</th>
                       </tr>
                     </thead>
@@ -1213,6 +1281,22 @@ export default function AttendanceDashboardPage() {
                           <td className="px-4 py-3 text-slate-600">{formatDateTime(r.startTime)}</td>
                           <td className="px-4 py-3 text-slate-600">{formatDateTime(r.endTime)}</td>
                           <td className="px-4 py-3 font-semibold text-slate-700">{r.realTimeLabel}</td>
+                          <td className="px-4 py-3">
+                            {(r.checkoutProofs?.length ?? 0) > 0 ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 border-slate-300 text-slate-700"
+                                onClick={() => openProofViewer(r)}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                View ({r.checkoutProofs?.length ?? 0})
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-slate-400">No uploads</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3"><StatusPill status={r.status} autoEnded={r.autoEnded} /></td>
                         </tr>
                       ))}
@@ -1287,6 +1371,66 @@ export default function AttendanceDashboardPage() {
           ) : null}
         </div>
       )}
+
+      <Dialog open={proofViewerOpen} onOpenChange={setProofViewerOpen}>
+        <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-white border-slate-200">
+          <DialogHeader className="border-b border-slate-100 p-5">
+            <DialogTitle className="text-xl font-bold text-slate-900">Attendance Work Documents</DialogTitle>
+            <DialogDescription className="mt-1 text-slate-500">
+              {selectedProofRecord
+                ? `${selectedProofRecord.fullName ?? "Member"} · ${formatDateShort(selectedProofRecord.date)} · Check In ${formatDateTime(selectedProofRecord.startTime)} · Check Out ${formatDateTime(selectedProofRecord.endTime)}`
+                : "Review uploaded attendance files"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[70vh] overflow-y-auto p-5">
+            {selectedProofs.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                No work documents were uploaded for this attendance record.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {selectedProofs.map((file, index) => (
+                  <div key={`${file.url}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-slate-600">
+                        {isImageProof(file) ? <Paperclip className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-800" title={file.name}>{file.name}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{file.mimeType ?? "Unknown type"} · {formatFileSize(file.size)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 border-slate-300"
+                        onClick={() => window.open(file.url, "_blank", "noopener,noreferrer")}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Open
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 gap-1.5 bg-slate-900 text-white hover:bg-slate-800"
+                        onClick={() => window.open(file.url, "_blank", "noopener,noreferrer")}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Download
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

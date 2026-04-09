@@ -213,6 +213,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
 
     const now = new Date();
     const today = startOfLocalDay(now);
+    const workStart = buildWorkDateTime(today, user.workStartTime);
 
     const existing = await prisma.attendance.findUnique({
       where: {
@@ -223,8 +224,42 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
       },
     });
 
-    // Already checked in and session active
+    // Already checked in and session active.
+    // Repair legacy records where startTime was accidentally saved in the future.
     if (existing?.startTime && !existing.endTime) {
+      if (existing.startTime > now) {
+        const repaired = await prisma.attendance.update({
+          where: { id: existing.id },
+          data: {
+            startTime: now,
+            lateLogin: workStart ? now > workStart : false,
+          },
+          include: {
+            heartbeats: {
+              select: { timestamp: true },
+              orderBy: { timestamp: "asc" },
+            },
+          },
+        });
+
+        await logActivity(userId, "attendance_check_in_repaired", "attendance", repaired.id, {
+          previousStartTime: existing.startTime.toISOString(),
+          newStartTime: now.toISOString(),
+        });
+
+        res.status(200).json({
+          message: "Active session repaired with correct check-in time.",
+          attendance: serializeAttendance(
+            repaired,
+            user.minHoursPresent,
+            user.workStartTime,
+            user.workEndTime,
+          ),
+          isWorking: true,
+        });
+        return;
+      }
+
       res.status(400).json({ error: "You've already checked in today. Your session is active." });
       return;
     }
@@ -236,8 +271,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
     }
 
     // If there's an absent record (no-show), but user is now checking in, we update it
-    const workStart = buildWorkDateTime(today, user.workStartTime);
-    const effectiveStart = workStart && now < workStart ? workStart : now;
+    const effectiveStart = now;
 
     const attendance = await prisma.attendance.upsert({
       where: {
@@ -448,8 +482,26 @@ export async function getTodayAttendance(req: AuthRequest, res: Response): Promi
 
     if (liveAttendance?.startTime && !liveAttendance.endTime) {
       const now = new Date();
+
+      if (liveAttendance.startTime > now) {
+        liveAttendance = await prisma.attendance.update({
+          where: { id: liveAttendance.id },
+          data: {
+            startTime: now,
+            lateLogin: workStart ? now > workStart : false,
+          },
+          include: {
+            heartbeats: {
+              select: { timestamp: true },
+              orderBy: { timestamp: "asc" },
+            },
+          },
+        });
+      }
+
+      const activeStart = liveAttendance.startTime ?? now;
       const summary = calculateAttendanceSummary(
-        liveAttendance.startTime,
+        activeStart,
         now,
         liveAttendance.heartbeats,
       );
