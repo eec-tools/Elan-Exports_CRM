@@ -7,10 +7,10 @@ import prisma from "../config/db.js";
 import { logActivity } from "../services/activityLogger.js";
 import { AuthRequest } from "../types/index.js";
 import {
-  buildWorkDateTime,
   calculateAttendanceSummary,
   formatMinutes,
   isValidWorkWindow,
+  parseHHMM,
   startOfLocalDay,
 } from "../utils/attendance.js";
 
@@ -23,6 +23,21 @@ interface CheckoutProofFile {
 
 const MAX_CHECKOUT_PROOFS = 10;
 const CHECKOUT_EARLY_WINDOW_MINUTES = 60;
+const ATTENDANCE_TZ_OFFSET_MINUTES = Number(
+  process.env.ATTENDANCE_TZ_OFFSET_MINUTES ?? 330,
+);
+
+function buildScheduleDateTime(referenceDate: Date, hhmm: string): Date | null {
+  const parsed = parseHHMM(hhmm);
+  if (!parsed) return null;
+
+  const shifted = new Date(
+    referenceDate.getTime() + ATTENDANCE_TZ_OFFSET_MINUTES * 60 * 1000,
+  );
+  shifted.setHours(parsed.hours, parsed.minutes, 0, 0);
+
+  return new Date(shifted.getTime() - ATTENDANCE_TZ_OFFSET_MINUTES * 60 * 1000);
+}
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -236,7 +251,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
 
     const now = new Date();
     const today = startOfLocalDay(now);
-    const workStart = buildWorkDateTime(today, user.workStartTime);
+    const workStart = buildScheduleDateTime(now, user.workStartTime);
 
     const existing = await prisma.attendance.findUnique({
       where: {
@@ -389,7 +404,7 @@ export async function endAttendance(req: AuthRequest, res: Response): Promise<vo
       context.attendance.heartbeats,
     );
 
-    const scheduleEnd = buildWorkDateTime(context.today, context.user.workEndTime);
+    const scheduleEnd = buildScheduleDateTime(now, context.user.workEndTime);
     if (!scheduleEnd) {
       res.status(400).json({ error: "Invalid work schedule for user" });
       return;
@@ -508,8 +523,9 @@ export async function getTodayAttendance(req: AuthRequest, res: Response): Promi
       return;
     }
 
-    const workStart = buildWorkDateTime(context.today, context.user.workStartTime);
-    const workEnd = buildWorkDateTime(context.today, context.user.workEndTime);
+    const now = new Date();
+    const workStart = buildScheduleDateTime(now, context.user.workStartTime);
+    const workEnd = buildScheduleDateTime(now, context.user.workEndTime);
 
     if (!workStart || !workEnd) {
       res.status(400).json({ error: "Invalid work schedule for user" });
