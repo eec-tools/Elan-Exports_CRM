@@ -405,7 +405,7 @@ export default function AttendanceDashboardPage() {
   const startMutation = useMutation({
     mutationFn: () => api.post("/attendance/start"),
     onSuccess: () => {
-      toast.success("✅ Checked in successfully!");
+      toast.success("Checked in successfully!");
       setCheckoutProofs([]);
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
@@ -416,7 +416,7 @@ export default function AttendanceDashboardPage() {
   const endMutation = useMutation({
     mutationFn: (proofFiles: CheckoutProofUpload[]) => api.post("/attendance/end", { proofFiles }),
     onSuccess: () => {
-      toast.success("✅ Checked out successfully!");
+      toast.success("Checked out successfully!");
       setCheckoutProofs([]);
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
