@@ -50,7 +50,8 @@ import {
   LayoutGrid,
   Loader2,
   FileSpreadsheet,
-  Briefcase
+  Briefcase,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -210,6 +211,16 @@ export default function ReportsPage() {
     },
     onError: (e: any) =>
       toast.error(e.response?.data?.error || "Failed to delete report"),
+  });
+
+  const resyncMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/reports/${id}/resync`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      toast.success("Suppliers refreshed from buyer profile");
+    },
+    onError: (e: any) =>
+      toast.error(e.response?.data?.error || "Failed to refresh suppliers"),
   });
 
   const openCreate = () => {
@@ -589,6 +600,16 @@ export default function ReportsPage() {
                     {canEditReports && (
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                            onClick={(e) => { e.stopPropagation(); resyncMutation.mutate(item.id); }}
+                            title="Refresh Suppliers from Buyer"
+                            disabled={resyncMutation.isPending}
+                          >
+                            <RefreshCw className={`h-4 w-4 ${resyncMutation.isPending ? "animate-spin" : ""}`} />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"

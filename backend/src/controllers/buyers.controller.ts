@@ -277,17 +277,22 @@ export async function createBuyer(
       const recalculateSuppliersForReport = async (buyerNamesString: string) => {
           const names = buyerNamesString.split(",").map((x: string) => x.trim()).filter(Boolean);
           if (names.length === 0) return "Direct";
-          
-          const buyers = await prisma.buyer.findMany({
-              where: { company: { in: names } }
-          });
-          
+
+          // Use case-insensitive lookup for each name individually to avoid PostgreSQL case-sensitivity issues
+          const allBuyers: any[] = [];
+          for (const name of names) {
+              const found = await prisma.buyer.findMany({
+                  where: { company: { equals: name, mode: "insensitive" } }
+              });
+              allBuyers.push(...found);
+          }
+
           let allSupplierNames = new Set<string>();
-          for (const b of buyers) {
+          for (const b of allBuyers) {
               const bLinks = Array.isArray(b.supplierLinks) ? b.supplierLinks : [];
               for (const l of bLinks as any[]) {
                   if (l.type === "new") {
-                      const s = await prisma.newSupplier.findUnique({ where: { id: l.id } });
+                      const s = await (prisma as any).newSupplier.findUnique({ where: { id: l.id } });
                       if (s) allSupplierNames.add(s.company);
                   } else {
                       const s = await prisma.supplier.findUnique({ where: { id: l.id } });
@@ -310,11 +315,15 @@ export async function createBuyer(
           if (existingReport && reportProduct !== "General Sourcing Request" && reportProduct !== "N/A") {
               const newBuyerName = mergeStr(existingReport.buyerName, buyer.company);
               const recalculatedSuppliers = await recalculateSuppliersForReport(newBuyerName);
+              // Preserve existing companyName if recalculation returns "Direct" but existing value was not "Direct"
+              const finalCompanyName = (recalculatedSuppliers === "Direct" && existingReport.companyName && existingReport.companyName !== "Direct")
+                  ? existingReport.companyName
+                  : recalculatedSuppliers;
 
               await prisma.report.update({
                   where: { id: existingReport.id },
                   data: {
-                      companyName: recalculatedSuppliers,
+                      companyName: finalCompanyName,
                       buyerName: newBuyerName,
                       status: mergeStr(existingReport.status, buyer.status || "Pending"),
                       keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
@@ -461,10 +470,38 @@ export async function updateBuyer(
           ? baseString.split(",").map((s: string) => s.trim()).filter((s: string) => s.length > 0)
           : ["General Sourcing Request"];
 
-      // We log updates here similar to the existing implementation
+      // Build a meaningful key update entry based on what actually changed
       const statusChanged = req.body.status && req.body.status !== existing.status;
-      const updatesText = statusChanged ? `Status changed to ${req.body.status}` : `Buyer profile updated.`;
-      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] ${updatesText}`;
+
+      // Resolve names for added/removed supplier links
+      const resolveSupplierName = async (link: { id: string; type: string }): Promise<string | null> => {
+          if (link.type === "new") {
+              const s = await (prisma as any).newSupplier.findUnique({ where: { id: link.id }, select: { company: true } });
+              return s?.company ?? null;
+          } else {
+              const s = await prisma.supplier.findUnique({ where: { id: link.id }, select: { company: true } });
+              return s?.company ?? null;
+          }
+      };
+
+      const addedNames: string[] = [];
+      for (const link of added) {
+          const name = await resolveSupplierName(link);
+          if (name) addedNames.push(name);
+      }
+      const removedNames: string[] = [];
+      for (const link of removed) {
+          const name = await resolveSupplierName(link);
+          if (name) removedNames.push(name);
+      }
+
+      const changeParts: string[] = [];
+      if (addedNames.length > 0) changeParts.push(`Suppliers added: ${addedNames.join(", ")}`);
+      if (removedNames.length > 0) changeParts.push(`Suppliers removed: ${removedNames.join(", ")}`);
+      if (statusChanged) changeParts.push(`Status changed to ${req.body.status}`);
+      if (changeParts.length === 0) changeParts.push("Profile updated");
+
+      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] ${changeParts.join(". ")}.`;
 
       const mergeStr = (a: string, b: string) => {
           if (!b || b === "Direct" || b === "N/A" || b === "General Sourcing Request") return a;
@@ -476,17 +513,22 @@ export async function updateBuyer(
       const recalculateSuppliersForReport = async (buyerNamesString: string) => {
           const names = buyerNamesString.split(",").map((x: string) => x.trim()).filter(Boolean);
           if (names.length === 0) return "Direct";
-          
-          const buyers = await prisma.buyer.findMany({
-              where: { company: { in: names } }
-          });
-          
+
+          // Use case-insensitive lookup for each name individually to avoid PostgreSQL case-sensitivity issues
+          const allBuyers: any[] = [];
+          for (const name of names) {
+              const found = await prisma.buyer.findMany({
+                  where: { company: { equals: name, mode: "insensitive" } }
+              });
+              allBuyers.push(...found);
+          }
+
           let allSupplierNames = new Set<string>();
-          for (const b of buyers) {
+          for (const b of allBuyers) {
               const bLinks = Array.isArray(b.supplierLinks) ? b.supplierLinks : [];
               for (const l of bLinks as any[]) {
                   if (l.type === "new") {
-                      const s = await prisma.newSupplier.findUnique({ where: { id: l.id } });
+                      const s = await (prisma as any).newSupplier.findUnique({ where: { id: l.id } });
                       if (s) allSupplierNames.add(s.company);
                   } else {
                       const s = await prisma.supplier.findUnique({ where: { id: l.id } });
@@ -509,11 +551,15 @@ export async function updateBuyer(
           if (existingReport && reportProduct !== "General Sourcing Request" && reportProduct !== "N/A") {
               const newBuyerName = mergeStr(existingReport.buyerName, buyer.company);
               const recalculatedSuppliers = await recalculateSuppliersForReport(newBuyerName);
+              // Preserve existing companyName if recalculation returns "Direct" but existing value was not "Direct"
+              const finalCompanyName = (recalculatedSuppliers === "Direct" && existingReport.companyName && existingReport.companyName !== "Direct")
+                  ? existingReport.companyName
+                  : recalculatedSuppliers;
 
               await prisma.report.update({
                   where: { id: existingReport.id },
                   data: {
-                      companyName: recalculatedSuppliers,
+                      companyName: finalCompanyName,
                       buyerName: newBuyerName,
                       status: mergeStr(existingReport.status, buyer.status || "Status Updated"),
                       keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,

@@ -8,6 +8,7 @@ import {
   deleteReport,
   exportPdf,
   exportExcel,
+  resyncReportSuppliers,
 } from "../controllers/reports.controller.js";
 import {
   authenticate,
@@ -68,6 +69,7 @@ router.put(
   upload.single("productImage"),
   updateReport,
 );
+router.post("/:id/resync", requireEdit("reports"), resyncReportSuppliers);
 router.delete("/:id", requireEdit("reports"), deleteReport);
 
 export default router;

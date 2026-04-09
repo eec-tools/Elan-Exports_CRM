@@ -185,6 +185,95 @@ export async function deleteReport(
 }
 
 /**
+ * POST /api/reports/:id/resync
+ * Re-calculates companyName from the buyer's actual current supplierLinks
+ * and re-appends any missing key update note for the resync action.
+ */
+export async function resyncReportSuppliers(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const existing = await prisma.report.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: "Report not found" });
+      return;
+    }
+
+    const buyerNames = existing.buyerName
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    // Case-insensitive lookup for each buyer name
+    const allBuyers: any[] = [];
+    for (const name of buyerNames) {
+      const found = await prisma.buyer.findMany({
+        where: { company: { equals: name, mode: "insensitive" } },
+      });
+      allBuyers.push(...found);
+    }
+
+    // If no exact match found, try partial match as fallback
+    if (allBuyers.length === 0) {
+      for (const name of buyerNames) {
+        const found = await prisma.buyer.findMany({
+          where: { company: { contains: name, mode: "insensitive" } },
+        });
+        allBuyers.push(...found);
+      }
+    }
+
+    const allSupplierNames = new Set<string>();
+    for (const b of allBuyers) {
+      const links = Array.isArray(b.supplierLinks) ? b.supplierLinks : [];
+      for (const l of links as any[]) {
+        if (l.type === "new") {
+          const s = await (prisma as any).newSupplier.findUnique({ where: { id: l.id } });
+          if (s) allSupplierNames.add(s.company);
+        } else {
+          const s = await prisma.supplier.findUnique({ where: { id: l.id } });
+          if (s) allSupplierNames.add(s.company);
+        }
+      }
+    }
+
+    const supplierList = Array.from(allSupplierNames);
+    const newCompanyName =
+      supplierList.length > 0
+        ? supplierList.join(", ")
+        : existing.companyName; // preserve existing if none found
+
+    const date = new Date().toLocaleDateString();
+    const resyncNote =
+      supplierList.length > 0
+        ? `[${date}] Suppliers in talks: ${supplierList.join(", ")}.`
+        : `[${date}] No linked suppliers found on buyer profile.`;
+
+    const updatedKeyUpdates = existing.keyUpdates
+      ? `${resyncNote}\n\n${existing.keyUpdates}`
+      : resyncNote;
+
+    const report = await prisma.report.update({
+      where: { id: req.params.id },
+      data: {
+        companyName: newCompanyName,
+        keyUpdates: updatedKeyUpdates,
+        updateDate: new Date(),
+      },
+    });
+
+    res.json(report);
+  } catch (err) {
+    console.error("Resync report suppliers error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
  * GET /api/reports/export/pdf
  */
 export async function exportPdf(
