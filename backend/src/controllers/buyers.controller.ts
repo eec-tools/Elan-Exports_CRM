@@ -264,99 +264,72 @@ export async function createBuyer(
           ? baseString.split(",").map((s: string) => s.trim()).filter((s: string) => s.length > 0)
           : ["General Sourcing Request"];
 
-      // Build rich key update entry for buyer creation
-      const recalculateSuppliersForReport = async (buyerNamesString: string) => {
-          const names = buyerNamesString.split(",").map((x: string) => x.trim()).filter(Boolean);
-          if (names.length === 0) return "Direct";
-
-          const allBuyers: any[] = [];
-          for (const name of names) {
-              const found = await prisma.buyer.findMany({
-                  where: { company: { equals: name, mode: "insensitive" } }
-              });
-              allBuyers.push(...found);
+      // Resolve individual supplier companies from buyer's links — never join them
+      const links = (buyer.supplierLinks as { id: string; type: string }[]) ?? [];
+      const resolvedSuppliers: { company: string }[] = [];
+      for (const link of links) {
+          if (link.type === "new") {
+              const s = await (prisma as any).newSupplier.findUnique({ where: { id: link.id }, select: { company: true } });
+              if (s) resolvedSuppliers.push(s);
+          } else {
+              const s = await prisma.supplier.findUnique({ where: { id: link.id }, select: { company: true } });
+              if (s) resolvedSuppliers.push(s);
           }
+      }
+      // One entry per supplier — never merge multiple suppliers into one row
+      const supplierEntries = resolvedSuppliers.length > 0 ? resolvedSuppliers : [{ company: "Direct" }];
 
-          let allSupplierNames = new Set<string>();
-          for (const b of allBuyers) {
-              const bLinks = Array.isArray(b.supplierLinks) ? b.supplierLinks : [];
-              for (const l of bLinks as any[]) {
-                  if (l.type === "new") {
-                      const s = await (prisma as any).newSupplier.findUnique({ where: { id: l.id } });
-                      if (s) allSupplierNames.add(s.company);
-                  } else {
-                      const s = await prisma.supplier.findUnique({ where: { id: l.id } });
-                      if (s) allSupplierNames.add(s.company);
-                  }
-              }
-          }
-          if (allSupplierNames.size === 0) return "Direct";
-          return Array.from(allSupplierNames).join(", ");
-      };
-
-      const recalculatedSuppliers = await recalculateSuppliersForReport(buyer.company);
-      const productPart = `Products: ${productsToReport.join(", ") || "Not specified"}`;
-      const supplierPart = recalculatedSuppliers !== "Direct"
-          ? `Suppliers in talks: ${recalculatedSuppliers}`
-          : "Sourcing in progress";
       const statusPart = `Status: ${buyer.status || "Pending"}`;
       const countryPart = buyer.country ? `Country: ${buyer.country}` : "";
       const notesPart = buyer.notes ? `Notes: ${buyer.notes}` : "";
 
-      const richParts = [productPart, supplierPart, statusPart];
-      if (countryPart) richParts.push(countryPart);
-      if (notesPart) richParts.push(notesPart);
+      // One entry per (supplier × product) combination — never merge
+      for (const supplierEntry of supplierEntries) {
+          for (const reportProduct of productsToReport) {
+              const supplierPart = supplierEntry.company !== "Direct"
+                  ? `Supplier in talks: ${supplierEntry.company}`
+                  : "Sourcing in progress";
 
-      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] New buyer added. ${richParts.join(" | ")}`;
+              const richParts = [`Product: ${reportProduct}`, supplierPart, statusPart];
+              if (countryPart) richParts.push(countryPart);
+              if (notesPart) richParts.push(notesPart);
 
-      const mergeStr = (a: string, b: string) => {
-          if (!b || b === "Direct" || b === "N/A" || b === "General Sourcing Request") return a;
-          if (!a || a === "Direct" || a === "N/A" || a === "General Sourcing Request") return b;
-          const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
-          return Array.from(s).filter(Boolean).join(", ");
-      };
+              const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] New buyer added. ${richParts.join(" | ")}`;
 
-      for (const reportProduct of productsToReport) {
-          // Find report already belonging to this buyer + product
-          const existingReport = await prisma.report.findFirst({
-              where: {
-                  productName: { equals: reportProduct, mode: "insensitive" },
-                  buyerName: { contains: buyer.company, mode: "insensitive" },
-              },
-              orderBy: { createdAt: 'desc' }
-          });
-
-          if (existingReport) {
-              const newBuyerName = mergeStr(existingReport.buyerName, buyer.company);
-              const recalcSuppliers = await recalculateSuppliersForReport(newBuyerName);
-              const finalCompanyName = (recalcSuppliers === "Direct" && existingReport.companyName && existingReport.companyName !== "Direct")
-                  ? existingReport.companyName
-                  : recalcSuppliers;
-
-              await prisma.report.update({
-                  where: { id: existingReport.id },
-                  data: {
-                      companyName: finalCompanyName,
-                      buyerName: newBuyerName,
-                      status: buyer.status || "Pending",
-                      keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
-                      updateDate: new Date()
-                  }
+              // Exact triple match — prevents cross-contamination across different deals
+              const existingReport = await prisma.report.findFirst({
+                  where: {
+                      productName:  { equals: reportProduct, mode: "insensitive" },
+                      buyerName:    { equals: buyer.company, mode: "insensitive" },
+                      companyName:  { equals: supplierEntry.company, mode: "insensitive" },
+                  },
+                  orderBy: { createdAt: 'desc' }
               });
-          } else {
-              await prisma.report.create({
-                data: {
-                  productName: reportProduct,
-                  buyerName: buyer.company,
-                  companyName: recalculatedSuppliers,
-                  status: buyer.status || "Pending",
-                  keyUpdates: newUpdatePoint,
-                  buyerSupplier: "Buyer",
-                  reportDate: new Date(),
-                  updateDate: new Date(),
-                  createdBy: req.user!.id,
-                }
-              });
+
+              if (existingReport) {
+                  await prisma.report.update({
+                      where: { id: existingReport.id },
+                      data: {
+                          status: buyer.status || "Pending",
+                          keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
+                          updateDate: new Date()
+                      }
+                  });
+              } else {
+                  await prisma.report.create({
+                      data: {
+                          productName: reportProduct,
+                          buyerName: buyer.company,
+                          companyName: supplierEntry.company,
+                          status: buyer.status || "Pending",
+                          keyUpdates: newUpdatePoint,
+                          buyerSupplier: "Buyer",
+                          reportDate: new Date(),
+                          updateDate: new Date(),
+                          createdBy: req.user!.id,
+                      }
+                  });
+              }
           }
       }
     } catch(e) { console.error("Auto Report Gen Failed", e); }
@@ -482,10 +455,9 @@ export async function updateBuyer(
           ? baseString.split(",").map((s: string) => s.trim()).filter((s: string) => s.length > 0)
           : ["General Sourcing Request"];
 
-      // Build a meaningful key update entry based on what actually changed
+      // Build shared change summary (what changed on this update)
       const statusChanged = req.body.status && req.body.status !== existing.status;
 
-      // Resolve names for added/removed supplier links
       const resolveSupplierName = async (link: { id: string; type: string }): Promise<string | null> => {
           if (link.type === "new") {
               const s = await (prisma as any).newSupplier.findUnique({ where: { id: link.id }, select: { company: true } });
@@ -507,97 +479,71 @@ export async function updateBuyer(
           if (name) removedNames.push(name);
       }
 
-      const changeParts: string[] = [];
-      if (addedNames.length > 0) changeParts.push(`Suppliers added: ${addedNames.join(", ")}`);
-      if (removedNames.length > 0) changeParts.push(`Suppliers removed: ${removedNames.join(", ")}`);
-      if (statusChanged) changeParts.push(`Status changed to ${req.body.status}`);
-      if (changeParts.length === 0) changeParts.push("Profile updated");
+      const sharedChangeParts: string[] = [];
+      if (addedNames.length > 0) sharedChangeParts.push(`Suppliers added: ${addedNames.join(", ")}`);
+      if (removedNames.length > 0) sharedChangeParts.push(`Suppliers removed: ${removedNames.join(", ")}`);
+      if (statusChanged) sharedChangeParts.push(`Status changed to ${req.body.status}`);
+      if (sharedChangeParts.length === 0) sharedChangeParts.push("Profile updated");
 
-      // Recalculate current suppliers for context
-      const recalculateSuppliersForReport = async (buyerNamesString: string) => {
-          const names = buyerNamesString.split(",").map((x: string) => x.trim()).filter(Boolean);
-          if (names.length === 0) return "Direct";
-
-          const allBuyers: any[] = [];
-          for (const name of names) {
-              const found = await prisma.buyer.findMany({
-                  where: { company: { equals: name, mode: "insensitive" } }
-              });
-              allBuyers.push(...found);
-          }
-
-          let allSupplierNames = new Set<string>();
-          for (const b of allBuyers) {
-              const bLinks = Array.isArray(b.supplierLinks) ? b.supplierLinks : [];
-              for (const l of bLinks as any[]) {
-                  if (l.type === "new") {
-                      const s = await (prisma as any).newSupplier.findUnique({ where: { id: l.id } });
-                      if (s) allSupplierNames.add(s.company);
-                  } else {
-                      const s = await prisma.supplier.findUnique({ where: { id: l.id } });
-                      if (s) allSupplierNames.add(s.company);
-                  }
-              }
-          }
-          if (allSupplierNames.size === 0) return "Direct";
-          return Array.from(allSupplierNames).join(", ");
-      };
-      const recalculatedSuppliers = await recalculateSuppliersForReport(buyer.company);
-
-      // Append current supplier context
-      if (recalculatedSuppliers && recalculatedSuppliers !== "Direct") {
-        changeParts.push(`Suppliers in talks: ${recalculatedSuppliers}`);
-      }
-
-      const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] ${changeParts.join(". ")}.`;
-
-      const mergeStr = (a: string, b: string) => {
-          if (!b || b === "Direct" || b === "N/A" || b === "General Sourcing Request") return a;
-          if (!a || a === "Direct" || a === "N/A" || a === "General Sourcing Request") return b;
-          const s = new Set([...a.split(",").map(x=>x.trim()), ...b.split(",").map(x=>x.trim())]);
-          return Array.from(s).filter(Boolean).join(", ");
-      };
-
-      for (const reportProduct of productsToReport) {
-          // Find report already belonging to this buyer + product
-          const existingReport = await prisma.report.findFirst({
-              where: {
-                  productName: { equals: reportProduct, mode: "insensitive" },
-                  buyerName: { contains: buyer.company, mode: "insensitive" },
-              },
-              orderBy: { createdAt: 'desc' }
-          });
-
-          if (existingReport) {
-              const newBuyerName = mergeStr(existingReport.buyerName, buyer.company);
-              const finalCompanyName = (recalculatedSuppliers === "Direct" && existingReport.companyName && existingReport.companyName !== "Direct")
-                  ? existingReport.companyName
-                  : recalculatedSuppliers;
-
-              await prisma.report.update({
-                  where: { id: existingReport.id },
-                  data: {
-                      companyName: finalCompanyName,
-                      buyerName: newBuyerName,
-                      status: buyer.status || "Pending",
-                      keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
-                      updateDate: new Date()
-                  }
-              });
+      // Resolve current supplier links to individual companies — never join them
+      const currentLinks = (buyer.supplierLinks as { id: string; type: string }[]) ?? [];
+      const resolvedSuppliers: { company: string }[] = [];
+      for (const link of currentLinks) {
+          if (link.type === "new") {
+              const s = await (prisma as any).newSupplier.findUnique({ where: { id: link.id }, select: { company: true } });
+              if (s) resolvedSuppliers.push(s);
           } else {
-              await prisma.report.create({
-                data: {
-                  productName: reportProduct,
-                  buyerName: buyer.company,
-                  companyName: recalculatedSuppliers,
-                  status: buyer.status || "Pending",
-                  keyUpdates: newUpdatePoint,
-                  buyerSupplier: "Buyer",
-                  reportDate: new Date(),
-                  updateDate: new Date(),
-                  createdBy: req.user!.id,
-                }
+              const s = await prisma.supplier.findUnique({ where: { id: link.id }, select: { company: true } });
+              if (s) resolvedSuppliers.push(s);
+          }
+      }
+      // One entry per supplier — never merge multiple suppliers into one row
+      const supplierEntries = resolvedSuppliers.length > 0 ? resolvedSuppliers : [{ company: "Direct" }];
+
+      // One entry per (supplier × product) combination — never merge
+      for (const supplierEntry of supplierEntries) {
+          for (const reportProduct of productsToReport) {
+              const supplierPart = supplierEntry.company !== "Direct"
+                  ? `Supplier in talks: ${supplierEntry.company}`
+                  : "Sourcing in progress";
+
+              const richParts = [...sharedChangeParts, supplierPart];
+              const newUpdatePoint = `[${new Date().toLocaleDateString()}] [${buyer.company}] ${richParts.join(" | ")}.`;
+
+              // Exact triple match — prevents cross-contamination across different deals
+              const existingReport = await prisma.report.findFirst({
+                  where: {
+                      productName:  { equals: reportProduct, mode: "insensitive" },
+                      buyerName:    { equals: buyer.company, mode: "insensitive" },
+                      companyName:  { equals: supplierEntry.company, mode: "insensitive" },
+                  },
+                  orderBy: { createdAt: 'desc' }
               });
+
+              if (existingReport) {
+                  await prisma.report.update({
+                      where: { id: existingReport.id },
+                      data: {
+                          status: buyer.status || "Pending",
+                          keyUpdates: existingReport.keyUpdates ? `${newUpdatePoint}\n\n${existingReport.keyUpdates}` : newUpdatePoint,
+                          updateDate: new Date()
+                      }
+                  });
+              } else {
+                  await prisma.report.create({
+                      data: {
+                          productName: reportProduct,
+                          buyerName: buyer.company,
+                          companyName: supplierEntry.company,
+                          status: buyer.status || "Pending",
+                          keyUpdates: newUpdatePoint,
+                          buyerSupplier: "Buyer",
+                          reportDate: new Date(),
+                          updateDate: new Date(),
+                          createdBy: req.user!.id,
+                      }
+                  });
+              }
           }
       }
     } catch(e) { console.error("Auto Report Gen Failed", e); }

@@ -148,7 +148,7 @@ export async function generateBuyerReportsPdf(reports: Report[]): Promise<Buffer
       const cells: Record<keyof typeof COLS, string> = {
         no:       String(index + 1),
         buyer:    safeText(report.buyerName),
-        product:  safeText(report.productName),
+        product:  report.productName === "General Sourcing Request" ? "No Requirements Yet" : safeText(report.productName),
         supplier: safeText(report.companyName),
         status:   safeText(report.status),
         updated:  updatedText,

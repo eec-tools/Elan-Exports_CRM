@@ -81,15 +81,15 @@ const resolveImageUrl = (url?: string | null) => {
 };
 
 const reportSchema = z.object({
-  product_name: z.string().min(1, "Product name is required"),
+  product_name: z.string().optional(),
   product_image_url: z.string().optional().nullable(),
-  buyer_name: z.string().min(1, "Buyer name is required"),
-  company_name: z.string().min(1, "Company name is required"),
-  status: z.string().min(1, "Status is required"),
+  buyer_name: z.string().optional(),
+  company_name: z.string().optional(),
+  status: z.string().optional(),
   key_updates: z.string().optional().nullable(),
   update_date: z.date().optional().nullable(),
-  buyer_supplier: z.string().min(1, "Action type is required"),
-  report_date: z.date(),
+  buyer_supplier: z.string().optional(),
+  report_date: z.date().optional(),
 });
 
 type ReportFormValues = z.infer<typeof reportSchema>;
@@ -165,7 +165,7 @@ export default function ReportsPage() {
           ? format(values.update_date, "yyyy-MM-dd")
           : null,
         buyerSupplier: values.buyer_supplier,
-        reportDate: format(values.report_date, "yyyy-MM-dd"),
+        reportDate: values.report_date ? format(values.report_date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
       };
 
       const formData = new FormData();
@@ -768,7 +768,7 @@ export default function ReportsPage() {
                                 <Input
                                   type="date"
                                   className="bg-white border-slate-200 focus:border-brand-500 focus:ring-brand-500/20"
-                                  value={format(field.value, "yyyy-MM-dd")}
+                                  value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
                                   onChange={(e) => field.onChange(new Date(e.target.value))}
                                 />
                               </FormControl>
