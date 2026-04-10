@@ -32,6 +32,9 @@ import { startEmailSyncScheduler } from "./services/emailSyncScheduler.js";
 import attendanceRoutes from "./routes/attendance.routes.js";
 import { startAttendanceScheduler } from "./services/attendanceScheduler.js";
 import activityTrackingRoutes from "./routes/activityTracking.routes.js";
+import employeesRoutes from "./routes/employees.routes.js";
+import leaveRoutes from "./routes/leave.routes.js";
+import payrollRoutes from "./routes/payroll.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -150,6 +153,9 @@ app.use("/api/new-supplier-campaigns", newSupplierEmailCampaignRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/activity-tracking", activityTrackingRoutes);
+app.use("/api/admin/employees", employeesRoutes);
+app.use("/api/leaves", leaveRoutes);
+app.use("/api/payroll", payrollRoutes);
 
 // Health check with detailed status
 app.get("/api/health", async (_req, res) => {
