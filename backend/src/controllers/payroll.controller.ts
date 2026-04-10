@@ -1,11 +1,15 @@
-import { Response } from "express";
+import { Response, Request } from "express";
 import prisma from "../config/db.js";
-import { AuthRequest } from "../types/index.js";
+import { AuthUser } from "../types/index.js";
 import { generatePayroll } from "../services/payroll.service.js";
+
+type AuthReq<P extends Record<string, string> = Record<string, never>> = Request<P> & {
+  user?: AuthUser;
+};
 
 /** POST /api/admin/payroll/generate — generate payroll for all active employees */
 export async function generateMonthlyPayroll(
-  req: AuthRequest,
+  req: AuthReq,
   res: Response,
 ): Promise<void> {
   try {
@@ -46,7 +50,7 @@ export async function generateMonthlyPayroll(
 
 /** GET /api/admin/payroll?month=&year= — monthly payroll summary */
 export async function getMonthlyPayrollSummary(
-  req: AuthRequest,
+  req: AuthReq,
   res: Response,
 ): Promise<void> {
   try {
@@ -83,7 +87,7 @@ export async function getMonthlyPayrollSummary(
 
 /** GET /api/admin/payroll/:userId — payroll history for one employee */
 export async function getEmployeePayrollHistory(
-  req: AuthRequest,
+  req: AuthReq<{ userId: string }>,
   res: Response,
 ): Promise<void> {
   try {
@@ -113,7 +117,7 @@ export async function getEmployeePayrollHistory(
 
 /** GET /api/admin/payroll/:userId/slip?month=&year= — payroll slip for one employee */
 export async function getPayrollSlip(
-  req: AuthRequest,
+  req: AuthReq<{ userId: string }>,
   res: Response,
 ): Promise<void> {
   try {
@@ -154,7 +158,7 @@ export async function getPayrollSlip(
 }
 
 /** GET /api/payroll/me — employee views own payroll */
-export async function getMyPayroll(req: AuthRequest, res: Response): Promise<void> {
+export async function getMyPayroll(req: AuthReq, res: Response): Promise<void> {
   try {
     const userId = req.user!.id;
     const { month, year } = req.query;
