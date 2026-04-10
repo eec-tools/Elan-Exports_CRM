@@ -29,6 +29,12 @@ import VaultPage from "@/pages/VaultPage";
 import DealsPage from "@/pages/DealsPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import AttendanceDashboardPage from "@/pages/AttendanceDashboardPage";
+import LeavePage from "@/pages/LeavePage";
+import PayrollPage from "@/pages/PayrollPage";
+import AdminLeavesPage from "@/pages/admin/AdminLeavesPage";
+import AdminPayrollPage from "@/pages/admin/AdminPayrollPage";
+import AdminEmployeesPage from "@/pages/admin/AdminEmployeesPage";
+import PayrollSlipPage from "@/pages/admin/PayrollSlipPage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient({
@@ -179,7 +185,9 @@ export default function App() {
                   }
                 />
                 <Route path="notifications" element={<NotificationsPage />} />
-                  <Route path="attendance" element={<AttendanceDashboardPage />} />
+                <Route path="attendance" element={<AttendanceDashboardPage />} />
+                <Route path="leaves" element={<LeavePage />} />
+                <Route path="payroll" element={<PayrollPage />} />
 
                 {/* Admin-only routes */}
                 <Route element={<AdminRoute />}>
@@ -189,6 +197,10 @@ export default function App() {
                     path="access-requests"
                     element={<AccessRequestsPage />}
                   />
+                  <Route path="admin/employees" element={<AdminEmployeesPage />} />
+                  <Route path="admin/leaves" element={<AdminLeavesPage />} />
+                  <Route path="admin/payroll" element={<AdminPayrollPage />} />
+                  <Route path="admin/payroll-slip/:userId" element={<PayrollSlipPage />} />
                 </Route>
               </Route>
             </Route>

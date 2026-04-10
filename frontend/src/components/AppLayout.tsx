@@ -19,6 +19,9 @@ import {
   TrendingUp,
   Bell,
   Clock3,
+  Umbrella,
+  Banknote,
+  UsersRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -125,6 +128,41 @@ const navItems = [
     icon: Clock3,
     perm: null,
     adminOnly: false,
+  },
+  {
+    to: "/leaves",
+    label: "Leaves",
+    icon: Umbrella,
+    perm: null,
+    adminOnly: false,
+  },
+  {
+    to: "/payroll",
+    label: "My Payroll",
+    icon: Banknote,
+    perm: null,
+    adminOnly: false,
+  },
+  {
+    to: "/admin/employees",
+    label: "Employees",
+    icon: UsersRound,
+    perm: null,
+    adminOnly: true,
+  },
+  {
+    to: "/admin/leaves",
+    label: "Leave Requests",
+    icon: Umbrella,
+    perm: null,
+    adminOnly: true,
+  },
+  {
+    to: "/admin/payroll",
+    label: "Payroll",
+    icon: Banknote,
+    perm: null,
+    adminOnly: true,
   },
 ];
 
