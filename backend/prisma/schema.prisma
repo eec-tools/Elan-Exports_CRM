@@ -18,6 +18,15 @@ model User {
   isActive          Boolean               @default(true) @map("is_active")
   createdAt         DateTime              @default(now()) @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
+  // Payroll fields
+  monthlySalary     Float?                @map("monthly_salary")
+  employeeStatus    EmployeeStatus        @default(probation) @map("employee_status")
+  gender            Gender?
+  designation       String?
+  bankAccountNumber String?               @map("bank_account_number")
+  bankName          String?               @map("bank_name")
+  bankIfsc          String?               @map("bank_ifsc")
+  // Relations
   reviewedRequests  AccessRequest[]       @relation("reviewer")
   accessRequests    AccessRequest[]       @relation("requester")
   activityLogs      ActivityLog[]
@@ -33,6 +42,8 @@ model User {
   vaultDocuments    VaultDocument[]
   notificationReads NotificationRead[]
   assignedCompanies String[]              @default([]) @map("assigned_companies")
+  leaves            Leave[]
+  payrolls          Payroll[]
 
   @@map("users")
 }
@@ -724,4 +735,70 @@ enum ComplianceStatus {
 enum AttendanceStatus {
   Present
   Absent
+  HalfDay
+  WeeklyOff
+  Leave
+}
+
+enum EmployeeStatus {
+  intern
+  probation
+  confirmed
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+}
+
+model Leave {
+  id           String      @id @default(uuid())
+  userId       String      @map("user_id")
+  startDate    DateTime    @map("start_date") @db.Date
+  endDate      DateTime    @map("end_date") @db.Date
+  numberOfDays Int         @map("number_of_days")
+  reason       String?
+  status       LeaveStatus @default(pending)
+  reviewedBy   String?     @map("reviewed_by")
+  reviewedAt   DateTime?   @map("reviewed_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([startDate, endDate])
+  @@map("leaves")
+}
+
+model Payroll {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  month           Int
+  year            Int
+  workingDays     Int      @map("working_days")
+  presentDays     Float    @map("present_days")
+  approvedLeaves  Float    @map("approved_leaves")
+  absentDays      Float    @map("absent_days")
+  grossSalary     Float    @map("gross_salary")
+  professionalTax Float    @map("professional_tax")
+  netSalary       Float    @map("net_salary")
+  generatedAt     DateTime @default(now()) @map("generated_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month, year])
+  @@map("payrolls")
+}
+
+model AttendanceSettings {
+  id          String  @id @default(uuid())
+  saturdayOff Boolean @default(true) @map("saturday_off")
+  sundayOff   Boolean @default(true) @map("sunday_off")
+
+  @@map("attendance_settings")
 }
