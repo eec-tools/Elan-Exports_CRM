@@ -3,6 +3,31 @@ import bcrypt from "bcryptjs";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 
+/** GET /api/employees/me — current user's own employee profile */
+export async function getMyEmployeeProfile(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: req.user!.id },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        designation: true,
+        employeeStatus: true,
+        gender: true,
+        monthlySalary: true,
+        bankAccountNumber: true,
+        bankName: true,
+        bankIfsc: true,
+      },
+    });
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch employee profile" });
+  }
+}
+
 /** GET /api/admin/employees — list all users with payroll fields */
 export async function listEmployees(req: AuthRequest, res: Response): Promise<void> {
   try {

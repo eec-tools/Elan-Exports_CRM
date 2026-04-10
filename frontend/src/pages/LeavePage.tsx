@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import api from "@/api/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +31,6 @@ const statusColors: Record<string, string> = {
 };
 
 export default function LeavePage() {
-  const { user } = useAuth();
   const qc = useQueryClient();
 
   const [startDate, setStartDate] = useState("");
@@ -50,12 +48,8 @@ export default function LeavePage() {
   });
 
   const { data: empData } = useQuery({
-    queryKey: ["my-employee-status"],
-    queryFn: () =>
-      api.get(`/admin/employees`).then((r) => {
-        const me = r.data.find((e: any) => e.id === user?.id);
-        return me;
-      }),
+    queryKey: ["my-employee-profile"],
+    queryFn: () => api.get("/admin/employees/me").then((r) => r.data),
   });
 
   const isConfirmed = empData?.employeeStatus === "confirmed";
