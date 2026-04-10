@@ -1,9 +1,10 @@
 import { Response, Request } from "express";
+import { ParamsDictionary } from "express-serve-static-core";
 import prisma from "../config/db.js";
 import { AuthUser } from "../types/index.js";
 import { generatePayroll } from "../services/payroll.service.js";
 
-type AuthReq<P extends Record<string, string> = Record<string, never>> = Request<P> & {
+type AuthReq<P extends ParamsDictionary = ParamsDictionary> = Request<P> & {
   user?: AuthUser;
 };
 
