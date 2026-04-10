@@ -37,10 +37,9 @@ export async function getDashboardStats(
       safe(() => (prisma as any).deal.count(), 0),
       safe(() => (prisma as any).vaultDocument.count(), 0),
       safe(() => (prisma as any).dailyTask.count({ where: { status: { not: "Completed" } } }), 0),
-      safe(() =>
-        (prisma as any).deal.findMany({
+      safe(async () => {
+        const allDeals = await (prisma as any).deal.findMany({
           orderBy: { createdAt: "desc" },
-          take: 3,
           select: {
             id: true,
             title: true,
@@ -51,8 +50,15 @@ export async function getDashboardStats(
             riskScore: true,
             createdAt: true,
           },
-        }), []
-      ),
+        });
+        // Group by stage, keep up to 3 latest per stage
+        const byStage: Record<string, any[]> = {};
+        for (const deal of allDeals) {
+          if (!byStage[deal.stage]) byStage[deal.stage] = [];
+          if (byStage[deal.stage].length < 3) byStage[deal.stage].push(deal);
+        }
+        return Object.values(byStage).flat();
+      }, []),
       safe(() =>
         (prisma as any).dailyTask.groupBy({
           by: ["owner", "status"],

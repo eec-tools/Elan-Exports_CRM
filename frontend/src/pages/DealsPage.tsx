@@ -442,7 +442,7 @@ export default function DealsPage() {
             />
           ) : (
             <TableView
-              deals={deals}
+              deals={deals.filter((d) => STAGES.some((s) => s.id === d.stage))}
               onRowClick={openDeal}
               onDelete={(d) => setDeleteTarget(d)}
               onEdit={(d) => { openDeal(d); setEditMode(true); }}

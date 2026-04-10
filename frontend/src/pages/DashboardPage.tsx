@@ -327,7 +327,7 @@ export default function DashboardPage() {
 
           <div className="p-5">
             {(() => {
-              const topDeals = s.recentDeals?.slice(0, 3) || [];
+              const topDeals = s.recentDeals || [];
               if (topDeals.length === 0) {
                 return (
                   <div className="flex flex-col items-center justify-center py-8 text-center h-full">
@@ -339,6 +339,47 @@ export default function DashboardPage() {
                   </div>
                 );
               }
+
+              const dealCard = (deal: RecentDeal, stageColor: string) => (
+                <Link
+                  key={deal.id}
+                  to="/deals"
+                  className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 transition-all group block"
+                >
+                  <div className="flex items-start justify-between gap-1 mb-1">
+                    <p className="text-sm font-semibold text-slate-800 leading-tight line-clamp-2 group-hover:text-brand-700 transition-colors">
+                      {deal.title}
+                    </p>
+                    <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0 mt-0.5 group-hover:text-brand-500 transition-colors" />
+                  </div>
+                  {deal.buyer && (
+                    <p className="text-xs text-slate-500 mb-2 truncate">{deal.buyer}</p>
+                  )}
+                  <div className="flex items-center justify-between mt-2">
+                    {deal.expectedRevenue ? (
+                      <span className="text-sm font-bold" style={{ color: stageColor }}>
+                        {fmtMoney(deal.expectedRevenue)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">No revenue</span>
+                    )}
+                    {deal.probability !== undefined && (
+                      <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                        {deal.probability}%
+                      </span>
+                    )}
+                  </div>
+                  {deal.riskScore && (
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: riskColor(deal.riskScore) }}
+                      />
+                      <span className="text-xs text-slate-400">{deal.riskScore} risk</span>
+                    </div>
+                  )}
+                </Link>
+              );
 
               return (
                 <div className="flex gap-4 overflow-x-auto pb-2 min-h-[160px]">
@@ -361,46 +402,7 @@ export default function DashboardPage() {
                           </span>
                         </div>
                         <div className="flex flex-col gap-2 p-2">
-                          {stageDeals.map(deal => (
-                            <Link
-                              key={deal.id}
-                              to="/deals"
-                              className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 transition-all group block"
-                            >
-                              <div className="flex items-start justify-between gap-1 mb-1">
-                                <p className="text-sm font-semibold text-slate-800 leading-tight line-clamp-2 group-hover:text-brand-700 transition-colors">
-                                  {deal.title}
-                                </p>
-                                <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0 mt-0.5 group-hover:text-brand-500 transition-colors" />
-                              </div>
-                              {deal.buyer && (
-                                <p className="text-xs text-slate-500 mb-2 truncate">{deal.buyer}</p>
-                              )}
-                              <div className="flex items-center justify-between mt-2">
-                                {deal.expectedRevenue ? (
-                                  <span className="text-sm font-bold" style={{ color: stage.color }}>
-                                    {fmtMoney(deal.expectedRevenue)}
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-slate-400">No revenue</span>
-                                )}
-                                {deal.probability !== undefined && (
-                                  <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                                    {deal.probability}%
-                                  </span>
-                                )}
-                              </div>
-                              {deal.riskScore && (
-                                <div className="flex items-center gap-1 mt-1.5">
-                                  <div
-                                    className="h-2 w-2 rounded-full"
-                                    style={{ background: riskColor(deal.riskScore) }}
-                                  />
-                                  <span className="text-xs text-slate-400">{deal.riskScore} risk</span>
-                                </div>
-                              )}
-                            </Link>
-                          ))}
+                          {stageDeals.map(deal => dealCard(deal, stage.color))}
                         </div>
                       </div>
                     );
