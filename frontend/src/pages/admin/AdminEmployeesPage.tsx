@@ -11,7 +11,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Pencil } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -52,6 +62,7 @@ export default function AdminEmployeesPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [removeTarget, setRemoveTarget] = useState<Employee | null>(null);
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
     queryKey: ["admin-employees"],
@@ -91,6 +102,17 @@ export default function AdminEmployeesPage() {
       closeModal();
     },
     onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed to update employee"),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.patch(`/admin/employees/${id}`, { isActive: false }).then((r) => r.data),
+    onSuccess: () => {
+      toast.success("Employee removed");
+      qc.invalidateQueries({ queryKey: ["admin-employees"] });
+      setRemoveTarget(null);
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed to remove employee"),
   });
 
   const openCreate = () => {
@@ -203,14 +225,24 @@ export default function AdminEmployeesPage() {
                           : "—"}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0"
-                          onClick={() => openEdit(emp)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            onClick={() => openEdit(emp)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => setRemoveTarget(emp)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -283,6 +315,27 @@ export default function AdminEmployeesPage() {
           </form>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={!!removeTarget} onOpenChange={(o) => !o && setRemoveTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Employee</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <strong>{removeTarget?.fullName}</strong>? They will be
+              deactivated and no longer appear in the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => removeTarget && removeMutation.mutate(removeTarget.id)}
+              disabled={removeMutation.isPending}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
