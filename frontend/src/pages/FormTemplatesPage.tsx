@@ -62,8 +62,8 @@ interface FormTemplate {
 
 export default function FormTemplatesPage() {
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuth();
-  const canEdit = hasPermission("suppliers", "edit");
+  const { hasEditPermission } = useAuth();
+  const canEdit = hasEditPermission("suppliers");
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<FormTemplate | null>(null);
@@ -152,7 +152,7 @@ export default function FormTemplatesPage() {
             Configure which sections appear in the public supplier form. Templates control what the supplier sees.
           </p>
         </div>
-        <PermissionGate permission="new_suppliers" level="edit">
+        <PermissionGate permission="new_suppliers" editOnly>
           <Button size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1.5" />
             New Template

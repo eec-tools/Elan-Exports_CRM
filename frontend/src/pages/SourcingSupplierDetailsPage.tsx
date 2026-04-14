@@ -13,16 +13,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { PermissionGate } from "@/components/PermissionGate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   Loader2,
   Mail,
-  Phone,
-  MapPin,
-  User,
-  Building2,
   CheckCircle2,
   Copy,
   ArrowRight,
@@ -195,8 +190,8 @@ export default function SourcingSupplierDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuth();
-  const canEdit = hasPermission("suppliers", "edit");
+  const { hasEditPermission } = useAuth();
+  const canEdit = hasEditPermission("suppliers");
 
   const [fields, setFields] = useState<Partial<SourcingSupplier>>({});
   const [isDirty, setIsDirty] = useState(false);

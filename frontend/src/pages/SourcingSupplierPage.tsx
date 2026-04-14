@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
-import { Badge } from "@/components/ui/badge";
 
 interface SourcingSupplier {
   id: string;
@@ -79,8 +78,8 @@ const CAMPAIGN_STEP_LABEL: Record<number, string> = {
 };
 
 export default function SourcingSupplierPage() {
-  const { hasPermission } = useAuth();
-  const canEdit = hasPermission("suppliers", "edit");
+  const { hasEditPermission } = useAuth();
+  const canEdit = hasEditPermission("suppliers");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -229,7 +228,7 @@ export default function SourcingSupplierPage() {
             <LayoutTemplate className="h-4 w-4 mr-1.5" />
             Form Templates
           </Button>
-          <PermissionGate permission="new_suppliers" level="edit">
+          <PermissionGate permission="new_suppliers" editOnly>
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" />
               Add Sourcing Supplier

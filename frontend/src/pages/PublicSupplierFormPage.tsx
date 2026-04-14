@@ -417,7 +417,6 @@ export default function PublicSupplierFormPage() {
   const completedSections = activeSections.filter((s) => sectionComplete(s.key)).length;
   const progressPct = totalSections > 0 ? Math.round((completedSections / totalSections) * 100) : 0;
 
-  const currentSectionValid = requiredFields.every((f) => (field(f) ?? "").trim() !== "");
 
   const allFields = () => ({
     ...formData,
