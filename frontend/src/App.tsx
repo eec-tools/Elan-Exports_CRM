@@ -35,6 +35,10 @@ import AdminLeavesPage from "@/pages/admin/AdminLeavesPage";
 import AdminPayrollPage from "@/pages/admin/AdminPayrollPage";
 import AdminEmployeesPage from "@/pages/admin/AdminEmployeesPage";
 import PayrollSlipPage from "@/pages/admin/PayrollSlipPage";
+import SourcingSupplierPage from "@/pages/SourcingSupplierPage";
+import SourcingSupplierDetailsPage from "@/pages/SourcingSupplierDetailsPage";
+import FormTemplatesPage from "@/pages/FormTemplatesPage";
+import PublicSupplierFormPage from "@/pages/PublicSupplierFormPage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient({
@@ -75,6 +79,7 @@ export default function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/supplier-form/:token" element={<PublicSupplierFormPage />} />
 
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
@@ -123,6 +128,30 @@ export default function App() {
                   element={
                     <PermissionGate permission="old_suppliers">
                       <OldSuppliersPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="suppliers/sourcing"
+                  element={
+                    <PermissionGate permission="new_suppliers">
+                      <SourcingSupplierPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="suppliers/sourcing/:id"
+                  element={
+                    <PermissionGate permission="new_suppliers">
+                      <SourcingSupplierDetailsPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="suppliers/form-templates"
+                  element={
+                    <PermissionGate permission="new_suppliers">
+                      <FormTemplatesPage />
                     </PermissionGate>
                   }
                 />

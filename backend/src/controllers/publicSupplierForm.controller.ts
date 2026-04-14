@@ -1,0 +1,228 @@
+import { Request, Response } from "express";
+import prisma from "../config/db.js";
+import { v2 as cloudinary } from "cloudinary";
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const publicFormStorage = new CloudinaryStorage({
+    cloudinary,
+    params: async (_req: Express.Request, file: Express.Multer.File) => {
+        const isPdf = file.mimetype === "application/pdf" || file.originalname.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|csv|zip)$/);
+        const extMatch = file.originalname.match(/\.[^/.]+$/);
+        const ext = isPdf && extMatch ? extMatch[0] : "";
+        const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
+        return {
+            folder: "elan-supplier-forms",
+            resource_type: isPdf ? "raw" : "auto",
+            public_id: `form_upload_${Date.now()}_${baseName}${ext}`,
+        };
+    },
+} as any);
+
+export const publicFormUpload = multer({
+    storage: publicFormStorage,
+    limits: { fileSize: 50 * 1024 * 1024 },
+});
+
+/**
+ * POST /api/public/supplier-form/:token/upload
+ * Upload a file from the public form (no auth required).
+ */
+export async function uploadPublicFormFile(_req: Request, res: Response): Promise<void> {
+    try {
+        const file = (_req as any).file;
+        if (!file) {
+            res.status(400).json({ error: "No file uploaded" });
+            return;
+        }
+        const url: string = file.path || file.secure_url || file.url;
+        res.json({ url, name: (_req as any).file.originalname });
+    } catch (err) {
+        console.error("Public form upload error:", err);
+        res.status(500).json({ error: "Upload failed" });
+    }
+}
+
+const ALL_SECTIONS_ENABLED = {
+    identity: { enabled: true, requiredFields: [] },
+    contacts: { enabled: true, requiredFields: [] },
+    products: { enabled: true, requiredFields: [] },
+    production: { enabled: true, requiredFields: [] },
+    commercial: { enabled: true, requiredFields: [] },
+    regulatory: { enabled: true, requiredFields: [] },
+    certifications: { enabled: true, requiredFields: [] },
+    organic: { enabled: true, requiredFields: [] },
+    labTesting: { enabled: true, requiredFields: [] },
+    branding: { enabled: true, requiredFields: [] },
+    processing: { enabled: true, requiredFields: [] },
+    media: { enabled: true, requiredFields: [] },
+};
+
+/**
+ * GET /api/public/supplier-form/:token
+ * Publicly accessible — no auth required.
+ * Looks up token in SourcingSupplier first, then NewSupplier.
+ */
+export async function getPublicForm(req: Request, res: Response): Promise<void> {
+    try {
+        const { token } = req.params;
+
+        // Try sourcing supplier first
+        const sourcing = await (prisma as any).sourcingSupplier.findUnique({
+            where: { formToken: token },
+        });
+
+        if (sourcing) {
+            // Try to find an associated form template (use the most recently created default or first template)
+            const defaultTemplate = await (prisma as any).supplierFormTemplate.findFirst({
+                where: { isDefault: true },
+            });
+
+            res.json({
+                supplierType: "sourcing",
+                id: sourcing.id,
+                company: sourcing.company,
+                contactPerson: sourcing.contactPerson,
+                email: sourcing.email,
+                templateConfig: defaultTemplate?.config ?? ALL_SECTIONS_ENABLED,
+                formData: buildFormData(sourcing),
+            });
+            return;
+        }
+
+        // Try new supplier
+        const newSupplier = await (prisma as any).newSupplier.findUnique({
+            where: { formToken: token },
+        });
+
+        if (newSupplier) {
+            const defaultTemplate = await (prisma as any).supplierFormTemplate.findFirst({
+                where: { isDefault: true },
+            });
+
+            res.json({
+                supplierType: "new",
+                id: newSupplier.id,
+                company: newSupplier.company,
+                contactPerson: newSupplier.contactPerson,
+                email: newSupplier.email,
+                templateConfig: defaultTemplate?.config ?? ALL_SECTIONS_ENABLED,
+                formData: buildFormData(newSupplier),
+            });
+            return;
+        }
+
+        res.status(404).json({ error: "Form not found. The link may be invalid or expired." });
+    } catch (err) {
+        console.error("Get public form error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+
+/**
+ * POST /api/public/supplier-form/:token
+ * Submit (or partially save) the form. Merges non-empty fields only.
+ */
+export async function submitPublicForm(req: Request, res: Response): Promise<void> {
+    try {
+        const { token } = req.params;
+        const { fields } = req.body as { fields: Record<string, unknown> };
+
+        if (!fields || typeof fields !== "object") {
+            res.status(400).json({ error: "Invalid form data" });
+            return;
+        }
+
+        // Build a safe update payload — only include fields that are non-empty strings
+        // so we never overwrite already-filled values with blanks
+        const update: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(fields)) {
+            if (value !== null && value !== undefined && value !== "") {
+                update[key] = value;
+            }
+        }
+
+        // Blacklist fields that should never be updated via the public form
+        const forbidden = new Set([
+            "id", "formToken", "supplierStage", "status", "createdBy",
+            "createdAt", "updatedAt", "buyerIds", "blacklistedBuyerIds",
+            "vettingScore", "exclusivityArrangement", "eecMarginPercent",
+            "factoryVisitStatus", "factoryVisitDate", "factoryVisitOutcome",
+            "referralSource", "dealStage",
+            // EEC / internal-only fields
+            "notes", "latestQuotation", "accountManager", "currentStatus",
+            "certifications", "reasonInactive", "dateMarkedInactive",
+            "reactivationPotential",
+        ]);
+        for (const key of forbidden) {
+            delete update[key];
+        }
+
+        if (Object.keys(update).length === 0) {
+            res.json({ success: true, message: "No new data to save" });
+            return;
+        }
+
+        // Try sourcing supplier
+        const sourcing = await (prisma as any).sourcingSupplier.findUnique({
+            where: { formToken: token },
+        });
+
+        if (sourcing) {
+            await (prisma as any).sourcingSupplier.update({
+                where: { formToken: token },
+                data: update,
+            });
+            res.json({ success: true });
+            return;
+        }
+
+        // Try new supplier
+        const newSupplier = await (prisma as any).newSupplier.findUnique({
+            where: { formToken: token },
+        });
+
+        if (newSupplier) {
+            await (prisma as any).newSupplier.update({
+                where: { formToken: token },
+                data: update,
+            });
+            res.json({ success: true });
+            return;
+        }
+
+        res.status(404).json({ error: "Form not found. The link may be invalid or expired." });
+    } catch (err) {
+        console.error("Submit public form error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+
+/**
+ * Extract the form-fillable fields from a supplier record.
+ * Excludes internal/system fields.
+ */
+function buildFormData(supplier: Record<string, unknown>): Record<string, unknown> {
+    const excluded = new Set([
+        "id", "formToken", "supplierStage", "status", "createdBy", "createdAt", "updatedAt",
+        "buyerIds", "blacklistedBuyerIds", "vettingScore", "exclusivityArrangement",
+        "eecMarginPercent", "factoryVisitStatus", "factoryVisitDate", "factoryVisitOutcome",
+        "referralSource", "dealStage", "emailCampaign", "accountManager",
+        "latestQuotation", "reasonInactive", "dateMarkedInactive", "reactivationPotential",
+        "currentStatus", "certifications", "notes",
+    ]);
+
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(supplier)) {
+        if (!excluded.has(key) && value !== null && value !== undefined) {
+            result[key] = value;
+        }
+    }
+    return result;
+}
