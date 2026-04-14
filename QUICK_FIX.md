@@ -19,7 +19,7 @@ Your frontend (Vercel) cannot talk to your backend (Render) because CORS is bloc
 
 1. Open: https://elan-exports-crm.onrender.com/api/health
 2. You should see JSON with `"status": "ok"`
-3. Check that `allowedOrigins` includes your Vercel URL
+3. Check that `allowedOrigins` includes your Vercel URL.
 
 ### Step 3: Test Your App
 
