@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { copyToClipboard } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
@@ -98,6 +99,7 @@ export default function SourcingSupplierPage() {
 
   // Create form state — only company name required; supplier fills the rest via the web form
   const [form, setForm] = useState({ company: "" });
+  const [createTemplateId, setCreateTemplateId] = useState<string>("");
 
   // ─── Queries ────────────────────────────────────────
   const { data, isLoading } = useQuery({
@@ -122,6 +124,14 @@ export default function SourcingSupplierPage() {
     },
   });
 
+  const { data: templates = [] } = useQuery({
+    queryKey: ["supplier-form-templates"],
+    queryFn: async () => {
+      const res = await api.get("/supplier-form-templates");
+      return res.data as { id: string; name: string; isDefault: boolean }[];
+    },
+  });
+
   // ─── Mutations ──────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (data: typeof form) => api.post("/sourcing-suppliers", data),
@@ -132,7 +142,9 @@ export default function SourcingSupplierPage() {
       setForm({ company: "" });
       const created = res.data;
       if (created?.formToken) {
-        const link = `${window.location.origin}/supplier-form/${created.formToken}`;
+        const base = `${window.location.origin}/supplier-form/${created.formToken}`;
+        const link = createTemplateId ? `${base}?t=${createTemplateId}` : base;
+        setCreateTemplateId("");
         setFormLinkDialog({ open: true, link, company: created.company, source: "created" });
       } else {
         toast.success("Sourcing supplier created");
@@ -200,10 +212,10 @@ export default function SourcingSupplierPage() {
   });
 
   // ─── Helpers ────────────────────────────────────────
-  const copyFormLink = (supplier: SourcingSupplier) => {
+  const copyFormLink = async (supplier: SourcingSupplier) => {
     if (!supplier.formToken) return;
     const link = `${window.location.origin}/supplier-form/${supplier.formToken}`;
-    navigator.clipboard.writeText(link);
+    await copyToClipboard(link);
     toast.success("Form link copied to clipboard");
   };
 
@@ -493,6 +505,22 @@ export default function SourcingSupplierPage() {
               autoFocus
             />
           </div>
+          <div className="mt-3">
+            <Label>Form Template</Label>
+            <select
+              value={createTemplateId}
+              onChange={(e) => setCreateTemplateId(e.target.value)}
+              className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            >
+              <option value="">Default form</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}{t.isDefault ? " (Default)" : ""}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-400 mt-1">Choose which sections the supplier sees in their form</p>
+          </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button
@@ -521,8 +549,8 @@ export default function SourcingSupplierPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                navigator.clipboard.writeText(formLinkDialog.link);
+              onClick={async () => {
+                await copyToClipboard(formLinkDialog.link);
                 toast.success("Copied!");
               }}
             >

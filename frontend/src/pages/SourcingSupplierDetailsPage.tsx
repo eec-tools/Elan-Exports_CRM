@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { copyToClipboard } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { toast } from "sonner";
@@ -283,9 +284,9 @@ export default function SourcingSupplierDetailsPage() {
     ? `${window.location.origin}/supplier-form/${supplier.formToken}`
     : null;
 
-  const copyLink = () => {
+  const copyLink = async () => {
     if (formLink) {
-      navigator.clipboard.writeText(formLink);
+      await copyToClipboard(formLink);
       toast.success("Form link copied");
     }
   };

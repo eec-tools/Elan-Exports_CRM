@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -357,6 +357,7 @@ function UploadBucket({ label, description, icon, accept, files, uploading, onUp
 
 export default function PublicSupplierFormPage() {
   const { token } = useParams<{ token: string }>();
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -377,7 +378,7 @@ export default function PublicSupplierFormPage() {
   useEffect(() => {
     if (!token) return;
     axios
-      .get(`${API_BASE}/public/supplier-form/${token}`)
+      .get(`${API_BASE}/public/supplier-form/${token}${searchParams.get("t") ? `?t=${searchParams.get("t")}` : ""}`)
       .then((res) => {
         const { company: c, templateConfig: tc, formData: fd } = res.data;
         setCompany(c ?? "");

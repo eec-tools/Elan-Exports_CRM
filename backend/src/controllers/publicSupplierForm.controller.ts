@@ -72,6 +72,13 @@ const ALL_SECTIONS_ENABLED = {
 export async function getPublicForm(req: Request, res: Response): Promise<void> {
     try {
         const { token } = req.params;
+        const templateId = req.query.t as string | undefined;
+
+        // Resolve template: explicit ?t= param takes priority, then default, then all-sections
+        const template = templateId
+            ? await (prisma as any).supplierFormTemplate.findUnique({ where: { id: templateId } })
+            : await (prisma as any).supplierFormTemplate.findFirst({ where: { isDefault: true } });
+        const templateConfig = template?.config ?? ALL_SECTIONS_ENABLED;
 
         // Try sourcing supplier first
         const sourcing = await (prisma as any).sourcingSupplier.findUnique({
@@ -79,18 +86,13 @@ export async function getPublicForm(req: Request, res: Response): Promise<void> 
         });
 
         if (sourcing) {
-            // Try to find an associated form template (use the most recently created default or first template)
-            const defaultTemplate = await (prisma as any).supplierFormTemplate.findFirst({
-                where: { isDefault: true },
-            });
-
             res.json({
                 supplierType: "sourcing",
                 id: sourcing.id,
                 company: sourcing.company,
                 contactPerson: sourcing.contactPerson,
                 email: sourcing.email,
-                templateConfig: defaultTemplate?.config ?? ALL_SECTIONS_ENABLED,
+                templateConfig,
                 formData: buildFormData(sourcing),
             });
             return;
@@ -102,17 +104,13 @@ export async function getPublicForm(req: Request, res: Response): Promise<void> 
         });
 
         if (newSupplier) {
-            const defaultTemplate = await (prisma as any).supplierFormTemplate.findFirst({
-                where: { isDefault: true },
-            });
-
             res.json({
                 supplierType: "new",
                 id: newSupplier.id,
                 company: newSupplier.company,
                 contactPerson: newSupplier.contactPerson,
                 email: newSupplier.email,
-                templateConfig: defaultTemplate?.config ?? ALL_SECTIONS_ENABLED,
+                templateConfig,
                 formData: buildFormData(newSupplier),
             });
             return;
