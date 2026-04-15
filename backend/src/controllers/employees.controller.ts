@@ -2,6 +2,7 @@ import { Response } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
+import { isValidWorkWindow } from "../utils/attendance.js";
 
 /** GET /api/employees/me — current user's own employee profile */
 export async function getMyEmployeeProfile(req: AuthRequest, res: Response): Promise<void> {
@@ -44,6 +45,8 @@ export async function listEmployees(req: AuthRequest, res: Response): Promise<vo
         bankAccountNumber: true,
         bankName: true,
         bankIfsc: true,
+        workStartTime: true,
+        workEndTime: true,
         isActive: true,
         createdAt: true,
         roles: { select: { role: true } },
@@ -71,11 +74,19 @@ export async function createEmployee(req: AuthRequest, res: Response): Promise<v
       bankAccountNumber,
       bankName,
       bankIfsc,
+      workStartTime = "09:00",
+      workEndTime = "18:00",
       role = "member",
     } = req.body;
 
     if (!fullName || !email || !password) {
       res.status(400).json({ error: "fullName, email, and password are required" });
+      return;
+    }
+
+    const timeError = isValidWorkWindow(workStartTime, workEndTime);
+    if (timeError) {
+      res.status(400).json({ error: timeError });
       return;
     }
 
@@ -99,6 +110,8 @@ export async function createEmployee(req: AuthRequest, res: Response): Promise<v
         bankAccountNumber: bankAccountNumber ?? null,
         bankName: bankName ?? null,
         bankIfsc: bankIfsc ?? null,
+        workStartTime,
+        workEndTime,
         roles: { create: { role } },
       },
       select: {
@@ -112,6 +125,8 @@ export async function createEmployee(req: AuthRequest, res: Response): Promise<v
         bankAccountNumber: true,
         bankName: true,
         bankIfsc: true,
+        workStartTime: true,
+        workEndTime: true,
         isActive: true,
       },
     });
@@ -136,8 +151,18 @@ export async function updateEmployee(req: AuthRequest, res: Response): Promise<v
       bankAccountNumber,
       bankName,
       bankIfsc,
+      workStartTime,
+      workEndTime,
       isActive,
     } = req.body;
+
+    if (workStartTime !== undefined && workEndTime !== undefined) {
+      const timeError = isValidWorkWindow(workStartTime, workEndTime);
+      if (timeError) {
+        res.status(400).json({ error: timeError });
+        return;
+      }
+    }
 
     const user = await prisma.user.update({
       where: { id },
@@ -150,6 +175,8 @@ export async function updateEmployee(req: AuthRequest, res: Response): Promise<v
         ...(bankAccountNumber !== undefined && { bankAccountNumber }),
         ...(bankName !== undefined && { bankName }),
         ...(bankIfsc !== undefined && { bankIfsc }),
+        ...(workStartTime !== undefined && { workStartTime }),
+        ...(workEndTime !== undefined && { workEndTime }),
         ...(isActive !== undefined && { isActive }),
       },
       select: {
@@ -163,6 +190,8 @@ export async function updateEmployee(req: AuthRequest, res: Response): Promise<v
         bankAccountNumber: true,
         bankName: true,
         bankIfsc: true,
+        workStartTime: true,
+        workEndTime: true,
         isActive: true,
       },
     });

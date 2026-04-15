@@ -34,6 +34,8 @@ interface Employee {
   bankAccountNumber: string | null;
   bankName: string | null;
   bankIfsc: string | null;
+  workStartTime: string;
+  workEndTime: string;
   isActive: boolean;
   roles: { role: string }[];
 }
@@ -55,6 +57,8 @@ const emptyForm = {
   bankAccountNumber: "",
   bankName: "",
   bankIfsc: "",
+  workStartTime: "09:00",
+  workEndTime: "18:00",
 };
 
 export default function AdminEmployeesPage() {
@@ -75,6 +79,8 @@ export default function AdminEmployeesPage() {
         ...data,
         monthlySalary: data.monthlySalary ? Number(data.monthlySalary) : null,
         gender: data.gender || null,
+        workStartTime: data.workStartTime,
+        workEndTime: data.workEndTime,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success("Employee created");
@@ -95,6 +101,8 @@ export default function AdminEmployeesPage() {
         bankAccountNumber: data.bankAccountNumber || null,
         bankName: data.bankName || null,
         bankIfsc: data.bankIfsc || null,
+        workStartTime: data.workStartTime,
+        workEndTime: data.workEndTime,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success("Employee updated");
@@ -134,6 +142,8 @@ export default function AdminEmployeesPage() {
       bankAccountNumber: emp.bankAccountNumber ?? "",
       bankName: emp.bankName ?? "",
       bankIfsc: emp.bankIfsc ?? "",
+      workStartTime: emp.workStartTime || "09:00",
+      workEndTime: emp.workEndTime || "18:00",
     });
     setOpen(true);
   };
@@ -291,6 +301,38 @@ export default function AdminEmployeesPage() {
             </div>
 
             {field("Monthly Salary (₹)", "monthlySalary", "number")}
+
+            <div className="pt-1 border-t border-slate-100">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                Work Hours
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-1">
+                    Work Start Time <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={form.workStartTime}
+                    onChange={(e) => setForm((f) => ({ ...f, workStartTime: e.target.value }))}
+                    required
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-1">
+                    Work End Time <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={form.workEndTime}
+                    onChange={(e) => setForm((f) => ({ ...f, workEndTime: e.target.value }))}
+                    required
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+              </div>
+            </div>
 
             <div className="pt-1 border-t border-slate-100">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
