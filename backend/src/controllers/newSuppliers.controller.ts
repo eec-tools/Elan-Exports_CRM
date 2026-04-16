@@ -886,6 +886,13 @@ export async function deleteNewSupplier(
         } catch (e) { console.error("Report Cleanup Failed", e); }
         // ------------------------------------------
 
+        // --- VAULT CLEANUP ---
+        try {
+            const { cleanupSupplierFromVault } = await import("../services/vaultSync.service.js");
+            await cleanupSupplierFromVault(existing.company);
+        } catch (e) { console.error("Vault Cleanup Failed", e); }
+        // ----------------------
+
         res.json({ message: "New supplier deleted" });
     } catch (err) {
         console.error("Delete new supplier error:", err);

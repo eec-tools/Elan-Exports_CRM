@@ -285,16 +285,20 @@ export async function createSupplier(
     try {
       const docs = (supplier as any).documents;
       const supplierProducts = (supplier as any).supplierProducts;
-      const contractDoc = (supplier as any).contractDocument;
+      const contractDocRaw = (supplier as any).contractDocument;
       const productCatalogs = (supplier as any).productCatalogs;
       const productCatalogImages = (supplier as any).productCatalogImages;
       const quotations = (supplier as any).quotations;
+      // Normalize contractDocument to array (supports legacy single-object and new array format)
+      const contractDocItems = Array.isArray(contractDocRaw)
+        ? contractDocRaw.filter((d: any) => d?.url)
+        : contractDocRaw?.url ? [contractDocRaw] : [];
       await syncSupplierDocsToVault(supplier.company, {
         certificates: Array.isArray(docs) ? docs : [],
         productCatalogs: Array.isArray(productCatalogs) ? productCatalogs : [],
         productCatalogImages: Array.isArray(productCatalogImages) ? productCatalogImages : [],
         warehousePhotos: [],
-        contractDocument: contractDoc && contractDoc.url ? contractDoc : null,
+        contractDocuments: contractDocItems,
         quotations: Array.isArray(quotations) ? quotations : [],
       }, req.user!.id);
     } catch (e) { console.error("Vault Sync Failed", e); }
@@ -483,16 +487,20 @@ export async function updateSupplier(
     // --- VAULT SYNC: auto-create folders ---
     try {
       const docs = (supplier as any).documents;
-      const contractDoc = (supplier as any).contractDocument;
+      const contractDocRaw = (supplier as any).contractDocument;
       const productCatalogs = (supplier as any).productCatalogs;
       const productCatalogImages = (supplier as any).productCatalogImages;
       const quotations = (supplier as any).quotations;
+      // Normalize contractDocument to array (supports legacy single-object and new array format)
+      const contractDocItems = Array.isArray(contractDocRaw)
+        ? contractDocRaw.filter((d: any) => d?.url)
+        : contractDocRaw?.url ? [contractDocRaw] : [];
       await syncSupplierDocsToVault(supplier.company, {
         certificates: Array.isArray(docs) ? docs : [],
         productCatalogs: Array.isArray(productCatalogs) ? productCatalogs : [],
         productCatalogImages: Array.isArray(productCatalogImages) ? productCatalogImages : [],
         warehousePhotos: [],
-        contractDocument: contractDoc && contractDoc.url ? contractDoc : null,
+        contractDocuments: contractDocItems,
         quotations: Array.isArray(quotations) ? quotations : [],
       }, req.user!.id);
     } catch (e) { console.error("Vault Sync Failed", e); }
@@ -728,6 +736,13 @@ export async function deleteSupplier(
       }
     } catch (e) { console.error("Report Cleanup Failed", e); }
     // ------------------------------------------
+
+    // --- VAULT CLEANUP ---
+    try {
+      const { cleanupSupplierFromVault } = await import("../services/vaultSync.service.js");
+      await cleanupSupplierFromVault(existing.company);
+    } catch (e) { console.error("Vault Cleanup Failed", e); }
+    // ----------------------
 
     res.json({ message: "Supplier deleted" });
   } catch (err) {

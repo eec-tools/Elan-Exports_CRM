@@ -613,6 +613,13 @@ export async function deleteBuyer(
       company: existing.company,
     });
 
+    // --- VAULT CLEANUP ---
+    try {
+      const { cleanupBuyerFromVault } = await import("../services/vaultSync.service.js");
+      await cleanupBuyerFromVault(existing.company);
+    } catch (e) { console.error("Vault Cleanup Failed", e); }
+    // ----------------------
+
     res.json({ message: "Buyer deleted" });
   } catch (err) {
     console.error("Delete buyer error:", err);

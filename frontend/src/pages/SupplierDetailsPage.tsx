@@ -121,7 +121,7 @@ interface Supplier {
   currentStatus?: string;
   createdAt?: string;
   documents?: { name: string; url: string }[];
-  contractDocument?: { name: string; url: string } | null;
+  contractDocument?: { name: string; url: string } | { name: string; url: string }[] | null;
   // New fields from Supplier Information Sheet
   tradeName?: string;
   yearEstablished?: string;
@@ -241,6 +241,16 @@ function getCatalogViewUrl(url?: string) {
     fixed = fixed.replace("/image/upload/", "/raw/upload/");
   }
   return fixed;
+}
+
+/** Normalize contractDocument to always be an array regardless of storage format */
+function normalizeContractDocs(
+  val: { name: string; url: string } | { name: string; url: string }[] | null | undefined,
+): { name: string; url: string }[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  // Legacy single-object format
+  return val.url ? [val] : [];
 }
 
 function statusColor(status?: string) {
@@ -431,9 +441,14 @@ export default function SupplierDetailsPage() {
     setUploadingContract(true);
     try {
       const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-      const newContract = { name: file.name, url: uploadRes.url };
+      const newEntry = { name: file.name, url: uploadRes.url };
       if (supplier?.id) {
-        updateMutation.mutate({ id: supplier.id, d: { contractDocument: newContract } });
+        // Append to existing list (backward compat: normalize first)
+        const existing = normalizeContractDocs(supplier.contractDocument);
+        updateMutation.mutate({
+          id: supplier.id,
+          d: { contractDocument: [...existing, newEntry] },
+        });
       }
     } catch {
       toast.error("Failed to upload contract document");
@@ -442,9 +457,14 @@ export default function SupplierDetailsPage() {
     }
   };
 
-  const handleDeleteContract = () => {
+  const handleDeleteContractDoc = (index: number) => {
     if (!supplier?.id) return;
-    updateMutation.mutate({ id: supplier.id, d: { contractDocument: null } });
+    const existing = normalizeContractDocs(supplier.contractDocument);
+    const updated = existing.filter((_, i) => i !== index);
+    updateMutation.mutate({
+      id: supplier.id,
+      d: { contractDocument: updated.length > 0 ? updated : null },
+    });
   };
 
   if (isLoading) {
@@ -767,50 +787,62 @@ export default function SupplierDetailsPage() {
             <div>
               <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-2">
                 <FileText className="h-3.5 w-3.5" />
-                Contract Document
+                Contract Documents
               </p>
               {!isUnlocked ? (
                 <p className="text-sm font-medium text-slate-800">•••••••••••••••••••••</p>
-              ) : supplier.contractDocument ? (
-                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4 text-blue-500" />
-                    <a
-                      href={getCatalogViewUrl(supplier.contractDocument.url)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm font-medium text-blue-600 hover:underline line-clamp-1"
-                    >
-                      {supplier.contractDocument.name}
-                    </a>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full shrink-0 ml-2"
-                    onClick={handleDeleteContract}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
               ) : (
-                <div className="flex items-center gap-2 mt-1">
-                  <Input
-                    type="file"
-                    className="h-9 text-sm text-slate-500 max-w-[250px]
-                    file:mr-4 file:py-1 file:px-3
-                    file:rounded-md file:border-0
-                    file:text-xs file:font-semibold
-                    file:bg-brand-50 file:text-brand-700
-                    hover:file:bg-brand-100 cursor-pointer"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        uploadContractDocument(e.target.files[0]);
-                      }
-                    }}
-                    disabled={uploadingContract}
-                  />
-                  {uploadingContract && <Loader2 className="h-4 w-4 animate-spin text-brand-500" />}
+                <div className="space-y-2">
+                  {/* List of existing contract documents */}
+                  {normalizeContractDocs(supplier.contractDocument).map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2.5 border border-slate-200 rounded-lg bg-slate-50 group"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <FileText className="h-4 w-4 text-blue-500 shrink-0" />
+                        <a
+                          href={getCatalogViewUrl(doc.url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-blue-600 hover:underline truncate"
+                          title={doc.name}
+                        >
+                          {doc.name}
+                        </a>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Remove"
+                        onClick={() => handleDeleteContractDoc(idx)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  {/* Upload new contract document (always visible) */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-700 border border-dashed border-brand-300 hover:border-brand-500 rounded-lg px-3 py-2 transition-colors">
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Contract Document
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx"
+                        disabled={uploadingContract || updateMutation.isPending}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            uploadContractDocument(e.target.files[0]);
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                    </label>
+                    {uploadingContract && <Loader2 className="h-4 w-4 animate-spin text-brand-500" />}
+                  </div>
                 </div>
               )}
             </div>
