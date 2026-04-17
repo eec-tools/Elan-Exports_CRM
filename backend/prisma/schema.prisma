@@ -666,6 +666,7 @@ model Attendance {
   lateLogin              Boolean               @default(false) @map("late_login")
   earlyLogout            Boolean               @default(false) @map("early_logout")
   autoEnded              Boolean               @default(false) @map("auto_ended")
+  isWeekendWork          Boolean               @default(false) @map("is_weekend_work")
   createdAt              DateTime              @default(now()) @map("created_at")
   updatedAt              DateTime              @updatedAt @map("updated_at")
   user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -940,19 +941,23 @@ model Leave {
 }
 
 model Payroll {
-  id              String   @id @default(uuid())
-  userId          String   @map("user_id")
-  month           Int
-  year            Int
-  workingDays     Int      @map("working_days")
-  presentDays     Float    @map("present_days")
-  approvedLeaves  Float    @map("approved_leaves")
-  absentDays      Float    @map("absent_days")
-  grossSalary     Float    @map("gross_salary")
-  professionalTax Float    @map("professional_tax")
-  netSalary       Float    @map("net_salary")
-  generatedAt     DateTime @default(now()) @map("generated_at")
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(uuid())
+  userId               String   @map("user_id")
+  month                Int
+  year                 Int
+  daysInMonth          Int      @map("days_in_month")
+  weekdayPresentDays   Float    @map("weekday_present_days")
+  weekendWorkedDays    Float    @map("weekend_worked_days")
+  approvedLeavesMonth  Float    @map("approved_leaves_month")
+  excessLeaveDays      Float    @map("excess_leave_days")
+  paidDays             Float    @map("paid_days")
+  perDaySalary         Float    @map("per_day_salary")
+  grossSalary          Float    @map("gross_salary")
+  leaveSalaryDeduction Float    @map("leave_salary_deduction")
+  professionalTax      Float    @map("professional_tax")
+  netSalary            Float    @map("net_salary")
+  generatedAt          DateTime @default(now()) @map("generated_at")
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, month, year])
   @@map("payrolls")

@@ -75,19 +75,23 @@ enum LeaveStatus {
 
 ```prisma
 model Payroll {
-  id               String   @id @default(uuid())
-  userId           String   @map("user_id")
-  month            Int      // 1–12
-  year             Int
-  workingDays      Int      @map("working_days")
-  presentDays      Float    @map("present_days")
-  approvedLeaves   Float    @map("approved_leaves")
-  absentDays       Float    @map("absent_days")
-  grossSalary      Float    @map("gross_salary")
-  professionalTax  Float    @map("professional_tax")
-  netSalary        Float    @map("net_salary")
-  generatedAt      DateTime @default(now()) @map("generated_at")
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                    String   @id @default(uuid())
+  userId                String   @map("user_id")
+  month                 Int      // 1–12
+  year                  Int
+  daysInMonth           Int      @map("days_in_month")       // actual calendar days (28/29/30/31)
+  weekdayPresentDays    Float    @map("weekday_present_days")
+  weekendWorkedDays     Float    @map("weekend_worked_days") // Sat/Sun days with checkbox ticked
+  approvedLeavesMonth   Float    @map("approved_leaves_month")
+  excessLeaveDays       Float    @map("excess_leave_days")   // leaves beyond 14-day annual quota
+  paidDays              Float    @map("paid_days")           // weekdayPresent + weekendWorked + paidLeaves
+  perDaySalary          Float    @map("per_day_salary")
+  grossSalary           Float    @map("gross_salary")
+  leaveSalaryDeduction  Float    @map("leave_salary_deduction")
+  professionalTax       Float    @map("professional_tax")
+  netSalary             Float    @map("net_salary")
+  generatedAt           DateTime @default(now()) @map("generated_at")
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, month, year])
   @@map("payrolls")
@@ -96,12 +100,20 @@ model Payroll {
 
 ### 1.4 Attendance model changes
 
-The existing `Attendance` model uses `startTime`/`endTime`. We will re-use it as-is and alias:
+The existing `Attendance` model uses `startTime`/`endTime`. Extend it with:
 - `startTime` → Clock In
 - `endTime` → Clock Out
 - `status` → `Present | Absent | HalfDay | WeeklyOff | Leave`
+- **NEW**: `isWeekendWork Boolean @default(false)` — checkbox admin/employee ticks when someone voluntarily works on Saturday or Sunday
 
 Add `WeeklyOff` and `Leave` to the `AttendanceStatus` enum.
+
+```prisma
+// Add to existing Attendance model:
+isWeekendWork   Boolean  @default(false) @map("is_weekend_work")
+```
+
+> When `isWeekendWork = true` on a Saturday/Sunday record, that day counts as a **paid worked day** in the salary calculation.
 
 ### 1.5 Settings model (configurable weekly offs)
 
@@ -183,67 +195,153 @@ PATCH /api/admin/leaves/:id/reject    ← Admin rejects
 
 ### 2.4 Payroll Service (`services/payroll.service.ts`)
 
+---
+
+#### Generalised Salary Formula
+
+```
+daysInMonth        = actual calendar days in the month
+                     (Jan=31, Feb=28 or 29, Mar=31, Apr=30, May=31, Jun=30,
+                      Jul=31, Aug=31, Sep=30, Oct=31, Nov=30, Dec=31)
+
+perDaySalary       = monthlySalary / daysInMonth
+
+weekdayPresent     = attendance days on Mon–Fri with status = Present (or HalfDay × 0.5)
+weekendWorked      = Sat/Sun attendance records where isWeekendWork = true
+approvedLeavesYTD  = total approved leave days from Jan 1 to end of current month (this year)
+approvedLeavesThisMonth = approved leaves falling within the current month
+
+excessLeavesYTD      = max(0, approvedLeavesYTD − 14)
+  -- once the annual quota of 14 days is exhausted, further leaves are unpaid
+
+excessInThisMonth    = min(excessLeavesYTD, approvedLeavesThisMonth)
+  -- portion of the annual excess that falls in this month
+
+paidDays             = weekdayPresent + weekendWorked + approvedLeavesThisMonth
+  -- ALL approved leaves are included here (paid + excess)
+
+grossSalary          = perDaySalary × paidDays
+  -- gross is calculated on all days including excess leave days
+
+leaveSalaryDeduction = perDaySalary × excessInThisMonth
+  -- excess leave days are then explicitly deducted as a line item
+  -- this makes the deduction visible on the slip (transparent to employee)
+
+professionalTax      = calculatePT(monthlySalary, gender, month)  [see PT table]
+
+netSalary            = grossSalary − leaveSalaryDeduction − professionalTax
+```
+
+> **Why Method B (explicit deduction)?**
+> `paidDays` includes ALL approved leaves so the gross shows what would have been earned.
+> The `leaveSalaryDeduction` line item is then shown separately on the payroll slip — the employee
+> can clearly see "you took 2 excess leave days, here is the exact amount deducted." This is more
+> transparent than silently lowering `paidDays` with no explanation.
+> There is **no double deduction** because excess days ARE included in `grossSalary` first,
+> and deducted exactly once as `leaveSalaryDeduction`.
+
+**Example — April 2026 (30 days), salary ₹30,000, 16 approved leaves YTD by April end**
+
+| Variable | Value |
+|---|---|
+| daysInMonth | 30 |
+| perDaySalary | ₹30,000 / 30 = **₹1,000** |
+| weekdayPresent | 18 days |
+| weekendWorked | 2 days (ticked checkbox) |
+| approvedLeavesThisMonth | 4 days |
+| approvedLeavesYTD | 16 days |
+| excessLeavesYTD | 16 − 14 = **2 days** |
+| excessInThisMonth | min(2, 4) = **2 days** |
+| paidDays | 18 + 2 + 4 = **24 days** (all leaves included) |
+| grossSalary | ₹1,000 × 24 = **₹24,000** |
+| leaveSalaryDeduction | ₹1,000 × 2 = **−₹2,000** (excess leave line item) |
+| professionalTax | **−₹200** |
+| **netSalary** | 24,000 − 2,000 − 200 = **₹21,800** ✅ |
+
+---
+
 #### Core Function: `generatePayroll(userId, month, year)`
 
 ```typescript
 async function generatePayroll(userId: string, month: number, year: number) {
   const user = await getUser(userId); // includes monthlySalary, gender, employeeStatus
 
-  // 1. Determine working days in the month
-  const workingDays = getWorkingDaysInMonth(month, year, settings);
-  // All days in month INCLUDING Sat/Sun per spec
-
-  // 2. Count present days (attendance status = Present or HalfDay)
-  const presentDays = await countPresentDays(userId, month, year);
-
-  // 3. Count approved leaves
-  const approvedLeaves = await countApprovedLeaves(userId, month, year);
-
-  // 4. Calculate
-  const perDaySalary = user.monthlySalary / workingDays;
-  const paidDays = presentDays + approvedLeaves;
-  const grossSalary = perDaySalary * paidDays;
-  const absentDays = workingDays - paidDays;
-
-  // 5. Professional Tax
-  const professionalTax = calculatePT(user.monthlySalary, user.gender, month);
-
-  // 6. Net Salary
-  const netSalary = grossSalary - professionalTax;
-
-  // 7. Upsert payroll record
-  return prisma.payroll.upsert({ ... });
-}
-```
-
-#### Working Days Calculation
-
-```typescript
-function getWorkingDaysInMonth(month: number, year: number, settings: AttendanceSettings): number {
-  // Count ALL days in the month (calendar days)
-  // Per spec: "Per Day Salary = Monthly Salary / Working Days (Includes Saturdays and Sundays)"
-  // So working days = total days in month minus configured weekly offs
+  // 1. Actual calendar days in the month (28/29/30/31)
   const daysInMonth = new Date(year, month, 0).getDate();
-  let workingDays = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dow = new Date(year, month - 1, d).getDay(); // 0=Sun, 6=Sat
-    if (dow === 0 && settings.sundayOff) continue;
-    if (dow === 6 && settings.saturdayOff) continue;
-    workingDays++;
-  }
-  return workingDays;
+  const perDaySalary = user.monthlySalary / daysInMonth;
+
+  // 2. Weekday present days (Mon–Fri, status = Present)
+  //    HalfDay counts as 0.5
+  const weekdayPresent = await countWeekdayPresentDays(userId, month, year);
+
+  // 3. Weekend worked days (Sat/Sun with isWeekendWork = true)
+  const weekendWorked = await countWeekendWorkedDays(userId, month, year);
+
+  // 4. Approved leaves this month
+  const approvedLeavesThisMonth = await countApprovedLeavesInMonth(userId, month, year);
+
+  // 5. Annual leave quota check (Jan 1 → end of current month)
+  const approvedLeavesYTD = await countApprovedLeavesYTD(userId, year, month);
+  const excessLeavesYTD   = Math.max(0, approvedLeavesYTD - 14);
+
+  // 6. Portion of excess that falls in THIS month
+  //    (excess is attributed to the latest month's leaves first)
+  const excessInThisMonth = Math.min(excessLeavesYTD, approvedLeavesThisMonth);
+
+  // 7. Paid days — ALL approved leaves included (excess deducted as a separate line item below)
+  const paidDays = weekdayPresent + weekendWorked + approvedLeavesThisMonth;
+
+  // 8. Salary calculations (Method B — explicit deduction, no double count)
+  //    grossSalary includes excess leave days, then they are deducted once as leaveSalaryDeduction
+  const grossSalary          = perDaySalary * paidDays;
+  const leaveSalaryDeduction = perDaySalary * excessInThisMonth; // deducted exactly once
+  const professionalTax      = calculatePT(user.monthlySalary, user.gender, month);
+  const netSalary            = grossSalary - leaveSalaryDeduction - professionalTax;
+
+  // 9. Upsert payroll record
+  return prisma.payroll.upsert({
+    where: { userId_month_year: { userId, month, year } },
+    create: {
+      userId, month, year, daysInMonth,
+      weekdayPresentDays:   weekdayPresent,
+      weekendWorkedDays:    weekendWorked,
+      approvedLeavesMonth:  approvedLeavesThisMonth,
+      excessLeaveDays:      excessInThisMonth,
+      paidDays,             perDaySalary,
+      grossSalary,          leaveSalaryDeduction,
+      professionalTax,      netSalary,
+    },
+    update: { /* same fields */ },
+  });
 }
 ```
+
+#### Weekend Work Checkbox Logic
+
+- Saturday/Sunday attendance records have an `isWeekendWork` boolean field.
+- **Employee** can tick the checkbox when clocking in on a weekend — or **Admin** can tick it manually.
+- If `isWeekendWork = false` on a Sat/Sun → that day is `WeeklyOff` (not paid, not absent).
+- If `isWeekendWork = true` on a Sat/Sun → that day counts as a **paid present day**.
+- Frontend: When clocking in on a Saturday or Sunday, show a prominent checkbox:
+  > ☑ I am working today (Saturday/Sunday) — this day will be counted as a paid workday.
+
+#### Leave Deduction Rules
+
+| Scenario | Effect |
+|---|---|
+| Approved leaves ≤ 14 for the year | All leaves are **paid** — no deduction |
+| Approved leaves > 14 for the year | Excess days = **unpaid** — `perDaySalary × excessDays` deducted |
+| Intern / Probation employee on leave | Leave still not paid (not eligible for 14-day quota) |
+| Rejected / Pending leave | Day treated as **absent** — not counted in paidDays |
 
 #### Professional Tax (`utils/professionalTax.ts`)
 
 ```typescript
 function calculatePT(monthlySalary: number, gender: Gender, month: number): number {
-  // February override
+  // February: higher slab
   if (month === 2) {
-    // Only if PT is applicable
     if (gender === 'female' && monthlySalary <= 25000) return 0;
-    if (gender === 'male' && monthlySalary <= 7500) return 0;
+    if (gender === 'male'   && monthlySalary <= 7500)  return 0;
     return 300;
   }
 
@@ -253,7 +351,7 @@ function calculatePT(monthlySalary: number, gender: Gender, month: number): numb
   }
 
   // Male
-  if (monthlySalary <= 7500) return 0;
+  if (monthlySalary <= 7500)  return 0;
   if (monthlySalary <= 10000) return 175;
   return 200;
 }
@@ -322,13 +420,41 @@ frontend/src/pages/
 
 **Admin Payroll Page** (`AdminPayrollPage.tsx`):
 - Month/Year selector
-- "Generate Payroll" button → calls generate API
-- Summary table:
+- "Generate Payroll" button → calls generate API for all employees
+- Full salary breakdown table (one row per employee, all calculation columns visible):
 
-| Employee | Designation | Present | Leaves | Absent | Gross | PT | Net |
-|----------|-------------|---------|--------|--------|-------|----|-----|
+| # | Employee | Designation | Days in Month | Per Day Salary | Weekday Present | Weekend Worked | Approved Leaves | Excess Leaves (Unpaid) | Paid Days | Gross Salary | Leave Deduction | Prof. Tax | **Net Salary** |
+|---|----------|-------------|:---:|---:|:---:|:---:|:---:|:---:|:---:|---:|---:|---:|---:|
+| 1 | John Doe | Sales Mgr | 30 | ₹1,000.00 | 18 | 2 | 4 | 2 | 24 | ₹24,000 | −₹2,000 | −₹200 | **₹21,800** |
+| 2 | Jane Smith | Accounts | 30 | ₹833.33 | 22 | 0 | 1 | 0 | 23 | ₹19,166 | ₹0 | ₹0 | **₹19,166** |
 
-- Row click → open PayrollSlipPage
+Column definitions shown as tooltip or footer key:
+- **Days in Month** — actual calendar days (28/29/30/31)
+- **Per Day Salary** — Monthly Salary ÷ Days in Month
+- **Weekday Present** — Mon–Fri days clocked in (HalfDay = 0.5)
+- **Weekend Worked** — Sat/Sun with "working today" checkbox ticked
+- **Approved Leaves** — leaves approved by admin falling this month
+- **Excess Leaves** — portion beyond 14-day annual quota (unpaid, deducted)
+- **Paid Days** — Weekday Present + Weekend Worked + All Approved Leaves (excess included)
+- **Gross Salary** — Per Day Salary × Paid Days
+- **Leave Deduction** — Per Day Salary × Excess Leave Days (days beyond 14-day annual quota)
+- **Prof. Tax** — Professional Tax per Maharashtra slab
+- **Net Salary** — Gross − Leave Deduction − Prof. Tax
+
+Formula row at table footer (always visible):
+
+```
+Net Salary = (Monthly Salary ÷ Days in Month)
+             × (Weekday Present + Weekend Worked + All Approved Leaves This Month)
+             − (Monthly Salary ÷ Days in Month) × Excess Leave Days
+             − Professional Tax
+```
+
+Where:
+- `Excess Leave Days = max(0, Approved Leaves YTD − 14)` capped to this month's approved leaves
+- Gross already includes excess leave days; deduction brings them back out as a transparent line item
+
+- Row click → open PayrollSlipPage for that employee
 
 **Admin Employees Page** (`AdminEmployeesPage.tsx`):
 - List employees with name, designation, status, monthly salary
@@ -345,28 +471,44 @@ frontend/src/pages/
 Printable slip layout:
 
 ```
-┌─────────────────────────────────────────────┐
-│           ELAN EXPORTS                      │
-│         Salary Slip — March 2026            │
-├──────────────────┬──────────────────────────┤
-│ Employee Name    │ John Doe                 │
-│ Designation      │ Sales Manager            │
-│ Month / Year     │ March 2026               │
-├──────────────────┼──────────────────────────┤
-│ Working Days     │ 26                       │
-│ Present Days     │ 22                       │
-│ Approved Leaves  │ 2                        │
-│ Absent Days      │ 2                        │
-├──────────────────┼──────────────────────────┤
-│ Monthly Salary   │ ₹ 30,000                 │
-│ Per Day Salary   │ ₹ 1,153.85              │
-│ Gross Salary     │ ₹ 27,692.31             │
-├──────────────────┼──────────────────────────┤
-│ Professional Tax │ - ₹ 200                  │
-├──────────────────┼──────────────────────────┤
-│ NET SALARY       │ ₹ 27,492.31             │
-└──────────────────┴──────────────────────────┘
-│ Bank: HDFC Bank  | A/C: XXXX1234 | IFSC: HDFC0001 │
+┌────────────────────────────────────────────────────┐
+│                  ELAN EXPORTS                      │
+│             Salary Slip — April 2026               │
+├────────────────────────┬───────────────────────────┤
+│ Employee Name          │ John Doe                  │
+│ Designation            │ Sales Manager             │
+│ Month / Year           │ April 2026                │
+│ Employee Status        │ Confirmed                 │
+├────────────────────────┼───────────────────────────┤
+│ ATTENDANCE BREAKDOWN   │                           │
+├────────────────────────┼───────────────────────────┤
+│ Days in Month          │ 30                        │
+│ Weekday Present Days   │ 18                        │
+│ Weekend Days Worked    │ 2  (Sat/Sun, opt-in)      │
+│ Approved Leave Days    │ 4                         │
+│ Paid Days              │ 24 (18 + 2 + 4)           │
+├────────────────────────┼───────────────────────────┤
+│ SALARY CALCULATION     │                           │
+├────────────────────────┼───────────────────────────┤
+│ Monthly Salary         │ ₹ 30,000.00               │
+│ Per Day Salary         │ ₹  1,000.00  (÷ 30 days) │
+│ Gross Salary           │ ₹ 24,000.00  (× 24 days) │
+├────────────────────────┼───────────────────────────┤
+│ DEDUCTIONS             │                           │
+├────────────────────────┼───────────────────────────┤
+│ Excess Leave Deduction │ − ₹  2,000.00             │
+│   (2 days over quota)  │   (₹1,000 × 2 days)      │
+│ Professional Tax       │ − ₹    200.00             │
+├────────────────────────┼───────────────────────────┤
+│ NET SALARY             │ ₹ 21,800.00               │
+└────────────────────────┴───────────────────────────┘
+│ Bank: HDFC Bank  | A/C: XXXX1234 | IFSC: HDFC0001  │
+└────────────────────────────────────────────────────┘
+```
+
+Formula printed at slip bottom (small text):
+```
+Net = (₹30,000 ÷ 30) × 24 days − (₹1,000 × 2 excess leave days) − ₹200 PT = ₹21,800
 ```
 
 Use `window.print()` with print-specific CSS, or generate PDF via a library like `jsPDF` or `html2canvas`.
@@ -426,15 +568,20 @@ Use `window.print()` with print-specific CSS, or generate PDF via a library like
 | No clock-out without clock-in | Check `startTime` is not null |
 | Present if clocked in, no clock-out | `status = Present` as long as `startTime` exists |
 | Weekly off (Sat/Sun configurable) | Auto-create `WeeklyOff` records; excluded from absent calc |
+| Weekend work opt-in | `isWeekendWork` checkbox on Sat/Sun — ticked = paid workday, unticked = weekly off |
 | Intern/Probation no paid leave | Return 403 if `employeeStatus !== confirmed` |
 | Leave eligibility | 14 days/year for confirmed employees |
-| Approved leave = paid | Count in `paidDays` for salary |
-| Rejected/no request = unpaid | Not counted in `paidDays` |
-| PT Maharashtra (Male) | ≤7500→0, 7501-10000→175, >10000→200, Feb→300 |
-| PT Maharashtra (Female) | ≤25000→0, >25000→200, Feb→300 |
-| Per day salary | `monthlySalary / workingDaysInMonth` |
-| Gross salary | `perDaySalary × (presentDays + approvedLeaves)` |
-| Net salary | `grossSalary − professionalTax` |
+| Approved leave ≤ 14 days YTD | All approved leaves = paid; counted in paidDays |
+| Approved leave > 14 days YTD | Days beyond 14 = unpaid; deducted as `leaveSalaryDeduction` |
+| Rejected/no request = absent | Not counted in `paidDays`, treated as absent for that day |
+| PT Maharashtra (Male) | ≤7500→₹0, 7501–10000→₹175, >10000→₹200, Feb→₹300 |
+| PT Maharashtra (Female) | ≤25000→₹0, >25000→₹200, Feb→₹300 |
+| Days in month | Real calendar days: 28/29/30/31 (no fixed value) |
+| Per day salary | `monthlySalary ÷ daysInMonth` |
+| Paid days | `weekdayPresent + weekendWorked + paidLeavesThisMonth` |
+| Gross salary | `perDaySalary × paidDays` |
+| Leave deduction | `perDaySalary × excessLeaveDaysThisMonth` |
+| Net salary | `grossSalary − leaveSalaryDeduction − professionalTax` |
 
 ---
 
@@ -442,11 +589,12 @@ Use `window.print()` with print-specific CSS, or generate PDF via a library like
 
 ### Phase 1 — Schema & Backend Foundation
 1. Add new fields to `User` model (monthlySalary, employeeStatus, gender, designation, bank details)
-2. Add `Leave` model and `Payroll` model to Prisma schema
+2. Add `Leave` model and updated `Payroll` model to Prisma schema
 3. Add `WeeklyOff` and `Leave` to `AttendanceStatus` enum
-4. Add `AttendanceSettings` model
-5. Run Prisma migration
-6. Seed default `AttendanceSettings` row
+4. Add `isWeekendWork Boolean @default(false)` to `Attendance` model
+5. Add `AttendanceSettings` model
+6. Run Prisma migration
+7. Seed default `AttendanceSettings` row
 
 ### Phase 2 — Employee Management API
 7. Create `employees.controller.ts` and `employees.routes.ts`
@@ -486,7 +634,10 @@ Use `window.print()` with print-specific CSS, or generate PDF via a library like
 
 - **Existing attendance system**: The current system uses `startTime`/`endTime` + heartbeats for tracking. The new clock-in/out for payroll will reuse this exact model — `startTime` = clock-in, `endTime` = clock-out.
 - **IST timezone**: Existing code uses `ATTENDANCE_TZ_OFFSET_MINUTES=330` — keep this for all date operations.
-- **Working days definition**: Per spec, working days include Saturdays and Sundays by default (only weekly-off-configured days are excluded). The "Per Day Salary" divides by these working days.
+- **Days in month = real calendar days**: Per day salary divides by the actual days in the month (28, 29, 30, or 31) — NOT a fixed 26 or 30. This is the canonical denominator.
+- **Weekend work is opt-in per day**: `isWeekendWork` is set per attendance record, not a global per-employee flag. This lets one employee work some Saturdays and skip others.
+- **14-day leave quota is annual (Jan–Dec)**: Excess is tracked cumulatively across the year. If an employee takes 10 leaves in Q1 and 5 more in Q2, the 15th leave day triggers the deduction in Q2 (in whichever month it falls).
+- **Excess leave attribution**: Excess is applied to the current month's leaves first (latest leaves are the unpaid ones). This keeps the logic simple and deterministic.
 - **No cron required for MVP**: Absent marking can be done lazily when payroll is generated, or triggered manually by admin. Keep it simple.
 - **Payroll slip**: Use browser print (`window.print()`) for MVP. No PDF library needed initially.
 - **Leave overlap**: Validate that a new leave request doesn't overlap with an existing approved/pending leave.

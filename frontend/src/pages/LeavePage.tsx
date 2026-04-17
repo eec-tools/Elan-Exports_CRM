@@ -5,7 +5,7 @@ import api from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, AlertCircle } from "lucide-react";
+import { CalendarDays, AlertCircle, AlertTriangle } from "lucide-react";
 
 interface Leave {
   id: string;
@@ -54,11 +54,30 @@ export default function LeavePage() {
 
   const isConfirmed = empData?.employeeStatus === "confirmed";
 
+  // Preview: how many days in the selected range would exceed the quota
+  const previewDays =
+    startDate && endDate
+      ? Math.max(
+          0,
+          Math.round(
+            (new Date(endDate).getTime() - new Date(startDate).getTime()) /
+              (1000 * 60 * 60 * 24),
+          ) + 1,
+        )
+      : 0;
+  const previewExcess = balance
+    ? Math.max(0, balance.used + previewDays - balance.quota)
+    : 0;
+
   const applyMutation = useMutation({
     mutationFn: (data: { startDate: string; endDate: string; reason: string }) =>
       api.post("/leaves", data).then((r) => r.data),
-    onSuccess: () => {
-      toast.success("Leave application submitted");
+    onSuccess: (data) => {
+      if (data.warning) {
+        toast.warning(data.warning);
+      } else {
+        toast.success("Leave application submitted");
+      }
       qc.invalidateQueries({ queryKey: ["my-leaves"] });
       qc.invalidateQueries({ queryKey: ["leave-balance"] });
       setStartDate("");
@@ -70,7 +89,7 @@ export default function LeavePage() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!startDate || !endDate) {
       toast.error("Please select start and end dates");
@@ -92,21 +111,36 @@ export default function LeavePage() {
           <Card>
             <CardContent className="pt-6 text-center">
               <p className="text-3xl font-bold text-slate-800">{balance.quota}</p>
-              <p className="text-sm text-slate-500 mt-1">Annual Quota</p>
+              <p className="text-sm text-slate-500 mt-1">Annual Quota (Paid)</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6 text-center">
-              <p className="text-3xl font-bold text-orange-600">{balance.used}</p>
-              <p className="text-sm text-slate-500 mt-1">Used</p>
+              <p className={`text-3xl font-bold ${balance.used > balance.quota ? "text-red-600" : "text-orange-600"}`}>
+                {balance.used}
+              </p>
+              <p className="text-sm text-slate-500 mt-1">Used This Year</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6 text-center">
-              <p className="text-3xl font-bold text-green-600">{balance.remaining}</p>
-              <p className="text-sm text-slate-500 mt-1">Remaining</p>
+              <p className={`text-3xl font-bold ${balance.remaining < 0 ? "text-red-600" : "text-green-600"}`}>
+                {balance.remaining < 0 ? 0 : balance.remaining}
+              </p>
+              <p className="text-sm text-slate-500 mt-1">Paid Days Left</p>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Quota exceeded notice */}
+      {balance && balance.used > balance.quota && (
+        <div className="flex items-start gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            You have used <strong>{balance.used - balance.quota}</strong> day(s) beyond your annual
+            quota. Those extra days will be deducted from your salary at payroll.
+          </span>
         </div>
       )}
 
@@ -153,6 +187,19 @@ export default function LeavePage() {
                   />
                 </div>
               </div>
+
+              {/* Unpaid leave preview warning */}
+              {previewDays > 0 && previewExcess > 0 && (
+                <div className="flex items-start gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>{previewExcess}</strong> of these {previewDays} day(s) will be{" "}
+                    <strong>unpaid</strong> (annual quota of {balance?.quota} days exceeded). You
+                    can still apply — the excess will be deducted from your salary.
+                  </span>
+                </div>
+              )}
+
               <div>
                 <label className="text-sm font-medium text-slate-700 block mb-1">
                   Reason (optional)

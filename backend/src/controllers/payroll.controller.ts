@@ -8,7 +8,7 @@ type AuthReq<P extends ParamsDictionary = ParamsDictionary> = Request<P> & {
   user?: AuthUser;
 };
 
-/** POST /api/admin/payroll/generate — generate payroll for all active employees */
+/** POST /api/payroll/admin/generate — generate payroll for all active employees */
 export async function generateMonthlyPayroll(
   req: AuthReq,
   res: Response,
@@ -25,8 +25,7 @@ export async function generateMonthlyPayroll(
       select: { id: true, fullName: true },
     });
 
-    const results: { userId: string; fullName: string; status: string; error?: string }[] =
-      [];
+    const results: { userId: string; fullName: string; status: string; error?: string }[] = [];
 
     for (const emp of employees) {
       try {
@@ -49,7 +48,7 @@ export async function generateMonthlyPayroll(
   }
 }
 
-/** GET /api/admin/payroll?month=&year= — monthly payroll summary */
+/** GET /api/payroll/admin?month=&year= — monthly payroll summary table */
 export async function getMonthlyPayrollSummary(
   req: AuthReq,
   res: Response,
@@ -69,10 +68,10 @@ export async function getMonthlyPayrollSummary(
             id: true,
             fullName: true,
             designation: true,
+            monthlySalary: true,
             bankAccountNumber: true,
             bankName: true,
             bankIfsc: true,
-            monthlySalary: true,
           },
         },
       },
@@ -86,7 +85,7 @@ export async function getMonthlyPayrollSummary(
   }
 }
 
-/** GET /api/admin/payroll/:userId — payroll history for one employee */
+/** GET /api/payroll/admin/:userId — payroll history for one employee */
 export async function getEmployeePayrollHistory(
   req: AuthReq<{ userId: string }>,
   res: Response,
@@ -116,7 +115,7 @@ export async function getEmployeePayrollHistory(
   }
 }
 
-/** GET /api/admin/payroll/:userId/slip?month=&year= — payroll slip for one employee */
+/** GET /api/payroll/admin/:userId/slip?month=&year= — payroll slip for one employee */
 export async function getPayrollSlip(
   req: AuthReq<{ userId: string }>,
   res: Response,
@@ -138,6 +137,7 @@ export async function getPayrollSlip(
             fullName: true,
             designation: true,
             monthlySalary: true,
+            employeeStatus: true,
             bankAccountNumber: true,
             bankName: true,
             bankIfsc: true,
@@ -175,6 +175,7 @@ export async function getMyPayroll(req: AuthReq, res: Response): Promise<void> {
               fullName: true,
               designation: true,
               monthlySalary: true,
+              employeeStatus: true,
               bankAccountNumber: true,
               bankName: true,
               bankIfsc: true,

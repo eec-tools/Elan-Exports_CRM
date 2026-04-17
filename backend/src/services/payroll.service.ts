@@ -6,39 +6,26 @@ const ATTENDANCE_TZ_OFFSET_MINUTES = Number(
   process.env.ATTENDANCE_TZ_OFFSET_MINUTES ?? 330,
 );
 
-/** Returns the number of working days in the given month/year based on settings */
-export function getWorkingDaysInMonth(
-  month: number,
-  year: number,
-  saturdayOff: boolean,
-  sundayOff: boolean,
-): number {
-  const daysInMonth = new Date(year, month, 0).getDate();
-  let workingDays = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dow = new Date(year, month - 1, d).getDay(); // 0=Sun, 6=Sat
-    if (dow === 0 && sundayOff) continue;
-    if (dow === 6 && saturdayOff) continue;
-    workingDays++;
-  }
-  return workingDays;
+/** Returns the actual calendar days in a given month/year (28/29/30/31) */
+function getDaysInMonth(month: number, year: number): number {
+  return new Date(year, month, 0).getDate();
 }
 
-/** Returns the first date of a month in UTC (start of day in IST) */
+/** Returns the UTC start of the first day of the month (IST midnight → UTC) */
 function monthStartUTC(month: number, year: number): Date {
-  // Create the first day of the month in IST and convert to UTC
   const localMidnight = new Date(year, month - 1, 1, 0, 0, 0, 0);
   return new Date(localMidnight.getTime() - ATTENDANCE_TZ_OFFSET_MINUTES * 60 * 1000);
 }
 
-/** Returns the last date of a month in UTC (end of day in IST) */
+/** Returns the UTC end of the last day of the month (IST 23:59:59 → UTC) */
 function monthEndUTC(month: number, year: number): Date {
-  const daysInMonth = new Date(year, month, 0).getDate();
+  const daysInMonth = getDaysInMonth(month, year);
   const localEndOfDay = new Date(year, month - 1, daysInMonth, 23, 59, 59, 999);
   return new Date(localEndOfDay.getTime() - ATTENDANCE_TZ_OFFSET_MINUTES * 60 * 1000);
 }
 
-async function countPresentDays(
+/** Count weekday (Mon-Fri) present days. HalfDay = 0.5 */
+async function countWeekdayPresentDays(
   userId: string,
   month: number,
   year: number,
@@ -46,11 +33,9 @@ async function countPresentDays(
   const records = await prisma.attendance.findMany({
     where: {
       userId,
-      date: {
-        gte: monthStartUTC(month, year),
-        lte: monthEndUTC(month, year),
-      },
+      date: { gte: monthStartUTC(month, year), lte: monthEndUTC(month, year) },
       status: { in: [AttendanceStatus.Present, AttendanceStatus.HalfDay] },
+      isWeekendWork: false,
     },
     select: { status: true },
   });
@@ -60,7 +45,24 @@ async function countPresentDays(
   }, 0);
 }
 
-async function countApprovedLeaves(
+/** Count Sat/Sun days where isWeekendWork = true */
+async function countWeekendWorkedDays(
+  userId: string,
+  month: number,
+  year: number,
+): Promise<number> {
+  const count = await prisma.attendance.count({
+    where: {
+      userId,
+      date: { gte: monthStartUTC(month, year), lte: monthEndUTC(month, year) },
+      isWeekendWork: true,
+    },
+  });
+  return count;
+}
+
+/** Count approved leave days that fall within the given month */
+async function countApprovedLeavesInMonth(
   userId: string,
   month: number,
   year: number,
@@ -79,13 +81,43 @@ async function countApprovedLeaves(
 
   let total = 0;
   for (const leave of leaves) {
-    // Clip the leave to the current month
     const clippedStart = leave.startDate < firstDay ? firstDay : leave.startDate;
     const clippedEnd = leave.endDate > lastDay ? lastDay : leave.endDate;
     const days =
-      Math.round(
-        (clippedEnd.getTime() - clippedStart.getTime()) / (1000 * 60 * 60 * 24),
-      ) + 1;
+      Math.round((clippedEnd.getTime() - clippedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    total += days;
+  }
+  return total;
+}
+
+/**
+ * Count total approved leaves from Jan 1 of the year through the end of throughMonth.
+ * Used to compute YTD excess (leaves beyond the 14-day annual quota).
+ */
+async function countApprovedLeavesYTD(
+  userId: string,
+  year: number,
+  throughMonth: number,
+): Promise<number> {
+  const yearStart = new Date(year, 0, 1);
+  const monthEnd = new Date(year, throughMonth, 0);
+
+  const leaves = await prisma.leave.findMany({
+    where: {
+      userId,
+      status: "approved",
+      startDate: { lte: monthEnd },
+      endDate: { gte: yearStart },
+    },
+  });
+
+  let total = 0;
+  for (const leave of leaves) {
+    const clippedStart = leave.startDate < yearStart ? yearStart : leave.startDate;
+    const clippedEnd = leave.endDate > monthEnd ? monthEnd : leave.endDate;
+    if (clippedEnd < clippedStart) continue;
+    const days =
+      Math.round((clippedEnd.getTime() - clippedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     total += days;
   }
   return total;
@@ -101,6 +133,18 @@ async function getOrCreateSettings() {
   return settings;
 }
 
+/**
+ * Generate (or regenerate) payroll for a single user for the given month/year.
+ *
+ * Formula (Method B - explicit deduction, no double-counting):
+ *   daysInMonth          = actual calendar days (28/29/30/31)
+ *   perDaySalary         = monthlySalary / daysInMonth
+ *   paidDays             = weekdayPresent + weekendWorked + approvedLeavesThisMonth
+ *   grossSalary          = perDaySalary x paidDays
+ *   excessInThisMonth    = min(max(0, approvedLeavesYTD - 14), approvedLeavesThisMonth)
+ *   leaveSalaryDeduction = perDaySalary x excessInThisMonth  [deducted exactly once]
+ *   netSalary            = grossSalary - leaveSalaryDeduction - professionalTax
+ */
 export async function generatePayroll(
   userId: string,
   month: number,
@@ -122,25 +166,31 @@ export async function generatePayroll(
     throw new Error(`User ${user.fullName} has no monthly salary set`);
   }
 
-  const settings = await getOrCreateSettings();
+  // Step 1: Actual calendar days in the month (28/29/30/31)
+  const daysInMonth = getDaysInMonth(month, year);
+  const perDaySalary = user.monthlySalary / daysInMonth;
 
-  const workingDays = getWorkingDaysInMonth(
-    month,
-    year,
-    settings.saturdayOff,
-    settings.sundayOff,
-  );
+  // Step 2: Attendance counts
+  const weekdayPresentDays = await countWeekdayPresentDays(userId, month, year);
+  const weekendWorkedDays = await countWeekendWorkedDays(userId, month, year);
 
-  const presentDays = await countPresentDays(userId, month, year);
-  const approvedLeaves = await countApprovedLeaves(userId, month, year);
+  // Step 3: Leave counts
+  const approvedLeavesMonth = await countApprovedLeavesInMonth(userId, month, year);
+  const approvedLeavesYTD = await countApprovedLeavesYTD(userId, year, month);
 
-  const perDaySalary = user.monthlySalary / workingDays;
-  const paidDays = presentDays + approvedLeaves;
+  // Step 4: Excess leave calculation (annual quota = 14 days)
+  const excessLeavesYTD = Math.max(0, approvedLeavesYTD - 14);
+  // Attribute excess to this month's leaves (latest leaves are unpaid first)
+  const excessLeaveDays = Math.min(excessLeavesYTD, approvedLeavesMonth);
+
+  // Step 5: paidDays includes ALL approved leaves (gross covers them, excess deducted below)
+  const paidDays = weekdayPresentDays + weekendWorkedDays + approvedLeavesMonth;
+
+  // Step 6: Salary calculation
   const grossSalary = perDaySalary * paidDays;
-  const absentDays = workingDays - paidDays;
-
+  const leaveSalaryDeduction = perDaySalary * excessLeaveDays; // deducted exactly once
   const professionalTax = calculatePT(user.monthlySalary, user.gender, month);
-  const netSalary = grossSalary - professionalTax;
+  const netSalary = grossSalary - leaveSalaryDeduction - professionalTax;
 
   return prisma.payroll.upsert({
     where: { userId_month_year: { userId, month, year } },
@@ -148,20 +198,28 @@ export async function generatePayroll(
       userId,
       month,
       year,
-      workingDays,
-      presentDays,
-      approvedLeaves,
-      absentDays,
+      daysInMonth,
+      weekdayPresentDays,
+      weekendWorkedDays,
+      approvedLeavesMonth,
+      excessLeaveDays,
+      paidDays,
+      perDaySalary,
       grossSalary,
+      leaveSalaryDeduction,
       professionalTax,
       netSalary,
     },
     update: {
-      workingDays,
-      presentDays,
-      approvedLeaves,
-      absentDays,
+      daysInMonth,
+      weekdayPresentDays,
+      weekendWorkedDays,
+      approvedLeavesMonth,
+      excessLeaveDays,
+      paidDays,
+      perDaySalary,
       grossSalary,
+      leaveSalaryDeduction,
       professionalTax,
       netSalary,
       generatedAt: new Date(),

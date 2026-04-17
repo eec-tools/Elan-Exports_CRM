@@ -129,6 +129,7 @@ function serializeAttendance(
     lateLogin: attendance.lateLogin,
     earlyLogout: attendance.earlyLogout,
     autoEnded: attendance.autoEnded,
+    isWeekendWork: attendance.isWeekendWork,
     checkoutProofs,
     checkoutProofCount: checkoutProofs.length,
     minHoursPresent,
@@ -311,6 +312,9 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
     // If there's an absent record (no-show), but user is now checking in, we update it
     const effectiveStart = now;
 
+    // isWeekendWork: opt-in flag for voluntarily working on Sat/Sun
+    const isWeekendWork = req.body?.isWeekendWork === true;
+
     const attendance = await prisma.attendance.upsert({
       where: {
         userId_date: {
@@ -330,6 +334,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
         lateLogin: false,
         earlyLogout: false,
         autoEnded: false,
+        isWeekendWork,
       },
       create: {
         userId,
@@ -337,6 +342,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
         startTime: effectiveStart,
         status: AttendanceStatus.Present,
         lateLogin: false,
+        isWeekendWork,
       },
       include: {
         heartbeats: {

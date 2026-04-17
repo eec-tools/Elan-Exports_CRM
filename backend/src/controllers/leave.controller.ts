@@ -67,21 +67,21 @@ export async function applyLeave(req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    // Check annual balance
+    // Leaves beyond 14/year are allowed but become unpaid at payroll generation
     const year = start.getFullYear();
     const used = await getUsedLeaves(userId, year);
-    if (used + numberOfDays > ANNUAL_LEAVE_QUOTA) {
-      res.status(400).json({
-        error: `Insufficient leave balance. Used: ${used}, Requested: ${numberOfDays}, Quota: ${ANNUAL_LEAVE_QUOTA}`,
-      });
-      return;
-    }
+    const excessDays = Math.max(0, used + numberOfDays - ANNUAL_LEAVE_QUOTA);
 
     const leave = await prisma.leave.create({
       data: { userId, startDate: start, endDate: end, numberOfDays, reason },
     });
 
-    res.status(201).json(leave);
+    res.status(201).json({
+      ...leave,
+      warning: excessDays > 0
+        ? `${excessDays} day(s) will be unpaid (annual quota of ${ANNUAL_LEAVE_QUOTA} exceeded)`
+        : undefined,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to apply for leave" });

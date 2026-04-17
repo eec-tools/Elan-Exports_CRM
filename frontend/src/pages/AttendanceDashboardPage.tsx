@@ -369,6 +369,7 @@ export default function AttendanceDashboardPage() {
   const [adminHistoryRange, setAdminHistoryRange] = useState("30d");
   const [checkoutProofs, setCheckoutProofs] = useState<CheckoutProofUpload[]>([]);
   const [isUploadingProofs, setIsUploadingProofs] = useState(false);
+  const [isWeekendWork, setIsWeekendWork] = useState(false);
   const [proofViewerOpen, setProofViewerOpen] = useState(false);
   const [selectedProofRecord, setSelectedProofRecord] = useState<HistoryRecord | null>(null);
   const [loadedDraftKey, setLoadedDraftKey] = useState<string | null>(null);
@@ -417,12 +418,13 @@ export default function AttendanceDashboardPage() {
   /* ─── Mutations ──────────────────────────────────── */
 
   const startMutation = useMutation({
-    mutationFn: () => api.post("/attendance/start"),
+    mutationFn: () => api.post("/attendance/start", { isWeekendWork }),
     onSuccess: () => {
       toast.success("Checked in successfully!");
       if (draftStorageKey) localStorage.removeItem(draftStorageKey);
       setCheckoutProofs([]);
       setLoadedDraftKey(null);
+      setIsWeekendWork(false);
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
     },
@@ -627,14 +629,31 @@ export default function AttendanceDashboardPage() {
               {/* Action Buttons */}
               <div className="flex flex-col items-center gap-3">
                 {checkInStage === "not-started" && (
-                  <Button
-                    onClick={() => startMutation.mutate()}
-                    disabled={startMutation.isPending || todayQuery.isLoading}
-                    className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 px-8 py-6 text-base rounded-xl transition-all hover:scale-105"
-                  >
-                    {startMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
-                    Check In
-                  </Button>
+                  <>
+                    {/* Weekend work opt-in checkbox — shown only on Saturday (6) or Sunday (0) */}
+                    {[0, 6].includes(new Date().getDay()) && (
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+                        <input
+                          type="checkbox"
+                          checked={isWeekendWork}
+                          onChange={(e) => setIsWeekendWork(e.target.checked)}
+                          className="h-4 w-4 rounded accent-emerald-600"
+                        />
+                        <span>
+                          I am working today ({new Date().getDay() === 6 ? "Saturday" : "Sunday"}) —
+                          this day will count as a <strong>paid workday</strong>
+                        </span>
+                      </label>
+                    )}
+                    <Button
+                      onClick={() => startMutation.mutate()}
+                      disabled={startMutation.isPending || todayQuery.isLoading}
+                      className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 px-8 py-6 text-base rounded-xl transition-all hover:scale-105"
+                    >
+                      {startMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
+                      Check In
+                    </Button>
+                  </>
                 )}
 
                 {checkInStage === "working" && (

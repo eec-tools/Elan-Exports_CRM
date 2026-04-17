@@ -9,18 +9,22 @@ interface Payroll {
   id: string;
   month: number;
   year: number;
-  workingDays: number;
-  presentDays: number;
-  approvedLeaves: number;
-  absentDays: number;
+  daysInMonth: number;
+  weekdayPresentDays: number;
+  weekendWorkedDays: number;
+  approvedLeavesMonth: number;
+  excessLeaveDays: number;
+  paidDays: number;
+  perDaySalary: number;
   grossSalary: number;
+  leaveSalaryDeduction: number;
   professionalTax: number;
   netSalary: number;
-  generatedAt: string;
   user: {
     fullName: string;
     designation: string | null;
     monthlySalary: number | null;
+    employeeStatus: string;
     bankAccountNumber: string | null;
     bankName: string | null;
     bankIfsc: string | null;
@@ -35,6 +39,12 @@ const MONTHS = [
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(n);
 
+const statusLabel: Record<string, string> = {
+  intern: "Intern",
+  probation: "Probation",
+  confirmed: "Confirmed",
+};
+
 export default function PayrollPage() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -48,10 +58,9 @@ export default function PayrollPage() {
 
   const years = Array.from({ length: 3 }, (_, i) => now.getFullYear() - i);
 
-  const perDaySalary =
-    payroll && payroll.workingDays > 0
-      ? (payroll.user.monthlySalary ?? 0) / payroll.workingDays
-      : 0;
+  const paidLeaves = payroll
+    ? payroll.approvedLeavesMonth - payroll.excessLeaveDays
+    : 0;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -101,32 +110,88 @@ export default function PayrollPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-6 space-y-0">
+              {/* Employee info */}
               <SlipRow label="Employee Name" value={payroll.user.fullName} />
               {payroll.user.designation && (
                 <SlipRow label="Designation" value={payroll.user.designation} />
               )}
+              <SlipRow
+                label="Employee Status"
+                value={statusLabel[payroll.user.employeeStatus] ?? payroll.user.employeeStatus}
+              />
               <SlipRow label="Month / Year" value={`${MONTHS[payroll.month - 1]} ${payroll.year}`} />
+
+              {/* Attendance breakdown */}
               <div className="border-t border-slate-100 my-2" />
-              <SlipRow label="Working Days" value={String(payroll.workingDays)} />
-              <SlipRow label="Present Days" value={String(payroll.presentDays)} />
-              <SlipRow label="Approved Leaves" value={String(payroll.approvedLeaves)} />
-              <SlipRow label="Absent Days" value={String(payroll.absentDays)} />
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide pb-1">
+                Attendance Breakdown
+              </p>
+              <SlipRow label="Days in Month" value={String(payroll.daysInMonth)} />
+              <SlipRow label="Weekday Present Days" value={String(payroll.weekdayPresentDays)} />
+              <SlipRow label="Weekend Days Worked" value={String(payroll.weekendWorkedDays)} />
+              <SlipRow label="Approved Leave Days" value={String(payroll.approvedLeavesMonth)} />
+              {payroll.excessLeaveDays > 0 && (
+                <SlipRow
+                  label="Excess Leaves (Unpaid)"
+                  value={String(payroll.excessLeaveDays)}
+                  className="text-red-600"
+                />
+              )}
+              <SlipRow label="Paid Leave Days" value={String(paidLeaves)} />
+              <SlipRow label="Total Paid Days" value={String(payroll.paidDays)} bold />
+
+              {/* Salary calculation */}
               <div className="border-t border-slate-100 my-2" />
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide pb-1">
+                Salary Calculation
+              </p>
               <SlipRow label="Monthly Salary" value={fmt(payroll.user.monthlySalary ?? 0)} />
-              <SlipRow label="Per Day Salary" value={fmt(perDaySalary)} />
-              <SlipRow label="Gross Salary" value={fmt(payroll.grossSalary)} />
+              <SlipRow
+                label={`Per Day Salary (÷ ${payroll.daysInMonth} days)`}
+                value={fmt(payroll.perDaySalary)}
+              />
+              <SlipRow
+                label={`Gross Salary (× ${payroll.paidDays} paid days)`}
+                value={fmt(payroll.grossSalary)}
+              />
+
+              {/* Deductions */}
               <div className="border-t border-slate-100 my-2" />
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide pb-1">
+                Deductions
+              </p>
+              {payroll.leaveSalaryDeduction > 0 ? (
+                <SlipRow
+                  label={`Excess Leave Deduction (${payroll.excessLeaveDays} days × ${fmt(payroll.perDaySalary)})`}
+                  value={`- ${fmt(payroll.leaveSalaryDeduction)}`}
+                  className="text-red-600"
+                />
+              ) : (
+                <SlipRow label="Excess Leave Deduction" value="- ₹0" className="text-slate-400" />
+              )}
               <SlipRow
                 label="Professional Tax"
-                value={`- ${fmt(payroll.professionalTax)}`}
+                value={payroll.professionalTax > 0 ? `- ${fmt(payroll.professionalTax)}` : "- ₹0"}
                 className="text-red-600"
               />
+
+              {/* Net */}
               <div className="border-t border-slate-200 my-2" />
-              <SlipRow
-                label="NET SALARY"
-                value={fmt(payroll.netSalary)}
-                bold
-              />
+              <SlipRow label="NET SALARY" value={fmt(payroll.netSalary)} bold />
+
+              {/* Formula */}
+              <div className="border-t border-slate-100 mt-3 pt-2">
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  Net = ({fmt(payroll.user.monthlySalary ?? 0)} ÷ {payroll.daysInMonth}) × {payroll.paidDays} days
+                  {payroll.leaveSalaryDeduction > 0
+                    ? ` − ${fmt(payroll.leaveSalaryDeduction)} (excess leaves)`
+                    : ""}
+                  {payroll.professionalTax > 0 ? ` − ${fmt(payroll.professionalTax)} (PT)` : ""}
+                  {" "}= {fmt(payroll.netSalary)}
+                </p>
+              </div>
+
+              {/* Bank details */}
               {(payroll.user.bankName || payroll.user.bankAccountNumber) && (
                 <>
                   <div className="border-t border-slate-100 my-2" />

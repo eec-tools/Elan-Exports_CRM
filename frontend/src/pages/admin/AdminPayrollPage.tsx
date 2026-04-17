@@ -5,18 +5,28 @@ import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface PayrollRow {
   id: string;
   userId: string;
   month: number;
   year: number;
-  workingDays: number;
-  presentDays: number;
-  approvedLeaves: number;
-  absentDays: number;
+  daysInMonth: number;
+  weekdayPresentDays: number;
+  weekendWorkedDays: number;
+  approvedLeavesMonth: number;
+  excessLeaveDays: number;
+  paidDays: number;
+  perDaySalary: number;
   grossSalary: number;
+  leaveSalaryDeduction: number;
   professionalTax: number;
   netSalary: number;
   user: {
@@ -38,6 +48,31 @@ const fmt = (n: number) =>
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(n);
+
+const fmtPrecise = (n: number) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(n);
+
+function ColHeader({ label, tip }: { label: string; tip: string }) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex items-center gap-1 cursor-default">
+            {label}
+            <Info className="h-3 w-3 text-slate-400" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs">
+          {tip}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 export default function AdminPayrollPage() {
   const navigate = useNavigate();
@@ -69,6 +104,8 @@ export default function AdminPayrollPage() {
     },
     onError: () => toast.error("Failed to generate payroll"),
   });
+
+  const totalNet = rows.reduce((s, r) => s + r.netSalary, 0);
 
   return (
     <div className="space-y-6">
@@ -113,68 +150,125 @@ export default function AdminPayrollPage() {
               No payroll for {MONTHS[month - 1]} {year}. Click "Generate Payroll" to create it.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50">
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Employee</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Designation</th>
-                    <th className="text-right px-4 py-3 font-medium text-slate-600">Present</th>
-                    <th className="text-right px-4 py-3 font-medium text-slate-600">Leaves</th>
-                    <th className="text-right px-4 py-3 font-medium text-slate-600">Absent</th>
-                    <th className="text-right px-4 py-3 font-medium text-slate-600">Gross</th>
-                    <th className="text-right px-4 py-3 font-medium text-slate-600">PT</th>
-                    <th className="text-right px-4 py-3 font-medium text-slate-600">Net</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="hover:bg-slate-50/50 cursor-pointer"
-                      onClick={() =>
-                        navigate(
-                          `/admin/payroll-slip/${row.userId}?month=${month}&year=${year}`,
-                        )
-                      }
-                    >
-                      <td className="px-4 py-3 font-medium text-slate-800">
-                        {row.user.fullName}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500">
-                        {row.user.designation || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-right text-slate-600">{row.presentDays}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{row.approvedLeaves}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{row.absentDays}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{fmt(row.grossSalary)}</td>
-                      <td className="px-4 py-3 text-right text-red-600">
-                        -{fmt(row.professionalTax)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                        {fmt(row.netSalary)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(
-                              `/admin/payroll-slip/${row.userId}?month=${month}&year=${year}`,
-                            );
-                          }}
-                        >
-                          Slip
-                        </Button>
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-600">
+                      <th className="text-left px-4 py-3 font-medium">Employee</th>
+                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
+                        <ColHeader label="Days" tip="Actual calendar days in the month (28/29/30/31)" />
+                      </th>
+                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
+                        <ColHeader label="Per Day" tip="Monthly Salary ÷ Days in Month" />
+                      </th>
+                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
+                        <ColHeader label="Weekday" tip="Mon–Fri days clocked in (HalfDay = 0.5)" />
+                      </th>
+                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
+                        <ColHeader label="Weekend" tip="Sat/Sun days where 'Working today' was ticked" />
+                      </th>
+                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
+                        <ColHeader label="Leaves" tip="Approved leave days falling this month" />
+                      </th>
+                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
+                        <ColHeader label="Excess" tip="Leave days beyond the 14-day annual quota (unpaid)" />
+                      </th>
+                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
+                        <ColHeader label="Paid Days" tip="Weekday + Weekend + All Approved Leaves" />
+                      </th>
+                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
+                        <ColHeader label="Gross" tip="Per Day Salary × Paid Days" />
+                      </th>
+                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
+                        <ColHeader label="Leave Ded." tip="Per Day Salary × Excess Leave Days (deducted once)" />
+                      </th>
+                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
+                        <ColHeader label="PT" tip="Professional Tax (Maharashtra slab)" />
+                      </th>
+                      <th className="text-right px-4 py-3 font-medium whitespace-nowrap">
+                        Net Salary
+                      </th>
+                      <th className="px-4 py-3" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {rows.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-slate-50/50 cursor-pointer"
+                        onClick={() =>
+                          navigate(`/admin/payroll-slip/${row.userId}?month=${month}&year=${year}`)
+                        }
+                      >
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-slate-800">{row.user.fullName}</p>
+                          {row.user.designation && (
+                            <p className="text-xs text-slate-400">{row.user.designation}</p>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right text-slate-600">{row.daysInMonth}</td>
+                        <td className="px-3 py-3 text-right text-slate-600">{fmtPrecise(row.perDaySalary)}</td>
+                        <td className="px-3 py-3 text-right text-slate-600">{row.weekdayPresentDays}</td>
+                        <td className="px-3 py-3 text-right text-slate-600">{row.weekendWorkedDays}</td>
+                        <td className="px-3 py-3 text-right text-slate-600">{row.approvedLeavesMonth}</td>
+                        <td className="px-3 py-3 text-right">
+                          {row.excessLeaveDays > 0 ? (
+                            <span className="text-red-600 font-medium">{row.excessLeaveDays}</span>
+                          ) : (
+                            <span className="text-slate-400">0</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right font-medium text-slate-700">{row.paidDays}</td>
+                        <td className="px-3 py-3 text-right text-slate-600">{fmt(row.grossSalary)}</td>
+                        <td className="px-3 py-3 text-right">
+                          {row.leaveSalaryDeduction > 0 ? (
+                            <span className="text-red-600">-{fmt(row.leaveSalaryDeduction)}</span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          {row.professionalTax > 0 ? (
+                            <span className="text-red-600">-{fmt(row.professionalTax)}</span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                          {fmt(row.netSalary)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(
+                                `/admin/payroll-slip/${row.userId}?month=${month}&year=${year}`,
+                              );
+                            }}
+                          >
+                            Slip
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary footer */}
+              <div className="border-t border-slate-100 px-4 py-3 flex items-center justify-between text-sm">
+                <p className="text-slate-500 text-xs">
+                  Formula: Net = (Salary ÷ Days in Month) × Paid Days − Excess Leave Deduction − Professional Tax
+                </p>
+                <p className="font-semibold text-slate-800">
+                  Total Payout: {fmt(totalNet)}
+                </p>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
