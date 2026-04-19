@@ -42,6 +42,7 @@ model User {
   vaultDocuments    VaultDocument[]
   notificationReads NotificationRead[]
   assignedCompanies String[]              @default([]) @map("assigned_companies")
+  saturdaySchedule  String                @default("off") @map("saturday_schedule")
   leaves            Leave[]
   payrolls          Payroll[]
 
@@ -946,6 +947,8 @@ model Payroll {
   month                Int
   year                 Int
   daysInMonth          Int      @map("days_in_month")
+  scheduledWorkingDays Int      @map("scheduled_working_days")
+  saturdaySchedule     String   @default("off") @map("saturday_schedule")
   weekdayPresentDays   Float    @map("weekday_present_days")
   weekendWorkedDays    Float    @map("weekend_worked_days")
   approvedLeavesMonth  Float    @map("approved_leaves_month")

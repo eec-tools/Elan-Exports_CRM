@@ -141,6 +141,13 @@ function serializeAttendance(
   };
 }
 
+const SATURDAY_HALF_END = "14:00";
+
+function effectiveWorkEndTime(workEndTime: string, saturdaySchedule: string, date: Date): string {
+  if (date.getDay() === 6 && saturdaySchedule === "half") return SATURDAY_HALF_END;
+  return workEndTime;
+}
+
 async function getTodayAttendanceWithSchedule(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -150,6 +157,7 @@ async function getTodayAttendanceWithSchedule(userId: string) {
       workStartTime: true,
       workEndTime: true,
       minHoursPresent: true,
+      saturdaySchedule: true,
     },
   });
 
@@ -236,6 +244,7 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
         workStartTime: true,
         workEndTime: true,
         minHoursPresent: true,
+        saturdaySchedule: true,
       },
     });
 
@@ -312,8 +321,9 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
     // If there's an absent record (no-show), but user is now checking in, we update it
     const effectiveStart = now;
 
-    // isWeekendWork: opt-in flag for voluntarily working on Sat/Sun
-    const isWeekendWork = req.body?.isWeekendWork === true;
+    // isWeekendWork: true if today is an off day (Sunday always off; Saturday depends on schedule)
+    const todayDow = today.getDay(); // 0=Sunday, 6=Saturday
+    const isWeekendWork = todayDow === 0 || (todayDow === 6 && user.saturdaySchedule === "off");
 
     const attendance = await prisma.attendance.upsert({
       where: {
@@ -410,7 +420,8 @@ export async function endAttendance(req: AuthRequest, res: Response): Promise<vo
       context.attendance.heartbeats,
     );
 
-    const scheduleEnd = buildScheduleDateTime(now, context.user.workEndTime);
+    const effectiveEnd = effectiveWorkEndTime(context.user.workEndTime, context.user.saturdaySchedule, now);
+    const scheduleEnd = buildScheduleDateTime(now, effectiveEnd);
     if (!scheduleEnd) {
       res.status(400).json({ error: "Invalid work schedule for user" });
       return;
@@ -531,7 +542,8 @@ export async function getTodayAttendance(req: AuthRequest, res: Response): Promi
 
     const now = new Date();
     const workStart = buildScheduleDateTime(now, context.user.workStartTime);
-    const workEnd = buildScheduleDateTime(now, context.user.workEndTime);
+    const effectiveEnd = effectiveWorkEndTime(context.user.workEndTime, context.user.saturdaySchedule, now);
+    const workEnd = buildScheduleDateTime(now, effectiveEnd);
 
     if (!workStart || !workEnd) {
       res.status(400).json({ error: "Invalid work schedule for user" });

@@ -30,7 +30,7 @@ export async function getMyEmployeeProfile(req: AuthRequest, res: Response): Pro
 }
 
 /** GET /api/admin/employees — list all users with payroll fields */
-export async function listEmployees(req: AuthRequest, res: Response): Promise<void> {
+export async function listEmployees(_req: AuthRequest, res: Response): Promise<void> {
   try {
     const employees = await prisma.user.findMany({
       where: { isActive: true },
@@ -47,6 +47,7 @@ export async function listEmployees(req: AuthRequest, res: Response): Promise<vo
         bankIfsc: true,
         workStartTime: true,
         workEndTime: true,
+        saturdaySchedule: true,
         isActive: true,
         createdAt: true,
         roles: { select: { role: true } },
@@ -76,6 +77,7 @@ export async function createEmployee(req: AuthRequest, res: Response): Promise<v
       bankIfsc,
       workStartTime = "09:00",
       workEndTime = "18:00",
+      saturdaySchedule = "off",
       role = "member",
     } = req.body;
 
@@ -87,6 +89,11 @@ export async function createEmployee(req: AuthRequest, res: Response): Promise<v
     const timeError = isValidWorkWindow(workStartTime, workEndTime);
     if (timeError) {
       res.status(400).json({ error: timeError });
+      return;
+    }
+
+    if (!["off", "full", "half"].includes(saturdaySchedule)) {
+      res.status(400).json({ error: "saturdaySchedule must be off, full, or half" });
       return;
     }
 
@@ -112,6 +119,7 @@ export async function createEmployee(req: AuthRequest, res: Response): Promise<v
         bankIfsc: bankIfsc ?? null,
         workStartTime,
         workEndTime,
+        saturdaySchedule,
         roles: { create: { role } },
       },
       select: {
@@ -127,6 +135,7 @@ export async function createEmployee(req: AuthRequest, res: Response): Promise<v
         bankIfsc: true,
         workStartTime: true,
         workEndTime: true,
+        saturdaySchedule: true,
         isActive: true,
       },
     });
@@ -153,6 +162,7 @@ export async function updateEmployee(req: AuthRequest, res: Response): Promise<v
       bankIfsc,
       workStartTime,
       workEndTime,
+      saturdaySchedule,
       isActive,
     } = req.body;
 
@@ -162,6 +172,11 @@ export async function updateEmployee(req: AuthRequest, res: Response): Promise<v
         res.status(400).json({ error: timeError });
         return;
       }
+    }
+
+    if (saturdaySchedule !== undefined && !["off", "full", "half"].includes(saturdaySchedule)) {
+      res.status(400).json({ error: "saturdaySchedule must be off, full, or half" });
+      return;
     }
 
     const user = await prisma.user.update({
@@ -177,6 +192,7 @@ export async function updateEmployee(req: AuthRequest, res: Response): Promise<v
         ...(bankIfsc !== undefined && { bankIfsc }),
         ...(workStartTime !== undefined && { workStartTime }),
         ...(workEndTime !== undefined && { workEndTime }),
+        ...(saturdaySchedule !== undefined && { saturdaySchedule }),
         ...(isActive !== undefined && { isActive }),
       },
       select: {
@@ -192,6 +208,7 @@ export async function updateEmployee(req: AuthRequest, res: Response): Promise<v
         bankIfsc: true,
         workStartTime: true,
         workEndTime: true,
+        saturdaySchedule: true,
         isActive: true,
       },
     });

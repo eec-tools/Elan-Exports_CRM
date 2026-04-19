@@ -36,6 +36,7 @@ interface Employee {
   bankIfsc: string | null;
   workStartTime: string;
   workEndTime: string;
+  saturdaySchedule: "off" | "full" | "half";
   isActive: boolean;
   roles: { role: string }[];
 }
@@ -59,6 +60,7 @@ const emptyForm = {
   bankIfsc: "",
   workStartTime: "09:00",
   workEndTime: "18:00",
+  saturdaySchedule: "off" as "off" | "full" | "half",
 };
 
 export default function AdminEmployeesPage() {
@@ -81,6 +83,7 @@ export default function AdminEmployeesPage() {
         gender: data.gender || null,
         workStartTime: data.workStartTime,
         workEndTime: data.workEndTime,
+        saturdaySchedule: data.saturdaySchedule,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success("Employee created");
@@ -103,6 +106,7 @@ export default function AdminEmployeesPage() {
         bankIfsc: data.bankIfsc || null,
         workStartTime: data.workStartTime,
         workEndTime: data.workEndTime,
+        saturdaySchedule: data.saturdaySchedule,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success("Employee updated");
@@ -144,6 +148,7 @@ export default function AdminEmployeesPage() {
       bankIfsc: emp.bankIfsc ?? "",
       workStartTime: emp.workStartTime || "09:00",
       workEndTime: emp.workEndTime || "18:00",
+      saturdaySchedule: emp.saturdaySchedule,
     });
     setOpen(true);
   };
@@ -163,9 +168,11 @@ export default function AdminEmployeesPage() {
     }
   };
 
+  type StringFormKey = { [K in keyof typeof emptyForm]: (typeof emptyForm)[K] extends string ? K : never }[keyof typeof emptyForm];
+
   const field = (
     label: string,
-    key: keyof typeof emptyForm,
+    key: StringFormKey,
     type = "text",
     required = false,
   ) => (
@@ -331,6 +338,19 @@ export default function AdminEmployeesPage() {
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
+              </div>
+              <div className="mt-3">
+                <label className="text-sm font-medium text-slate-700 block mb-1">Saturday Schedule</label>
+                <select
+                  value={form.saturdaySchedule}
+                  onChange={(e) => setForm((f) => ({ ...f, saturdaySchedule: e.target.value as "off" | "full" | "half" }))}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="off">Saturday Off</option>
+                  <option value="full">Full Day (regular workday)</option>
+                  <option value="half">Half Day (checkout by 2 PM, paid full day)</option>
+                </select>
+                <p className="text-xs text-slate-400 mt-1">Sunday is always off for all employees.</p>
               </div>
             </div>
 

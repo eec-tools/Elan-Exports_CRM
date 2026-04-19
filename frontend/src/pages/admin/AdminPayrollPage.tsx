@@ -19,6 +19,8 @@ interface PayrollRow {
   month: number;
   year: number;
   daysInMonth: number;
+  scheduledWorkingDays: number;
+  saturdaySchedule: string;
   weekdayPresentDays: number;
   weekendWorkedDays: number;
   approvedLeavesMonth: number;
@@ -36,6 +38,12 @@ interface PayrollRow {
     monthlySalary: number | null;
   };
 }
+
+const saturdayLabel: Record<string, string> = {
+  off: "Sat Off",
+  full: "Sat Full",
+  half: "Sat Half",
+};
 
 const MONTHS = [
   "January","February","March","April","May","June",
@@ -157,16 +165,16 @@ export default function AdminPayrollPage() {
                     <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-600">
                       <th className="text-left px-4 py-3 font-medium">Employee</th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
-                        <ColHeader label="Days" tip="Actual calendar days in the month (28/29/30/31)" />
+                        <ColHeader label="Work Days" tip="Scheduled working days in the month based on employee's Saturday schedule. Used as per-day salary denominator." />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
-                        <ColHeader label="Per Day" tip="Monthly Salary ÷ Days in Month" />
+                        <ColHeader label="Per Day" tip="Monthly Salary ÷ Scheduled Working Days" />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
-                        <ColHeader label="Weekday" tip="Mon–Fri days clocked in (HalfDay = 0.5)" />
+                        <ColHeader label="Present" tip="Regular present days on scheduled workdays (Mon–Fri + Sat for full/half). HalfDay = 0.5." />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
-                        <ColHeader label="Weekend" tip="Sat/Sun days where 'Working today' was ticked" />
+                        <ColHeader label="Bonus Days" tip="Days worked on off days (Sunday, or Saturday for off-schedule employees). Paid at same per-day rate." />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
                         <ColHeader label="Leaves" tip="Approved leave days falling this month" />
@@ -203,11 +211,12 @@ export default function AdminPayrollPage() {
                       >
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-800">{row.user.fullName}</p>
-                          {row.user.designation && (
-                            <p className="text-xs text-slate-400">{row.user.designation}</p>
-                          )}
+                          <p className="text-xs text-slate-400">
+                            {row.user.designation && `${row.user.designation} · `}
+                            {saturdayLabel[row.saturdaySchedule] ?? row.saturdaySchedule}
+                          </p>
                         </td>
-                        <td className="px-3 py-3 text-right text-slate-600">{row.daysInMonth}</td>
+                        <td className="px-3 py-3 text-right text-slate-600">{row.scheduledWorkingDays}</td>
                         <td className="px-3 py-3 text-right text-slate-600">{fmtPrecise(row.perDaySalary)}</td>
                         <td className="px-3 py-3 text-right text-slate-600">{row.weekdayPresentDays}</td>
                         <td className="px-3 py-3 text-right text-slate-600">{row.weekendWorkedDays}</td>
@@ -262,7 +271,7 @@ export default function AdminPayrollPage() {
               {/* Summary footer */}
               <div className="border-t border-slate-100 px-4 py-3 flex items-center justify-between text-sm">
                 <p className="text-slate-500 text-xs">
-                  Formula: Net = (Salary ÷ Days in Month) × Paid Days − Excess Leave Deduction − Professional Tax
+                  Formula: Net = (Salary ÷ Scheduled Work Days) × Paid Days − Excess Leave Deduction − Professional Tax
                 </p>
                 <p className="font-semibold text-slate-800">
                   Total Payout: {fmt(totalNet)}

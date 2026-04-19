@@ -72,6 +72,7 @@ async function processOpenAttendances(): Promise<void> {
             email: true,
             workStartTime: true,
             workEndTime: true,
+            saturdaySchedule: true,
           },
         },
         heartbeats: {
@@ -95,7 +96,9 @@ async function processOpenAttendances(): Promise<void> {
       if (ruleError) continue;
 
       const day = startOfLocalDay(attendance.startTime);
-      const workEnd = buildWorkDateTime(day, attendance.user.workEndTime);
+      const dow = day.getDay();
+      const endTimeStr = dow === 6 && attendance.user.saturdaySchedule === "half" ? "14:00" : attendance.user.workEndTime;
+      const workEnd = buildWorkDateTime(day, endTimeStr);
       if (!workEnd) continue;
       if (now < workEnd) continue;
 
@@ -181,14 +184,21 @@ async function markNoShowAbsent(): Promise<void> {
       select: {
         id: true,
         workEndTime: true,
+        saturdaySchedule: true,
       },
     });
 
     const now = new Date();
+    const todayDow = today.getDay(); // 0=Sunday, 6=Saturday
 
     for (const user of activeUsers) {
-      // Only mark absent after their work end time has passed
-      const workEnd = buildWorkDateTime(today, user.workEndTime);
+      // Sunday always off; Saturday off if schedule is "off"
+      if (todayDow === 0) continue;
+      if (todayDow === 6 && user.saturdaySchedule === "off") continue;
+
+      // Saturday half-day: work ends at 14:00
+      const endTimeStr = todayDow === 6 && user.saturdaySchedule === "half" ? "14:00" : user.workEndTime;
+      const workEnd = buildWorkDateTime(today, endTimeStr);
       if (!workEnd || now < workEnd) continue;
 
       // Check if they already have a record for today
@@ -248,6 +258,7 @@ async function closePreviousDayOpenAttendances(): Promise<void> {
             workStartTime: true,
             workEndTime: true,
             minHoursPresent: true,
+            saturdaySchedule: true,
           },
         },
         heartbeats: {
@@ -261,7 +272,9 @@ async function closePreviousDayOpenAttendances(): Promise<void> {
       if (!attendance.startTime) continue;
 
       const day = startOfLocalDay(attendance.date);
-      const workEnd = buildWorkDateTime(day, attendance.user.workEndTime);
+      const dow = day.getDay();
+      const endTimeStr = dow === 6 && attendance.user.saturdaySchedule === "half" ? "14:00" : attendance.user.workEndTime;
+      const workEnd = buildWorkDateTime(day, endTimeStr);
       if (!workEnd) continue;
 
       const safeEnd = workEnd < attendance.startTime ? attendance.startTime : workEnd;
