@@ -23,6 +23,7 @@ import {
   Umbrella,
   Banknote,
   UsersRound,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -348,6 +349,34 @@ export function AppLayout() {
                       )}
                     </NavLink>
                   </div>
+                  {!sidebarCollapsed && <Separator className="bg-slate-100 mt-4 mb-2 w-[calc(100%-1.5rem)] mx-auto" />}
+                  {!sidebarCollapsed && (
+                    <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Quotations
+                    </div>
+                  )}
+                  <NavLink
+                    to="/quotations"
+                    onClick={() => setSidebarOpen(false)}
+                    className={({ isActive }) =>
+                      `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
+                      } ${isActive
+                        ? "bg-brand-50 text-brand-700"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                      }`
+                    }
+                    title={sidebarCollapsed ? "Quotations" : undefined}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {isActive && !sidebarCollapsed && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                        )}
+                        <ClipboardList className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
+                        {!sidebarCollapsed && <span className="truncate">Quotations</span>}
+                      </>
+                    )}
+                  </NavLink>
                   {!sidebarCollapsed && <Separator className="bg-slate-100 my-4 w-[calc(100%-1.5rem)] mx-auto" />}
                 </div>
               );

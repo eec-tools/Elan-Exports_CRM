@@ -39,6 +39,8 @@ import sourcingSuppliersRoutes from "./routes/sourcingSuppliers.routes.js";
 import sourcingEmailCampaignRoutes from "./routes/sourcingEmailCampaign.routes.js";
 import supplierFormTemplateRoutes from "./routes/supplierFormTemplate.routes.js";
 import publicSupplierFormRoutes from "./routes/publicSupplierForm.routes.js";
+import quotationsRoutes from "./routes/quotations.routes.js";
+import publicQuotationFormRoutes from "./routes/publicQuotationForm.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,6 +166,8 @@ app.use("/api/sourcing-suppliers", sourcingSuppliersRoutes);
 app.use("/api/sourcing-campaigns", sourcingEmailCampaignRoutes);
 app.use("/api/supplier-form-templates", supplierFormTemplateRoutes);
 app.use("/api/public/supplier-form", publicSupplierFormRoutes);
+app.use("/api/quotations", quotationsRoutes);
+app.use("/api/public/quotation-form", publicQuotationFormRoutes);
 
 // Health check with detailed status
 app.get("/api/health", async (_req, res) => {

@@ -973,3 +973,53 @@ model AttendanceSettings {
 
   @@map("attendance_settings")
 }
+
+model Quotation {
+  id        String  @id @default(uuid())
+  formToken String? @unique @map("form_token")
+
+  // Status: pending | form_sent | response_received | negotiating | finalized
+  status String @default("pending")
+
+  // Linked supplier from existing records
+  linkedSupplierId   String? @map("linked_supplier_id")
+  linkedSupplierType String? @map("linked_supplier_type")
+
+  // Supplier info (denormalized for display & public form)
+  supplierName    String  @map("supplier_name")
+  supplierWebsite String? @map("supplier_website")
+
+  // Per-field config: { [fieldKey]: { sentToSupplier: boolean, mandatory: boolean } }
+  fieldConfig Json @default("{}") @map("field_config")
+
+  // Track who filled each field: { [fieldKey]: "supplier" | "internal" }
+  fieldSources Json @default("{}") @map("field_sources")
+
+  // Quotation fields
+  date                   String?
+  hsCode                 String? @map("hs_code")
+  product                String?
+  fclDetails             String? @map("fcl_details")
+  fobSupplierPrice       String? @map("fob_supplier_price")
+  fobCommissionPercent   String? @map("fob_commission_percent")
+  fobWithCommission      String? @map("fob_with_commission")
+  cifSupplierPrice       String? @map("cif_supplier_price")
+  cifWithCommission      String? @map("cif_with_commission")
+  loadability            String?
+  packing                String?
+  paymentTerms           String? @map("payment_terms")
+  origin                 String?
+  priceValidity          String? @map("price_validity")
+  supplierCertifications String? @map("supplier_certifications")
+  leadTime               String? @map("lead_time")
+  supplierComments       String? @map("supplier_comments")
+
+  // Buyer's Specifications — NEVER sent to supplier
+  buyerSpecifications Json? @default("{}") @map("buyer_specifications")
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("quotations")
+}

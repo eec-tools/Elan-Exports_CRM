@@ -39,6 +39,9 @@ import SourcingSupplierPage from "@/pages/SourcingSupplierPage";
 import SourcingSupplierDetailsPage from "@/pages/SourcingSupplierDetailsPage";
 import FormTemplatesPage from "@/pages/FormTemplatesPage";
 import PublicSupplierFormPage from "@/pages/PublicSupplierFormPage";
+import QuotationsPage from "@/pages/QuotationsPage";
+import QuotationDetailsPage from "@/pages/QuotationDetailsPage";
+import PublicQuotationFormPage from "@/pages/PublicQuotationFormPage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient({
@@ -80,6 +83,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/supplier-form/:token" element={<PublicSupplierFormPage />} />
+            <Route path="/quotation-form/:token" element={<PublicQuotationFormPage />} />
 
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
@@ -168,6 +172,22 @@ export default function App() {
                   element={
                     <PermissionGate permission="new_suppliers">
                       <NewSupplierDetailsPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="quotations"
+                  element={
+                    <PermissionGate permission="suppliers">
+                      <QuotationsPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="quotations/:id"
+                  element={
+                    <PermissionGate permission="suppliers">
+                      <QuotationDetailsPage />
                     </PermissionGate>
                   }
                 />
