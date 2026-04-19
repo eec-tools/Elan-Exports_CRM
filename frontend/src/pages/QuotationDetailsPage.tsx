@@ -237,7 +237,7 @@ export default function QuotationDetailsPage() {
   const getFieldValue = (key: string): string =>
     localFields[key] !== undefined
       ? localFields[key]
-      : ((quotation as Record<string, unknown>)[key] as string) ?? "";
+      : ((quotation as unknown as Record<string, unknown>)[key] as string) ?? "";
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
