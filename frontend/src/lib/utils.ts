@@ -31,7 +31,12 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     textArea.style.pointerEvents = "none";
     textArea.setAttribute("readonly", ""); // Prevent keyboard on mobile
 
-    document.body.appendChild(textArea);
+    // Append inside the active dialog (if any) to avoid Radix UI's focus trap
+    // blocking selection of elements outside the dialog.
+    const container =
+      (document.activeElement?.closest('[role="dialog"]') as HTMLElement) ??
+      document.body;
+    container.appendChild(textArea);
 
     // iOS requires a different approach
     const isIOS = navigator.userAgent.match(/ipad|iphone/i);
@@ -53,7 +58,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       console.error("Fallback copy failed", err);
     }
 
-    document.body.removeChild(textArea);
+    container.removeChild(textArea);
     return success;
   } catch (error) {
     console.error("Failed to copy to clipboard", error);
