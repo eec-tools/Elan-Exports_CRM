@@ -9,7 +9,8 @@ const QUOTATION_FIELDS = [
     "fclDetails", "fobSupplierPrice", "fobCommissionPercent", "fobWithCommission",
     "cifSupplierPrice", "cifWithCommission", "loadability", "packing",
     "paymentTerms", "origin", "priceValidity", "supplierCertifications",
-    "leadTime", "supplierComments", "buyerSpecifications", "fieldConfig", "fieldSources",
+    "leadTime", "supplierComments", "quantityDetails", "monthlyVolume", "yearlyVolume", "palette",
+    "buyerSpecifications", "fieldConfig", "fieldSources",
     "linkedSupplierId", "linkedSupplierType", "status",
 ] as const;
 
@@ -36,6 +37,10 @@ export const QUOTATION_FIELD_LABELS: Record<string, string> = {
     supplierCertifications: "Supplier Certifications",
     leadTime: "Lead Time",
     supplierComments: "Supplier Comments on Specs",
+    quantityDetails: "Quantity Details",
+    monthlyVolume: "Monthly Volume",
+    yearlyVolume: "Yearly Volume",
+    palette: "Palette",
 };
 
 /**

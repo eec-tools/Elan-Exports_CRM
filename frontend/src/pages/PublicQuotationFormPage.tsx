@@ -22,7 +22,7 @@ interface QuotationFormData {
 }
 
 // ─── All field definitions ───────────────────────────
-const ALL_FIELDS: { key: string; label: string; multiline?: boolean }[] = [
+const ALL_FIELDS: { key: string; label: string; multiline?: boolean; dropdown?: boolean }[] = [
   { key: "supplierName",           label: "Supplier Name" },
   { key: "supplierWebsite",        label: "Website" },
   { key: "date",                   label: "Date" },
@@ -42,6 +42,10 @@ const ALL_FIELDS: { key: string; label: string; multiline?: boolean }[] = [
   { key: "supplierCertifications", label: "Supplier Certifications" },
   { key: "leadTime",               label: "Lead Time" },
   { key: "supplierComments",       label: "Supplier Comments on Specifications", multiline: true },
+  { key: "quantityDetails",        label: "Quantity Details" },
+  { key: "monthlyVolume",          label: "Monthly Volume" },
+  { key: "yearlyVolume",           label: "Yearly Volume" },
+  { key: "palette",                label: "Palette (Yes/No)", dropdown: true },
 ];
 
 // Public axios instance — same base URL as authenticated client, just no auth header
@@ -184,7 +188,19 @@ export default function PublicQuotationFormPage() {
                     {field.label}
                     {mandatory && <span className="text-red-500 ml-0.5">*</span>}
                   </Label>
-                  {field.multiline ? (
+                  {field.dropdown ? (
+                    <select
+                      value={values[field.key] ?? ""}
+                      onChange={(e) =>
+                        setValues((p) => ({ ...p, [field.key]: e.target.value }))
+                      }
+                      className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    >
+                      <option value="">— Select —</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  ) : field.multiline ? (
                     <Textarea
                       rows={3}
                       value={values[field.key] ?? ""}

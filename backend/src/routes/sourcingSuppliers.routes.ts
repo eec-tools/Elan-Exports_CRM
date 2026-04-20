@@ -12,15 +12,15 @@ import { authenticate, requirePermission, requireEdit } from "../middleware/auth
 
 const router = Router();
 
-router.use(authenticate, requirePermission("suppliers"));
+router.use(authenticate, requirePermission(["suppliers", "sourcing_suppliers"]));
 
 router.get("/", listSourcingSuppliers);
 router.get("/stats", getSourcingSupplierStats);
 router.get("/:id", getSourcingSupplier);
 
-router.post("/", requireEdit("suppliers"), createSourcingSupplier);
-router.post("/:id/convert", requireEdit("suppliers"), convertToNewSupplier);
-router.put("/:id", requireEdit("suppliers"), updateSourcingSupplier);
-router.delete("/:id", requireEdit("suppliers"), deleteSourcingSupplier);
+router.post("/", requireEdit(["suppliers", "sourcing_suppliers"]), createSourcingSupplier);
+router.post("/:id/convert", requireEdit(["suppliers", "sourcing_suppliers"]), convertToNewSupplier);
+router.put("/:id", requireEdit(["suppliers", "sourcing_suppliers"]), updateSourcingSupplier);
+router.delete("/:id", requireEdit(["suppliers", "sourcing_suppliers"]), deleteSourcingSupplier);
 
 export default router;

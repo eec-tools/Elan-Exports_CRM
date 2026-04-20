@@ -192,7 +192,7 @@ export default function SourcingSupplierDetailsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("suppliers");
+  const canEdit = hasEditPermission("suppliers") || hasEditPermission("sourcing_suppliers");
 
   const [fields, setFields] = useState<Partial<SourcingSupplier>>({});
   const [isDirty, setIsDirty] = useState(false);

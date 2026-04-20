@@ -80,7 +80,7 @@ const CAMPAIGN_STEP_LABEL: Record<number, string> = {
 
 export default function SourcingSupplierPage() {
   const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("suppliers");
+  const canEdit = hasEditPermission("suppliers") || hasEditPermission("sourcing_suppliers");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -244,7 +244,7 @@ export default function SourcingSupplierPage() {
             <LayoutTemplate className="h-4 w-4 mr-1.5" />
             Form Templates
           </Button>
-          <PermissionGate permission="new_suppliers" editOnly>
+          <PermissionGate permission="sourcing_suppliers" editOnly>
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" />
               Add Sourcing Supplier

@@ -21,7 +21,7 @@ import {
 
 const router = Router();
 
-router.use(authenticate, requirePermission("suppliers"));
+router.use(authenticate, requirePermission(["suppliers", "signed_suppliers"]));
 
 router.get("/", listSuppliers);
 router.get("/list", listSuppliersForDropdown);
@@ -30,10 +30,10 @@ router.get("/filters", getSupplierFilters);
 router.get("/export/csv", exportSuppliersCsv);
 router.get("/:id", getSupplier);
 
-router.post("/upload", requireEdit("suppliers"), uploadSupplierFile.single("file"), uploadCatalog);
-router.post("/", requireEdit("suppliers"), createSupplier);
-router.put("/:id", requireEdit("suppliers"), updateSupplier);
-router.patch("/:id/stage", requireEdit("suppliers"), updateSupplierStage);
-router.delete("/:id", requireEdit("suppliers"), deleteSupplier);
+router.post("/upload", requireEdit(["suppliers", "signed_suppliers"]), uploadSupplierFile.single("file"), uploadCatalog);
+router.post("/", requireEdit(["suppliers", "signed_suppliers"]), createSupplier);
+router.put("/:id", requireEdit(["suppliers", "signed_suppliers"]), updateSupplier);
+router.patch("/:id/stage", requireEdit(["suppliers", "signed_suppliers"]), updateSupplierStage);
+router.delete("/:id", requireEdit(["suppliers", "signed_suppliers"]), deleteSupplier);
 
 export default router;

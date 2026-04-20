@@ -40,6 +40,8 @@ const PERMISSIONS = [
   "new_suppliers",
   "signed_suppliers",
   "old_suppliers",
+  "sourcing_suppliers",
+  "quotations",
   "analytics",
   "reports",
   "vault",
@@ -54,6 +56,8 @@ const formatPermission = (perm: string) => {
   if (perm === "new_suppliers") return "New Suppliers";
   if (perm === "signed_suppliers") return "Signed Suppliers";
   if (perm === "old_suppliers") return "Old Suppliers";
+  if (perm === "sourcing_suppliers") return "Sourcing Suppliers";
+  if (perm === "quotations") return "Quotations";
   return perm.replace('_', ' ');
 };
 

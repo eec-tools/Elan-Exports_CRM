@@ -86,7 +86,7 @@ const DEAL_STAGES = [
 export default function OldSuppliersPage() {
   const { hasEditPermission } = useAuth();
   const queryClient = useQueryClient();
-  const canEdit = hasEditPermission("suppliers");
+  const canEdit = hasEditPermission("suppliers") || hasEditPermission("old_suppliers");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -235,7 +235,7 @@ export default function OldSuppliersPage() {
           <Button variant="outline" onClick={handleExport} className="gap-2 bg-white hover:bg-slate-50 text-slate-700 shadow-sm border-slate-200 h-9">
             <Download className="h-4 w-4" /> Export CSV
           </Button>
-          <PermissionGate permission="suppliers" editOnly>
+          <PermissionGate permission="old_suppliers" editOnly>
             <Button onClick={openCreate} className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9">
               <Plus className="h-4 w-4" /> Add Supplier
             </Button>

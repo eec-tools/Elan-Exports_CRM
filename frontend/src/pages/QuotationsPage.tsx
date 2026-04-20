@@ -85,6 +85,10 @@ const QUOTATION_FIELDS: {
   { key: "supplierCertifications",label: "Supplier Certifications",      defaultSent: true,  defaultMandatory: false },
   { key: "leadTime",              label: "Lead Time",                    defaultSent: true,  defaultMandatory: false },
   { key: "supplierComments",      label: "Supplier Comments on Specs",   defaultSent: true,  defaultMandatory: false },
+  { key: "quantityDetails",       label: "Quantity Details",             defaultSent: true,  defaultMandatory: false },
+  { key: "monthlyVolume",         label: "Monthly Volume",               defaultSent: true,  defaultMandatory: false },
+  { key: "yearlyVolume",          label: "Yearly Volume",                defaultSent: true,  defaultMandatory: false },
+  { key: "palette",               label: "Palette",                      defaultSent: true,  defaultMandatory: false },
 ];
 
 function buildDefaultFieldConfig() {
@@ -106,7 +110,7 @@ const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
 
 export default function QuotationsPage() {
   const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("suppliers");
+  const canEdit = hasEditPermission("suppliers") || hasEditPermission("quotations");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -254,7 +258,7 @@ export default function QuotationsPage() {
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">Send customisable quotation forms to suppliers and collect pricing.</p>
         </div>
-        <PermissionGate permission="suppliers" editOnly>
+        <PermissionGate permission="quotations" editOnly>
           <Button onClick={() => { resetCreateForm(); setCreateOpen(true); }} className="gap-2">
             <Plus className="h-4 w-4" /> New Quotation
           </Button>

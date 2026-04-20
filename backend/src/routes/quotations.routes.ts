@@ -14,7 +14,7 @@ import { authenticate, requirePermission, requireEdit } from "../middleware/auth
 
 const router = Router();
 
-router.use(authenticate, requirePermission("suppliers"));
+router.use(authenticate, requirePermission(["suppliers", "quotations"]));
 
 router.get("/", listQuotations);
 router.get("/stats", getQuotationStats);
@@ -22,9 +22,9 @@ router.get("/search-suppliers", searchSuppliers);
 router.get("/:id", getQuotation);
 router.get("/:id/export-pdf", exportQuotationPdf);
 
-router.post("/", requireEdit("suppliers"), createQuotation);
-router.post("/:id/regenerate-token", requireEdit("suppliers"), regenerateToken);
-router.put("/:id", requireEdit("suppliers"), updateQuotation);
-router.delete("/:id", requireEdit("suppliers"), deleteQuotation);
+router.post("/", requireEdit(["suppliers", "quotations"]), createQuotation);
+router.post("/:id/regenerate-token", requireEdit(["suppliers", "quotations"]), regenerateToken);
+router.put("/:id", requireEdit(["suppliers", "quotations"]), updateQuotation);
+router.delete("/:id", requireEdit(["suppliers", "quotations"]), deleteQuotation);
 
 export default router;

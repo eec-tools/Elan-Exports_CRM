@@ -884,6 +884,8 @@ enum Permission {
   new_suppliers
   signed_suppliers
   old_suppliers
+  sourcing_suppliers
+  quotations
 }
 
 enum AccessLevel {
@@ -1013,6 +1015,10 @@ model Quotation {
   supplierCertifications String? @map("supplier_certifications")
   leadTime               String? @map("lead_time")
   supplierComments       String? @map("supplier_comments")
+  quantityDetails        String? @map("quantity_details")
+  monthlyVolume          String? @map("monthly_volume")
+  yearlyVolume           String? @map("yearly_volume")
+  palette                String? @map("palette")
 
   // Buyer's Specifications — NEVER sent to supplier
   buyerSpecifications Json? @default("{}") @map("buyer_specifications")

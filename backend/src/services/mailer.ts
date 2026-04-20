@@ -96,7 +96,12 @@ export async function sendCredentialsEmail(
           <p style="margin: 4px 0;"><strong>Email:</strong> ${email}</p>
           <p style="margin: 4px 0;"><strong>Password:</strong> ${password}</p>
         </div>
-        <p style="color: #888; font-size: 12px; margin-top: 24px;">
+        <div style="margin-top: 24px; text-align: center;">
+          <a href="${loginUrl}" style="background-color: #1a1a2e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            Go to Login
+          </a>
+        </div>
+        <p style="color: #888; font-size: 12px; margin-top: 32px;">
           ⚠️ Please keep your password safe and do not share it with anyone.
         </p>
       </div>

@@ -75,6 +75,10 @@ interface Quotation {
   supplierCertifications?: string;
   leadTime?: string;
   supplierComments?: string;
+  quantityDetails?: string;
+  monthlyVolume?: string;
+  yearlyVolume?: string;
+  palette?: string;
   buyerSpecifications?: BuyerSpecs;
   createdAt: string;
   updatedAt: string;
@@ -101,6 +105,10 @@ const QUOTATION_FIELDS: { key: keyof Quotation; label: string }[] = [
   { key: "supplierCertifications",label: "Supplier Certifications" },
   { key: "leadTime",              label: "Lead Time" },
   { key: "supplierComments",      label: "Supplier Comments on Specs" },
+  { key: "quantityDetails",       label: "Quantity Details" },
+  { key: "monthlyVolume",         label: "Monthly Volume" },
+  { key: "yearlyVolume",          label: "Yearly Volume" },
+  { key: "palette",               label: "Palette" },
 ];
 
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
@@ -116,7 +124,7 @@ export default function QuotationDetailsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("suppliers");
+  const canEdit = hasEditPermission("suppliers") || hasEditPermission("quotations");
 
   const [localFields, setLocalFields] = useState<Record<string, string>>({});
   const [localBuyerSpecs, setLocalBuyerSpecs] = useState<BuyerSpecs>({});
@@ -356,6 +364,17 @@ export default function QuotationDetailsPage() {
                         disabled={!canEdit}
                         className="text-sm resize-none"
                       />
+                    ) : key === "palette" ? (
+                      <select
+                        value={getFieldValue(k)}
+                        onChange={(e) => handleFieldChange(k, e.target.value)}
+                        disabled={!canEdit}
+                        className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      >
+                        <option value="">— Select —</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </select>
                     ) : (
                       <Input
                         value={getFieldValue(k)}

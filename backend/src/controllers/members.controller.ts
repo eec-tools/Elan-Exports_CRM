@@ -415,8 +415,11 @@ export async function sendCredentials(
       return;
     }
 
+    const productionUrl = "http://elan-exports-s3.s3-website.ap-south-1.amazonaws.com";
     const loginUrl = process.env.FRONTEND_URL
       ? `${process.env.FRONTEND_URL}/login`
+      : process.env.NODE_ENV === "production"
+      ? `${productionUrl}/login`
       : "http://localhost:5173/login";
 
     await sendCredentialsEmail({

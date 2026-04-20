@@ -35,7 +35,7 @@ export async function getPublicQuotationForm(req: Request, res: Response): Promi
             "fclDetails", "fobSupplierPrice", "fobCommissionPercent", "fobWithCommission",
             "cifSupplierPrice", "cifWithCommission", "loadability", "packing",
             "paymentTerms", "origin", "priceValidity", "supplierCertifications",
-            "leadTime", "supplierComments",
+            "leadTime", "supplierComments", "quantityDetails", "monthlyVolume", "yearlyVolume", "palette",
         ];
 
         for (const key of supplierFieldKeys) {

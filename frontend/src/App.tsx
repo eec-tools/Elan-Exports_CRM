@@ -138,7 +138,7 @@ export default function App() {
                 <Route
                   path="suppliers/sourcing"
                   element={
-                    <PermissionGate permission="new_suppliers">
+                    <PermissionGate permission="sourcing_suppliers">
                       <SourcingSupplierPage />
                     </PermissionGate>
                   }
@@ -146,7 +146,7 @@ export default function App() {
                 <Route
                   path="suppliers/sourcing/:id"
                   element={
-                    <PermissionGate permission="new_suppliers">
+                    <PermissionGate permission="sourcing_suppliers">
                       <SourcingSupplierDetailsPage />
                     </PermissionGate>
                   }
@@ -178,7 +178,7 @@ export default function App() {
                 <Route
                   path="quotations"
                   element={
-                    <PermissionGate permission="suppliers">
+                    <PermissionGate permission="quotations">
                       <QuotationsPage />
                     </PermissionGate>
                   }
@@ -186,7 +186,7 @@ export default function App() {
                 <Route
                   path="quotations/:id"
                   element={
-                    <PermissionGate permission="suppliers">
+                    <PermissionGate permission="quotations">
                       <QuotationDetailsPage />
                     </PermissionGate>
                   }

@@ -63,7 +63,7 @@ interface FormTemplate {
 export default function FormTemplatesPage() {
   const queryClient = useQueryClient();
   const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("suppliers");
+  const canEdit = hasEditPermission("suppliers") || hasEditPermission("new_suppliers");
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<FormTemplate | null>(null);

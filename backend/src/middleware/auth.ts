@@ -76,18 +76,19 @@ export function requireAdmin(
 }
 
 /**
- * Require admin role OR the specified permission (read or edit)
+ * Require admin role OR any one of the specified permissions (read or edit)
  */
-export function requirePermission(perm: Permission) {
+export function requirePermission(perm: Permission | Permission[]) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (req.user?.roles.includes("admin")) {
       next();
       return;
     }
 
-    const has = req.user?.permissions.find((p) => p.permission === perm);
+    const perms = Array.isArray(perm) ? perm : [perm];
+    const has = req.user?.permissions.find((p) => perms.includes(p.permission));
     if (!has) {
-      res.status(403).json({ error: `Permission '${perm}' required` });
+      res.status(403).json({ error: `Permission required` });
       return;
     }
     next();
@@ -95,20 +96,21 @@ export function requirePermission(perm: Permission) {
 }
 
 /**
- * Require admin role OR the specified permission with 'edit' access level
+ * Require admin role OR any one of the specified permissions with 'edit' access level
  */
-export function requireEdit(perm: Permission) {
+export function requireEdit(perm: Permission | Permission[]) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (req.user?.roles.includes("admin")) {
       next();
       return;
     }
 
+    const perms = Array.isArray(perm) ? perm : [perm];
     const has = req.user?.permissions.find(
-      (p) => p.permission === perm && p.accessLevel === "edit",
+      (p) => perms.includes(p.permission) && p.accessLevel === "edit",
     );
     if (!has) {
-      res.status(403).json({ error: `Edit permission for '${perm}' required` });
+      res.status(403).json({ error: `Edit permission required` });
       return;
     }
     next();

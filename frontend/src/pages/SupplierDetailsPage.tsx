@@ -641,7 +641,7 @@ export default function SupplierDetailsPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {unlockButton}
-          <PermissionGate permission="suppliers" editOnly>
+          <PermissionGate permission="signed_suppliers" editOnly>
             <Button variant="outline" size="sm" onClick={openEdit}>
               <Pencil className="mr-1.5 h-4 w-4" />
               Edit
@@ -951,7 +951,7 @@ export default function SupplierDetailsPage() {
                     >
                       View Catalog
                     </a>
-                    <PermissionGate permission="suppliers" editOnly>
+                    <PermissionGate permission="signed_suppliers" editOnly>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -984,7 +984,7 @@ export default function SupplierDetailsPage() {
                           {cat.name}
                         </a>
                       </div>
-                      <PermissionGate permission="suppliers" editOnly>
+                      <PermissionGate permission="signed_suppliers" editOnly>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1013,7 +1013,7 @@ export default function SupplierDetailsPage() {
                           {img.name}
                         </a>
                       </div>
-                      <PermissionGate permission="suppliers" editOnly>
+                      <PermissionGate permission="signed_suppliers" editOnly>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1255,7 +1255,7 @@ export default function SupplierDetailsPage() {
             <ShieldCheck className="h-4 w-4" />
             Certifications & Documents
           </CardTitle>
-          <PermissionGate permission="suppliers" editOnly>
+          <PermissionGate permission="signed_suppliers" editOnly>
             <div>
               <input
                 type="file"
@@ -1296,7 +1296,7 @@ export default function SupplierDetailsPage() {
                         {doc.name}
                       </a>
                     </div>
-                    <PermissionGate permission="suppliers" editOnly>
+                    <PermissionGate permission="signed_suppliers" editOnly>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1397,7 +1397,7 @@ export default function SupplierDetailsPage() {
                 <p className="text-sm font-medium text-slate-700">No campaign started yet</p>
                 <p className="text-xs text-slate-500 mt-0.5">Start a campaign after sending the intro email to this supplier</p>
               </div>
-              <PermissionGate permission="suppliers" editOnly>
+              <PermissionGate permission="signed_suppliers" editOnly>
                 <Button
                   size="sm"
                   className="bg-brand-600 hover:bg-brand-700 text-white gap-1.5"
@@ -1476,7 +1476,7 @@ export default function SupplierDetailsPage() {
                           )}
                         </div>
                         {(isDue || isNext) && (
-                          <PermissionGate permission="suppliers" editOnly>
+                          <PermissionGate permission="signed_suppliers" editOnly>
                             <Button
                               size="sm"
                               variant="outline"
