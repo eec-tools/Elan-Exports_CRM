@@ -203,6 +203,19 @@ export default function QuotationsPage() {
     onError: () => toast.error("Failed to delete quotation"),
   });
 
+  const handleCopyLink = async (link: string | null) => {
+    if (!link) {
+      toast.error("Link not available");
+      return;
+    }
+    const success = await copyToClipboard(link);
+    if (success) {
+      toast.success("Link copied to clipboard");
+    } else {
+      toast.error("Failed to copy link. Please copy it manually.");
+    }
+  };
+
   function resetCreateForm() {
     setSupplierQuery("");
     setSelectedSupplier(null);
@@ -336,7 +349,7 @@ export default function QuotationsPage() {
                           <Button
                             size="sm" variant="ghost"
                             title="Copy form link"
-                            onClick={() => { copyToClipboard(formLink); toast.success("Form link copied"); }}
+                            onClick={() => handleCopyLink(formLink)}
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
@@ -510,7 +523,7 @@ export default function QuotationsPage() {
             <div className="flex gap-3">
               <Button
                 className="flex-1 gap-2"
-                onClick={() => { copyToClipboard(formLinkDialog.link); toast.success("Link copied"); }}
+                onClick={() => handleCopyLink(formLinkDialog.link)}
               >
                 <Copy className="h-4 w-4" /> Copy Link
               </Button>

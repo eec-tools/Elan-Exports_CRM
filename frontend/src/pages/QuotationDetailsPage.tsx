@@ -154,14 +154,34 @@ export default function QuotationDetailsPage() {
 
   const regenerateTokenMutation = useMutation({
     mutationFn: () => api.post(`/quotations/${id}/regenerate-token`),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["quotation", id] });
       queryClient.invalidateQueries({ queryKey: ["quotations"] });
       toast.success("New form link generated");
-      setFormLinkDialog(true);
+      
+      // Use the new token from response if available, otherwise it will update via re-render
+      const newToken = res.data?.formToken;
+      if (newToken) {
+        setFormLinkDialog(true);
+      } else {
+        setFormLinkDialog(true);
+      }
     },
     onError: () => toast.error("Failed to regenerate link"),
   });
+
+  const handleCopyLink = async (link: string | null) => {
+    if (!link) {
+      toast.error("Link not available");
+      return;
+    }
+    const success = await copyToClipboard(link);
+    if (success) {
+      toast.success("Link copied to clipboard");
+    } else {
+      toast.error("Failed to copy link. Please copy it manually.");
+    }
+  };
 
   async function downloadPdf(mode: "supplier" | "all") {
     try {
@@ -269,7 +289,7 @@ export default function QuotationDetailsPage() {
         <div className="flex items-center gap-2 flex-wrap">
           {formLink && (
             <Button variant="outline" size="sm" className="gap-2"
-              onClick={() => { copyToClipboard(formLink); toast.success("Link copied"); }}>
+              onClick={() => handleCopyLink(formLink)}>
               <Copy className="h-4 w-4" /> Copy Form Link
             </Button>
           )}
@@ -423,7 +443,7 @@ export default function QuotationDetailsPage() {
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" className="flex-1 gap-1.5"
-                    onClick={() => { copyToClipboard(formLink); toast.success("Copied"); }}>
+                    onClick={() => handleCopyLink(formLink)}>
                     <Copy className="h-3.5 w-3.5" /> Copy
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1.5"
@@ -559,7 +579,7 @@ export default function QuotationDetailsPage() {
                   <p className="text-xs font-mono text-slate-800 break-all">{formLink}</p>
                 </div>
                 <Button className="w-full gap-2"
-                  onClick={() => { copyToClipboard(formLink); toast.success("Copied"); }}>
+                  onClick={() => handleCopyLink(formLink)}>
                   <Copy className="h-4 w-4" /> Copy Link
                 </Button>
               </>

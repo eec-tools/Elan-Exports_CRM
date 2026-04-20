@@ -215,8 +215,12 @@ export default function SourcingSupplierPage() {
   const copyFormLink = async (supplier: SourcingSupplier) => {
     if (!supplier.formToken) return;
     const link = `${window.location.origin}/supplier-form/${supplier.formToken}`;
-    await copyToClipboard(link);
-    toast.success("Form link copied to clipboard");
+    const success = await copyToClipboard(link);
+    if (success) {
+      toast.success("Form link copied to clipboard");
+    } else {
+      toast.error("Failed to copy link. Please copy it manually.");
+    }
   };
 
   const isOverdue = (dateStr?: string | null) => {
@@ -550,8 +554,12 @@ export default function SourcingSupplierPage() {
               variant="outline"
               size="sm"
               onClick={async () => {
-                await copyToClipboard(formLinkDialog.link);
-                toast.success("Copied!");
+                const success = await copyToClipboard(formLinkDialog.link);
+                if (success) {
+                  toast.success("Copied!");
+                } else {
+                  toast.error("Failed to copy link");
+                }
               }}
             >
               <Copy className="h-4 w-4" />

@@ -286,8 +286,12 @@ export default function SourcingSupplierDetailsPage() {
 
   const copyLink = async () => {
     if (formLink) {
-      await copyToClipboard(formLink);
-      toast.success("Form link copied");
+      const success = await copyToClipboard(formLink);
+      if (success) {
+        toast.success("Form link copied");
+      } else {
+        toast.error("Failed to copy link. Please copy it manually.");
+      }
     }
   };
 
