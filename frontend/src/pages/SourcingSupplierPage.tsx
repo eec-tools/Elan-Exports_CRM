@@ -24,7 +24,6 @@ import {
   Copy,
   CheckCircle2,
   Mail,
-  ArrowRight,
   ExternalLink,
   LayoutTemplate,
 } from "lucide-react";
@@ -42,6 +41,7 @@ interface SourcingSupplier {
   contactPerson?: string;
   notes?: string;
   status: string;
+  assignedGmailAccount?: string | null;
   formToken?: string;
   emailCampaign?: {
     status: string;
@@ -50,8 +50,15 @@ interface SourcingSupplier {
     introEmailSentAt?: string;
     followup1SentAt?: string;
     followup2SentAt?: string;
+    followup3SentAt?: string;
   } | null;
   createdAt: string;
+}
+
+interface GmailAccount {
+  email: string;
+  connected: boolean;
+  label: string;
 }
 
 interface Stats {
@@ -67,15 +74,18 @@ const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
   intro_sent:        { label: "Intro Sent",          class: "bg-blue-100 text-blue-700" },
   followup1_sent:    { label: "Follow-up 1 Sent",    class: "bg-amber-100 text-amber-700" },
   followup2_sent:    { label: "Follow-up 2 Sent",    class: "bg-orange-100 text-orange-700" },
+  followup3_sent:    { label: "Follow-up 3 Sent",    class: "bg-red-100 text-red-700" },
   response_received: { label: "Responded",           class: "bg-green-100 text-green-700" },
   no_response:       { label: "No Response",         class: "bg-red-100 text-red-700" },
+  converted_to_new:  { label: "Converted",           class: "bg-purple-100 text-purple-700" },
   converted:         { label: "Converted",           class: "bg-purple-100 text-purple-700" },
 };
 
 const CAMPAIGN_STEP_LABEL: Record<number, string> = {
   1: "Intro Sent",
   2: "Follow-up 1 Sent",
-  3: "Follow-up 2 Sent (Final)",
+  3: "Follow-up 2 Sent",
+  4: "Follow-up 3 Sent",
 };
 
 export default function SourcingSupplierPage() {
@@ -89,7 +99,6 @@ export default function SourcingSupplierPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SourcingSupplier | null>(null);
-  const [convertTarget, setConvertTarget] = useState<SourcingSupplier | null>(null);
   const [formLinkDialog, setFormLinkDialog] = useState<{ open: boolean; link: string; company: string; source: "created" | "campaign" }>({
     open: false,
     link: "",
@@ -97,8 +106,8 @@ export default function SourcingSupplierPage() {
     source: "created",
   });
 
-  // Create form state — only company name required; supplier fills the rest via the web form
-  const [form, setForm] = useState({ company: "" });
+  // Create form state
+  const [form, setForm] = useState({ company: "", email: "", assignedGmailAccount: "" });
   const [createTemplateId, setCreateTemplateId] = useState<string>("");
 
   // ─── Queries ────────────────────────────────────────
@@ -132,6 +141,15 @@ export default function SourcingSupplierPage() {
     },
   });
 
+  const { data: gmailAccounts = [] } = useQuery({
+    queryKey: ["gmail-accounts"],
+    queryFn: async () => {
+      const res = await api.get("/gmail/accounts");
+      return res.data as GmailAccount[];
+    },
+  });
+  const connectedAccounts = gmailAccounts.filter((a) => a.connected);
+
   // ─── Mutations ──────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (data: typeof form) => api.post("/sourcing-suppliers", data),
@@ -139,7 +157,7 @@ export default function SourcingSupplierPage() {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
       setCreateOpen(false);
-      setForm({ company: "" });
+      setForm({ company: "", email: "", assignedGmailAccount: "" });
       const created = res.data;
       if (created?.formToken) {
         const base = `${window.location.origin}/supplier-form/${created.formToken}`;
@@ -170,46 +188,33 @@ export default function SourcingSupplierPage() {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
       const supplier = data?.data.find((s) => s.id === id);
-      if (supplier?.formToken) {
-        const link = `${window.location.origin}/supplier-form/${supplier.formToken}`;
-        setFormLinkDialog({ open: true, link, company: supplier.company, source: "campaign" });
-      }
-      toast.success("Campaign started — intro email marked as sent");
+      toast.success(`Intro email sent to ${supplier?.company ?? "supplier"}`);
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed to start campaign"),
+    onError: () => toast.error("Failed to start campaign"),
   });
 
   const markSentMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/sourcing-campaigns/${id}/mark-sent`),
+    mutationFn: (id: string) => api.post(`/sourcing-campaigns/${id}/send-followup`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
-      toast.success("Follow-up marked as sent");
+      toast.success("Follow-up email sent");
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed to mark as sent"),
+    onError: () => toast.error("Failed to send follow-up"),
   });
 
   const markResponseMutation = useMutation({
     mutationFn: (id: string) => api.post(`/sourcing-campaigns/${id}/mark-response`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
-      toast.success("Response recorded — you can now convert this supplier");
-    },
-    onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed to record response"),
-  });
-
-  const convertMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/sourcing-suppliers/${id}/convert`),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
-      setConvertTarget(null);
-      toast.success("Converted to New Supplier");
-      navigate(`/suppliers/new/${res.data.id}`);
+      const newId = res.data?.newSupplierId;
+      toast.success("Response recorded — supplier converted to New Supplier");
+      if (newId) navigate(`/suppliers/new/${newId}`);
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed to convert"),
+    onError: () => toast.error("Failed to record response"),
   });
+
 
   // ─── Helpers ────────────────────────────────────────
   const copyFormLink = async (supplier: SourcingSupplier) => {
@@ -338,6 +343,15 @@ export default function SourcingSupplierPage() {
                           {s.company}
                         </button>
                         {s.country && <div className="text-xs text-slate-400">{s.country}</div>}
+                        {s.assignedGmailAccount && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Mail className="h-3 w-3 text-slate-400" />
+                            <span className="text-xs text-slate-400 truncate max-w-35">{s.assignedGmailAccount}</span>
+                          </div>
+                        )}
+                        {!s.assignedGmailAccount && s.status === "pending" && (
+                          <div className="text-xs text-amber-500 mt-0.5">No email account</div>
+                        )}
                       </td>
 
                       {/* Contact */}
@@ -389,12 +403,19 @@ export default function SourcingSupplierPage() {
                           {canEdit && (
                             <>
                               {/* Start campaign */}
-                              {!campaign && s.status !== "converted" && (
+                              {!campaign && s.status !== "converted" && s.status !== "converted_to_new" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={() => startCampaignMutation.mutate(s.id)}
+                                  className={`h-7 px-2 text-xs ${!s.assignedGmailAccount ? "opacity-50 cursor-not-allowed" : ""}`}
+                                  title={!s.assignedGmailAccount ? "Assign a Gmail account first (open supplier details)" : "Send intro email"}
+                                  onClick={() => {
+                                    if (!s.assignedGmailAccount) {
+                                      toast.error("No Gmail account assigned — open supplier details to set one");
+                                      return;
+                                    }
+                                    startCampaignMutation.mutate(s.id);
+                                  }}
                                   disabled={startCampaignMutation.isPending}
                                 >
                                   <Mail className="h-3.5 w-3.5 mr-1" />
@@ -402,8 +423,8 @@ export default function SourcingSupplierPage() {
                                 </Button>
                               )}
 
-                              {/* Mark sent (only if campaign active) */}
-                              {campaign?.status === "active" && campaign.currentStep < 3 && (
+                              {/* Send next follow-up (only if campaign active and steps remain) */}
+                              {campaign?.status === "active" && campaign.currentStep < 4 && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -411,12 +432,12 @@ export default function SourcingSupplierPage() {
                                   onClick={() => markSentMutation.mutate(s.id)}
                                   disabled={markSentMutation.isPending}
                                 >
-                                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                                  Mark Sent
+                                  <Mail className="h-3.5 w-3.5 mr-1" />
+                                  Send FU{campaign.currentStep}
                                 </Button>
                               )}
 
-                              {/* Response received */}
+                              {/* Mark responded — auto-converts to New Supplier */}
                               {campaign?.status === "active" && (
                                 <Button
                                   size="sm"
@@ -427,18 +448,6 @@ export default function SourcingSupplierPage() {
                                 >
                                   <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                                   Responded
-                                </Button>
-                              )}
-
-                              {/* Convert to New Supplier */}
-                              {s.status === "response_received" && (
-                                <Button
-                                  size="sm"
-                                  className="h-7 px-2 text-xs bg-purple-600 hover:bg-purple-700"
-                                  onClick={() => setConvertTarget(s)}
-                                >
-                                  <ArrowRight className="h-3.5 w-3.5 mr-1" />
-                                  Convert
                                 </Button>
                               )}
 
@@ -493,46 +502,84 @@ export default function SourcingSupplierPage() {
 
       {/* ── Create Dialog ─────────────────────────────── */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md">
           <DialogTitle>Add Sourcing Supplier</DialogTitle>
           <DialogDescription>
-            Enter the company name. A form link will be generated instantly — the supplier fills in all other details themselves.
+            Fill in the required details. A supplier form link will be generated automatically.
           </DialogDescription>
-          <div className="mt-3">
-            <Label>Company Name *</Label>
-            <Input
-              value={form.company}
-              onChange={(e) => setForm({ company: e.target.value })}
-              placeholder="e.g. Spice Farm India Pvt Ltd"
-              className="mt-1"
-              onKeyDown={(e) => e.key === "Enter" && form.company && createMutation.mutate(form)}
-              autoFocus
-            />
+
+          <div className="mt-3 space-y-3">
+            <div>
+              <Label>Company Name *</Label>
+              <Input
+                value={form.company}
+                onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+                placeholder="e.g. Spice Farm India Pvt Ltd"
+                className="mt-1"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <Label>Supplier Email *</Label>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="supplier@example.com"
+                className="mt-1"
+              />
+              <p className="text-xs text-slate-400 mt-1">Campaign emails (intro + follow-ups) will be sent to this address</p>
+            </div>
+
+            <div>
+              <Label>Form Template</Label>
+              <select
+                value={createTemplateId}
+                onChange={(e) => setCreateTemplateId(e.target.value)}
+                className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              >
+                <option value="">Default form</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}{t.isDefault ? " (Default)" : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-400 mt-1">Choose which sections the supplier sees in their form</p>
+            </div>
+
+            <div>
+              <Label>Campaign Email Account *</Label>
+              {connectedAccounts.length === 0 ? (
+                <div className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  No Gmail accounts connected yet. Connect one in{" "}
+                  <a href="/settings/gmail" className="underline font-medium">Gmail Settings</a> before starting campaigns.
+                </div>
+              ) : (
+                <select
+                  value={form.assignedGmailAccount}
+                  onChange={(e) => setForm((f) => ({ ...f, assignedGmailAccount: e.target.value }))}
+                  className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                >
+                  <option value="">Select sending account…</option>
+                  {connectedAccounts.map((a) => (
+                    <option key={a.email} value={a.email}>{a.email}</option>
+                  ))}
+                </select>
+              )}
+              <p className="text-xs text-slate-400 mt-1">All emails (intro + 3 follow-ups) will be sent from this account</p>
+            </div>
           </div>
-          <div className="mt-3">
-            <Label>Form Template</Label>
-            <select
-              value={createTemplateId}
-              onChange={(e) => setCreateTemplateId(e.target.value)}
-              className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            >
-              <option value="">Default form</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}{t.isDefault ? " (Default)" : ""}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-slate-400 mt-1">Choose which sections the supplier sees in their form</p>
-          </div>
+
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button
-              disabled={!form.company.trim() || createMutation.isPending}
+              disabled={!form.company.trim() || !form.email.trim() || createMutation.isPending}
               onClick={() => createMutation.mutate(form)}
             >
               {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              Create &amp; Get Link
+              Add Supplier
             </Button>
           </div>
         </DialogContent>
@@ -592,26 +639,6 @@ export default function SourcingSupplierPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Convert Confirm ───────────────────────────── */}
-      <Dialog open={!!convertTarget} onOpenChange={(v) => !v && setConvertTarget(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogTitle>Convert to New Supplier?</DialogTitle>
-          <DialogDescription>
-            <strong>{convertTarget?.company}</strong> will be converted to a New Supplier. All data collected so far will be carried over. The sourcing record will be marked as "Converted".
-          </DialogDescription>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setConvertTarget(null)}>Cancel</Button>
-            <Button
-              className="bg-purple-600 hover:bg-purple-700"
-              disabled={convertMutation.isPending}
-              onClick={() => convertTarget && convertMutation.mutate(convertTarget.id)}
-            >
-              {convertMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              Convert
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

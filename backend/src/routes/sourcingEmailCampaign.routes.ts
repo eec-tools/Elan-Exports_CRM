@@ -4,6 +4,7 @@ import {
     getDueCampaigns,
     getCampaign,
     startCampaign,
+    sendFollowup,
     markEmailSent,
     markResponseReceived,
 } from "../controllers/sourcingEmailCampaign.controller.js";
@@ -18,7 +19,8 @@ router.get("/due", getDueCampaigns);
 router.get("/:id", getCampaign);
 
 router.post("/:id/start", requireEdit("suppliers"), startCampaign);
-router.post("/:id/mark-sent", requireEdit("suppliers"), markEmailSent);
+router.post("/:id/send-followup", requireEdit("suppliers"), sendFollowup);
+router.post("/:id/mark-sent", requireEdit("suppliers"), markEmailSent);   // legacy alias
 router.post("/:id/mark-response", requireEdit("suppliers"), markResponseReceived);
 
 export default router;

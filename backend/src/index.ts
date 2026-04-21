@@ -29,6 +29,7 @@ import newSupplierEmailCampaignRoutes from "./routes/newSupplierEmailCampaign.ro
 import notificationsRoutes from "./routes/notifications.routes.js";
 import { startEmailCampaignScheduler } from "./services/emailCampaignScheduler.js";
 import { startEmailSyncScheduler } from "./services/emailSyncScheduler.js";
+import { startGmailReplyDetector } from "./services/gmailReplyDetector.js";
 import attendanceRoutes from "./routes/attendance.routes.js";
 import { startAttendanceScheduler } from "./services/attendanceScheduler.js";
 import activityTrackingRoutes from "./routes/activityTracking.routes.js";
@@ -37,6 +38,7 @@ import leaveRoutes from "./routes/leave.routes.js";
 import payrollRoutes from "./routes/payroll.routes.js";
 import sourcingSuppliersRoutes from "./routes/sourcingSuppliers.routes.js";
 import sourcingEmailCampaignRoutes from "./routes/sourcingEmailCampaign.routes.js";
+import gmailRoutes from "./routes/gmail.routes.js";
 import supplierFormTemplateRoutes from "./routes/supplierFormTemplate.routes.js";
 import publicSupplierFormRoutes from "./routes/publicSupplierForm.routes.js";
 import quotationsRoutes from "./routes/quotations.routes.js";
@@ -164,6 +166,7 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/sourcing-suppliers", sourcingSuppliersRoutes);
 app.use("/api/sourcing-campaigns", sourcingEmailCampaignRoutes);
+app.use("/api/gmail", gmailRoutes);
 app.use("/api/supplier-form-templates", supplierFormTemplateRoutes);
 app.use("/api/public/supplier-form", publicSupplierFormRoutes);
 app.use("/api/quotations", quotationsRoutes);
@@ -224,6 +227,7 @@ app.listen(PORT, () => {
   startEmailCampaignScheduler();
   startAttendanceScheduler();
   startEmailSyncScheduler();
+  startGmailReplyDetector();
 });
 
 // Graceful shutdown

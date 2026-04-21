@@ -2,6 +2,7 @@ import cron from "node-cron";
 import prisma from "../config/db.js";
 import { sendFollowupReminderEmail } from "./mailer.js";
 import { createNotification } from "./notificationService.js";
+import { executeSendStep } from "../controllers/sourcingEmailCampaign.controller.js";
 
 function endOfDay(date: Date): Date {
   const d = new Date(date);
@@ -86,8 +87,48 @@ async function sendDailyFollowupReminders() {
   }
 }
 
+async function autoSendDueFollowups() {
+  if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET) return;
+
+  try {
+    const today = endOfDay(new Date());
+
+    const dueCampaigns = await (prisma as any).sourcingEmailCampaign.findMany({
+      where: {
+        status: "active",
+        currentStep: { lt: 4 },
+        nextFollowupDue: { lte: today },
+      },
+      include: {
+        sourcingSupplier: {
+          select: { id: true, company: true, assignedGmailAccount: true },
+        },
+      },
+    });
+
+    if (dueCampaigns.length === 0) return;
+
+    let sent = 0;
+    for (const campaign of dueCampaigns) {
+      if (!campaign.sourcingSupplier.assignedGmailAccount) continue;
+      try {
+        await executeSendStep(campaign.sourcingId);
+        sent++;
+      } catch (err) {
+        console.error(`[EmailCampaignScheduler] Failed to auto-send for ${campaign.sourcingSupplier.company}:`, err);
+      }
+    }
+
+    console.log(`[EmailCampaignScheduler] Auto-sent ${sent}/${dueCampaigns.length} due sourcing follow-ups`);
+  } catch (err) {
+    console.error("[EmailCampaignScheduler] autoSendDueFollowups error:", err);
+  }
+}
+
 export function startEmailCampaignScheduler() {
-  // Run every day at 9:00 AM server time
+  // Signed supplier follow-up reminders — 9:00 AM daily
   cron.schedule("0 9 * * *", sendDailyFollowupReminders);
-  console.log("[EmailCampaignScheduler] Daily follow-up reminder job scheduled at 9:00 AM.");
+  // Auto-send due sourcing supplier follow-ups — 9:00 AM daily
+  cron.schedule("0 9 * * *", autoSendDueFollowups);
+  console.log("[EmailCampaignScheduler] Daily follow-up jobs scheduled at 9:00 AM.");
 }

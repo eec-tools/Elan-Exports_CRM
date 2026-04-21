@@ -42,6 +42,7 @@ import PublicSupplierFormPage from "@/pages/PublicSupplierFormPage";
 import QuotationsPage from "@/pages/QuotationsPage";
 import QuotationDetailsPage from "@/pages/QuotationDetailsPage";
 import PublicQuotationFormPage from "@/pages/PublicQuotationFormPage";
+import GmailSettingsPage from "@/pages/GmailSettingsPage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient({
@@ -237,6 +238,8 @@ export default function App() {
                 <Route path="attendance" element={<AttendanceDashboardPage />} />
                 <Route path="leaves" element={<LeavePage />} />
                 <Route path="payroll" element={<PayrollPage />} />
+
+                <Route path="settings/gmail" element={<GmailSettingsPage />} />
 
                 {/* Admin-only routes */}
                 <Route element={<AdminRoute />}>

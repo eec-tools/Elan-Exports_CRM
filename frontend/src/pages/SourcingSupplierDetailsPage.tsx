@@ -21,7 +21,6 @@ import {
   Mail,
   CheckCircle2,
   Copy,
-  ArrowRight,
   LayoutTemplate,
   Save,
   Circle,
@@ -123,14 +122,18 @@ interface SourcingSupplier {
   factoryVisitDate?: string;
   factoryVisitOutcome?: string;
   referralSource?: string;
+  assignedGmailAccount?: string | null;
   emailCampaign?: {
     status: string;
     currentStep: number;
     introEmailSentAt?: string;
     followup1SentAt?: string | null;
     followup2SentAt?: string | null;
+    followup3SentAt?: string | null;
     responseReceivedAt?: string | null;
     nextFollowupDue?: string | null;
+    gmailThreadId?: string | null;
+    lastCheckedAt?: string | null;
   } | null;
 }
 
@@ -145,8 +148,10 @@ const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
   intro_sent:        { label: "Intro Sent",          class: "bg-blue-100 text-blue-700" },
   followup1_sent:    { label: "Follow-up 1 Sent",    class: "bg-amber-100 text-amber-700" },
   followup2_sent:    { label: "Follow-up 2 Sent",    class: "bg-orange-100 text-orange-700" },
+  followup3_sent:    { label: "Follow-up 3 Sent",    class: "bg-red-100 text-red-700" },
   response_received: { label: "Responded",           class: "bg-green-100 text-green-700" },
   no_response:       { label: "No Response",         class: "bg-red-100 text-red-700" },
+  converted_to_new:  { label: "Converted",           class: "bg-purple-100 text-purple-700" },
   converted:         { label: "Converted",           class: "bg-purple-100 text-purple-700" },
 };
 
@@ -196,7 +201,6 @@ export default function SourcingSupplierDetailsPage() {
 
   const [fields, setFields] = useState<Partial<SourcingSupplier>>({});
   const [isDirty, setIsDirty] = useState(false);
-  const [convertOpen, setConvertOpen] = useState(false);
   const [formLinkOpen, setFormLinkOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
@@ -224,6 +228,15 @@ export default function SourcingSupplierDetailsPage() {
     },
   });
 
+  const { data: gmailAccounts = [] } = useQuery({
+    queryKey: ["gmail-accounts"],
+    queryFn: async () => {
+      const res = await api.get("/gmail/accounts");
+      return res.data as { email: string; connected: boolean; label: string }[];
+    },
+  });
+  const connectedGmailAccounts = gmailAccounts.filter((a) => a.connected);
+
   useEffect(() => {
     if (supplier) {
       setFields(supplier);
@@ -246,37 +259,35 @@ export default function SourcingSupplierDetailsPage() {
     mutationFn: () => api.post(`/sourcing-campaigns/${id}/start`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-supplier", id] });
-      toast.success("Campaign started");
+      toast.success("Intro email sent successfully");
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed to start campaign"),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Failed to start campaign");
+    },
   });
 
-  const markSentMutation = useMutation({
-    mutationFn: () => api.post(`/sourcing-campaigns/${id}/mark-sent`),
+  const sendFollowupMutation = useMutation({
+    mutationFn: () => api.post(`/sourcing-campaigns/${id}/send-followup`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-supplier", id] });
-      toast.success("Email marked as sent");
+      toast.success("Follow-up email sent");
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed"),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Failed to send follow-up");
+    },
   });
 
   const markResponseMutation = useMutation({
     mutationFn: () => api.post(`/sourcing-campaigns/${id}/mark-response`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sourcing-supplier", id] });
-      toast.success("Response recorded");
-    },
-    onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed"),
-  });
-
-  const convertMutation = useMutation({
-    mutationFn: () => api.post(`/sourcing-suppliers/${id}/convert`),
     onSuccess: (res) => {
-      setConvertOpen(false);
-      toast.success("Converted to New Supplier");
-      navigate(`/suppliers/new/${res.data.id}`);
+      queryClient.invalidateQueries({ queryKey: ["sourcing-supplier", id] });
+      toast.success("Response recorded — converted to New Supplier");
+      const newId = res.data?.newSupplierId;
+      if (newId) navigate(`/suppliers/new/${newId}`);
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed to convert"),
+    onError: () => toast.error("Failed to record response"),
   });
 
   // ─── Helpers ────────────────────────────────────────
@@ -338,12 +349,6 @@ export default function SourcingSupplierDetailsPage() {
               Form Link
             </Button>
           )}
-          {supplier.status === "response_received" && canEdit && (
-            <Button size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={() => setConvertOpen(true)}>
-              <ArrowRight className="h-4 w-4 mr-1.5" />
-              Convert to New Supplier
-            </Button>
-          )}
           {isDirty && canEdit && (
             <Button size="sm" onClick={() => saveMutation.mutate(fields)} disabled={saveMutation.isPending}>
               {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
@@ -362,11 +367,42 @@ export default function SourcingSupplierDetailsPage() {
               <FieldRow label="Company" value={v("company")} onChange={set("company")} canEdit={canEdit} />
               <FieldRow label="Country" value={v("country")} onChange={set("country")} canEdit={canEdit} />
               <FieldRow label="Contact Person" value={v("contactPerson")} onChange={set("contactPerson")} canEdit={canEdit} />
-              <FieldRow label="Email" value={v("email")} onChange={set("email")} canEdit={canEdit} type="email" />
+              <FieldRow label="Supplier Email" value={v("email")} onChange={set("email")} canEdit={canEdit} type="email" />
               <FieldRow label="Phone" value={v("phone")} onChange={set("phone")} canEdit={canEdit} />
               <FieldRow label="WhatsApp" value={v("whatsapp")} onChange={set("whatsapp")} canEdit={canEdit} />
               <FieldRow label="Product" value={v("product")} onChange={set("product")} canEdit={canEdit} />
               <FieldRow label="Product Category" value={v("productCategory")} onChange={set("productCategory")} canEdit={canEdit} />
+              {/* Campaign email account */}
+              <div className="col-span-2">
+                <Label className="text-xs text-slate-500 font-medium">Campaign Email Account</Label>
+                {canEdit && !supplier.emailCampaign ? (
+                  <>
+                    <select
+                      value={v("assignedGmailAccount")}
+                      onChange={(e) => set("assignedGmailAccount")(e.target.value)}
+                      className="mt-1 w-full h-8 border border-slate-200 rounded-md text-sm px-2 bg-white text-slate-700"
+                    >
+                      <option value="">— Not assigned —</option>
+                      {connectedGmailAccounts.map((a) => (
+                        <option key={a.email} value={a.email}>{a.email}</option>
+                      ))}
+                    </select>
+                    {connectedGmailAccounts.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">No Gmail accounts connected. Set one up in Settings.</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="mt-1 flex items-center gap-1.5 h-8 text-sm">
+                    <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    {v("assignedGmailAccount")
+                      ? <span className="text-slate-700">{v("assignedGmailAccount")}</span>
+                      : <span className="text-slate-400 italic">Not assigned</span>}
+                    {supplier.emailCampaign && (
+                      <span className="text-xs text-slate-400 ml-1">(locked — campaign active)</span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <Label className="text-xs text-slate-500 font-medium">Notes</Label>
@@ -379,10 +415,22 @@ export default function SourcingSupplierDetailsPage() {
         <div className="space-y-4">
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <h2 className="font-semibold text-slate-800 mb-3">Email Campaign</h2>
+            {/* Assigned Gmail account badge */}
+            {(fields.assignedGmailAccount ?? supplier.assignedGmailAccount) && (
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3 pb-3 border-b border-slate-100">
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                <span className="font-medium">{fields.assignedGmailAccount ?? supplier.assignedGmailAccount}</span>
+              </div>
+            )}
+
             {!campaign ? (
               <div className="space-y-3">
-                <p className="text-sm text-slate-500">No campaign started yet.</p>
-                {canEdit && supplier.status !== "converted" && (
+                {!(fields.assignedGmailAccount ?? supplier.assignedGmailAccount) ? (
+                  <p className="text-xs text-amber-600 bg-amber-50 rounded p-2">No campaign email account assigned. Set one above in Basic Information, then save.</p>
+                ) : (
+                  <p className="text-sm text-slate-500">No campaign started yet.</p>
+                )}
+                {canEdit && (fields.assignedGmailAccount ?? supplier.assignedGmailAccount) && supplier.status !== "converted_to_new" && supplier.status !== "no_response" && (
                   <Button size="sm" className="w-full" onClick={() => startCampaignMutation.mutate()} disabled={startCampaignMutation.isPending}>
                     {startCampaignMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Mail className="h-4 w-4 mr-1.5" />}
                     Start Campaign
@@ -391,11 +439,12 @@ export default function SourcingSupplierDetailsPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {/* Step timeline */}
+                {/* Step timeline — 4 steps */}
                 {[
-                  { step: 1, label: "Intro Email", date: campaign.introEmailSentAt },
-                  { step: 2, label: "Follow-up 1", date: campaign.followup1SentAt },
-                  { step: 3, label: "Follow-up 2 (Final)", date: campaign.followup2SentAt },
+                  { step: 1, label: "Intro Email",   date: campaign.introEmailSentAt },
+                  { step: 2, label: "Follow-up 1",   date: campaign.followup1SentAt },
+                  { step: 3, label: "Follow-up 2",   date: campaign.followup2SentAt },
+                  { step: 4, label: "Follow-up 3",   date: campaign.followup3SentAt },
                 ].map(({ step, label, date }) => (
                   <div key={step} className="flex items-start gap-2.5">
                     {date ? (
@@ -431,10 +480,10 @@ export default function SourcingSupplierDetailsPage() {
                 {/* Actions */}
                 {canEdit && campaign.status === "active" && (
                   <div className="space-y-2 pt-2 border-t border-slate-100">
-                    {campaign.currentStep < 3 && (
-                      <Button size="sm" variant="outline" className="w-full" onClick={() => markSentMutation.mutate()} disabled={markSentMutation.isPending}>
-                        {markSentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Mail className="h-4 w-4 mr-1.5" />}
-                        Mark {campaign.currentStep === 1 ? "Follow-up 1" : "Follow-up 2"} Sent
+                    {campaign.currentStep < 4 && (
+                      <Button size="sm" variant="outline" className="w-full" onClick={() => sendFollowupMutation.mutate()} disabled={sendFollowupMutation.isPending}>
+                        {sendFollowupMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Mail className="h-4 w-4 mr-1.5" />}
+                        Send Follow-up {campaign.currentStep}
                       </Button>
                     )}
                     <Button size="sm" variant="outline" className="w-full border-green-400 text-green-700 hover:bg-green-50" onClick={() => markResponseMutation.mutate()} disabled={markResponseMutation.isPending}>
@@ -796,26 +845,6 @@ export default function SourcingSupplierDetailsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Convert Dialog ── */}
-      <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogTitle>Convert to New Supplier?</DialogTitle>
-          <DialogDescription>
-            <strong>{supplier.company}</strong> will be moved to the New Suppliers list with all data carried over. The sourcing record will be marked as "Converted".
-          </DialogDescription>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setConvertOpen(false)}>Cancel</Button>
-            <Button
-              className="bg-purple-600 hover:bg-purple-700"
-              disabled={convertMutation.isPending}
-              onClick={() => convertMutation.mutate()}
-            >
-              {convertMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              Convert
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

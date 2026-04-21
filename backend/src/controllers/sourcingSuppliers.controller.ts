@@ -106,7 +106,7 @@ export async function listSourcingSuppliers(req: AuthRequest, res: Response): Pr
 /**
  * GET /api/sourcing-suppliers/stats
  */
-export async function getSourcingSupplierStats(req: AuthRequest, res: Response): Promise<void> {
+export async function getSourcingSupplierStats(_req: AuthRequest, res: Response): Promise<void> {
     try {
         const [total, activeCampaigns, responseReceived, converted, noResponse] = await Promise.all([
             (prisma as any).sourcingSupplier.count(),
@@ -148,18 +148,26 @@ export async function getSourcingSupplier(req: AuthRequest, res: Response): Prom
 export async function createSourcingSupplier(req: AuthRequest, res: Response): Promise<void> {
     try {
         const {
-            company, productCategory, product, country, accountManager,
-            currentStatus, certifications, notes, phone, email, contactPerson,
+            company, email, assignedGmailAccount,
+            // kept for backwards-compat if sent, but not required in add dialog
+            productCategory, product, country, accountManager,
+            currentStatus, certifications, notes, phone, contactPerson,
         } = req.body;
 
         if (!company) {
             res.status(400).json({ error: "Company name is required" });
             return;
         }
+        if (!email) {
+            res.status(400).json({ error: "Supplier email is required" });
+            return;
+        }
 
         const supplier = await (prisma as any).sourcingSupplier.create({
             data: {
                 company,
+                email,
+                assignedGmailAccount: assignedGmailAccount ?? null,
                 productCategory: productCategory ?? null,
                 product: product ?? null,
                 country: country ?? null,
@@ -168,7 +176,6 @@ export async function createSourcingSupplier(req: AuthRequest, res: Response): P
                 certifications: certifications ?? null,
                 notes: notes ?? null,
                 phone: phone ?? null,
-                email: email ?? null,
                 contactPerson: contactPerson ?? null,
                 formToken: randomUUID(),
                 supplierStage: "Sourcing",
