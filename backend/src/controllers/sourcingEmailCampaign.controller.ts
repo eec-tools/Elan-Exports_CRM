@@ -470,7 +470,7 @@ export async function sendFollowup(req: AuthRequest, res: Response): Promise<voi
             return;
         }
 
-        await executeSendStep(sourcingId, req.user!.id);
+        await executeSendStep(sourcingId!, req.user!.id);
 
         const updated = await (prisma as any).sourcingEmailCampaign.findUnique({
             where: { sourcingId },
@@ -505,7 +505,7 @@ export async function markResponseReceived(req: AuthRequest, res: Response): Pro
             return;
         }
 
-        const newSupplierId = await executeMarkResponse(sourcingId, req.user!.id);
+        const newSupplierId = await executeMarkResponse(sourcingId!, req.user!.id);
 
         const updated = await (prisma as any).sourcingEmailCampaign.findUnique({
             where: { sourcingId },
