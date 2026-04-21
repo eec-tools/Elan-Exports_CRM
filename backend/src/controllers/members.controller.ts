@@ -197,7 +197,10 @@ export async function updateMember(
         email: email ?? existing.email,
         fullName: fullName ?? existing.fullName,
         passwordHash,
-        assignedCompanies: assignedCompanies !== undefined ? assignedCompanies : existing.assignedCompanies,
+        assignedCompanies:
+          assignedCompanies !== undefined
+            ? assignedCompanies
+            : existing.assignedCompanies,
         workStartTime: effectiveWorkStart,
         workEndTime: effectiveWorkEnd,
         roles: {
@@ -415,12 +418,13 @@ export async function sendCredentials(
       return;
     }
 
-    const productionUrl = "http://elan-exports-s3.s3-website.ap-south-1.amazonaws.com";
+    const productionUrl =
+      "http://elan-exports-s3.s3-website.ap-south-1.amazonaws.com";
     const loginUrl = process.env.FRONTEND_URL
       ? `${process.env.FRONTEND_URL}/login`
       : process.env.NODE_ENV === "production"
-      ? `${productionUrl}/login`
-      : "http://localhost:5173/login";
+        ? `${productionUrl}/login`
+        : "http://localhost:5173/login";
 
     await sendCredentialsEmail({
       to: user.email,
@@ -435,5 +439,26 @@ export async function sendCredentials(
     console.error("Send credentials error:", err);
     const message = err?.message || "Failed to send email";
     res.status(500).json({ error: `Failed to send email: ${message}` });
+  }
+}
+
+/**
+ * GET /api/members/names - Get member names for non-admins (for dropdowns)
+ */
+export async function listMemberNames(
+  _req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const members = await prisma.user.findMany({
+      where: { isActive: true },
+      select: { fullName: true },
+      orderBy: { fullName: "asc" },
+    });
+
+    res.json(members.map((m) => m.fullName));
+  } catch (err) {
+    console.error("List member names error:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 }

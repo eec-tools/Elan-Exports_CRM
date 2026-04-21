@@ -24,6 +24,7 @@ import {
   Banknote,
   UsersRound,
   ClipboardList,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -44,132 +45,132 @@ const navItems = [
     to: "/",
     label: "Dashboard",
     icon: LayoutDashboard,
-    perm: null,
+    perms: null,
     adminOnly: false,
   },
   {
     to: "/buyers",
     label: "Buyers",
     icon: Users,
-    perm: "buyers",
+    perms: ["buyers"],
     adminOnly: false,
   },
   {
     to: "/suppliers/signed-contract",
     label: "Suppliers",
     icon: Factory,
-    perm: "suppliers",
+    perms: ["suppliers", "signed_suppliers"],
     adminOnly: false,
   },
   {
     to: "/deals",
     label: "Deals",
     icon: TrendingUp,
-    perm: "deals",
+    perms: ["deals"],
     adminOnly: false,
   },
   {
     to: "/reports",
     label: "Reports",
     icon: FileText,
-    perm: "reports",
+    perms: ["reports"],
     adminOnly: false,
   },
   {
     to: "/vault",
     label: "Vault",
     icon: Archive,
-    perm: "vault",
+    perms: ["vault"],
     adminOnly: false,
   },
   {
     to: "/members",
     label: "Members",
     icon: UserCog,
-    perm: null,
+    perms: null,
     adminOnly: true,
   },
   {
     to: "/activity",
     label: "Activity",
     icon: Activity,
-    perm: null,
+    perms: null,
     adminOnly: true,
   },
   {
     to: "/access-requests",
     label: "Access Requests",
     icon: ShieldCheck,
-    perm: null,
+    perms: null,
     adminOnly: true,
   },
   {
     to: "/email-tasks",
     label: "Email Tracker",
     icon: Mail,
-    perm: "email_tracker",
+    perms: ["email_tracker"],
     adminOnly: false,
   },
   {
     to: "/daily-tasks",
     label: "Daily Tasks",
     icon: CalendarCheck,
-    perm: "task_tracker",
+    perms: ["task_tracker"],
     adminOnly: false,
   },
   {
     to: "/notifications",
     label: "Notifications",
     icon: Bell,
-    perm: null,
+    perms: null,
     adminOnly: false,
   },
   {
     to: "/attendance",
     label: "Attendance Dashboard",
     icon: Clock3,
-    perm: null,
+    perms: null,
     adminOnly: false,
   },
   {
     to: "/leaves",
     label: "Leaves",
     icon: Umbrella,
-    perm: null,
+    perms: null,
     adminOnly: false,
   },
   {
     to: "/payroll",
     label: "My Payroll",
     icon: Banknote,
-    perm: null,
+    perms: null,
     adminOnly: false,
   },
   {
     to: "/admin/employees",
     label: "Employees",
     icon: UsersRound,
-    perm: null,
+    perms: null,
     adminOnly: true,
   },
   {
     to: "/admin/leaves",
     label: "Leave Requests",
     icon: Umbrella,
-    perm: null,
+    perms: null,
     adminOnly: true,
   },
   {
     to: "/admin/payroll",
     label: "Payroll",
     icon: Banknote,
-    perm: null,
+    perms: null,
     adminOnly: true,
   },
 ];
 
 export function AppLayout() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, hasPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -204,8 +205,9 @@ export function AppLayout() {
 
       {/* Sidebar - Changed to a soft white theme */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-white text-slate-600 border-r border-slate-200 transition-all duration-300 md:relative shadow-xl shadow-slate-200/50 md:shadow-none ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-          } ${sidebarCollapsed ? "w-20" : "w-64"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-white text-slate-600 border-r border-slate-200 transition-all duration-300 md:relative shadow-xl shadow-slate-200/50 md:shadow-none ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        } ${sidebarCollapsed ? "w-20" : "w-64"}`}
       >
         {/* Logo */}
         <div
@@ -257,99 +259,173 @@ export function AppLayout() {
                     title={sidebarCollapsed ? "SUPPLIERS" : undefined}
                   >
                     {!sidebarCollapsed && <span>Suppliers Area</span>}
-                    {sidebarCollapsed && <Factory className="h-4 w-4 text-slate-400" />}
+                    {sidebarCollapsed && (
+                      <Factory className="h-4 w-4 text-slate-400" />
+                    )}
                   </div>
                   <div className="space-y-1">
                     <NavLink
                       to="/suppliers/sourcing"
                       onClick={() => setSidebarOpen(false)}
                       className={({ isActive }) =>
-                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
-                        } ${isActive
-                          ? "bg-brand-50 text-brand-700"
-                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${
+                          sidebarCollapsed ? "justify-center" : ""
+                        } ${
+                          isActive
+                            ? "bg-brand-50 text-brand-700"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                         }`
                       }
-                      title={sidebarCollapsed ? "Sourcing Suppliers" : undefined}
+                      title={
+                        sidebarCollapsed ? "Sourcing Suppliers" : undefined
+                      }
                     >
-                      {({ isActive }) => (
-                        <>
-                          {isActive && !sidebarCollapsed && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
-                          )}
-                          <Search className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
-                          {!sidebarCollapsed && <span className="truncate">Sourcing Suppliers</span>}
-                        </>
-                      )}
+                      {({ isActive }) => {
+                        const hasAccess = hasPermission("suppliers");
+                        return (
+                          <>
+                            {isActive && !sidebarCollapsed && (
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                            )}
+                            <Search
+                              className={`h-5 w-5 shrink-0 ${isActive ? "text-brand-600" : "text-slate-400 group-hover:text-brand-600 transition-colors"}`}
+                            />
+                            {!sidebarCollapsed && (
+                              <span className="truncate">
+                                Sourcing Suppliers
+                              </span>
+                            )}
+                            {!hasAccess && (
+                              <Lock
+                                className={`h-4 w-4 shrink-0 ${sidebarCollapsed ? "absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5" : "ml-auto"} text-slate-400 font-bold`}
+                                strokeWidth={3}
+                              />
+                            )}
+                          </>
+                        );
+                      }}
                     </NavLink>
                     <NavLink
                       to="/suppliers/new"
                       onClick={() => setSidebarOpen(false)}
                       className={({ isActive }) =>
-                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
-                        } ${isActive
-                          ? "bg-brand-50 text-brand-700"
-                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${
+                          sidebarCollapsed ? "justify-center" : ""
+                        } ${
+                          isActive
+                            ? "bg-brand-50 text-brand-700"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                         }`
                       }
                       title={sidebarCollapsed ? "New Suppliers" : undefined}
                     >
-                      {({ isActive }) => (
-                        <>
-                          {isActive && !sidebarCollapsed && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
-                          )}
-                          <Factory className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
-                          {!sidebarCollapsed && <span className="truncate">New Suppliers</span>}
-                        </>
-                      )}
+                      {({ isActive }) => {
+                        const hasAccess =
+                          hasPermission("suppliers") ||
+                          hasPermission("new_suppliers");
+                        return (
+                          <>
+                            {isActive && !sidebarCollapsed && (
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                            )}
+                            <Factory
+                              className={`h-5 w-5 shrink-0 ${isActive ? "text-brand-600" : "text-slate-400 group-hover:text-brand-600 transition-colors"}`}
+                            />
+                            {!sidebarCollapsed && (
+                              <span className="truncate">New Suppliers</span>
+                            )}
+                            {!hasAccess && (
+                              <Lock
+                                className={`h-4 w-4 shrink-0 ${sidebarCollapsed ? "absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5" : "ml-auto"} text-slate-400 font-bold`}
+                                strokeWidth={3}
+                              />
+                            )}
+                          </>
+                        );
+                      }}
                     </NavLink>
                     <NavLink
                       to="/suppliers/signed-contract"
                       onClick={() => setSidebarOpen(false)}
                       className={({ isActive }) =>
-                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
-                        } ${isActive
-                          ? "bg-brand-50 text-brand-700"
-                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${
+                          sidebarCollapsed ? "justify-center" : ""
+                        } ${
+                          isActive
+                            ? "bg-brand-50 text-brand-700"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                         }`
                       }
                       title={sidebarCollapsed ? "Signed Contracts" : undefined}
                     >
-                      {({ isActive }) => (
-                        <>
-                          {isActive && !sidebarCollapsed && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
-                          )}
-                          <FileText className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
-                          {!sidebarCollapsed && <span className="truncate">Signed Contracts</span>}
-                        </>
-                      )}
+                      {({ isActive }) => {
+                        const hasAccess =
+                          hasPermission("suppliers") ||
+                          hasPermission("signed_suppliers");
+                        return (
+                          <>
+                            {isActive && !sidebarCollapsed && (
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                            )}
+                            <FileText
+                              className={`h-5 w-5 shrink-0 ${isActive ? "text-brand-600" : "text-slate-400 group-hover:text-brand-600 transition-colors"}`}
+                            />
+                            {!sidebarCollapsed && (
+                              <span className="truncate">Signed Contracts</span>
+                            )}
+                            {!hasAccess && (
+                              <Lock
+                                className={`h-4 w-4 shrink-0 ${sidebarCollapsed ? "absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5" : "ml-auto"} text-slate-400 font-bold`}
+                                strokeWidth={3}
+                              />
+                            )}
+                          </>
+                        );
+                      }}
                     </NavLink>
                     <NavLink
                       to="/suppliers/old"
                       onClick={() => setSidebarOpen(false)}
                       className={({ isActive }) =>
-                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
-                        } ${isActive
-                          ? "bg-brand-50 text-brand-700"
-                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${
+                          sidebarCollapsed ? "justify-center" : ""
+                        } ${
+                          isActive
+                            ? "bg-brand-50 text-brand-700"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                         }`
                       }
                       title={sidebarCollapsed ? "Old Supplier Data" : undefined}
                     >
-                      {({ isActive }) => (
-                        <>
-                          {isActive && !sidebarCollapsed && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
-                          )}
-                          <Archive className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
-                          {!sidebarCollapsed && <span className="truncate">Old Supplier Data</span>}
-                        </>
-                      )}
+                      {({ isActive }) => {
+                        const hasAccess = hasPermission("suppliers");
+                        return (
+                          <>
+                            {isActive && !sidebarCollapsed && (
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                            )}
+                            <Archive
+                              className={`h-5 w-5 shrink-0 ${isActive ? "text-brand-600" : "text-slate-400 group-hover:text-brand-600 transition-colors"}`}
+                            />
+                            {!sidebarCollapsed && (
+                              <span className="truncate">
+                                Old Supplier Data
+                              </span>
+                            )}
+                            {!hasAccess && (
+                              <Lock
+                                className={`h-4 w-4 shrink-0 ${sidebarCollapsed ? "absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5" : "ml-auto"} text-slate-400 font-bold`}
+                                strokeWidth={3}
+                              />
+                            )}
+                          </>
+                        );
+                      }}
                     </NavLink>
                   </div>
-                  {!sidebarCollapsed && <Separator className="bg-slate-100 mt-4 mb-2 w-[calc(100%-1.5rem)] mx-auto" />}
+                  {!sidebarCollapsed && (
+                    <Separator className="bg-slate-100 mt-4 mb-2 w-[calc(100%-1.5rem)] mx-auto" />
+                  )}
                   {!sidebarCollapsed && (
                     <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                       Quotations
@@ -359,25 +435,44 @@ export function AppLayout() {
                     to="/quotations"
                     onClick={() => setSidebarOpen(false)}
                     className={({ isActive }) =>
-                      `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
-                      } ${isActive
-                        ? "bg-brand-50 text-brand-700"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                      `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${
+                        sidebarCollapsed ? "justify-center" : ""
+                      } ${
+                        isActive
+                          ? "bg-brand-50 text-brand-700"
+                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                       }`
                     }
                     title={sidebarCollapsed ? "Quotations" : undefined}
                   >
-                    {({ isActive }) => (
-                      <>
-                        {isActive && !sidebarCollapsed && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
-                        )}
-                        <ClipboardList className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
-                        {!sidebarCollapsed && <span className="truncate">Quotations</span>}
-                      </>
-                    )}
+                    {({ isActive }) => {
+                      const hasAccess =
+                        hasPermission("suppliers") ||
+                        hasPermission("quotations");
+                      return (
+                        <>
+                          {isActive && !sidebarCollapsed && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                          )}
+                          <ClipboardList
+                            className={`h-5 w-5 shrink-0 ${isActive ? "text-brand-600" : "text-slate-400 group-hover:text-brand-600 transition-colors"}`}
+                          />
+                          {!sidebarCollapsed && (
+                            <span className="truncate">Quotations</span>
+                          )}
+                          {!hasAccess && (
+                            <Lock
+                              className={`h-4 w-4 shrink-0 ${sidebarCollapsed ? "absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5" : "ml-auto"} text-slate-400 font-bold`}
+                              strokeWidth={3}
+                            />
+                          )}
+                        </>
+                      );
+                    }}
                   </NavLink>
-                  {!sidebarCollapsed && <Separator className="bg-slate-100 my-4 w-[calc(100%-1.5rem)] mx-auto" />}
+                  {!sidebarCollapsed && (
+                    <Separator className="bg-slate-100 my-4 w-[calc(100%-1.5rem)] mx-auto" />
+                  )}
                 </div>
               );
             }
@@ -389,23 +484,39 @@ export function AppLayout() {
                 end={item.to === "/"}
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
-                  `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${sidebarCollapsed ? "justify-center" : ""
-                  } ${isActive
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${
+                    sidebarCollapsed ? "justify-center" : ""
+                  } ${
+                    isActive
+                      ? "bg-brand-50 text-brand-700"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                   }`
                 }
                 title={sidebarCollapsed ? item.label : undefined}
               >
-                {({ isActive }) => (
-                  <>
-                    {isActive && !sidebarCollapsed && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
-                    )}
-                    <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-600 transition-colors'}`} />
-                    {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                  </>
-                )}
+                {({ isActive }) => {
+                  const hasAccess =
+                    !item.perms || item.perms.some((p) => hasPermission(p));
+                  return (
+                    <>
+                      {isActive && !sidebarCollapsed && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                      )}
+                      <item.icon
+                        className={`h-5 w-5 shrink-0 ${isActive ? "text-brand-600" : "text-slate-400 group-hover:text-brand-600 transition-colors"}`}
+                      />
+                      {!sidebarCollapsed && (
+                        <span className="truncate">{item.label}</span>
+                      )}
+                      {!hasAccess && (
+                        <Lock
+                          className={`h-4 w-4 shrink-0 ${sidebarCollapsed ? "absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5" : "ml-auto"} text-slate-400 font-bold`}
+                          strokeWidth={3}
+                        />
+                      )}
+                    </>
+                  );
+                }}
               </NavLink>
             );
           })}
@@ -416,7 +527,9 @@ export function AppLayout() {
           <div
             className={`flex items-center gap-3 rounded-xl px-2 py-2 transition-colors ${sidebarCollapsed ? "justify-center" : "hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200"}`}
           >
-            <Avatar className={`h-9 w-9 border border-slate-200 shrink-0 shadow-sm ${sidebarCollapsed ? 'mx-auto' : ''}`}>
+            <Avatar
+              className={`h-9 w-9 border border-slate-200 shrink-0 shadow-sm ${sidebarCollapsed ? "mx-auto" : ""}`}
+            >
               <AvatarFallback className="bg-white text-brand-700 text-xs font-bold">
                 {initials}
               </AvatarFallback>
@@ -475,9 +588,11 @@ export function AppLayout() {
               alt="Logo"
               className="h-8 w-8 rounded-full object-cover mr-3 border border-slate-100"
             />
-            <span className="text-[17px] font-bold text-slate-900 tracking-tight">Élan Exports</span>
+            <span className="text-[17px] font-bold text-slate-900 tracking-tight">
+              Élan Exports
+            </span>
           </div>
-          
+
           <div className="hidden md:flex flex-col justify-center ml-4">
             <h1 className="text-sm font-bold tracking-tight sm:text-base text-slate-800">
               {getGreeting()},{" "}

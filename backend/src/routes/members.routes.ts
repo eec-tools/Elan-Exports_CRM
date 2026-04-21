@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   listMembers,
+  listMemberNames,
   createMember,
   updateMember,
   deleteMember,
@@ -13,7 +14,10 @@ import { authenticate, requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
 
-// All member routes require admin
+// Public route for authenticated users - get member names for dropdowns
+router.get("/names", authenticate, listMemberNames);
+
+// All other member routes require admin
 router.use(authenticate, requireAdmin);
 
 router.get("/", listMembers);
