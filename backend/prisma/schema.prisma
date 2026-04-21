@@ -132,6 +132,7 @@ model Supplier {
   company                    String
   country                    String?
   contactPerson              String?                @map("contact_person")
+  designation                String?                   @map("designation")
   email                      String?
   phone                      String?
   products                   String?
@@ -346,6 +347,7 @@ model NewSupplier {
   // Section 2 — Contacts
   whatsapp                   String?
   contactPerson              String?                   @map("contact_person")
+  designation                String?                   @map("designation")
   // Section 3 — Products
   hsCode                     String?                   @map("hs_code")
   organicStatus              String?                   @map("organic_status")
@@ -495,6 +497,7 @@ model SourcingSupplier {
   // Section 2 — Contacts
   whatsapp                   String?
   contactPerson              String?                   @map("contact_person")
+  designation                String?                   @map("designation")
   // Section 3 — Products
   hsCode                     String?                   @map("hs_code")
   organicStatus              String?                   @map("organic_status")

@@ -281,7 +281,9 @@ export function AppLayout() {
                       }
                     >
                       {({ isActive }) => {
-                        const hasAccess = hasPermission("suppliers");
+                        const hasAccess =
+                          hasPermission("suppliers") ||
+                          hasPermission("sourcing_suppliers");
                         return (
                           <>
                             {isActive && !sidebarCollapsed && (
@@ -398,7 +400,9 @@ export function AppLayout() {
                       title={sidebarCollapsed ? "Old Supplier Data" : undefined}
                     >
                       {({ isActive }) => {
-                        const hasAccess = hasPermission("suppliers");
+                        const hasAccess =
+                          hasPermission("suppliers") ||
+                          hasPermission("old_suppliers");
                         return (
                           <>
                             {isActive && !sidebarCollapsed && (

@@ -5,13 +5,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle2, ChevronLeft, ChevronRight, Save, Upload, X, FileText, Image, Video } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Save,
+  Upload,
+  X,
+  FileText,
+  Image,
+  Video,
+} from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
 
 // ─── Section Definitions ─────────────────────────────────────────────────────
 
-type Field = { key: string; label: string; type?: "text" | "email" | "textarea"; hint?: string };
+type Field = {
+  key: string;
+  label: string;
+  type?: "text" | "email" | "textarea";
+  hint?: string;
+};
 
 const SECTION_DEFS: { key: string; label: string; fields: Field[] }[] = [
   {
@@ -21,11 +37,19 @@ const SECTION_DEFS: { key: string; label: string; fields: Field[] }[] = [
       { key: "company", label: "Company Name" },
       { key: "tradeName", label: "Trade Name" },
       { key: "yearEstablished", label: "Year Established" },
-      { key: "manufacturingAddress", label: "Manufacturing Address", type: "textarea" },
+      {
+        key: "manufacturingAddress",
+        label: "Manufacturing Address",
+        type: "textarea",
+      },
       { key: "city", label: "City" },
       { key: "state", label: "State / Province" },
       { key: "postalCode", label: "Postal Code" },
-      { key: "supplierType", label: "Supplier Type", hint: "e.g. Manufacturer, Trader, Farm" },
+      {
+        key: "supplierType",
+        label: "Supplier Type",
+        hint: "e.g. Manufacturer, Trader, Farm",
+      },
       { key: "country", label: "Country" },
     ],
   },
@@ -34,6 +58,11 @@ const SECTION_DEFS: { key: string; label: string; fields: Field[] }[] = [
     label: "Contact Details",
     fields: [
       { key: "contactPerson", label: "Contact Person Name" },
+      {
+        key: "designation",
+        label: "Role/Designation",
+        hint: "e.g., Sales Manager, Owner",
+      },
       { key: "email", label: "Email Address", type: "email" },
       { key: "phone", label: "Phone Number" },
       { key: "whatsapp", label: "WhatsApp Number" },
@@ -46,9 +75,17 @@ const SECTION_DEFS: { key: string; label: string; fields: Field[] }[] = [
       { key: "product", label: "Primary Product" },
       { key: "productCategory", label: "Product Category" },
       { key: "hsCode", label: "HS Code" },
-      { key: "organicStatus", label: "Organic Status", hint: "e.g. Certified Organic, Conventional" },
+      {
+        key: "organicStatus",
+        label: "Organic Status",
+        hint: "e.g. Certified Organic, Conventional",
+      },
       { key: "ingredientList", label: "Ingredient List", type: "textarea" },
-      { key: "allergenDeclaration", label: "Allergen Declaration", type: "textarea" },
+      {
+        key: "allergenDeclaration",
+        label: "Allergen Declaration",
+        type: "textarea",
+      },
       { key: "shelfLife", label: "Shelf Life" },
       { key: "storageConditions", label: "Storage Conditions" },
       { key: "packagingType", label: "Packaging Type" },
@@ -108,7 +145,10 @@ const SECTION_DEFS: { key: string; label: string; fields: Field[] }[] = [
       { key: "isoFsscCertNo", label: "ISO / FSSC Cert No." },
       { key: "isoCertValidityDate", label: "ISO Cert Validity Date" },
       { key: "latestInternalAuditDate", label: "Latest Internal Audit Date" },
-      { key: "latestThirdPartyAuditDate", label: "Latest 3rd Party Audit Date" },
+      {
+        key: "latestThirdPartyAuditDate",
+        label: "Latest 3rd Party Audit Date",
+      },
       { key: "auditingBodyName", label: "Auditing Body Name" },
     ],
   },
@@ -118,7 +158,10 @@ const SECTION_DEFS: { key: string; label: string; fields: Field[] }[] = [
     fields: [
       { key: "farmerOrganicCert", label: "Farmer Organic Cert" },
       { key: "aggregatorOrganicCert", label: "Aggregator Organic Cert" },
-      { key: "processingUnitOrganicCert", label: "Processing Unit Organic Cert" },
+      {
+        key: "processingUnitOrganicCert",
+        label: "Processing Unit Organic Cert",
+      },
       { key: "certifyingBodyName", label: "Certifying Body Name" },
       { key: "certsValidForExport", label: "Certs Valid for Export?" },
     ],
@@ -128,7 +171,10 @@ const SECTION_DEFS: { key: string; label: string; fields: Field[] }[] = [
     label: "Lab Testing",
     fields: [
       { key: "gmoFreeDeclaration", label: "GMO-Free Declaration" },
-      { key: "irradiationFreeDeclaration", label: "Irradiation-Free Declaration" },
+      {
+        key: "irradiationFreeDeclaration",
+        label: "Irradiation-Free Declaration",
+      },
       { key: "foodContactCompliance", label: "Food Contact Compliance" },
       { key: "compostabilityCert", label: "Compostability Cert" },
       { key: "migrationTestReport", label: "Migration Test Report" },
@@ -139,9 +185,16 @@ const SECTION_DEFS: { key: string; label: string; fields: Field[] }[] = [
     label: "Branding",
     fields: [
       { key: "exportBrand", label: "Export Brand Name" },
-      { key: "healthNutritionClaims", label: "Health & Nutrition Claims", type: "textarea" },
+      {
+        key: "healthNutritionClaims",
+        label: "Health & Nutrition Claims",
+        type: "textarea",
+      },
       { key: "claimsApprovedMarkets", label: "Claims Approved Markets" },
-      { key: "packagingComplianceRegions", label: "Packaging Compliance Regions" },
+      {
+        key: "packagingComplianceRegions",
+        label: "Packaging Compliance Regions",
+      },
     ],
   },
   {
@@ -207,9 +260,13 @@ function MediaSection({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await axios.post(`${API_BASE}/public/supplier-form/${token}/upload`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await axios.post(
+        `${API_BASE}/public/supplier-form/${token}/upload`,
+        fd,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
       onChange([...current, { url: res.data.url, name: file.name }]);
     } catch {
       // silently fail — user can retry
@@ -217,8 +274,11 @@ function MediaSection({
     setUploading((u) => ({ ...u, [bucket]: false }));
   };
 
-  const removeFile = (arr: UploadedFile[], idx: number, onChange: (f: UploadedFile[]) => void) =>
-    onChange(arr.filter((_, i) => i !== idx));
+  const removeFile = (
+    arr: UploadedFile[],
+    idx: number,
+    onChange: (f: UploadedFile[]) => void,
+  ) => onChange(arr.filter((_, i) => i !== idx));
 
   return (
     <div className="space-y-6">
@@ -230,8 +290,12 @@ function MediaSection({
         accept=".pdf,.doc,.docx,.xls,.xlsx"
         files={productCatalogs}
         uploading={uploading["catalogs"]}
-        onUpload={(f) => uploadFile(f, "catalogs", productCatalogs, onProductCatalogsChange)}
-        onRemove={(i) => removeFile(productCatalogs, i, onProductCatalogsChange)}
+        onUpload={(f) =>
+          uploadFile(f, "catalogs", productCatalogs, onProductCatalogsChange)
+        }
+        onRemove={(i) =>
+          removeFile(productCatalogs, i, onProductCatalogsChange)
+        }
       />
 
       {/* Certificates */}
@@ -242,7 +306,9 @@ function MediaSection({
         accept=".pdf,.jpg,.jpeg,.png"
         files={certificates}
         uploading={uploading["certs"]}
-        onUpload={(f) => uploadFile(f, "certs", certificates, onCertificatesChange)}
+        onUpload={(f) =>
+          uploadFile(f, "certs", certificates, onCertificatesChange)
+        }
         onRemove={(i) => removeFile(certificates, i, onCertificatesChange)}
       />
 
@@ -254,22 +320,41 @@ function MediaSection({
         accept=".jpg,.jpeg,.png,.webp"
         files={warehousePhotos}
         uploading={uploading["photos"]}
-        onUpload={(f) => uploadFile(f, "photos", warehousePhotos, onWarehousePhotosChange)}
-        onRemove={(i) => removeFile(warehousePhotos, i, onWarehousePhotosChange)}
+        onUpload={(f) =>
+          uploadFile(f, "photos", warehousePhotos, onWarehousePhotosChange)
+        }
+        onRemove={(i) =>
+          removeFile(warehousePhotos, i, onWarehousePhotosChange)
+        }
       />
 
       {/* Video Links */}
       <div>
         <div className="flex items-center gap-2 mb-2">
           <Video className="h-5 w-5 text-purple-500" />
-          <Label className="text-sm font-medium text-slate-700">Video Links</Label>
+          <Label className="text-sm font-medium text-slate-700">
+            Video Links
+          </Label>
         </div>
-        <p className="text-xs text-slate-400 mb-2">YouTube, Vimeo, or direct links to facility/process videos</p>
+        <p className="text-xs text-slate-400 mb-2">
+          YouTube, Vimeo, or direct links to facility/process videos
+        </p>
         <div className="space-y-2">
           {videoLinks.map((link, i) => (
             <div key={i} className="flex gap-2 items-center">
-              <Input value={link} readOnly className="text-xs font-mono flex-1 h-8" />
-              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:bg-red-50" onClick={() => onVideoLinksChange(videoLinks.filter((_, j) => j !== i))}>
+              <Input
+                value={link}
+                readOnly
+                className="text-xs font-mono flex-1 h-8"
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 text-red-400 hover:bg-red-50"
+                onClick={() =>
+                  onVideoLinksChange(videoLinks.filter((_, j) => j !== i))
+                }
+              >
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -317,7 +402,16 @@ interface UploadBucketProps {
   onRemove: (i: number) => void;
 }
 
-function UploadBucket({ label, description, icon, accept, files, uploading, onUpload, onRemove }: UploadBucketProps) {
+function UploadBucket({
+  label,
+  description,
+  icon,
+  accept,
+  files,
+  uploading,
+  onUpload,
+  onRemove,
+}: UploadBucketProps) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-1">
@@ -327,25 +421,54 @@ function UploadBucket({ label, description, icon, accept, files, uploading, onUp
       <p className="text-xs text-slate-400 mb-2">{description}</p>
       <div className="space-y-1.5">
         {files.map((f, i) => (
-          <div key={i} className="flex items-center gap-2 bg-slate-50 rounded px-3 py-1.5 text-xs">
+          <div
+            key={i}
+            className="flex items-center gap-2 bg-slate-50 rounded px-3 py-1.5 text-xs"
+          >
             <span className="flex-1 truncate text-slate-700">{f.name}</span>
-            <a href={f.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline shrink-0">View</a>
-            <button onClick={() => onRemove(i)} className="text-red-400 hover:text-red-600 shrink-0">
+            <a
+              href={f.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-brand-600 hover:underline shrink-0"
+            >
+              View
+            </a>
+            <button
+              onClick={() => onRemove(i)}
+              className="text-red-400 hover:text-red-600 shrink-0"
+            >
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
         ))}
-        <label className={`flex items-center gap-2 border-2 border-dashed rounded-lg px-4 py-3 cursor-pointer transition-colors ${uploading ? "border-brand-300 bg-brand-50" : "border-slate-200 hover:border-brand-300 hover:bg-brand-50/40"}`}>
-          {uploading
-            ? <><Loader2 className="h-4 w-4 animate-spin text-brand-500" /><span className="text-sm text-brand-600">Uploading…</span></>
-            : <><Upload className="h-4 w-4 text-slate-400" /><span className="text-sm text-slate-500">Click to upload</span><span className="text-xs text-slate-400">({accept})</span></>
-          }
+        <label
+          className={`flex items-center gap-2 border-2 border-dashed rounded-lg px-4 py-3 cursor-pointer transition-colors ${uploading ? "border-brand-300 bg-brand-50" : "border-slate-200 hover:border-brand-300 hover:bg-brand-50/40"}`}
+        >
+          {uploading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin text-brand-500" />
+              <span className="text-sm text-brand-600">Uploading…</span>
+            </>
+          ) : (
+            <>
+              <Upload className="h-4 w-4 text-slate-400" />
+              <span className="text-sm text-slate-500">Click to upload</span>
+              <span className="text-xs text-slate-400">({accept})</span>
+            </>
+          )}
           <input
             type="file"
             className="hidden"
             accept={accept}
             disabled={uploading}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) { onUpload(f); e.target.value = ""; } }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) {
+                onUpload(f);
+                e.target.value = "";
+              }
+            }}
           />
         </label>
       </div>
@@ -378,7 +501,9 @@ export default function PublicSupplierFormPage() {
   useEffect(() => {
     if (!token) return;
     axios
-      .get(`${API_BASE}/public/supplier-form/${token}${searchParams.get("t") ? `?t=${searchParams.get("t")}` : ""}`)
+      .get(
+        `${API_BASE}/public/supplier-form/${token}${searchParams.get("t") ? `?t=${searchParams.get("t")}` : ""}`,
+      )
       .then((res) => {
         const { company: c, templateConfig: tc, formData: fd } = res.data;
         setCompany(c ?? "");
@@ -390,24 +515,36 @@ export default function PublicSupplierFormPage() {
         setFormData(flatData);
         // Pre-populate media arrays from existing data
         const raw = fd ?? {};
-        if (Array.isArray(raw.productCatalogs)) setProductCatalogs(raw.productCatalogs);
+        if (Array.isArray(raw.productCatalogs))
+          setProductCatalogs(raw.productCatalogs);
         if (Array.isArray(raw.certificates)) setCertificates(raw.certificates);
-        if (Array.isArray(raw.warehousePhotos)) setWarehousePhotos(raw.warehousePhotos);
-        if (Array.isArray(raw.videoLinks)) setVideoLinks(raw.videoLinks.map((v: any) => typeof v === "string" ? v : v?.url ?? "").filter(Boolean));
+        if (Array.isArray(raw.warehousePhotos))
+          setWarehousePhotos(raw.warehousePhotos);
+        if (Array.isArray(raw.videoLinks))
+          setVideoLinks(
+            raw.videoLinks
+              .map((v: any) => (typeof v === "string" ? v : (v?.url ?? "")))
+              .filter(Boolean),
+          );
         setLoading(false);
       })
       .catch((err) => {
-        setError(err?.response?.data?.error ?? "Failed to load the form. The link may be invalid.");
+        setError(
+          err?.response?.data?.error ??
+            "Failed to load the form. The link may be invalid.",
+        );
         setLoading(false);
       });
   }, [token]);
 
   const activeSections = getActiveSections(templateConfig);
   const currentSection = activeSections[activeSectionIdx];
-  const requiredFields = templateConfig[currentSection?.key]?.requiredFields ?? [];
+  const requiredFields =
+    templateConfig[currentSection?.key]?.requiredFields ?? [];
 
   const field = (key: string) => formData[key] ?? "";
-  const setField = (key: string, value: string) => setFormData((f) => ({ ...f, [key]: value }));
+  const setField = (key: string, value: string) =>
+    setFormData((f) => ({ ...f, [key]: value }));
 
   const sectionComplete = (sectionKey: string) => {
     const required = templateConfig[sectionKey]?.requiredFields ?? [];
@@ -415,9 +552,13 @@ export default function PublicSupplierFormPage() {
   };
 
   const totalSections = activeSections.length;
-  const completedSections = activeSections.filter((s) => sectionComplete(s.key)).length;
-  const progressPct = totalSections > 0 ? Math.round((completedSections / totalSections) * 100) : 0;
-
+  const completedSections = activeSections.filter((s) =>
+    sectionComplete(s.key),
+  ).length;
+  const progressPct =
+    totalSections > 0
+      ? Math.round((completedSections / totalSections) * 100)
+      : 0;
 
   const allFields = () => ({
     ...formData,
@@ -430,7 +571,9 @@ export default function PublicSupplierFormPage() {
   const saveProgress = async () => {
     setSaving(true);
     try {
-      await axios.post(`${API_BASE}/public/supplier-form/${token}`, { fields: allFields() });
+      await axios.post(`${API_BASE}/public/supplier-form/${token}`, {
+        fields: allFields(),
+      });
     } catch (_) {
       // Silent — progress saved in background
     }
@@ -440,10 +583,14 @@ export default function PublicSupplierFormPage() {
   const handleSubmit = async () => {
     setSaving(true);
     try {
-      await axios.post(`${API_BASE}/public/supplier-form/${token}`, { fields: allFields() });
+      await axios.post(`${API_BASE}/public/supplier-form/${token}`, {
+        fields: allFields(),
+      });
       setSubmitted(true);
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "Submission failed. Please try again.");
+      setError(
+        err?.response?.data?.error ?? "Submission failed. Please try again.",
+      );
     }
     setSaving(false);
   };
@@ -465,7 +612,9 @@ export default function PublicSupplierFormPage() {
           <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
             <span className="text-red-600 text-xl font-bold">!</span>
           </div>
-          <h2 className="text-lg font-semibold text-slate-800">Link Not Found</h2>
+          <h2 className="text-lg font-semibold text-slate-800">
+            Link Not Found
+          </h2>
           <p className="text-slate-500 text-sm mt-2">{error}</p>
         </div>
       </div>
@@ -479,7 +628,8 @@ export default function PublicSupplierFormPage() {
           <CheckCircle2 className="h-14 w-14 text-green-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-slate-800">Thank You!</h2>
           <p className="text-slate-500 text-sm mt-2">
-            Your supplier details for <strong>{company}</strong> have been received. Our team will review them and be in touch.
+            Your supplier details for <strong>{company}</strong> have been
+            received. Our team will review them and be in touch.
           </p>
         </div>
       </div>
@@ -490,7 +640,9 @@ export default function PublicSupplierFormPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-          <p className="text-slate-500">No form sections have been configured. Please contact the team.</p>
+          <p className="text-slate-500">
+            No form sections have been configured. Please contact the team.
+          </p>
         </div>
       </div>
     );
@@ -504,12 +656,16 @@ export default function PublicSupplierFormPage() {
       <div className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-400 uppercase font-medium tracking-wide">Supplier Profile Form</p>
+            <p className="text-xs text-slate-400 uppercase font-medium tracking-wide">
+              Supplier Profile Form
+            </p>
             <h1 className="text-lg font-bold text-slate-900">{company}</h1>
           </div>
           <div className="text-right">
             <p className="text-xs text-slate-400">Progress</p>
-            <p className="text-sm font-semibold text-slate-700">{progressPct}% complete</p>
+            <p className="text-sm font-semibold text-slate-700">
+              {progressPct}% complete
+            </p>
           </div>
         </div>
         {/* Progress bar */}
@@ -537,8 +693,8 @@ export default function PublicSupplierFormPage() {
                   active
                     ? "bg-brand-600 text-white"
                     : done
-                    ? "bg-green-100 text-green-700"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 {done && !active && <CheckCircle2 className="h-3 w-3" />}
@@ -552,9 +708,13 @@ export default function PublicSupplierFormPage() {
       {/* Form content */}
       <div className="max-w-2xl mx-auto px-6 py-8">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-slate-800 mb-1">{currentSection.label}</h2>
+          <h2 className="text-lg font-semibold text-slate-800 mb-1">
+            {currentSection.label}
+          </h2>
           {requiredFields.length > 0 && (
-            <p className="text-xs text-slate-400 mb-4">Fields marked with * are required</p>
+            <p className="text-xs text-slate-400 mb-4">
+              Fields marked with * are required
+            </p>
           )}
 
           {currentSection.key === "media" ? (
@@ -576,9 +736,12 @@ export default function PublicSupplierFormPage() {
                 return (
                   <div key={f.key}>
                     <Label className="text-sm font-medium text-slate-700">
-                      {f.label}{isRequired ? " *" : ""}
+                      {f.label}
+                      {isRequired ? " *" : ""}
                     </Label>
-                    {f.hint && <p className="text-xs text-slate-400">{f.hint}</p>}
+                    {f.hint && (
+                      <p className="text-xs text-slate-400">{f.hint}</p>
+                    )}
                     {f.type === "textarea" ? (
                       <Textarea
                         value={field(f.key)}
@@ -622,7 +785,11 @@ export default function PublicSupplierFormPage() {
               onClick={saveProgress}
               disabled={saving}
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : (
+                <Save className="h-4 w-4 mr-1.5" />
+              )}
               Save Progress
             </Button>
 
@@ -644,7 +811,11 @@ export default function PublicSupplierFormPage() {
                 disabled={saving}
                 className="bg-green-600 hover:bg-green-700"
               >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />}
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                )}
                 Submit
               </Button>
             )}
@@ -652,7 +823,8 @@ export default function PublicSupplierFormPage() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          Your information is securely stored and only shared with the EEC Export team.
+          Your information is securely stored and only shared with the EEC
+          Export team.
         </p>
       </div>
     </div>
