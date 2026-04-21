@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { toast } from "sonner";
@@ -228,6 +228,8 @@ function getCatalogViewUrl(url?: string) {
 export default function BuyerDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const backFrom = (location.state as { from?: { path: string; label: string } } | null)?.from;
   const queryClient = useQueryClient();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -463,9 +465,10 @@ export default function BuyerDetailsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate("/buyers")}
+            onClick={() => backFrom ? navigate(backFrom.path) : navigate("/buyers")}
           >
-            <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            {backFrom ? `Back to ${backFrom.label}` : "Back"}
           </Button>
         </div>
       </div>
@@ -1006,6 +1009,7 @@ export default function BuyerDetailsPage() {
                     <Link
                       key={`${link.id}-${link.type}`}
                       to={path}
+                      state={{ from: { path: `/buyers/${buyer.id}`, label: buyer.company } }}
                       className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
                     >
                       {label}

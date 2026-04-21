@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 
@@ -290,6 +290,8 @@ function InfoRow({
 export default function SupplierDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const backFrom = (location.state as { from?: { path: string; label: string } } | null)?.from;
 
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -650,10 +652,10 @@ export default function SupplierDetailsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate("/suppliers/signed-contract")}
+            onClick={() => backFrom ? navigate(backFrom.path) : navigate("/suppliers/signed-contract")}
           >
             <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Back
+            {backFrom ? `Back to ${backFrom.label}` : "Back"}
           </Button>
         </div>
       </div>
@@ -736,6 +738,7 @@ export default function SupplierDetailsPage() {
                           <Link
                             key={buyerId}
                             to={`/buyers/${buyerId}`}
+                            state={{ from: { path: `/suppliers/signed-contract/${supplier.id}`, label: supplier.company } }}
                             className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 border border-brand-200 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 transition-colors"
                           >
                             {buyer ? `${buyer.company}${buyer.name ? ` (${buyer.name})` : ""}` : buyerId.slice(0, 8)}
