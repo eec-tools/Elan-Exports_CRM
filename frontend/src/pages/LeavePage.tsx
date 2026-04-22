@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, AlertCircle, AlertTriangle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Leave {
   id: string;
@@ -24,6 +25,23 @@ interface LeaveBalance {
   year: number;
 }
 
+interface AdminEmployee {
+  id: string;
+  fullName: string;
+  email: string;
+  designation: string | null;
+  employeeStatus: "intern" | "probation" | "confirmed";
+  roles: { role: string }[];
+}
+
+interface AdminLeave {
+  id: string;
+  userId: string;
+  startDate: string;
+  endDate: string;
+  numberOfDays: number;
+}
+
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
   approved: "bg-green-100 text-green-800",
@@ -32,6 +50,9 @@ const statusColors: Record<string, string> = {
 
 export default function LeavePage() {
   const qc = useQueryClient();
+  const { isAdmin } = useAuth();
+  const currentYear = new Date().getFullYear();
+  const annualQuota = 14;
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -40,16 +61,31 @@ export default function LeavePage() {
   const { data: balance } = useQuery<LeaveBalance>({
     queryKey: ["leave-balance"],
     queryFn: () => api.get("/leaves/balance").then((r) => r.data),
+    enabled: !isAdmin,
   });
 
   const { data: leaves = [] } = useQuery<Leave[]>({
     queryKey: ["my-leaves"],
     queryFn: () => api.get("/leaves").then((r) => r.data),
+    enabled: !isAdmin,
   });
 
   const { data: empData } = useQuery({
     queryKey: ["my-employee-profile"],
     queryFn: () => api.get("/admin/employees/me").then((r) => r.data),
+    enabled: !isAdmin,
+  });
+
+  const { data: adminEmployees = [] } = useQuery<AdminEmployee[]>({
+    queryKey: ["admin-employees-leave-overview"],
+    queryFn: () => api.get("/admin/employees").then((r) => r.data),
+    enabled: isAdmin,
+  });
+
+  const { data: approvedLeaves = [] } = useQuery<AdminLeave[]>({
+    queryKey: ["admin-approved-leaves-overview", currentYear],
+    queryFn: () => api.get("/leaves/admin?status=approved").then((r) => r.data),
+    enabled: isAdmin,
   });
 
   const isConfirmed = empData?.employeeStatus === "confirmed";
@@ -84,8 +120,11 @@ export default function LeavePage() {
       setEndDate("");
       setReason("");
     },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.error ?? "Failed to apply for leave");
+    onError: (err: unknown) => {
+      const message =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        "Failed to apply for leave";
+      toast.error(message);
     },
   });
 
@@ -100,6 +139,104 @@ export default function LeavePage() {
 
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+
+  const teamEmployees = isAdmin
+    ? adminEmployees.filter((employee) => !employee.roles.some((role) => role.role === "admin"))
+    : [];
+
+  const usedByEmployee = new Map<string, number>();
+  if (isAdmin) {
+    for (const leave of approvedLeaves) {
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      if (start.getFullYear() !== currentYear || end.getFullYear() !== currentYear) continue;
+
+      const prev = usedByEmployee.get(leave.userId) ?? 0;
+      usedByEmployee.set(leave.userId, prev + leave.numberOfDays);
+    }
+  }
+
+  const adminRows = teamEmployees
+    .map((employee) => {
+      const used = usedByEmployee.get(employee.id) ?? 0;
+      const remaining = annualQuota - used;
+      return {
+        ...employee,
+        quota: annualQuota,
+        used,
+        remaining,
+      };
+    })
+    .sort((a, b) => {
+      if (b.used !== a.used) return b.used - a.used;
+      return a.fullName.localeCompare(b.fullName);
+    });
+
+  if (isAdmin) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Leave Management</h1>
+          <p className="text-sm text-slate-500 mt-1">Team paid leave overview for {currentYear}</p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Employee Leave Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {adminRows.length === 0 ? (
+              <p className="text-sm text-slate-500 px-6 py-4">No employees found.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/60">
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">Employee</th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">Status</th>
+                      <th className="text-right px-4 py-3 font-medium text-slate-600">Annual Quota (Paid)</th>
+                      <th className="text-right px-4 py-3 font-medium text-slate-600">Used This Year</th>
+                      <th className="text-right px-4 py-3 font-medium text-slate-600">Paid Days Left</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {adminRows.map((row) => (
+                      <tr key={row.id} className="hover:bg-slate-50/50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-slate-800">{row.fullName}</p>
+                          <p className="text-xs text-slate-500">{row.designation || row.email}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge
+                            className={`text-xs ${
+                              row.employeeStatus === "confirmed"
+                                ? "bg-green-100 text-green-800"
+                                : row.employeeStatus === "probation"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-blue-100 text-blue-800"
+                            }`}
+                          >
+                            {row.employeeStatus}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right text-slate-700">{row.quota}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">{row.used}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`font-semibold ${row.remaining < 0 ? "text-red-600" : "text-green-700"}`}>
+                            {Math.max(0, row.remaining)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -144,8 +281,8 @@ export default function LeavePage() {
         </div>
       )}
 
-      {/* Apply form */}
-      <Card>
+      {/* Apply form — hidden for admins */}
+      {!isAdmin && <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />
@@ -218,7 +355,7 @@ export default function LeavePage() {
             </form>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Leave history */}
       <Card>

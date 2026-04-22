@@ -11,9 +11,12 @@ import {
   Loader2,
   LogIn,
   LogOut,
+  MoreVertical,
   Paperclip,
   Square,
   Timer,
+  Trash2,
+  TrendingUp,
   Upload,
   Users,
   X,
@@ -23,12 +26,28 @@ import { toast } from "sonner";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 
 /* ─── Types ────────────────────────────────────────── */
@@ -88,6 +107,7 @@ interface TodayAttendanceResponse {
 }
 
 interface AdminAttendanceRow {
+  attendanceId: string | null;
   userId: string;
   fullName: string;
   email: string;
@@ -266,7 +286,7 @@ function LiveTimer({ startTime }: { startTime: string }) {
   const s = elapsed % 60;
 
   return (
-    <span className="font-mono text-3xl font-extrabold tracking-wider tabular-nums bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
+    <span className="font-mono text-3xl font-extrabold tracking-wider tabular-nums bg-linear-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
       {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
     </span>
   );
@@ -364,9 +384,17 @@ function StatCard({ label, value, sublabel, icon: Icon, color = "slate" }: {
 export default function AttendanceDashboardPage() {
   const queryClient = useQueryClient();
   const { isAdmin, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"my" | "history" | "admin" | "admin-history">("my");
+  const [activeTab, setActiveTab] = useState<"my" | "history" | "admin" | "admin-history">(
+    isAdmin ? "admin" : "my"
+  );
   const [historyRange, setHistoryRange] = useState("30d");
   const [adminHistoryRange, setAdminHistoryRange] = useState("30d");
+  const [selectedAdminEmployee, setSelectedAdminEmployee] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<
+    | { type: "record"; attendanceId: string; name: string; date: string }
+    | { type: "user"; userId: string; name: string; from: string; to: string }
+    | null
+  >(null);
   const [checkoutProofs, setCheckoutProofs] = useState<CheckoutProofUpload[]>([]);
   const [isUploadingProofs, setIsUploadingProofs] = useState(false);
   const [isWeekendWork, setIsWeekendWork] = useState(false);
@@ -380,6 +408,7 @@ export default function AttendanceDashboardPage() {
     queryKey: ["attendance-today"],
     queryFn: () => api.get("/attendance/today").then((r) => r.data),
     refetchInterval: 30000,
+    enabled: !isAdmin,
   });
 
   const adminTodayQuery = useQuery<AdminTodayResponse>({
@@ -393,7 +422,7 @@ export default function AttendanceDashboardPage() {
   const historyQuery = useQuery<HistoryResponse>({
     queryKey: ["attendance-history", historyRange],
     queryFn: () => api.get("/attendance/history", { params: historyParams }).then((r) => r.data),
-    enabled: activeTab === "history",
+    enabled: !isAdmin && activeTab === "history",
   });
 
   const adminHistoryParams = getDateRangeParams(adminHistoryRange);
@@ -414,6 +443,18 @@ export default function AttendanceDashboardPage() {
     user?.id && todayQuery.data?.date
       ? `attendance-proof-draft:${user.id}:${new Date(todayQuery.data.date).toISOString().slice(0, 10)}`
       : null;
+
+  /* ─── Reset employee filter on range change ──────── */
+
+  useEffect(() => {
+    setSelectedAdminEmployee(null);
+  }, [adminHistoryRange]);
+
+  /* ─── Derived admin history data ─────────────────── */
+
+  const filteredRecords = selectedAdminEmployee
+    ? (adminHistoryQuery.data?.records ?? []).filter((r) => r.userId === selectedAdminEmployee)
+    : (adminHistoryQuery.data?.records ?? []);
 
   /* ─── Mutations ──────────────────────────────────── */
 
@@ -443,6 +484,45 @@ export default function AttendanceDashboardPage() {
     },
     onError: (err: unknown) => toast.error(getApiErrorMessage(err, "Could not check out")),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (attendanceId: string) => api.delete(`/attendance/admin/${attendanceId}`),
+    onSuccess: () => {
+      toast.success("Attendance record removed.");
+      queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-attendance-history"] });
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, "Could not remove record")),
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: ({ userId, from, to }: { userId: string; from: string; to: string }) =>
+      api.delete(`/attendance/admin/user/${userId}`, { params: { from, to } }),
+    onSuccess: () => {
+      toast.success("Employee attendance records removed.");
+      queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-attendance-history"] });
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, "Could not remove records")),
+  });
+
+  const confirmDelete = useCallback((attendanceId: string, name: string, date: string) => {
+    setPendingDelete({ type: "record", attendanceId, name, date });
+  }, []);
+
+  const confirmDeleteUser = useCallback((userId: string, name: string, from: string, to: string) => {
+    setPendingDelete({ type: "user", userId, name, from, to });
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (!pendingDelete) return;
+    if (pendingDelete.type === "record") {
+      deleteMutation.mutate(pendingDelete.attendanceId);
+    } else {
+      deleteUserMutation.mutate({ userId: pendingDelete.userId, from: pendingDelete.from, to: pendingDelete.to });
+    }
+    setPendingDelete(null);
+  }, [pendingDelete, deleteMutation, deleteUserMutation]);
 
   const handleProofFileSelection = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -483,13 +563,14 @@ export default function AttendanceDashboardPage() {
   const heartbeatMutation = useMutation({
     mutationFn: () => api.post("/attendance/heartbeat"),
   });
+  const { mutate: sendHeartbeat } = heartbeatMutation;
 
-  // Heartbeat while working
+  // Heartbeat while working (employees only)
   useEffect(() => {
-    if (!todayQuery.data?.isWorking) return;
-    const interval = setInterval(() => heartbeatMutation.mutate(), 60000);
+    if (isAdmin || !todayQuery.data?.isWorking) return;
+    const interval = setInterval(() => sendHeartbeat(), 60000);
     return () => clearInterval(interval);
-  }, [todayQuery.data?.isWorking]);
+  }, [isAdmin, todayQuery.data?.isWorking, sendHeartbeat]);
 
   /* ─── Derived ────────────────────────────────────── */
 
@@ -557,37 +638,44 @@ export default function AttendanceDashboardPage() {
       <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Attendance & Activity</h1>
-          <p className="mt-1 text-sm text-slate-500">Track your check-ins, check-outs, and work activity.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {isAdmin
+              ? "Monitor team attendance, track work hours, and view employee analytics."
+              : "Track your check-ins, check-outs, and work activity."}
+          </p>
         </div>
       </div>
 
       {/* Tab Bar */}
       <div className="flex flex-wrap gap-2 rounded-xl bg-slate-50 border border-slate-200 p-2">
-        <TabButton active={activeTab === "my"} onClick={() => setActiveTab("my")} icon={Clock}>
-          My Attendance
-        </TabButton>
-        <TabButton active={activeTab === "history"} onClick={() => setActiveTab("history")} icon={Calendar}>
-          My History
-        </TabButton>
+        {!isAdmin && (
+          <>
+            <TabButton active={activeTab === "my"} onClick={() => setActiveTab("my")} icon={Clock}>
+              My Attendance
+            </TabButton>
+            <TabButton active={activeTab === "history"} onClick={() => setActiveTab("history")} icon={Calendar}>
+              My History
+            </TabButton>
+          </>
+        )}
         {isAdmin && (
           <>
-            <div className="w-px bg-slate-200 mx-1 self-stretch" />
             <TabButton active={activeTab === "admin"} onClick={() => setActiveTab("admin")} icon={Users}>
               Team Today
             </TabButton>
-            <TabButton active={activeTab === "admin-history"} onClick={() => setActiveTab("admin-history")} icon={Calendar}>
-              Team History
+            <TabButton active={activeTab === "admin-history"} onClick={() => setActiveTab("admin-history")} icon={TrendingUp}>
+              Team Analytics
             </TabButton>
           </>
         )}
       </div>
 
-      {/* ═══ My Attendance Tab ═══ */}
-      {activeTab === "my" && (
+      {/* ═══ My Attendance Tab (employees only) ═══ */}
+      {!isAdmin && activeTab === "my" && (
         <div className="space-y-6">
           {/* Hero Check-In/Check-Out Card */}
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50 p-6 shadow-sm">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-emerald-50 to-transparent rounded-bl-full opacity-60" />
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-br from-white via-white to-slate-50 p-6 shadow-sm">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-linear-to-bl from-emerald-50 to-transparent rounded-bl-full opacity-60" />
 
             <div className="relative flex flex-col items-center gap-6 md:flex-row md:justify-between">
               {/* Status + Timer */}
@@ -630,7 +718,6 @@ export default function AttendanceDashboardPage() {
               <div className="flex flex-col items-center gap-3">
                 {checkInStage === "not-started" && (
                   <>
-                    {/* Weekend work opt-in checkbox — shown only on Saturday (6) or Sunday (0) */}
                     {[0, 6].includes(new Date().getDay()) && (
                       <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
                         <input
@@ -777,8 +864,8 @@ export default function AttendanceDashboardPage() {
         </div>
       )}
 
-      {/* ═══ My History Tab ═══ */}
-      {activeTab === "history" && (
+      {/* ═══ My History Tab (employees only) ═══ */}
+      {!isAdmin && activeTab === "history" && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Attendance History</h2>
@@ -839,7 +926,6 @@ export default function AttendanceDashboardPage() {
         </div>
       )}
 
-
       {/* ═══ Admin: Team Today ═══ */}
       {activeTab === "admin" && isAdmin && (
         <div className="space-y-6">
@@ -886,16 +972,18 @@ export default function AttendanceDashboardPage() {
                     <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
                       <tr>
                         <th className="px-4 py-3">Member</th>
+                        <th className="px-4 py-3">Schedule</th>
                         <th className="px-4 py-3">Check In</th>
                         <th className="px-4 py-3">Check Out</th>
                         <th className="px-4 py-3">Work Time</th>
                         <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3"></th>
                       </tr>
                     </thead>
                     <tbody>
                       {(adminTodayQuery.data?.rows ?? []).length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
+                          <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                             No team members found.
                           </td>
                         </tr>
@@ -906,19 +994,58 @@ export default function AttendanceDashboardPage() {
                               <p className="font-semibold text-slate-800">{row.fullName}</p>
                               <p className="text-xs text-slate-400">{row.email}</p>
                             </td>
-                            <td className="px-4 py-3 text-slate-600">{formatDateTime(row.startTime)}</td>
-                            <td className="px-4 py-3 text-slate-600">
+                            <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+                              {row.workStartTime} – {row.workEndTime}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-slate-600 whitespace-nowrap">{formatDateTime(row.startTime)}</span>
+                                {row.lateLogin && (
+                                  <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-xs font-semibold text-amber-700">
+                                    Late
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
                               {row.isWorking ? (
                                 <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
                                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                   Working
                                 </span>
                               ) : (
-                                formatDateTime(row.endTime)
+                                <div className="flex items-center gap-2">
+                                  <span>{formatDateTime(row.endTime)}</span>
+                                  {row.earlyLogout && (
+                                    <span className="inline-flex items-center rounded-full bg-orange-50 border border-orange-200 px-1.5 py-0.5 text-xs font-semibold text-orange-700">
+                                      Early
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </td>
-                            <td className="px-4 py-3 font-semibold text-slate-700">{row.realTimeLabel}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-700 whitespace-nowrap">{row.realTimeLabel}</td>
                             <td className="px-4 py-3"><StatusPill status={row.status} autoEnded={row.autoEnded} /></td>
+                            <td className="px-4 py-3">
+                              {row.attendanceId && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 gap-2"
+                                      onClick={() => confirmDelete(row.attendanceId!, row.fullName, formatDateShort(new Date().toISOString()))}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Remove
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </td>
                           </tr>
                         ))
                       )}
@@ -931,13 +1058,14 @@ export default function AttendanceDashboardPage() {
         </div>
       )}
 
-      {/* ═══ Admin: Team History ═══ */}
+      {/* ═══ Admin: Team Analytics & History ═══ */}
       {activeTab === "admin-history" && isAdmin && (
         <div className="space-y-6">
+          {/* Header + Date Range */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-slate-500" />
-              <h2 className="text-lg font-semibold text-slate-900">Team Attendance History</h2>
+              <TrendingUp className="h-5 w-5 text-slate-500" />
+              <h2 className="text-lg font-semibold text-slate-900">Team Attendance Analytics</h2>
             </div>
             <DateRangePicker value={adminHistoryRange} onChange={setAdminHistoryRange} />
           </div>
@@ -948,93 +1076,276 @@ export default function AttendanceDashboardPage() {
             </div>
           ) : adminHistoryQuery.data ? (
             <>
-              {/* Per-User Summary Table */}
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-100">
-                  <h3 className="text-sm font-semibold text-slate-700">Summary by Member</h3>
+              {/* Team Overview Stats */}
+              {(() => {
+                const summaries = adminHistoryQuery.data.userSummaries;
+                const avgRate = summaries.length > 0
+                  ? Math.round(summaries.reduce((sum, u) => sum + (u.totalDays > 0 ? (u.presentDays / u.totalDays) * 100 : 0), 0) / summaries.length)
+                  : 0;
+                const totalAbsences = summaries.reduce((sum, u) => sum + u.absentDays, 0);
+                const totalWorkMinutes = summaries.reduce((sum, u) => sum + u.totalRealMinutes, 0);
+                return (
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <StatCard label="Team Members" value={summaries.length} icon={Users} color="slate" />
+                    <StatCard label="Avg Attendance" value={`${avgRate}%`} icon={TrendingUp} color="emerald" />
+                    <StatCard label="Total Absences" value={totalAbsences} icon={Eye} color="rose" />
+                    <StatCard label="Total Work Time" value={formatMinutes(totalWorkMinutes)} icon={Timer} color="violet" />
+                  </div>
+                );
+              })()}
+
+              {/* Employee Analytics Cards */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-slate-700">Employee Overview</h3>
+                  <p className="text-xs text-slate-400">Click a card to filter records below</p>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                      <tr>
-                        <th className="px-4 py-3">Member</th>
-                        <th className="px-4 py-3">Days</th>
-                        <th className="px-4 py-3">Present</th>
-                        <th className="px-4 py-3">Absent</th>
-                        <th className="px-4 py-3">Auto-Absent</th>
-                        <th className="px-4 py-3">Total Work</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {adminHistoryQuery.data.userSummaries.map((u) => (
-                        <tr key={u.userId} className="border-t border-slate-100 hover:bg-slate-50/50">
-                          <td className="px-4 py-3">
-                            <p className="font-semibold text-slate-800">{u.fullName}</p>
-                            <p className="text-xs text-slate-400">{u.email}</p>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">{u.totalDays}</td>
-                          <td className="px-4 py-3">
-                            <span className="font-semibold text-emerald-600">{u.presentDays}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="font-semibold text-rose-600">{u.absentDays}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="font-semibold text-amber-600">{u.autoEndedDays}</span>
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-slate-700">{formatMinutes(u.totalRealMinutes)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {adminHistoryQuery.data.userSummaries.map((u) => {
+                    const attendanceRate = u.totalDays > 0 ? Math.round((u.presentDays / u.totalDays) * 100) : 0;
+                    const isSelected = selectedAdminEmployee === u.userId;
+                    const rateColor = attendanceRate >= 80 ? "emerald" : attendanceRate >= 60 ? "amber" : "rose";
+                    return (
+                      <div
+                        key={u.userId}
+                        onClick={() => setSelectedAdminEmployee(isSelected ? null : u.userId)}
+                        className={`relative cursor-pointer text-left rounded-xl border p-4 transition-all hover:shadow-md ${
+                          isSelected
+                            ? "border-slate-900 bg-slate-900 shadow-lg"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                      >
+                        {/* Name + Rate + 3-dot */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-semibold text-sm truncate ${isSelected ? "text-white" : "text-slate-800"}`}>
+                              {u.fullName}
+                            </p>
+                            <p className={`text-xs mt-0.5 truncate ${isSelected ? "text-slate-400" : "text-slate-400"}`}>
+                              {u.email}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0 ml-2">
+                            <span className={`text-xl font-bold ${
+                              isSelected
+                                ? rateColor === "emerald" ? "text-emerald-400" : rateColor === "amber" ? "text-amber-400" : "text-rose-400"
+                                : rateColor === "emerald" ? "text-emerald-600" : rateColor === "amber" ? "text-amber-600" : "text-rose-600"
+                            }`}>
+                              {attendanceRate}%
+                            </span>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={`rounded-md p-1 transition-colors ${
+                                    isSelected
+                                      ? "text-slate-400 hover:bg-slate-700 hover:text-white"
+                                      : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                  }`}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 gap-2"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    confirmDeleteUser(u.userId, u.fullName, adminHistoryParams.from, adminHistoryParams.to);
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  Remove All Records
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+
+                        {/* Attendance Rate Bar */}
+                        <div className={`h-1.5 rounded-full mb-3 ${isSelected ? "bg-slate-700" : "bg-slate-100"}`}>
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              rateColor === "emerald" ? "bg-emerald-500" : rateColor === "amber" ? "bg-amber-500" : "bg-rose-500"
+                            }`}
+                            style={{ width: `${attendanceRate}%` }}
+                          />
+                        </div>
+
+                        {/* Stats Row */}
+                        <div className={`grid grid-cols-3 gap-2 text-xs ${isSelected ? "text-slate-400" : "text-slate-500"}`}>
+                          <div className="text-center">
+                            <p className={`text-base font-bold ${isSelected ? "text-emerald-400" : "text-emerald-600"}`}>{u.presentDays}</p>
+                            <p>Present</p>
+                          </div>
+                          <div className="text-center">
+                            <p className={`text-base font-bold ${isSelected ? "text-rose-400" : "text-rose-600"}`}>{u.absentDays}</p>
+                            <p>Absent</p>
+                          </div>
+                          <div className="text-center">
+                            <p className={`text-base font-bold ${isSelected ? "text-white" : "text-slate-700"}`}>{formatMinutes(u.totalRealMinutes)}</p>
+                            <p>Worked</p>
+                          </div>
+                        </div>
+
+                        {/* Flags */}
+                        {(u.lateLoginDays > 0 || u.earlyLogoutDays > 0 || u.autoEndedDays > 0) && (
+                          <div className="mt-3 pt-3 border-t border-dashed border-slate-200 flex flex-wrap gap-2">
+                            {u.lateLoginDays > 0 && (
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                isSelected ? "bg-amber-900/40 text-amber-300" : "bg-amber-50 border border-amber-200 text-amber-700"
+                              }`}>
+                                {u.lateLoginDays}× Late
+                              </span>
+                            )}
+                            {u.earlyLogoutDays > 0 && (
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                isSelected ? "bg-orange-900/40 text-orange-300" : "bg-orange-50 border border-orange-200 text-orange-700"
+                              }`}>
+                                {u.earlyLogoutDays}× Early Out
+                              </span>
+                            )}
+                            {u.autoEndedDays > 0 && (
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                isSelected ? "bg-slate-700 text-slate-300" : "bg-slate-100 border border-slate-200 text-slate-600"
+                              }`}>
+                                <Zap className="h-3 w-3 mr-1" />{u.autoEndedDays}× Auto-Absent
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Detailed Records */}
+              {/* Detailed Records Table */}
               <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-100">
-                  <h3 className="text-sm font-semibold text-slate-700">Detailed Records</h3>
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    {selectedAdminEmployee
+                      ? `Records — ${adminHistoryQuery.data.userSummaries.find((u) => u.userId === selectedAdminEmployee)?.fullName ?? "Selected Member"}`
+                      : "All Records"}
+                    <span className="ml-2 text-xs font-normal text-slate-400">({filteredRecords.length})</span>
+                  </h3>
+                  {selectedAdminEmployee && (
+                    <button
+                      onClick={() => setSelectedAdminEmployee(null)}
+                      className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-1 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                      Clear filter
+                    </button>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-left text-sm">
                     <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
                       <tr>
                         <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3">Member</th>
+                        {!selectedAdminEmployee && <th className="px-4 py-3">Member</th>}
                         <th className="px-4 py-3">Check In</th>
                         <th className="px-4 py-3">Check Out</th>
                         <th className="px-4 py-3">Work Time</th>
+                        <th className="px-4 py-3">Idle Time</th>
+                        <th className="px-4 py-3">Flags</th>
                         <th className="px-4 py-3">Documents</th>
                         <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {adminHistoryQuery.data.records.map((r) => (
-                        <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/50">
-                          <td className="px-4 py-3 font-medium text-slate-800">{formatDateShort(r.date)}</td>
-                          <td className="px-4 py-3 text-slate-700">{r.fullName}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatDateTime(r.startTime)}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatDateTime(r.endTime)}</td>
-                          <td className="px-4 py-3 font-semibold text-slate-700">{r.realTimeLabel}</td>
-                          <td className="px-4 py-3">
-                            {(r.checkoutProofs?.length ?? 0) > 0 ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-8 gap-1.5 border-slate-300 text-slate-700"
-                                onClick={() => openProofViewer(r)}
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                View ({r.checkoutProofs?.length ?? 0})
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-slate-400">No uploads</span>
-                            )}
+                      {filteredRecords.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={selectedAdminEmployee ? 9 : 10}
+                            className="px-4 py-12 text-center text-slate-400"
+                          >
+                            No attendance records found for this period.
                           </td>
-                          <td className="px-4 py-3"><StatusPill status={r.status} autoEnded={r.autoEnded} /></td>
                         </tr>
-                      ))}
+                      ) : (
+                        filteredRecords.map((r) => (
+                          <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">
+                              {formatDateShort(r.date)}
+                            </td>
+                            {!selectedAdminEmployee && (
+                              <td className="px-4 py-3">
+                                <p className="font-semibold text-slate-800 text-xs whitespace-nowrap">{r.fullName}</p>
+                                <p className="text-xs text-slate-400">{r.email}</p>
+                              </td>
+                            )}
+                            <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                              {formatDateTime(r.startTime)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                              {formatDateTime(r.endTime)}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-slate-700 whitespace-nowrap">
+                              {r.realTimeLabel}
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 whitespace-nowrap text-xs">
+                              {r.idleTimeLabel}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-1">
+                                {r.lateLogin && (
+                                  <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                                    Late
+                                  </span>
+                                )}
+                                {r.earlyLogout && (
+                                  <span className="inline-flex items-center rounded-full bg-orange-50 border border-orange-200 px-2 py-0.5 text-xs font-semibold text-orange-700">
+                                    Early Out
+                                  </span>
+                                )}
+                                {!r.lateLogin && !r.earlyLogout && (
+                                  <span className="text-xs text-slate-300">—</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {(r.checkoutProofs?.length ?? 0) > 0 ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 gap-1 border-slate-300 text-slate-700 text-xs px-2"
+                                  onClick={() => openProofViewer(r)}
+                                >
+                                  <Eye className="h-3 w-3" />
+                                  View ({r.checkoutProofs?.length ?? 0})
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-slate-300">None</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <StatusPill status={r.status} autoEnded={r.autoEnded} />
+                            </td>
+                            <td className="px-4 py-3">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 gap-2"
+                                    onClick={() => confirmDelete(r.id, r.fullName ?? "", formatDateShort(r.date))}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Remove
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1044,7 +1355,32 @@ export default function AttendanceDashboardPage() {
         </div>
       )}
 
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingDelete?.type === "user" ? "Remove All Attendance Records?" : "Remove Attendance Record?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.type === "user"
+                ? `This will permanently delete all attendance records for ${pendingDelete.name} from ${pendingDelete.from} to ${pendingDelete.to}. This action cannot be undone.`
+                : `This will permanently delete ${pendingDelete?.name}'s attendance record for ${pendingDelete?.date}. This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-rose-600 hover:bg-rose-700 text-white focus:ring-rose-600"
+            >
+              {pendingDelete?.type === "user" ? "Remove All" : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
+      {/* Proof Viewer Dialog */}
       <Dialog open={proofViewerOpen} onOpenChange={setProofViewerOpen}>
         <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-white border-slate-200">
           <DialogHeader className="border-b border-slate-100 p-5">

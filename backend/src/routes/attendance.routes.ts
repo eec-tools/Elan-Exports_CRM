@@ -1,5 +1,7 @@
 import { Router } from "express";
 import {
+  deleteAttendanceRecord,
+  deleteUserAttendanceRecords,
   endAttendance,
   getAdminAttendanceHistory,
   getAdminTodayAttendance,
@@ -27,5 +29,7 @@ router.get("/history", getAttendanceHistory);
 // Admin endpoints
 router.get("/admin/today", requireAdmin, getAdminTodayAttendance);
 router.get("/admin/history", requireAdmin, getAdminAttendanceHistory);
+router.delete("/admin/user/:id", requireAdmin, deleteUserAttendanceRecords);
+router.delete("/admin/:id", requireAdmin, deleteAttendanceRecord);
 
 export default router;

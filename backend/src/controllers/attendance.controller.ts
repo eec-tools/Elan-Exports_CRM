@@ -724,6 +724,7 @@ export async function getAdminTodayAttendance(
       const attendance = user.attendances[0] ?? null;
       if (!attendance?.startTime) {
         return {
+          attendanceId: attendance?.id ?? null,
           userId: user.id,
           fullName: user.fullName,
           email: user.email,
@@ -752,6 +753,7 @@ export async function getAdminTodayAttendance(
       const status = attendance.endTime ? attendance.status : AttendanceStatus.Present;
 
       return {
+        attendanceId: attendance.id,
         userId: user.id,
         fullName: user.fullName,
         email: user.email,
@@ -878,6 +880,107 @@ export async function getAdminAttendanceHistory(
     });
   } catch (err) {
     console.error("Get admin attendance history error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+// ─── Admin: Delete All Records for a User (date range) ──
+export async function deleteUserAttendanceRecords(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const userId = req.params.id;
+    const { from, to } = req.query;
+
+    const endDate = to ? new Date(to as string) : new Date();
+    const startDate = from
+      ? new Date(from as string)
+      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const records = await prisma.attendance.findMany({
+      where: {
+        userId,
+        date: {
+          gte: startOfLocalDay(startDate),
+          lte: startOfLocalDay(endDate),
+        },
+      },
+      select: { id: true },
+    });
+
+    const ids = records.map((r) => r.id);
+
+    await prisma.attendanceHeartbeat.deleteMany({
+      where: { attendanceId: { in: ids } },
+    });
+
+    const { count } = await prisma.attendance.deleteMany({
+      where: { id: { in: ids } },
+    });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true },
+    });
+
+    await logActivity(
+      req.user!.id,
+      "attendance_admin_delete_user",
+      "attendance",
+      userId,
+      {
+        targetUserId: userId,
+        targetUserName: user?.fullName ?? userId,
+        deletedCount: count,
+        from: startDate.toISOString().slice(0, 10),
+        to: endDate.toISOString().slice(0, 10),
+      },
+    );
+
+    res.json({ success: true, deletedCount: count });
+  } catch (err) {
+    console.error("Delete user attendance records error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+// ─── Admin: Delete Attendance Record ─────────────────
+export async function deleteAttendanceRecord(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const attendanceId = req.params.id;
+
+    const record = await prisma.attendance.findUnique({
+      where: { id: attendanceId },
+      include: { user: { select: { fullName: true } } },
+    });
+
+    if (!record) {
+      res.status(404).json({ error: "Attendance record not found" });
+      return;
+    }
+
+    await prisma.attendanceHeartbeat.deleteMany({ where: { attendanceId } });
+    await prisma.attendance.delete({ where: { id: attendanceId } });
+
+    await logActivity(
+      req.user!.id,
+      "attendance_admin_delete",
+      "attendance",
+      attendanceId,
+      {
+        targetUserId: record.userId,
+        targetUserName: record.user.fullName,
+        date: record.date.toISOString().slice(0, 10),
+      },
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete attendance record error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 }
