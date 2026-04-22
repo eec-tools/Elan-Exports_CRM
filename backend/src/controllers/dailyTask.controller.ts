@@ -45,7 +45,11 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
     }
     // If non-admin has no assigned companies, they can see all tasks (no filter)
 
-    if (owner) {
+    if (!isAdmin) {
+      andConditions.push({
+        owner: { equals: req.user?.fullName ?? "", mode: "insensitive" },
+      });
+    } else if (owner) {
       if (owner === "Unassigned") {
         andConditions.push({ OR: [{ owner: null }, { owner: "" }] });
       } else {

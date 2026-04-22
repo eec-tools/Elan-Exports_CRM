@@ -15,10 +15,13 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
  * GET /api/dashboard/stats
  */
 export async function getDashboardStats(
-  _req: AuthRequest,
+  req: AuthRequest,
   res: Response,
 ): Promise<void> {
   try {
+    const isAdmin = req.user?.roles?.includes("admin");
+    const currentUserName = req.user?.fullName ?? "";
+
     const [
       totalBuyers,
       totalSuppliers,
@@ -64,10 +67,9 @@ export async function getDashboardStats(
           by: ["owner", "status"],
           _count: { id: true },
           where: {
-            owner: {
-              not: null,
-              notIn: ["", "N/A", "n/a"]
-            }
+            owner: isAdmin
+              ? { not: null, notIn: ["", "N/A", "n/a"] }
+              : { equals: currentUserName, mode: "insensitive" },
           },
         }), []
       ),
@@ -75,34 +77,37 @@ export async function getDashboardStats(
 
     // Process Task Analytics
     const rawTasks = tasksGrouped as Array<{ owner: string; status: string; _count: { id: number } }>;
-    const taskAnalyticsMap: Record<string, { pending: number; inProgress: number; completed: number; closed: number; total: number }> = {};
+    // key = lowercased+trimmed name for deduplication; value stores display name + counts
+    const taskAnalyticsMap: Record<string, { displayName: string; pending: number; inProgress: number; completed: number; closed: number; total: number }> = {};
 
     for (const item of rawTasks) {
       if (!item.owner) continue;
 
-      const owner = item.owner;
+      const ownerTrimmed = item.owner.trim();
+      const ownerKey = ownerTrimmed.toLowerCase();
       const status = (item.status || "").toLowerCase();
       const count = item._count.id;
 
-      if (!taskAnalyticsMap[owner]) {
-        taskAnalyticsMap[owner] = { pending: 0, inProgress: 0, completed: 0, closed: 0, total: 0 };
+      if (!taskAnalyticsMap[ownerKey]) {
+        taskAnalyticsMap[ownerKey] = { displayName: ownerTrimmed, pending: 0, inProgress: 0, completed: 0, closed: 0, total: 0 };
       }
 
-      taskAnalyticsMap[owner].total += count;
+      // Prefer the version with most tasks as display name (set on first encounter; largest-count version wins via sort later)
+      taskAnalyticsMap[ownerKey].total += count;
 
       if (status === "inprogress") {
-        taskAnalyticsMap[owner].inProgress += count;
+        taskAnalyticsMap[ownerKey].inProgress += count;
       } else if (status === "completed") {
-        taskAnalyticsMap[owner].completed += count;
+        taskAnalyticsMap[ownerKey].completed += count;
       } else if (status === "closed") {
-        taskAnalyticsMap[owner].closed += count;
+        taskAnalyticsMap[ownerKey].closed += count;
       } else {
-        taskAnalyticsMap[owner].pending += count; // handles "not started" and any other unrecognized ones mapped to pending
+        taskAnalyticsMap[ownerKey].pending += count;
       }
     }
 
-    const taskAnalytics = Object.entries(taskAnalyticsMap)
-      .map(([owner, stats]) => ({ owner, ...stats }))
+    const taskAnalytics = Object.values(taskAnalyticsMap)
+      .map(({ displayName, ...stats }) => ({ owner: displayName, ...stats }))
       .sort((a, b) => b.total - a.total); // Sort by total tasks descending
 
     res.json({

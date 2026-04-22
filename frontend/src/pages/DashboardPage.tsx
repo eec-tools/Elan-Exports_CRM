@@ -310,7 +310,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {hasPermission("analytics") && (
+      {hasPermission("analytics") && hasPermission("deals") && (
         /* ── Latest Deals ──────────────── */
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">

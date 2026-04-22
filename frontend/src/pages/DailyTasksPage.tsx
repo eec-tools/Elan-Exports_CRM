@@ -186,6 +186,7 @@ export default function DailyTasksPage() {
         date: today,
         taskText: "",
         status: "Pending",
+        owner: isAdmin ? undefined : (user?.fullName ?? undefined),
       });
       setTasks([res.data, ...tasks]);
       toast.success("New task row added");
@@ -466,21 +467,27 @@ export default function DailyTasksPage() {
             ))}
           </select>
 
-          <select
-            className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-700 min-w-[130px]"
-            value={filterOwner}
-            onChange={(e) => {
-              setFilterOwner(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">All Owners</option>
-            {dynamicOwnerOptions.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
+          {isAdmin ? (
+            <select
+              className="h-9 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-700 min-w-[130px]"
+              value={filterOwner}
+              onChange={(e) => {
+                setFilterOwner(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All Owners</option>
+              {dynamicOwnerOptions.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="h-9 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600 min-w-[130px] flex items-center capitalize">
+              {user?.fullName ?? "Me"}
+            </div>
+          )}
 
           {hasActiveFilters && (
             <Button
@@ -686,10 +693,10 @@ export default function DailyTasksPage() {
 
                     {/* OWNER */}
                     <td
-                      className="border-r border-slate-100 relative align-middle hover:bg-slate-100/50"
-                      onClick={() => startEditing(task, "owner")}
+                      className={`border-r border-slate-100 relative align-middle ${isAdmin ? "hover:bg-slate-100/50" : ""}`}
+                      onClick={() => isAdmin && startEditing(task, "owner")}
                     >
-                      {editingCell?.id === task.id &&
+                      {isAdmin && editingCell?.id === task.id &&
                       editingCell?.field === "owner" ? (
                         <select
                           autoFocus
