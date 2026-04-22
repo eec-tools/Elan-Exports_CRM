@@ -108,11 +108,20 @@ export async function checkForReply(params: {
 }
 
 export async function getConfiguredAccounts(): Promise<Array<{ email: string; connected: boolean; label: string }>> {
-  const accountEmails = [
+  const fromListVar = (process.env.GMAIL_ACCOUNT_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  const fromLegacyVars = [
     process.env.GMAIL_ACCOUNT_1_EMAIL,
     process.env.GMAIL_ACCOUNT_2_EMAIL,
     process.env.GMAIL_ACCOUNT_3_EMAIL,
-  ].filter(Boolean) as string[];
+  ]
+    .filter(Boolean)
+    .map((email) => (email as string).trim());
+
+  const accountEmails = [...new Set([...fromListVar, ...fromLegacyVars])];
 
   const results = await Promise.all(
     accountEmails.map(async (email, i) => {
