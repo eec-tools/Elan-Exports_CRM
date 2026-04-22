@@ -9,7 +9,7 @@ stays in one mailbox with zero re-selection needed later.
 
 The campaign sends an intro email (with the supplier form link) then up to 3 follow-up reminders on
 3-day cycles. Replies are detected automatically via Gmail API. A reply at any stage auto-converts the
-supplier to a New Supplier. No reply after Follow-up 3 auto-moves them to Old Supplier.
+supplier to a New Supplier. No reply after Follow-up 3 auto-moves them to Old Supplier
 
 ---
 
