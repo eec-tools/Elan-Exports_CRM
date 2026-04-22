@@ -21,7 +21,7 @@ export async function generateMonthlyPayroll(
     }
 
     const employees = await prisma.user.findMany({
-      where: { isActive: true, monthlySalary: { not: null } },
+      where: { isActive: true, monthlySalary: { gt: 0 } },
       select: { id: true, fullName: true },
     });
 
@@ -129,6 +129,13 @@ export async function getPayrollSlip(
       return;
     }
 
+    // Keep slip consistent with latest payroll rules (including Sunday paid-day logic).
+    try {
+      await generatePayroll(userId, Number(month), Number(year));
+    } catch (err) {
+      console.warn("Payroll regen skipped in getPayrollSlip:", err);
+    }
+
     const payroll = await prisma.payroll.findUnique({
       where: { userId_month_year: { userId, month: Number(month), year: Number(year) } },
       include: {
@@ -165,6 +172,13 @@ export async function getMyPayroll(req: AuthReq, res: Response): Promise<void> {
     const { month, year } = req.query;
 
     if (month && year) {
+      // Keep employee slip aligned with latest payroll rules.
+      try {
+        await generatePayroll(userId, Number(month), Number(year));
+      } catch (err) {
+        console.warn("Payroll regen skipped in getMyPayroll:", err);
+      }
+
       const payroll = await prisma.payroll.findUnique({
         where: {
           userId_month_year: { userId, month: Number(month), year: Number(year) },

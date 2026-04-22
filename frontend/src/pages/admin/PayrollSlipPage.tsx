@@ -1,9 +1,13 @@
 import { useParams, useSearchParams } from "react-router-dom";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { jsPDF } from "jspdf";
+import { toPng } from "html-to-image";
+import { toast } from "sonner";
 import api from "@/api/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Printer } from "lucide-react";
+import { Download } from "lucide-react";
 
 interface Payroll {
   id: string;
@@ -33,12 +37,6 @@ interface Payroll {
   };
 }
 
-const saturdayScheduleLabel: Record<string, string> = {
-  off: "Saturday Off",
-  full: "Full Saturday (regular workday)",
-  half: "Half Saturday (until 2 PM, paid full day)",
-};
-
 const MONTHS = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December",
@@ -54,6 +52,7 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function PayrollSlipPage() {
+  const [isDownloading, setIsDownloading] = useState(false);
   const { userId } = useParams<{ userId: string }>();
   const [searchParams] = useSearchParams();
   const month = searchParams.get("month");
@@ -78,7 +77,71 @@ export default function PayrollSlipPage() {
     );
   }
 
-  const paidLeaves = payroll.approvedLeavesMonth - payroll.excessLeaveDays;
+  const handleDownloadPdf = async () => {
+    if (isDownloading) return;
+    const slip = document.getElementById("payroll-slip-print");
+    if (!slip) {
+      toast.error("Slip content not found");
+      return;
+    }
+
+    const safeName = payroll.user.fullName
+      .trim()
+      .replace(/[^a-zA-Z0-9-_ ]/g, "")
+      .replace(/\s+/g, "-")
+      .toLowerCase();
+
+    setIsDownloading(true);
+    try {
+      const pngData = await toPng(slip, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+      });
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const img = new Image();
+      img.src = pngData;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to prepare image for PDF"));
+      });
+
+      const maxWidth = pageWidth - margin * 2;
+      const maxHeight = pageHeight - margin * 2;
+      const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+      const renderWidth = img.width * ratio;
+      const renderHeight = img.height * ratio;
+      const x = (pageWidth - renderWidth) / 2;
+      const y = margin;
+
+      pdf.addImage(pngData, "PNG", x, y, renderWidth, renderHeight, undefined, "FAST");
+
+      const fileName = `salary-slip-${safeName || "employee"}-${payroll.month}-${payroll.year}.pdf`;
+      try {
+        pdf.save(fileName);
+      } catch {
+        const blob = pdf.output("blob");
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+      toast.success("PDF downloaded");
+    } catch (err) {
+      console.error("PDF download failed:", err);
+      toast.error("Failed to download PDF");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <div className="max-w-xl mx-auto space-y-4">
@@ -106,32 +169,6 @@ export default function PayrollSlipPage() {
               label="Month / Year"
               value={`${MONTHS[payroll.month - 1]} ${payroll.year}`}
             />
-
-            {/* Attendance breakdown */}
-            <div className="border-t border-slate-100 my-3" />
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide pb-1">
-              Attendance Breakdown
-            </p>
-            <SlipRow label="Calendar Days" value={String(payroll.daysInMonth)} />
-            <SlipRow
-              label="Saturday Schedule"
-              value={saturdayScheduleLabel[payroll.saturdaySchedule] ?? payroll.saturdaySchedule}
-            />
-            <SlipRow label="Scheduled Working Days" value={String(payroll.scheduledWorkingDays)} />
-            <SlipRow label="Regular Present Days" value={String(payroll.weekdayPresentDays)} />
-            {payroll.weekendWorkedDays > 0 && (
-              <SlipRow label="Bonus Days Worked (Off Days)" value={String(payroll.weekendWorkedDays)} />
-            )}
-            <SlipRow label="Approved Leave Days" value={String(payroll.approvedLeavesMonth)} />
-            {payroll.excessLeaveDays > 0 && (
-              <SlipRow
-                label="Excess Leaves (Unpaid)"
-                value={String(payroll.excessLeaveDays)}
-                className="text-red-600"
-              />
-            )}
-            <SlipRow label="Paid Leave Days" value={String(paidLeaves)} />
-            <SlipRow label="Total Paid Days" value={String(payroll.paidDays)} bold />
 
             {/* Salary calculation */}
             <div className="border-t border-slate-100 my-3" />
@@ -207,9 +244,9 @@ export default function PayrollSlipPage() {
       </div>
 
       <div className="flex justify-end print:hidden">
-        <Button variant="outline" onClick={() => window.print()} className="gap-2">
-          <Printer className="h-4 w-4" />
-          Print Slip
+        <Button variant="outline" onClick={handleDownloadPdf} className="gap-2" disabled={isDownloading}>
+          <Download className="h-4 w-4" />
+          {isDownloading ? "Downloading..." : "Download PDF"}
         </Button>
       </div>
 

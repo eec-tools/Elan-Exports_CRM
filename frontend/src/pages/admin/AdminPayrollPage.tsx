@@ -39,6 +39,19 @@ interface PayrollRow {
   };
 }
 
+interface GeneratePayrollResult {
+  userId: string;
+  fullName: string;
+  status: "generated" | "failed";
+  error?: string;
+}
+
+interface GeneratePayrollResponse {
+  month: number;
+  year: number;
+  results: GeneratePayrollResult[];
+}
+
 const saturdayLabel: Record<string, string> = {
   off: "Sat Off",
   full: "Sat Full",
@@ -98,13 +111,16 @@ export default function AdminPayrollPage() {
 
   const generateMutation = useMutation({
     mutationFn: () =>
-      api.post("/payroll/admin/generate", { month, year }).then((r) => r.data),
+      api.post<GeneratePayrollResponse>("/payroll/admin/generate", { month, year }).then((r) => r.data),
     onSuccess: (data) => {
-      const failed = data.results.filter((r: any) => r.status === "failed");
+      const failed = data.results.filter((r) => r.status === "failed");
       if (failed.length > 0) {
-        toast.warning(
-          `Payroll generated with ${failed.length} error(s). Check employees without salary set.`,
-        );
+        const details = failed
+          .slice(0, 3)
+          .map((r) => `${r.fullName}${r.error ? ` (${r.error})` : ""}`)
+          .join("; ");
+        const suffix = failed.length > 3 ? `; +${failed.length - 3} more` : "";
+        toast.warning(`Payroll generated with ${failed.length} error(s): ${details}${suffix}`);
       } else {
         toast.success(`Payroll generated for ${data.results.length} employees`);
       }
@@ -165,7 +181,7 @@ export default function AdminPayrollPage() {
                     <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-600">
                       <th className="text-left px-4 py-3 font-medium">Employee</th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
-                        <ColHeader label="Work Days" tip="Scheduled working days in the month based on employee's Saturday schedule. Used as per-day salary denominator." />
+                        <ColHeader label="Work Days" tip="Scheduled paid days in the month, including Sundays and employee's Saturday schedule. Used as per-day salary denominator." />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
                         <ColHeader label="Per Day" tip="Monthly Salary ÷ Scheduled Working Days" />
@@ -174,7 +190,7 @@ export default function AdminPayrollPage() {
                         <ColHeader label="Present" tip="Regular present days on scheduled workdays (Mon–Fri + Sat for full/half). HalfDay = 0.5." />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
-                        <ColHeader label="Bonus Days" tip="Days worked on off days (Sunday, or Saturday for off-schedule employees). Paid at same per-day rate." />
+                        <ColHeader label="Bonus Days" tip="Extra days worked on off days (typically Saturday for off-schedule employees). Sundays are already counted as official paid days." />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
                         <ColHeader label="Leaves" tip="Approved leave days falling this month" />
@@ -183,7 +199,7 @@ export default function AdminPayrollPage() {
                         <ColHeader label="Excess" tip="Leave days beyond the 14-day annual quota (unpaid)" />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
-                        <ColHeader label="Paid Days" tip="Weekday + Weekend + All Approved Leaves" />
+                        <ColHeader label="Paid Days" tip="Regular present + official paid Sundays + bonus days + approved leaves" />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
                         <ColHeader label="Gross" tip="Per Day Salary × Paid Days" />

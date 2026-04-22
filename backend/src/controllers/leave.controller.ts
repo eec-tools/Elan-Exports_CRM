@@ -4,6 +4,22 @@ import { AuthRequest } from "../types/index.js";
 
 const ANNUAL_LEAVE_QUOTA = 14;
 
+function countDaysExcludingSundays(start: Date, end: Date): number {
+  if (end < start) return 0;
+  let total = 0;
+  const cursor = new Date(start);
+  cursor.setHours(0, 0, 0, 0);
+  const endDate = new Date(end);
+  endDate.setHours(0, 0, 0, 0);
+
+  while (cursor <= endDate) {
+    if (cursor.getDay() !== 0) total += 1;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return total;
+}
+
 async function getUsedLeaves(userId: string, year: number): Promise<number> {
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year, 11, 31);
@@ -22,8 +38,7 @@ async function getUsedLeaves(userId: string, year: number): Promise<number> {
     const clippedEnd = leave.endDate > yearEnd ? yearEnd : leave.endDate;
     if (clippedEnd < clippedStart) return sum;
 
-    const days =
-      Math.round((clippedEnd.getTime() - clippedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const days = countDaysExcludingSundays(clippedStart, clippedEnd);
     return sum + days;
   }, 0);
 }
@@ -59,8 +74,14 @@ export async function applyLeave(req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    const numberOfDays =
-      Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const numberOfDays = countDaysExcludingSundays(start, end);
+
+    if (numberOfDays <= 0) {
+      res.status(400).json({
+        error: "Selected range contains only Sundays. Sundays are already paid off-days.",
+      });
+      return;
+    }
 
     // Check for overlapping leave
     const overlap = await prisma.leave.findFirst({

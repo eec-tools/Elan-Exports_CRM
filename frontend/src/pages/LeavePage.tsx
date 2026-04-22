@@ -54,6 +54,25 @@ export default function LeavePage() {
   const currentYear = new Date().getFullYear();
   const annualQuota = 14;
 
+  const countDaysExcludingSundays = (startDate: string | Date, endDate: string | Date) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (end < start) return 0;
+
+    let total = 0;
+    const cursor = new Date(start);
+    cursor.setHours(0, 0, 0, 0);
+    const endDateObj = new Date(end);
+    endDateObj.setHours(0, 0, 0, 0);
+
+    while (cursor <= endDateObj) {
+      if (cursor.getDay() !== 0) total += 1;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return total;
+  };
+
   const countLeaveDaysInYear = (startDate: string, endDate: string, year: number) => {
     const yearStart = new Date(year, 0, 1);
     const yearEnd = new Date(year, 11, 31);
@@ -64,9 +83,7 @@ export default function LeavePage() {
     const clippedEnd = end > yearEnd ? yearEnd : end;
     if (clippedEnd < clippedStart) return 0;
 
-    return (
-      Math.round((clippedEnd.getTime() - clippedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-    );
+    return countDaysExcludingSundays(clippedStart, clippedEnd);
   };
 
   const [startDate, setStartDate] = useState("");
@@ -110,10 +127,7 @@ export default function LeavePage() {
     startDate && endDate
       ? Math.max(
           0,
-          Math.round(
-            (new Date(endDate).getTime() - new Date(startDate).getTime()) /
-              (1000 * 60 * 60 * 24),
-          ) + 1,
+          countDaysExcludingSundays(startDate, endDate),
         )
       : 0;
   const previewExcess = balance

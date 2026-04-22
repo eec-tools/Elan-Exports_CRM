@@ -37,6 +37,15 @@ const MONTHS = [
   "July","August","September","October","November","December",
 ];
 
+const countSundaysInMonth = (month: number, year: number) => {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  let total = 0;
+  for (let day = 1; day <= daysInMonth; day++) {
+    if (new Date(year, month - 1, day).getDay() === 0) total += 1;
+  }
+  return total;
+};
+
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(n);
 
@@ -128,6 +137,10 @@ export default function PayrollPage() {
                 Attendance Breakdown
               </p>
               <SlipRow label="Days in Month" value={String(payroll.daysInMonth)} />
+              <SlipRow
+                label="Official Paid Sundays"
+                value={String(countSundaysInMonth(payroll.month, payroll.year))}
+              />
               <SlipRow label="Weekday Present Days" value={String(payroll.weekdayPresentDays)} />
               <SlipRow label="Weekend Days Worked" value={String(payroll.weekendWorkedDays)} />
               <SlipRow label="Approved Leave Days" value={String(payroll.approvedLeavesMonth)} />
@@ -139,7 +152,7 @@ export default function PayrollPage() {
                 />
               )}
               <SlipRow label="Paid Leave Days" value={String(paidLeaves)} />
-              <SlipRow label="Total Paid Days" value={String(payroll.paidDays)} bold />
+              <SlipRow label="Total Paid Days (incl. Sundays)" value={String(payroll.paidDays)} bold />
 
               {/* Salary calculation */}
               <div className="border-t border-slate-100 my-2" />

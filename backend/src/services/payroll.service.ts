@@ -24,9 +24,25 @@ function monthEndUTC(month: number, year: number): Date {
   return new Date(localEndOfDay.getTime() - ATTENDANCE_TZ_OFFSET_MINUTES * 60 * 1000);
 }
 
+function countDaysExcludingSundays(start: Date, end: Date): number {
+  if (end < start) return 0;
+  let total = 0;
+  const cursor = new Date(start);
+  cursor.setHours(0, 0, 0, 0);
+  const endDate = new Date(end);
+  endDate.setHours(0, 0, 0, 0);
+
+  while (cursor <= endDate) {
+    if (cursor.getDay() !== 0) total += 1;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return total;
+}
+
 /**
  * Count the employee's scheduled working days in the month.
- * - Sunday is always off.
+ * - Sunday is treated as an official paid day.
  * - Saturday is off only when saturdaySchedule === "off".
  * - Full and half Saturday schedules count Saturday as a working day.
  *
@@ -38,11 +54,20 @@ function countScheduledWorkingDays(month: number, year: number, saturdaySchedule
   let count = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dow = new Date(year, month - 1, d).getDay(); // 0=Sun, 6=Sat
-    if (dow === 0) continue; // Sunday always off
     if (dow === 6 && saturdaySchedule === "off") continue; // Saturday off
     count++;
   }
   return count;
+}
+
+/** Count Sundays in month (official paid days). */
+function countSundaysInMonth(month: number, year: number): number {
+  const daysInMonth = getDaysInMonth(month, year);
+  let total = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    if (new Date(year, month - 1, d).getDay() === 0) total++;
+  }
+  return total;
 }
 
 /**
@@ -74,22 +99,31 @@ async function countRegularPresentDays(
 
 /**
  * Bonus days worked on off days (isWeekendWork=true).
- * - For "off" schedule: Saturdays or Sundays voluntarily worked.
- * - For "full"/"half" schedule: only Sundays (Saturdays are regular workdays for them).
+ * - Sundays are official paid days, so they are not treated as bonus days.
+ * - For "off" schedule: only Saturdays voluntarily worked are bonus.
+ * - For "full"/"half" schedule: Saturdays are regular workdays, so no weekend bonus.
  */
 async function countBonusDaysWorked(
   userId: string,
   month: number,
   year: number,
 ): Promise<number> {
-  return prisma.attendance.count({
+  const records = await prisma.attendance.findMany({
     where: {
       userId,
       date: { gte: monthStartUTC(month, year), lte: monthEndUTC(month, year) },
       isWeekendWork: true,
       status: { in: [AttendanceStatus.Present, AttendanceStatus.HalfDay] },
     },
+    select: { date: true },
   });
+
+  return records.filter((record) => {
+    const localDate = new Date(
+      record.date.getTime() + ATTENDANCE_TZ_OFFSET_MINUTES * 60 * 1000,
+    );
+    return localDate.getUTCDay() !== 0;
+  }).length;
 }
 
 /** Approved leave days falling within the given month */
@@ -114,8 +148,7 @@ async function countApprovedLeavesInMonth(
   for (const leave of leaves) {
     const clippedStart = leave.startDate < firstDay ? firstDay : leave.startDate;
     const clippedEnd = leave.endDate > lastDay ? lastDay : leave.endDate;
-    const days =
-      Math.round((clippedEnd.getTime() - clippedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const days = countDaysExcludingSundays(clippedStart, clippedEnd);
     total += days;
   }
   return total;
@@ -147,8 +180,7 @@ async function countApprovedLeavesYTD(
     const clippedStart = leave.startDate < yearStart ? yearStart : leave.startDate;
     const clippedEnd = leave.endDate > monthEnd ? monthEnd : leave.endDate;
     if (clippedEnd < clippedStart) continue;
-    const days =
-      Math.round((clippedEnd.getTime() - clippedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const days = countDaysExcludingSundays(clippedStart, clippedEnd);
     total += days;
   }
   return total;
@@ -160,10 +192,11 @@ async function countApprovedLeavesYTD(
  * Formula:
  *   scheduledWorkingDays = Mon–Fri + Saturdays (if full/half schedule) in the month
  *   perDaySalary         = monthlySalary / scheduledWorkingDays
+ *   sundayPaidDays       = Sundays in month (official paid days)
  *   regularPresentDays   = days clocked in on scheduled working days (isWeekendWork=false)
  *                          HalfDay = 0.5; Saturday half-day employees always get Present = 1.0
  *   bonusDaysWorked      = days worked on off days (isWeekendWork=true) — paid at same perDaySalary
- *   paidDays             = regularPresentDays + bonusDaysWorked + approvedLeavesThisMonth
+ *   paidDays             = regularPresentDays + sundayPaidDays + bonusDaysWorked + approvedLeavesThisMonth
  *   grossSalary          = perDaySalary × paidDays
  *   excessLeaveDays      = min(max(0, approvedLeavesYTD − 14), approvedLeavesThisMonth)
  *   leaveSalaryDeduction = perDaySalary × excessLeaveDays
@@ -190,13 +223,14 @@ export async function generatePayroll(
     },
   });
 
-  if (!user.monthlySalary) {
-    throw new Error(`User ${user.fullName} has no monthly salary set`);
+  if (user.monthlySalary == null || user.monthlySalary <= 0) {
+    throw new Error(`User ${user.fullName} has invalid monthly salary`);
   }
 
   // Step 1: Days reference
   const daysInMonth = getDaysInMonth(month, year);
   const scheduledWorkingDays = countScheduledWorkingDays(month, year, user.saturdaySchedule);
+  const sundayPaidDays = countSundaysInMonth(month, year);
 
   // Step 2: Per-day rate based on employee's actual work schedule
   // Employees who work every scheduled day receive exactly their monthlySalary
@@ -215,7 +249,7 @@ export async function generatePayroll(
   const excessLeaveDays = Math.min(excessLeavesYTD, approvedLeavesMonth);
 
   // Step 6: Paid days — presence + bonus days + approved leaves (excess deducted below)
-  const paidDays = weekdayPresentDays + weekendWorkedDays + approvedLeavesMonth;
+  const paidDays = weekdayPresentDays + sundayPaidDays + weekendWorkedDays + approvedLeavesMonth;
 
   // Step 7: Salary calculation
   const grossSalary = perDaySalary * paidDays;
