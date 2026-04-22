@@ -10,6 +10,7 @@ interface Payroll {
   month: number;
   year: number;
   daysInMonth: number;
+  scheduledWorkingDays: number;
   weekdayPresentDays: number;
   weekendWorkedDays: number;
   approvedLeavesMonth: number;
@@ -147,7 +148,7 @@ export default function PayrollPage() {
               </p>
               <SlipRow label="Monthly Salary" value={fmt(payroll.user.monthlySalary ?? 0)} />
               <SlipRow
-                label={`Per Day Salary (÷ ${payroll.daysInMonth} days)`}
+                label={`Per Day Salary (÷ ${payroll.scheduledWorkingDays} scheduled days)`}
                 value={fmt(payroll.perDaySalary)}
               />
               <SlipRow
@@ -182,7 +183,7 @@ export default function PayrollPage() {
               {/* Formula */}
               <div className="border-t border-slate-100 mt-3 pt-2">
                 <p className="text-[10px] text-slate-400 leading-relaxed">
-                  Net = ({fmt(payroll.user.monthlySalary ?? 0)} ÷ {payroll.daysInMonth}) × {payroll.paidDays} days
+                  Net = ({fmt(payroll.user.monthlySalary ?? 0)} ÷ {payroll.scheduledWorkingDays}) × {payroll.paidDays} days
                   {payroll.leaveSalaryDeduction > 0
                     ? ` − ${fmt(payroll.leaveSalaryDeduction)} (excess leaves)`
                     : ""}

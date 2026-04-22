@@ -54,6 +54,21 @@ export default function LeavePage() {
   const currentYear = new Date().getFullYear();
   const annualQuota = 14;
 
+  const countLeaveDaysInYear = (startDate: string, endDate: string, year: number) => {
+    const yearStart = new Date(year, 0, 1);
+    const yearEnd = new Date(year, 11, 31);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    const clippedStart = start < yearStart ? yearStart : start;
+    const clippedEnd = end > yearEnd ? yearEnd : end;
+    if (clippedEnd < clippedStart) return 0;
+
+    return (
+      Math.round((clippedEnd.getTime() - clippedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    );
+  };
+
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
@@ -104,6 +119,8 @@ export default function LeavePage() {
   const previewExcess = balance
     ? Math.max(0, balance.used + previewDays - balance.quota)
     : 0;
+  const employeeExcessUnpaidDays = balance ? Math.max(0, balance.used - balance.quota) : 0;
+  const employeePaidUsedDays = balance ? Math.min(balance.used, balance.quota) : 0;
 
   const applyMutation = useMutation({
     mutationFn: (data: { startDate: string; endDate: string; reason: string }) =>
@@ -147,12 +164,11 @@ export default function LeavePage() {
   const usedByEmployee = new Map<string, number>();
   if (isAdmin) {
     for (const leave of approvedLeaves) {
-      const start = new Date(leave.startDate);
-      const end = new Date(leave.endDate);
-      if (start.getFullYear() !== currentYear || end.getFullYear() !== currentYear) continue;
+      const daysInYear = countLeaveDaysInYear(leave.startDate, leave.endDate, currentYear);
+      if (daysInYear === 0) continue;
 
       const prev = usedByEmployee.get(leave.userId) ?? 0;
-      usedByEmployee.set(leave.userId, prev + leave.numberOfDays);
+      usedByEmployee.set(leave.userId, prev + daysInYear);
     }
   }
 
@@ -160,11 +176,15 @@ export default function LeavePage() {
     .map((employee) => {
       const used = usedByEmployee.get(employee.id) ?? 0;
       const remaining = annualQuota - used;
+      const paidUsed = Math.min(used, annualQuota);
+      const unpaidExcess = Math.max(0, used - annualQuota);
       return {
         ...employee,
         quota: annualQuota,
         used,
         remaining,
+        paidUsed,
+        unpaidExcess,
       };
     })
     .sort((a, b) => {
@@ -195,7 +215,9 @@ export default function LeavePage() {
                       <th className="text-left px-4 py-3 font-medium text-slate-600">Employee</th>
                       <th className="text-left px-4 py-3 font-medium text-slate-600">Status</th>
                       <th className="text-right px-4 py-3 font-medium text-slate-600">Annual Quota (Paid)</th>
+                      <th className="text-right px-4 py-3 font-medium text-slate-600">Paid Used</th>
                       <th className="text-right px-4 py-3 font-medium text-slate-600">Used This Year</th>
+                      <th className="text-right px-4 py-3 font-medium text-slate-600">Unpaid (Excess)</th>
                       <th className="text-right px-4 py-3 font-medium text-slate-600">Paid Days Left</th>
                     </tr>
                   </thead>
@@ -220,7 +242,13 @@ export default function LeavePage() {
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-right text-slate-700">{row.quota}</td>
+                        <td className="px-4 py-3 text-right text-green-700 font-semibold">{row.paidUsed}</td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-800">{row.used}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`font-semibold ${row.unpaidExcess > 0 ? "text-red-600" : "text-slate-500"}`}>
+                            {row.unpaidExcess}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-right">
                           <span className={`font-semibold ${row.remaining < 0 ? "text-red-600" : "text-green-700"}`}>
                             {Math.max(0, row.remaining)}
@@ -244,11 +272,17 @@ export default function LeavePage() {
 
       {/* Balance widget */}
       {balance && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card>
             <CardContent className="pt-6 text-center">
               <p className="text-3xl font-bold text-slate-800">{balance.quota}</p>
               <p className="text-sm text-slate-500 mt-1">Annual Quota (Paid)</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <p className="text-3xl font-bold text-green-600">{employeePaidUsedDays}</p>
+              <p className="text-sm text-slate-500 mt-1">Paid Used</p>
             </CardContent>
           </Card>
           <Card>
@@ -265,6 +299,14 @@ export default function LeavePage() {
                 {balance.remaining < 0 ? 0 : balance.remaining}
               </p>
               <p className="text-sm text-slate-500 mt-1">Paid Days Left</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <p className={`text-3xl font-bold ${employeeExcessUnpaidDays > 0 ? "text-red-600" : "text-slate-500"}`}>
+                {employeeExcessUnpaidDays}
+              </p>
+              <p className="text-sm text-slate-500 mt-1">Unpaid (Excess)</p>
             </CardContent>
           </Card>
         </div>

@@ -5,15 +5,27 @@ import { AuthRequest } from "../types/index.js";
 const ANNUAL_LEAVE_QUOTA = 14;
 
 async function getUsedLeaves(userId: string, year: number): Promise<number> {
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year, 11, 31);
+
   const leaves = await prisma.leave.findMany({
     where: {
       userId,
       status: "approved",
-      startDate: { gte: new Date(year, 0, 1) },
-      endDate: { lte: new Date(year, 11, 31) },
+      startDate: { lte: yearEnd },
+      endDate: { gte: yearStart },
     },
   });
-  return leaves.reduce((sum, l) => sum + l.numberOfDays, 0);
+
+  return leaves.reduce((sum, leave) => {
+    const clippedStart = leave.startDate < yearStart ? yearStart : leave.startDate;
+    const clippedEnd = leave.endDate > yearEnd ? yearEnd : leave.endDate;
+    if (clippedEnd < clippedStart) return sum;
+
+    const days =
+      Math.round((clippedEnd.getTime() - clippedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return sum + days;
+  }, 0);
 }
 
 /** POST /api/leaves — employee applies for leave */
