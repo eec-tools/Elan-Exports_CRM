@@ -31,19 +31,12 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
     if (status) where.status = status;
     if (company) where.company = { contains: company, mode: "insensitive" };
 
-    // Non-admin users can see tasks for their assigned companies OR tasks with no company
     const isAdmin = req.user?.roles?.includes("admin");
-    const assignedCompanies = req.user?.assignedCompanies || [];
-    if (!isAdmin && assignedCompanies.length > 0) {
-      andConditions.push({
-        OR: [
-          { company: { in: assignedCompanies } },
-          { company: null },
-          { company: "" },
-        ],
-      });
-    }
-    // If non-admin has no assigned companies, they can see all tasks (no filter)
+
+    // Non-admin users see only their own tasks (owner filter below).
+    // Company filter is NOT applied for non-admin since owner filter already
+    // restricts visibility -- a member should see ALL tasks they own regardless
+    // of company value.
 
     if (!isAdmin) {
       const fullName = req.user?.fullName ?? "";
