@@ -36,18 +36,22 @@ export async function initiateAuth(req: Request, res: Response): Promise<void> {
  */
 export async function handleCallback(req: Request, res: Response): Promise<void> {
   const code = req.query.code as string;
-  const email = req.query.state as string;
+  const email = (req.query.state as string) || (req.query.email as string);
+  const frontendUrl = process.env.FRONTEND_URL?.split(",")[0] ?? "http://localhost:5173";
+
   if (!code || !email) {
-    res.status(400).send("Missing authorization code or state.");
+    const details = [];
+    if (!code) details.push("code");
+    if (!email) details.push("state/email");
+    const msg = `Missing OAuth callback params: ${details.join(", ")}`;
+    res.redirect(`${frontendUrl}/settings/gmail?error=${encodeURIComponent(msg)}`);
     return;
   }
   try {
     await exchangeCodeForToken(code, email);
-    const frontendUrl = process.env.FRONTEND_URL?.split(",")[0] ?? "http://localhost:5173";
     res.redirect(`${frontendUrl}/settings/gmail?connected=${encodeURIComponent(email)}`);
   } catch (err: any) {
     console.error("[gmail] OAuth callback error:", err);
-    const frontendUrl = process.env.FRONTEND_URL?.split(",")[0] ?? "http://localhost:5173";
     res.redirect(`${frontendUrl}/settings/gmail?error=${encodeURIComponent(err.message)}`);
   }
 }
