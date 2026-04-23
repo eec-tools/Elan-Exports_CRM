@@ -63,6 +63,11 @@ async function processOpenAttendances(): Promise<void> {
       where: {
         startTime: { not: null },
         endTime: null,
+        user: {
+          roles: {
+            none: { role: "admin" },
+          },
+        },
       },
       include: {
         user: {
@@ -180,7 +185,12 @@ async function markNoShowAbsent(): Promise<void> {
 
     // Get all active users
     const activeUsers = await prisma.user.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        roles: {
+          none: { role: "admin" },
+        },
+      },
       select: {
         id: true,
         workEndTime: true,
@@ -251,6 +261,11 @@ async function closePreviousDayOpenAttendances(): Promise<void> {
         date: { lt: today },
         startTime: { not: null },
         endTime: null,
+        user: {
+          roles: {
+            none: { role: "admin" },
+          },
+        },
       },
       include: {
         user: {

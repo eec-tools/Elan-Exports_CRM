@@ -456,6 +456,15 @@ export default function AttendanceDashboardPage() {
     ? (adminHistoryQuery.data?.records ?? []).filter((r) => r.userId === selectedAdminEmployee)
     : (adminHistoryQuery.data?.records ?? []);
 
+  const adminTeamRows = (adminTodayQuery.data?.rows ?? []).filter((r) => {
+    if (user?.id && r.userId === user.id) return false;
+
+    const email = r.email.toLowerCase();
+    const name = r.fullName.toLowerCase();
+
+    return !email.includes("admin") && !name.includes("admin");
+  });
+
   /* ─── Mutations ──────────────────────────────────── */
 
   const startMutation = useMutation({
@@ -943,22 +952,22 @@ export default function AttendanceDashboardPage() {
               {/* Quick Stats */}
               {adminTodayQuery.data && (
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                  <StatCard label="Total Team" value={adminTodayQuery.data.rows.length} icon={Users} color="slate" />
+                  <StatCard label="Total Team" value={adminTeamRows.length} icon={Users} color="slate" />
                   <StatCard
                     label="Checked In"
-                    value={adminTodayQuery.data.rows.filter((r) => r.startTime).length}
+                    value={adminTeamRows.filter((r) => r.startTime).length}
                     icon={LogIn}
                     color="emerald"
                   />
                   <StatCard
                     label="Working Now"
-                    value={adminTodayQuery.data.rows.filter((r) => r.isWorking).length}
+                    value={adminTeamRows.filter((r) => r.isWorking).length}
                     icon={Timer}
                     color="blue"
                   />
                   <StatCard
                     label="Absent"
-                    value={adminTodayQuery.data.rows.filter((r) => !r.startTime).length}
+                    value={adminTeamRows.filter((r) => !r.startTime).length}
                     icon={Eye}
                     color="rose"
                   />
@@ -981,14 +990,14 @@ export default function AttendanceDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(adminTodayQuery.data?.rows ?? []).length === 0 ? (
+                      {adminTeamRows.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                             No team members found.
                           </td>
                         </tr>
                       ) : (
-                        (adminTodayQuery.data?.rows ?? []).map((row) => (
+                        adminTeamRows.map((row) => (
                           <tr key={row.userId} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
                             <td className="px-4 py-3">
                               <p className="font-semibold text-slate-800">{row.fullName}</p>

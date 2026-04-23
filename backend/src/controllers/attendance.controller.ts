@@ -23,9 +23,43 @@ interface CheckoutProofFile {
 
 const MAX_CHECKOUT_PROOFS = 10;
 const CHECKOUT_EARLY_WINDOW_MINUTES = 60;
+const SHORT_SHIFT_MAX_MINUTES = 6 * 60;
+const SHORT_SHIFT_EARLY_LOGOUT_MINUTES = 30;
+const LONG_SHIFT_EARLY_LOGOUT_MINUTES = 60;
 const ATTENDANCE_TZ_OFFSET_MINUTES = Number(
   process.env.ATTENDANCE_TZ_OFFSET_MINUTES ?? 330,
 );
+
+function getShiftDurationMinutes(workStartTime: string, workEndTime: string): number | null {
+  const start = parseHHMM(workStartTime);
+  const end = parseHHMM(workEndTime);
+  if (!start || !end) return null;
+
+  const startMinutes = start.hours * 60 + start.minutes;
+  const endMinutes = end.hours * 60 + end.minutes;
+  if (endMinutes <= startMinutes) return null;
+
+  return endMinutes - startMinutes;
+}
+
+function getEarlyLogoutThresholdMinutes(workStartTime: string, workEndTime: string): number {
+  const shiftMinutes = getShiftDurationMinutes(workStartTime, workEndTime);
+  if (shiftMinutes !== null && shiftMinutes <= SHORT_SHIFT_MAX_MINUTES) {
+    return SHORT_SHIFT_EARLY_LOGOUT_MINUTES;
+  }
+  return LONG_SHIFT_EARLY_LOGOUT_MINUTES;
+}
+
+function isEarlyLogout(
+  checkoutAt: Date,
+  scheduleEnd: Date,
+  workStartTime: string,
+  workEndTime: string,
+): boolean {
+  const thresholdMinutes = getEarlyLogoutThresholdMinutes(workStartTime, workEndTime);
+  const earlyLogoutCutoff = new Date(scheduleEnd.getTime() - thresholdMinutes * 60 * 1000);
+  return checkoutAt <= earlyLogoutCutoff;
+}
 
 function buildScheduleDateTime(referenceDate: Date, hhmm: string): Date | null {
   const parsed = parseHHMM(hhmm);
@@ -143,6 +177,10 @@ function serializeAttendance(
 
 const SATURDAY_HALF_END = "14:00";
 
+function isAdminUser(req: AuthRequest): boolean {
+  return Boolean(req.user?.roles.includes("admin"));
+}
+
 function effectiveWorkEndTime(workEndTime: string, saturdaySchedule: string, date: Date): string {
   if (date.getDay() === 6 && saturdaySchedule === "half") return SATURDAY_HALF_END;
   return workEndTime;
@@ -187,6 +225,11 @@ export async function uploadAttendanceProof(req: AuthRequest, res: Response): Pr
     const userId = req.user?.id;
     if (!userId) {
       res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    if (isAdminUser(req)) {
+      res.status(403).json({ error: "Admin users are excluded from attendance tracking." });
       return;
     }
 
@@ -235,6 +278,11 @@ export async function startAttendance(req: AuthRequest, res: Response): Promise<
     const userId = req.user?.id;
     if (!userId) {
       res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    if (isAdminUser(req)) {
+      res.status(403).json({ error: "Admin users are excluded from attendance tracking." });
       return;
     }
 
@@ -391,6 +439,11 @@ export async function endAttendance(req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    if (isAdminUser(req)) {
+      res.status(403).json({ error: "Admin users are excluded from attendance tracking." });
+      return;
+    }
+
     const context = await getTodayAttendanceWithSchedule(userId);
     if (!context?.attendance || !context.attendance.startTime) {
       res.status(400).json({ error: "You haven't checked in today. Please check in first." });
@@ -448,7 +501,7 @@ export async function endAttendance(req: AuthRequest, res: Response): Promise<vo
         checkoutProofs: proofFiles as unknown as Prisma.InputJsonValue,
         checkoutReminderSentAt: null,
         status: AttendanceStatus.Present,
-        earlyLogout: now < scheduleEnd,
+        earlyLogout: isEarlyLogout(now, scheduleEnd, context.user.workStartTime, effectiveEnd),
         autoEnded: false,
       },
       include: {
@@ -493,6 +546,11 @@ export async function heartbeatAttendance(req: AuthRequest, res: Response): Prom
       return;
     }
 
+    if (isAdminUser(req)) {
+      res.status(403).json({ error: "Admin users are excluded from attendance tracking." });
+      return;
+    }
+
     const today = startOfLocalDay();
     const attendance = await prisma.attendance.findUnique({
       where: {
@@ -531,6 +589,11 @@ export async function getTodayAttendance(req: AuthRequest, res: Response): Promi
     const userId = req.user?.id;
     if (!userId) {
       res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    if (isAdminUser(req)) {
+      res.status(403).json({ error: "Admin users are excluded from attendance tracking." });
       return;
     }
 
@@ -621,6 +684,11 @@ export async function getAttendanceHistory(req: AuthRequest, res: Response): Pro
       return;
     }
 
+    if (isAdminUser(req)) {
+      res.status(403).json({ error: "Admin users are excluded from attendance tracking." });
+      return;
+    }
+
     const { from, to } = req.query;
 
     const user = await prisma.user.findUnique({
@@ -696,7 +764,13 @@ export async function getAdminTodayAttendance(
     const today = startOfLocalDay();
 
     const users = await prisma.user.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        id: req.user?.id ? { not: req.user.id } : undefined,
+        roles: {
+          none: { role: "admin" },
+        },
+      },
       select: {
         id: true,
         fullName: true,
@@ -795,10 +869,15 @@ export async function getAdminAttendanceHistory(
     const endDate = to ? new Date(to as string) : new Date();
     const startDate = from ? new Date(from as string) : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const whereClause: any = {
+    const whereClause: Prisma.AttendanceWhereInput = {
       date: {
         gte: startOfLocalDay(startDate),
         lte: startOfLocalDay(endDate),
+      },
+      user: {
+        roles: {
+          none: { role: "admin" },
+        },
       },
     };
 
