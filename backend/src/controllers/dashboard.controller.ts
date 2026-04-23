@@ -21,6 +21,21 @@ export async function getDashboardStats(
   try {
     const isAdmin = req.user?.roles?.includes("admin");
     const currentUserName = req.user?.fullName ?? "";
+    const currentFirstName = currentUserName.split(" ")[0] || currentUserName;
+
+    // Build firstName -> fullName mapping from members table for owner resolution
+    const activeMembers = await prisma.user.findMany({
+      where: { isActive: true },
+      select: { fullName: true },
+    });
+    const firstNameToFullName: Record<string, string> = {};
+    for (const m of activeMembers) {
+      const fn = m.fullName.split(" ")[0]?.toLowerCase();
+      if (fn) firstNameToFullName[fn] = m.fullName;
+    }
+    // Map "Admin" first name to "Shirali Shetty"
+    if (firstNameToFullName["admin"])
+      firstNameToFullName["admin"] = "Shirali Shetty";
 
     const [
       totalBuyers,
@@ -39,7 +54,13 @@ export async function getDashboardStats(
       safe(() => prisma.report.count(), 0),
       safe(() => (prisma as any).deal.count(), 0),
       safe(() => (prisma as any).vaultDocument.count(), 0),
-      safe(() => (prisma as any).dailyTask.count({ where: { status: { not: "Completed" } } }), 0),
+      safe(
+        () =>
+          (prisma as any).dailyTask.count({
+            where: { status: { not: "Completed" } },
+          }),
+        0,
+      ),
       safe(async () => {
         const allDeals = await (prisma as any).deal.findMany({
           orderBy: { createdAt: "desc" },
@@ -62,47 +83,86 @@ export async function getDashboardStats(
         }
         return Object.values(byStage).flat();
       }, []),
-      safe(() =>
-        (prisma as any).dailyTask.groupBy({
-          by: ["owner", "status"],
-          _count: { id: true },
-          where: {
-            owner: isAdmin
-              ? { not: null, notIn: ["", "N/A", "n/a"] }
-              : { equals: currentUserName, mode: "insensitive" },
-          },
-        }), []
+      safe(
+        () =>
+          (prisma as any).dailyTask.groupBy({
+            by: ["owner", "status"],
+            _count: { id: true },
+            where: isAdmin
+              ? { owner: { not: null, notIn: ["", "N/A", "n/a"] } }
+              : {
+                  OR: [
+                    { owner: { equals: currentUserName, mode: "insensitive" } },
+                    {
+                      owner: { equals: currentFirstName, mode: "insensitive" },
+                    },
+                  ],
+                },
+          }),
+        [],
       ),
     ]);
 
-    // Process Task Analytics
-    const rawTasks = tasksGrouped as Array<{ owner: string; status: string; _count: { id: number } }>;
-    // key = lowercased+trimmed name for deduplication; value stores display name + counts
-    const taskAnalyticsMap: Record<string, { displayName: string; pending: number; inProgress: number; completed: number; closed: number; total: number }> = {};
+    // Process Task Analytics -- dedup by first name, display full name
+    const rawTasks = tasksGrouped as Array<{
+      owner: string;
+      status: string;
+      _count: { id: number };
+    }>;
+    // key = lowercased first name for deduplication; value stores display name + counts
+    const taskAnalyticsMap: Record<
+      string,
+      {
+        displayName: string;
+        pending: number;
+        inProgress: number;
+        completed: number;
+        closed: number;
+        total: number;
+      }
+    > = {};
 
     for (const item of rawTasks) {
       if (!item.owner) continue;
 
       const ownerTrimmed = item.owner.trim();
-      const ownerKey = ownerTrimmed.toLowerCase();
+      const ownerFirstName =
+        ownerTrimmed.split(" ")[0]?.toLowerCase() || ownerTrimmed.toLowerCase();
       const status = (item.status || "").toLowerCase();
       const count = item._count.id;
 
-      if (!taskAnalyticsMap[ownerKey]) {
-        taskAnalyticsMap[ownerKey] = { displayName: ownerTrimmed, pending: 0, inProgress: 0, completed: 0, closed: 0, total: 0 };
+      // Resolve to full name if available, otherwise use as-is
+      const resolvedDisplayName =
+        firstNameToFullName[ownerFirstName] || ownerTrimmed;
+
+      if (!taskAnalyticsMap[ownerFirstName]) {
+        taskAnalyticsMap[ownerFirstName] = {
+          displayName: resolvedDisplayName,
+          pending: 0,
+          inProgress: 0,
+          completed: 0,
+          closed: 0,
+          total: 0,
+        };
+      }
+      // Always prefer the full name version as display name
+      if (
+        resolvedDisplayName.includes(" ") &&
+        !taskAnalyticsMap[ownerFirstName].displayName.includes(" ")
+      ) {
+        taskAnalyticsMap[ownerFirstName].displayName = resolvedDisplayName;
       }
 
-      // Prefer the version with most tasks as display name (set on first encounter; largest-count version wins via sort later)
-      taskAnalyticsMap[ownerKey].total += count;
+      taskAnalyticsMap[ownerFirstName].total += count;
 
       if (status === "inprogress") {
-        taskAnalyticsMap[ownerKey].inProgress += count;
+        taskAnalyticsMap[ownerFirstName].inProgress += count;
       } else if (status === "completed") {
-        taskAnalyticsMap[ownerKey].completed += count;
+        taskAnalyticsMap[ownerFirstName].completed += count;
       } else if (status === "closed") {
-        taskAnalyticsMap[ownerKey].closed += count;
+        taskAnalyticsMap[ownerFirstName].closed += count;
       } else {
-        taskAnalyticsMap[ownerKey].pending += count;
+        taskAnalyticsMap[ownerFirstName].pending += count;
       }
     }
 

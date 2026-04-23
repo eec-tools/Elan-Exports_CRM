@@ -49,7 +49,7 @@ interface PaginationData {
 
 const PRIORITY_OPTIONS = ["Urgent", "High", "Medium", "Low"];
 const STATUS_OPTIONS = ["Pending", "completed", "closed"];
-const OWNER_OPTIONS = ["Vandana", "Shirali", "Madan", "Mohita", "Shovan"];
+const OWNER_OPTIONS: string[] = [];
 const ALL_COMPANIES = ["EEC", "MTG", "Skin'd India", "Fresh Food Company"];
 
 // Premium styling helpers
@@ -141,17 +141,16 @@ export default function DailyTasksPage() {
         setPriorityStats(res.data.priorityStats);
       }
 
-      // Combine hardcoded names with member first names, mapping 'Admin' to 'Shirali'
+      // Use full names from members API for owner dropdown
       if (membersRes.data && Array.isArray(membersRes.data)) {
-        const memberFirstNames = membersRes.data
-          .map((fullName: string) => {
-            const name = fullName.split(" ")[0];
-            return name === "Admin" ? "Shirali" : name;
-          })
+        const memberFullNames = membersRes.data
+          .map((fullName: string) =>
+            fullName === "Admin User" ? "Shirali Shetty" : fullName,
+          )
           .filter(Boolean);
 
         const combined = Array.from(
-          new Set([...OWNER_OPTIONS, ...memberFirstNames]),
+          new Set([...OWNER_OPTIONS, ...memberFullNames]),
         ).sort();
         setDynamicOwnerOptions(combined);
       }
@@ -696,7 +695,8 @@ export default function DailyTasksPage() {
                       className={`border-r border-slate-100 relative align-middle ${isAdmin ? "hover:bg-slate-100/50" : ""}`}
                       onClick={() => isAdmin && startEditing(task, "owner")}
                     >
-                      {isAdmin && editingCell?.id === task.id &&
+                      {isAdmin &&
+                      editingCell?.id === task.id &&
                       editingCell?.field === "owner" ? (
                         <select
                           autoFocus

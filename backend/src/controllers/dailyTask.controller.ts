@@ -46,8 +46,13 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
     // If non-admin has no assigned companies, they can see all tasks (no filter)
 
     if (!isAdmin) {
+      const fullName = req.user?.fullName ?? "";
+      const firstName = fullName.split(" ")[0] || fullName;
       andConditions.push({
-        owner: { equals: req.user?.fullName ?? "", mode: "insensitive" },
+        OR: [
+          { owner: { equals: fullName, mode: "insensitive" } },
+          { owner: { equals: firstName, mode: "insensitive" } },
+        ],
       });
     } else if (owner) {
       if (owner === "Unassigned") {
