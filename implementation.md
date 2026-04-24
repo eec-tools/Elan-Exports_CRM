@@ -98,7 +98,7 @@ model Payroll {
 }
 ```
 
-### 1.4 Attendance model changes
+### 1.4 Attendance model change
 
 The existing `Attendance` model uses `startTime`/`endTime`. Extend it with:
 - `startTime` → Clock In
