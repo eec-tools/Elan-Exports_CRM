@@ -50,7 +50,7 @@ const ALL_FIELDS: { key: string; label: string; multiline?: boolean; dropdown?: 
 
 // Public axios instance — same base URL as authenticated client, just no auth header
 const publicApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
 });
 
 export default function PublicQuotationFormPage() {
