@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import logo from "@/assets/elanexportslogo.png";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -49,7 +48,11 @@ export default function LoginPage() {
 
         <div className="relative max-w-md space-y-6">
           <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-2xl overflow-hidden border-4">
-            <img src={logo} alt="Élan Exports Logo" className="h-full w-full object-cover" />
+            <img
+              src="/elan-exports-logo.png"
+              alt="Élan Exports Logo"
+              className="h-full w-full object-cover"
+            />
           </div>
           <div className="space-y-2">
             <h1 className="text-4xl font-semibold tracking-wide">
