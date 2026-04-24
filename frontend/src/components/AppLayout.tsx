@@ -30,7 +30,6 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
-import logo from "@/assets/elanexportslogo.png";
 import { NotificationBell } from "@/components/NotificationBell";
 
 function getGreeting() {
@@ -214,7 +213,7 @@ export function AppLayout() {
           className={`relative flex h-16 items-center border-b border-slate-100 bg-white z-10 ${sidebarCollapsed ? "justify-center px-2" : "gap-3 px-5"}`}
         >
           <img
-            src={logo}
+            src="/elan-exports-logo.png"
             alt="Élan Exports Consultancy"
             className="h-9 w-9 rounded-full object-cover shadow-sm border border-slate-50"
           />
@@ -588,7 +587,7 @@ export function AppLayout() {
               <Menu className="h-5 w-5" />
             </Button>
             <img
-              src={logo}
+              src="/elan-exports-logo.png"
               alt="Logo"
               className="h-8 w-8 rounded-full object-cover mr-3 border border-slate-100"
             />

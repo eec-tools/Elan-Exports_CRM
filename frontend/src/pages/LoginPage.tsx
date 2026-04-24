@@ -11,8 +11,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Ship } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import logo from "@/assets/elanexportslogo.png";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -47,8 +48,8 @@ export default function LoginPage() {
         </div>
 
         <div className="relative max-w-md space-y-6">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5b400] text-[#0b2c4a] shadow-lg">
-            <Ship className="h-10 w-10" />
+          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-2xl overflow-hidden border-4">
+            <img src={logo} alt="Élan Exports Logo" className="h-full w-full object-cover" />
           </div>
           <div className="space-y-2">
             <h1 className="text-4xl font-semibold tracking-wide">
