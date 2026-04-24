@@ -45,6 +45,10 @@ import PublicQuotationFormPage from "@/pages/PublicQuotationFormPage";
 import GmailSettingsPage from "@/pages/GmailSettingsPage";
 import { Loader2 } from "lucide-react";
 
+const backendApiUrl = (import.meta.env.VITE_API_URL || "http://localhost:3001/api").replace(/\/+$/, "");
+
+console.log("[frontend] Using backend API:", backendApiUrl);
+
 const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onSuccess: () => {
