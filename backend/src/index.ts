@@ -69,6 +69,7 @@ const hardcodedOrigins = [
   "http://localhost:5173",
   "http://elan-exports-s3.s3-website.ap-south-1.amazonaws.com",
   "https://d2f9ltld390jy8.cloudfront.net",
+  "https://dtbfqaoo30d2u.cloudfront.net",
 ];
 
 const envOrigins = process.env.FRONTEND_URL
