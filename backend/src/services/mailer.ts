@@ -127,7 +127,7 @@ export async function sendAttendanceCheckoutWarningEmail(params: {
         <p>Your work end time has passed, but your attendance is still open.</p>
         <p style="margin: 14px 0; padding: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;">
           Please check out within <strong>${graceMinutes} minutes</strong> in the Attendance screen.
-          If you do not check out in time, your are not a good <strong>Employee</strong>.
+          If you do not check out in time, you are not a good <strong>Employee</strong>.
         </p>
         <p>Before checkout, upload at least one work proof file (PDF/image/document).</p>
       </div>
