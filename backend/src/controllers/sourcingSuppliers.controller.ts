@@ -617,7 +617,7 @@ export async function addFromVaultFolder(
   res: Response,
 ): Promise<void> {
   try {
-    const { folderId, assignedGmailAccount, formTemplateId } = req.body as {
+    const { folderId, assignedGmailAccount } = req.body as {
       folderId: string;
       assignedGmailAccount?: string;
       formTemplateId?: string;
@@ -647,31 +647,33 @@ export async function addFromVaultFolder(
       return;
     }
 
+    const supplierData = vaultSuppliers.map((s: any) => ({
+      company: s.company,
+      email: s.email,
+      phone: s.phone,
+      contactPerson: s.contactPerson,
+      country: s.country,
+      product: s.product,
+      notes: s.notes,
+      productCategory: folder.name,
+      assignedGmailAccount: assignedGmailAccount ?? null,
+      formToken: randomUUID(),
+      status: "pending",
+      supplierStage: "Sourcing",
+      buyerIds: [],
+      supplierProducts: [],
+      productCatalogs: [],
+      productCatalogImages: [],
+      certificates: [],
+      warehousePhotos: [],
+      videoLinks: [],
+      quotations: [],
+      createdBy: req.user!.id,
+    }));
+
     await (prisma as any).$transaction(async (tx: any) => {
       await tx.sourcingSupplier.createMany({
-        data: vaultSuppliers.map((s: any) => ({
-          company: s.company,
-          email: s.email,
-          phone: s.phone,
-          contactPerson: s.contactPerson,
-          country: s.country,
-          product: s.product,
-          notes: s.notes,
-          productCategory: folder.name,
-          assignedGmailAccount: assignedGmailAccount ?? null,
-          formToken: randomUUID(),
-          status: "pending",
-          supplierStage: "Sourcing",
-          buyerIds: [],
-          supplierProducts: [],
-          productCatalogs: [],
-          productCatalogImages: [],
-          certificates: [],
-          warehousePhotos: [],
-          videoLinks: [],
-          quotations: [],
-          createdBy: req.user!.id,
-        })),
+        data: supplierData,
         skipDuplicates: true,
       });
 
@@ -681,7 +683,10 @@ export async function addFromVaultFolder(
       });
     });
 
-    res.status(201).json({ added: vaultSuppliers.length });
+    res.status(201).json({
+      added: supplierData.length,
+      suppliers: supplierData.map((s: any) => ({ company: s.company, formToken: s.formToken })),
+    });
   } catch (err) {
     console.error("Add from vault folder error:", err);
     res.status(500).json({ error: "Internal server error" });
