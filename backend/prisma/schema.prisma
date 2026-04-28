@@ -37,7 +37,10 @@ model User {
   deals             Deal[]
   reports           Report[]
   suppliers         Supplier[]
-  permissions       UserPermission[]
+  sourcingSuppliers        SourcingSupplier[]
+  sourcingVaultFolders     SourcingVaultFolder[]
+  sourcingVaultSuppliers   SourcingVaultSupplier[]
+  permissions          UserPermission[]
   roles             UserRole[]
   vaultDocuments    VaultDocument[]
   notificationReads NotificationRead[]
@@ -475,6 +478,7 @@ model SourcingSupplier {
   reactivationPotential      String?                   @map("reactivation_potential")
   notes                      String?
   createdBy                  String?                   @map("created_by")
+  creator                    User?                     @relation(fields: [createdBy], references: [id])
   createdAt                  DateTime                  @default(now()) @map("created_at")
   updatedAt                  DateTime                  @updatedAt @map("updated_at")
   email                      String?
@@ -1036,4 +1040,36 @@ model Quotation {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("quotations")
+}
+
+model SourcingVaultFolder {
+  id        String                  @id @default(uuid())
+  name      String                  @unique
+  createdBy String?                 @map("created_by")
+  creator   User?                   @relation(fields: [createdBy], references: [id])
+  suppliers SourcingVaultSupplier[]
+  createdAt DateTime                @default(now()) @map("created_at")
+  updatedAt DateTime                @updatedAt @map("updated_at")
+
+  @@map("sourcing_vault_folders")
+}
+
+model SourcingVaultSupplier {
+  id            String              @id @default(uuid())
+  folderId      String              @map("folder_id")
+  folder        SourcingVaultFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  company       String
+  email         String?
+  phone         String?
+  contactPerson String?             @map("contact_person")
+  country       String?
+  product       String?
+  notes         String?
+  emailStatus   String              @default("Not Sent") @map("email_status")
+  createdBy     String?             @map("created_by")
+  creator       User?               @relation(fields: [createdBy], references: [id])
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  @@map("sourcing_vault_suppliers")
 }

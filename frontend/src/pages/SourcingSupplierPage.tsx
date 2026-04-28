@@ -99,16 +99,11 @@ export default function SourcingSupplierPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SourcingSupplier | null>(null);
-  const [formLinkDialog, setFormLinkDialog] = useState<{ open: boolean; link: string; company: string; source: "created" | "campaign" }>({
-    open: false,
-    link: "",
-    company: "",
-    source: "created",
-  });
 
-  // Create form state
-  const [form, setForm] = useState({ company: "", email: "", assignedGmailAccount: "" });
-  const [createTemplateId, setCreateTemplateId] = useState<string>("");
+  // From-folder create state
+  const [selectedFolderId, setSelectedFolderId] = useState("");
+  const [selectedGmailAccount, setSelectedGmailAccount] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
   // ─── Queries ────────────────────────────────────────
   const { data, isLoading } = useQuery({
@@ -150,25 +145,45 @@ export default function SourcingSupplierPage() {
   });
   const connectedAccounts = gmailAccounts.filter((a) => a.connected);
 
+  // ─── Vault folder queries (for create dialog) ──────
+  const { data: vaultFolders = [] } = useQuery({
+    queryKey: ["sourcing-vault-folders"],
+    queryFn: async () => {
+      const res = await api.get("/sourcing-vault");
+      return res.data as { id: string; name: string; supplierCount: number }[];
+    },
+    enabled: createOpen,
+  });
+
+  const { data: notSentSuppliers = [], isLoading: notSentLoading } = useQuery({
+    queryKey: ["vault-not-sent", selectedFolderId],
+    queryFn: async () => {
+      const res = await api.get(`/sourcing-suppliers/from-folder?folderId=${selectedFolderId}`);
+      return res.data as { id: string; company: string; email?: string; country?: string; product?: string }[];
+    },
+    enabled: !!selectedFolderId && createOpen,
+  });
+
   // ─── Mutations ──────────────────────────────────────
-  const createMutation = useMutation({
-    mutationFn: (data: typeof form) => api.post("/sourcing-suppliers", data),
+  const addFromFolderMutation = useMutation({
+    mutationFn: () =>
+      api.post("/sourcing-suppliers/from-folder", {
+        folderId: selectedFolderId,
+        assignedGmailAccount: selectedGmailAccount || undefined,
+        formTemplateId: selectedTemplateId || undefined,
+      }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-vault-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-vault-folders"] });
       setCreateOpen(false);
-      setForm({ company: "", email: "", assignedGmailAccount: "" });
-      const created = res.data;
-      if (created?.formToken) {
-        const base = `${window.location.origin}/supplier-form/${created.formToken}`;
-        const link = createTemplateId ? `${base}?t=${createTemplateId}` : base;
-        setCreateTemplateId("");
-        setFormLinkDialog({ open: true, link, company: created.company, source: "created" });
-      } else {
-        toast.success("Sourcing supplier created");
-      }
+      setSelectedFolderId("");
+      setSelectedGmailAccount("");
+      setSelectedTemplateId("");
+      toast.success(`Added ${res.data.added} supplier${res.data.added !== 1 ? "s" : ""} to pipeline`);
     },
-    onError: () => toast.error("Failed to create supplier"),
+    onError: () => toast.error("Failed to add suppliers"),
   });
 
   const deleteMutation = useMutation({
@@ -501,42 +516,104 @@ export default function SourcingSupplierPage() {
       )}
 
       {/* ── Create Dialog ─────────────────────────────── */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog
+        open={createOpen}
+        onOpenChange={(v) => {
+          if (!v) {
+            setSelectedFolderId("");
+            setSelectedGmailAccount("");
+            setSelectedTemplateId("");
+          }
+          setCreateOpen(v);
+        }}
+      >
+        <DialogContent className="max-w-lg">
           <DialogTitle>Add Sourcing Supplier</DialogTitle>
           <DialogDescription>
-            Fill in the required details. A supplier form link will be generated automatically.
+            Select a Sourcing Vault folder to pull in all "Not Sent" staged suppliers.
           </DialogDescription>
 
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 space-y-4">
+            {/* Folder selector */}
             <div>
-              <Label>Company Name *</Label>
-              <Input
-                value={form.company}
-                onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                placeholder="e.g. Spice Farm India Pvt Ltd"
-                className="mt-1"
-                autoFocus
-              />
+              <Label>Select Folder *</Label>
+              <select
+                value={selectedFolderId}
+                onChange={(e) => { setSelectedFolderId(e.target.value); }}
+                className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              >
+                <option value="">Choose a vault folder…</option>
+                {vaultFolders.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
             </div>
 
+            {/* Preview of not-sent suppliers */}
+            {selectedFolderId && (
+              <div>
+                <Label className="text-xs text-slate-500 uppercase tracking-wide">
+                  Suppliers to be added
+                </Label>
+                {notSentLoading ? (
+                  <div className="mt-1 flex items-center gap-2 text-sm text-slate-400 py-3">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading…
+                  </div>
+                ) : notSentSuppliers.length === 0 ? (
+                  <div className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    No "Not Sent" suppliers in this folder. Use the Sourcing Vault to add suppliers first.
+                  </div>
+                ) : (
+                  <div className="mt-1 max-h-44 overflow-y-auto rounded-md border border-slate-200 divide-y divide-slate-100">
+                    {notSentSuppliers.map((s) => (
+                      <div key={s.id} className="flex items-center gap-3 px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-800 truncate">{s.company}</p>
+                          <p className="text-xs text-slate-400 truncate">
+                            {[s.email, s.country, s.product].filter(Boolean).join(" · ") || "—"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {notSentSuppliers.length > 0 && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    {notSentSuppliers.length} supplier{notSentSuppliers.length !== 1 ? "s" : ""} will be added to the pipeline
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Campaign Email Account */}
             <div>
-              <Label>Supplier Email *</Label>
-              <Input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder="supplier@example.com"
-                className="mt-1"
-              />
-              <p className="text-xs text-slate-400 mt-1">Campaign emails (intro + follow-ups) will be sent to this address</p>
+              <Label>Campaign Email Account</Label>
+              {connectedAccounts.length === 0 ? (
+                <div className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  No Gmail accounts connected.{" "}
+                  <a href="/settings/gmail" className="underline font-medium">Connect one</a> before starting campaigns.
+                </div>
+              ) : (
+                <select
+                  value={selectedGmailAccount}
+                  onChange={(e) => setSelectedGmailAccount(e.target.value)}
+                  className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                >
+                  <option value="">Select sending account (optional)…</option>
+                  {connectedAccounts.map((a) => (
+                    <option key={a.email} value={a.email}>{a.email}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
+            {/* Form Template */}
             <div>
               <Label>Form Template</Label>
               <select
-                value={createTemplateId}
-                onChange={(e) => setCreateTemplateId(e.target.value)}
+                value={selectedTemplateId}
+                onChange={(e) => setSelectedTemplateId(e.target.value)}
                 className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
               >
                 <option value="">Default form</option>
@@ -546,74 +623,24 @@ export default function SourcingSupplierPage() {
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-slate-400 mt-1">Choose which sections the supplier sees in their form</p>
-            </div>
-
-            <div>
-              <Label>Campaign Email Account *</Label>
-              {connectedAccounts.length === 0 ? (
-                <div className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                  No Gmail accounts connected yet. Connect one in{" "}
-                  <a href="/settings/gmail" className="underline font-medium">Gmail Settings</a> before starting campaigns.
-                </div>
-              ) : (
-                <select
-                  value={form.assignedGmailAccount}
-                  onChange={(e) => setForm((f) => ({ ...f, assignedGmailAccount: e.target.value }))}
-                  className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                >
-                  <option value="">Select sending account…</option>
-                  {connectedAccounts.map((a) => (
-                    <option key={a.email} value={a.email}>{a.email}</option>
-                  ))}
-                </select>
-              )}
-              <p className="text-xs text-slate-400 mt-1">All emails (intro + 3 follow-ups) will be sent from this account</p>
+              <p className="text-xs text-slate-400 mt-1">Overrides the template used during vault staging</p>
             </div>
           </div>
 
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button
-              disabled={!form.company.trim() || !form.email.trim() || createMutation.isPending}
-              onClick={() => createMutation.mutate(form)}
+              disabled={
+                !selectedFolderId ||
+                notSentSuppliers.length === 0 ||
+                notSentLoading ||
+                addFromFolderMutation.isPending
+              }
+              onClick={() => addFromFolderMutation.mutate()}
             >
-              {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              Add Supplier
+              {addFromFolderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              Add Supplier{notSentSuppliers.length > 1 ? "s" : ""}
             </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Form Link Dialog ──────────────────────────── */}
-      <Dialog open={formLinkDialog.open} onOpenChange={(v) => setFormLinkDialog((d) => ({ ...d, open: v }))}>
-        <DialogContent className="max-w-md">
-          <DialogTitle>{formLinkDialog.source === "created" ? "Supplier Added" : "Campaign Started"}</DialogTitle>
-          <DialogDescription>
-            {formLinkDialog.source === "created"
-              ? <>Supplier <strong>{formLinkDialog.company}</strong> has been created. Copy the form link below and send it to the supplier — they'll fill in their own details.</>
-              : <>Intro email marked as sent for <strong>{formLinkDialog.company}</strong>. Share the form link below so the supplier can fill in their details.</>
-            }
-          </DialogDescription>
-          <div className="mt-3 flex gap-2">
-            <Input readOnly value={formLinkDialog.link} className="text-xs font-mono" />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                const success = await copyToClipboard(formLinkDialog.link);
-                if (success) {
-                  toast.success("Copied!");
-                } else {
-                  toast.error("Failed to copy link");
-                }
-              }}
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button onClick={() => setFormLinkDialog((d) => ({ ...d, open: false }))}>Done</Button>
           </div>
         </DialogContent>
       </Dialog>
