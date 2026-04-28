@@ -18,23 +18,154 @@ import {
   Loader2,
   Star,
   LayoutTemplate,
+  ArrowLeft,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { PermissionGate } from "@/components/PermissionGate";
 
 const SECTIONS = [
-  { key: "identity",       label: "Section 1 — Identity",            fields: ["company", "tradeName", "yearEstablished", "manufacturingAddress", "city", "state", "postalCode", "supplierType"] },
-  { key: "contacts",       label: "Section 2 — Contacts",            fields: ["email", "phone", "whatsapp", "contactPerson"] },
-  { key: "products",       label: "Section 3 — Products",            fields: ["hsCode", "organicStatus", "ingredientList", "allergenDeclaration", "shelfLife", "storageConditions", "packagingType", "netWeightVariants", "sampleAvailable", "sampleLeadTime", "sampleCost"] },
-  { key: "production",     label: "Section 4 — Production",          fields: ["annualProductionVolume", "avgMonthlyVolume", "maxScalableMonthlyVolume", "peakSeasonMonths", "offSeasonAvailability", "minExportableBatch", "moq", "leadTimeFirstOrder", "leadTimeRepeatOrder"] },
-  { key: "commercial",     label: "Section 5 — Commercial",          fields: ["incotermsSupported", "portsOfExport", "targetExportMarkets", "currencyPreferred", "paymentTerms"] },
-  { key: "regulatory",     label: "Section 6 — Regulatory",          fields: ["iecNumber", "gstNumber", "fssaiLicense", "apedaNumber", "fdaRegistrationNumber", "usAgentAppointed", "tracesNtRegistration", "coiCapability", "daffBiosecurity", "jasLabelCompliance"] },
-  { key: "certifications", label: "Section 7 — Certifications",      fields: ["haccpAvailable", "isoFsscCertNo", "isoCertValidityDate", "latestInternalAuditDate", "latestThirdPartyAuditDate", "auditingBodyName"] },
-  { key: "organic",        label: "Section 8 — Organic Certification",fields: ["farmerOrganicCert", "aggregatorOrganicCert", "processingUnitOrganicCert", "certifyingBodyName", "certsValidForExport"] },
-  { key: "labTesting",     label: "Section 9 — Lab Testing",         fields: ["gmoFreeDeclaration", "irradiationFreeDeclaration", "foodContactCompliance", "compostabilityCert", "migrationTestReport"] },
-  { key: "branding",       label: "Section 10 — Branding",           fields: ["exportBrand", "healthNutritionClaims", "claimsApprovedMarkets", "packagingComplianceRegions"] },
-  { key: "processing",     label: "Section 11 — Processing",         fields: ["organicSegregationSop", "cleaningLinelearanceSop", "noProhibitedAids"] },
-  { key: "media",          label: "Section 12 — Media & Documents",  fields: ["productCatalogs", "certificates", "warehousePhotos", "videoLinks"] },
+  {
+    key: "identity",
+    label: "Section 1 — Identity",
+    fields: [
+      "company",
+      "tradeName",
+      "yearEstablished",
+      "manufacturingAddress",
+      "city",
+      "state",
+      "postalCode",
+      "supplierType",
+    ],
+  },
+  {
+    key: "contacts",
+    label: "Section 2 — Contacts",
+    fields: ["email", "phone", "whatsapp", "contactPerson"],
+  },
+  {
+    key: "products",
+    label: "Section 3 — Products",
+    fields: [
+      "hsCode",
+      "organicStatus",
+      "ingredientList",
+      "allergenDeclaration",
+      "shelfLife",
+      "storageConditions",
+      "packagingType",
+      "netWeightVariants",
+      "sampleAvailable",
+      "sampleLeadTime",
+      "sampleCost",
+    ],
+  },
+  {
+    key: "production",
+    label: "Section 4 — Production",
+    fields: [
+      "annualProductionVolume",
+      "avgMonthlyVolume",
+      "maxScalableMonthlyVolume",
+      "peakSeasonMonths",
+      "offSeasonAvailability",
+      "minExportableBatch",
+      "moq",
+      "leadTimeFirstOrder",
+      "leadTimeRepeatOrder",
+    ],
+  },
+  {
+    key: "commercial",
+    label: "Section 5 — Commercial",
+    fields: [
+      "incotermsSupported",
+      "portsOfExport",
+      "targetExportMarkets",
+      "currencyPreferred",
+      "paymentTerms",
+    ],
+  },
+  {
+    key: "regulatory",
+    label: "Section 6 — Regulatory",
+    fields: [
+      "iecNumber",
+      "gstNumber",
+      "fssaiLicense",
+      "apedaNumber",
+      "fdaRegistrationNumber",
+      "usAgentAppointed",
+      "tracesNtRegistration",
+      "coiCapability",
+      "daffBiosecurity",
+      "jasLabelCompliance",
+    ],
+  },
+  {
+    key: "certifications",
+    label: "Section 7 — Certifications",
+    fields: [
+      "haccpAvailable",
+      "isoFsscCertNo",
+      "isoCertValidityDate",
+      "latestInternalAuditDate",
+      "latestThirdPartyAuditDate",
+      "auditingBodyName",
+    ],
+  },
+  {
+    key: "organic",
+    label: "Section 8 — Organic Certification",
+    fields: [
+      "farmerOrganicCert",
+      "aggregatorOrganicCert",
+      "processingUnitOrganicCert",
+      "certifyingBodyName",
+      "certsValidForExport",
+    ],
+  },
+  {
+    key: "labTesting",
+    label: "Section 9 — Lab Testing",
+    fields: [
+      "gmoFreeDeclaration",
+      "irradiationFreeDeclaration",
+      "foodContactCompliance",
+      "compostabilityCert",
+      "migrationTestReport",
+    ],
+  },
+  {
+    key: "branding",
+    label: "Section 10 — Branding",
+    fields: [
+      "exportBrand",
+      "healthNutritionClaims",
+      "claimsApprovedMarkets",
+      "packagingComplianceRegions",
+    ],
+  },
+  {
+    key: "processing",
+    label: "Section 11 — Processing",
+    fields: [
+      "organicSegregationSop",
+      "cleaningLinelearanceSop",
+      "noProhibitedAids",
+    ],
+  },
+  {
+    key: "media",
+    label: "Section 12 — Media & Documents",
+    fields: [
+      "productCatalogs",
+      "certificates",
+      "warehousePhotos",
+      "videoLinks",
+    ],
+  },
 ];
 
 type SectionConfig = { enabled: boolean; requiredFields: string[] };
@@ -61,12 +192,16 @@ interface FormTemplate {
 }
 
 export default function FormTemplatesPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("suppliers") || hasEditPermission("new_suppliers");
+  const canEdit =
+    hasEditPermission("suppliers") || hasEditPermission("new_suppliers");
 
   const [editorOpen, setEditorOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<FormTemplate | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<FormTemplate | null>(
+    null,
+  );
   const [name, setName] = useState("");
   const [isDefault, setIsDefault] = useState(false);
   const [config, setConfig] = useState<TemplateConfig>(emptyConfig());
@@ -81,7 +216,11 @@ export default function FormTemplatesPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data: { name: string; config: TemplateConfig; isDefault: boolean }) =>
+    mutationFn: (data: {
+      name: string;
+      config: TemplateConfig;
+      isDefault: boolean;
+    }) =>
       editingTemplate
         ? api.put(`/supplier-form-templates/${editingTemplate.id}`, data)
         : api.post("/supplier-form-templates", data),
@@ -149,15 +288,26 @@ export default function FormTemplatesPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Form Templates</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Configure which sections appear in the public supplier form. Templates control what the supplier sees.
+            Configure which sections appear in the public supplier form.
+            Templates control what the supplier sees.
           </p>
         </div>
-        <PermissionGate permission="new_suppliers" editOnly>
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Template
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate("/suppliers/sourcing")}
+          >
+            <ArrowLeft className="h-4 w-4 mr-1.5" />
+            Back
           </Button>
-        </PermissionGate>
+          <PermissionGate permission="new_suppliers" editOnly>
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Template
+            </Button>
+          </PermissionGate>
+        </div>
       </div>
 
       {/* Template list */}
@@ -169,7 +319,9 @@ export default function FormTemplatesPage() {
         <div className="flex flex-col items-center justify-center py-16 text-slate-400">
           <LayoutTemplate className="h-10 w-10 mb-3 opacity-40" />
           <p className="font-medium">No templates yet</p>
-          <p className="text-sm mt-1">Create your first template to control what the public form shows</p>
+          <p className="text-sm mt-1">
+            Create your first template to control what the public form shows
+          </p>
           {canEdit && (
             <Button size="sm" className="mt-4" onClick={openCreate}>
               <Plus className="h-4 w-4 mr-1.5" />
@@ -180,9 +332,14 @@ export default function FormTemplatesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {templates.map((t) => {
-            const enabledSections = SECTIONS.filter((s) => t.config[s.key]?.enabled);
+            const enabledSections = SECTIONS.filter(
+              (s) => t.config[s.key]?.enabled,
+            );
             return (
-              <div key={t.id} className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+              <div
+                key={t.id}
+                className="bg-white rounded-xl border border-slate-200 p-4 space-y-3"
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <LayoutTemplate className="h-4 w-4 text-brand-600" />
@@ -196,25 +353,48 @@ export default function FormTemplatesPage() {
                   </div>
                   {canEdit && (
                     <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(t)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        onClick={() => openEdit(t)}
+                      >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:bg-red-50" onClick={() => setDeleteTarget(t)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-red-500 hover:bg-red-50"
+                        onClick={() => setDeleteTarget(t)}
+                      >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   )}
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-500 font-medium">Enabled sections ({enabledSections.length}):</p>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Enabled sections ({enabledSections.length}):
+                  </p>
                   <div className="flex flex-wrap gap-1">
                     {enabledSections.map((s) => (
-                      <span key={s.key} className="text-xs bg-brand-50 text-brand-700 rounded px-1.5 py-0.5">{s.label.split("—")[1]?.trim() ?? s.label}</span>
+                      <span
+                        key={s.key}
+                        className="text-xs bg-brand-50 text-brand-700 rounded px-1.5 py-0.5"
+                      >
+                        {s.label.split("—")[1]?.trim() ?? s.label}
+                      </span>
                     ))}
-                    {enabledSections.length === 0 && <span className="text-xs text-slate-400">No sections enabled</span>}
+                    {enabledSections.length === 0 && (
+                      <span className="text-xs text-slate-400">
+                        No sections enabled
+                      </span>
+                    )}
                   </div>
                 </div>
-                <p className="text-xs text-slate-400">{new Date(t.createdAt).toLocaleDateString()}</p>
+                <p className="text-xs text-slate-400">
+                  {new Date(t.createdAt).toLocaleDateString()}
+                </p>
               </div>
             );
           })}
@@ -224,16 +404,24 @@ export default function FormTemplatesPage() {
       {/* ── Template Editor Dialog ── */}
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogTitle>{editingTemplate ? "Edit Template" : "Create Template"}</DialogTitle>
+          <DialogTitle>
+            {editingTemplate ? "Edit Template" : "Create Template"}
+          </DialogTitle>
           <DialogDescription>
-            Choose which sections appear in the public supplier form. You can also mark individual fields as required.
+            Choose which sections appear in the public supplier form. You can
+            also mark individual fields as required.
           </DialogDescription>
 
           <div className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Template Name *</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Basic Intro Form" className="mt-1" />
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Basic Intro Form"
+                  className="mt-1"
+                />
               </div>
               <div className="flex items-end gap-2 pb-1">
                 <input
@@ -243,16 +431,26 @@ export default function FormTemplatesPage() {
                   onChange={(e) => setIsDefault(e.target.checked)}
                   className="h-4 w-4"
                 />
-                <Label htmlFor="isDefault" className="cursor-pointer">Set as default template</Label>
+                <Label htmlFor="isDefault" className="cursor-pointer">
+                  Set as default template
+                </Label>
               </div>
             </div>
 
             <div className="space-y-3">
-              <p className="text-sm font-medium text-slate-700">Form Sections</p>
+              <p className="text-sm font-medium text-slate-700">
+                Form Sections
+              </p>
               {SECTIONS.map((section) => {
-                const sectionCfg = config[section.key] ?? { enabled: false, requiredFields: [] };
+                const sectionCfg = config[section.key] ?? {
+                  enabled: false,
+                  requiredFields: [],
+                };
                 return (
-                  <div key={section.key} className={`border rounded-lg p-3 transition-colors ${sectionCfg.enabled ? "border-brand-200 bg-brand-50/30" : "border-slate-200"}`}>
+                  <div
+                    key={section.key}
+                    className={`border rounded-lg p-3 transition-colors ${sectionCfg.enabled ? "border-brand-200 bg-brand-50/30" : "border-slate-200"}`}
+                  >
                     <div className="flex items-center gap-3">
                       <input
                         type="checkbox"
@@ -261,21 +459,29 @@ export default function FormTemplatesPage() {
                         onChange={() => toggleSection(section.key)}
                         className="h-4 w-4"
                       />
-                      <Label htmlFor={`section-${section.key}`} className="cursor-pointer font-medium text-sm">
+                      <Label
+                        htmlFor={`section-${section.key}`}
+                        className="cursor-pointer font-medium text-sm"
+                      >
                         {section.label}
                       </Label>
                     </div>
 
                     {sectionCfg.enabled && (
                       <div className="mt-2 pl-7">
-                        <p className="text-xs text-slate-500 mb-1.5">Mark as required:</p>
+                        <p className="text-xs text-slate-500 mb-1.5">
+                          Mark as required:
+                        </p>
                         <div className="flex flex-wrap gap-1.5">
                           {section.fields.map((field) => {
-                            const required = sectionCfg.requiredFields.includes(field);
+                            const required =
+                              sectionCfg.requiredFields.includes(field);
                             return (
                               <button
                                 key={field}
-                                onClick={() => toggleRequired(section.key, field)}
+                                onClick={() =>
+                                  toggleRequired(section.key, field)
+                                }
                                 className={`text-xs rounded px-2 py-0.5 border transition-colors ${
                                   required
                                     ? "border-brand-400 bg-brand-100 text-brand-700 font-medium"
@@ -296,12 +502,16 @@ export default function FormTemplatesPage() {
           </div>
 
           <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-slate-100">
-            <Button variant="outline" onClick={() => setEditorOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setEditorOpen(false)}>
+              Cancel
+            </Button>
             <Button
               disabled={!name || saveMutation.isPending}
               onClick={() => saveMutation.mutate({ name, config, isDefault })}
             >
-              {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              {saveMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : null}
               {editingTemplate ? "Update Template" : "Create Template"}
             </Button>
           </div>
@@ -309,20 +519,30 @@ export default function FormTemplatesPage() {
       </Dialog>
 
       {/* ── Delete Confirm ── */}
-      <Dialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+      >
         <DialogContent className="max-w-sm">
           <DialogTitle>Delete Template?</DialogTitle>
           <DialogDescription>
-            This will permanently delete <strong>{deleteTarget?.name}</strong>. Existing form links won't be affected.
+            This will permanently delete <strong>{deleteTarget?.name}</strong>.
+            Existing form links won't be affected.
           </DialogDescription>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               disabled={deleteMutation.isPending}
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              onClick={() =>
+                deleteTarget && deleteMutation.mutate(deleteTarget.id)
+              }
             >
-              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : null}
               Delete
             </Button>
           </div>

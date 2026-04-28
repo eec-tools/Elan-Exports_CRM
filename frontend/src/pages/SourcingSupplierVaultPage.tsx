@@ -73,6 +73,7 @@ interface SourcingVaultSupplierItem {
   notes?: string;
   emailStatus: string;
   createdAt: string;
+  createdBy?: string | null;
   creator?: { fullName: string } | null;
 }
 
@@ -164,6 +165,14 @@ export default function SourcingVaultPage() {
   const [currentFolder, setCurrentFolder] = useState<VaultFolder | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [folderSearch, setFolderSearch] = useState("");
+
+  // ── Per-column filters (folder view) ──────────────
+  const [filterCompany, setFilterCompany] = useState("all");
+  const [filterContact, setFilterContact] = useState("all");
+  const [filterCountry, setFilterCountry] = useState("all");
+  const [filterProduct, setFilterProduct] = useState("all");
+  const [filterEmailStatus, setFilterEmailStatus] = useState("all");
   const [sourcedByFilter, setSourcedByFilter] = useState("all");
 
   const [newFolderOpen, setNewFolderOpen] = useState(false);
@@ -195,34 +204,60 @@ export default function SourcingVaultPage() {
     enabled: !!currentFolder,
   });
 
-  // ─── Folder view: vault suppliers query ───────────
+  // ─── Folder view: vault suppliers query (fetches all, filters client-side) ───
   const PAGE_SIZE = 20;
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: [
-      "sourcing-vault-suppliers",
-      currentFolder?.id,
-      search,
-      page,
-      sourcedByFilter,
-    ],
+  const { data: allSuppliers = [], isLoading: suppliersLoading } = useQuery<SourcingVaultSupplierItem[]>({
+    queryKey: ["sourcing-vault-suppliers", currentFolder?.id],
     queryFn: async () => {
-      const params = new URLSearchParams({ search });
-      if (sourcedByFilter !== "all") params.set("createdBy", sourcedByFilter);
-      const res = await api.get(
-        `/sourcing-vault/${currentFolder!.id}/suppliers?${params}`,
-      );
-      // backend returns a flat array; do client-side pagination
-      const all: SourcingVaultSupplierItem[] = res.data;
-      const total = all.length;
-      const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-      const data = all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-      return { data, pagination: { total, pages } };
+      const res = await api.get(`/sourcing-vault/${currentFolder!.id}/suppliers`);
+      return res.data;
     },
     enabled: !!currentFolder,
   });
 
-  const suppliers = suppliersData?.data ?? [];
-  const pagination = suppliersData?.pagination;
+  // ── Derive unique values for each filter dropdown ──
+  const uniqueCompanies = [...new Set(allSuppliers.map((s) => s.company).filter(Boolean))].sort();
+  const uniqueContacts = [...new Set(allSuppliers.map((s) => s.contactPerson ?? "").filter(Boolean))].sort();
+  const uniqueCountries = [...new Set(allSuppliers.map((s) => s.country ?? "").filter(Boolean))].sort();
+  const uniqueProducts = [...new Set(allSuppliers.map((s) => s.product ?? "").filter(Boolean))].sort();
+  const uniqueEmailStatuses = [...new Set(allSuppliers.map((s) => s.emailStatus).filter(Boolean))].sort();
+
+  // ── Apply all filters then paginate ───────────────
+  const filteredSuppliers = allSuppliers.filter((s) => {
+    const q = search.toLowerCase();
+    if (q && ![
+      s.company, s.email, s.contactPerson, s.country, s.product, s.notes,
+    ].some((v) => v?.toLowerCase().includes(q))) return false;
+    if (filterCompany !== "all" && s.company !== filterCompany) return false;
+    if (filterContact !== "all" && (s.contactPerson ?? "") !== filterContact) return false;
+    if (filterCountry !== "all" && (s.country ?? "") !== filterCountry) return false;
+    if (filterProduct !== "all" && (s.product ?? "") !== filterProduct) return false;
+    if (filterEmailStatus !== "all" && s.emailStatus !== filterEmailStatus) return false;
+    if (sourcedByFilter !== "all") {
+      const creatorName = creators.find((c) => c.id === sourcedByFilter)?.fullName;
+      if (s.creator?.fullName !== creatorName) return false;
+    }
+    return true;
+  });
+
+  const totalFiltered = filteredSuppliers.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const suppliers = filteredSuppliers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pagination = { total: totalFiltered, pages: totalPages };
+
+  const hasActiveFilters = filterCompany !== "all" || filterContact !== "all" ||
+    filterCountry !== "all" || filterProduct !== "all" ||
+    filterEmailStatus !== "all" || sourcedByFilter !== "all";
+
+  function resetAllFilters() {
+    setFilterCompany("all");
+    setFilterContact("all");
+    setFilterCountry("all");
+    setFilterProduct("all");
+    setFilterEmailStatus("all");
+    setSourcedByFilter("all");
+    setPage(1);
+  }
 
   // ─── Create folder mutation ────────────────────────
   const createFolderMutation = useMutation({
@@ -254,14 +289,14 @@ export default function SourcingVaultPage() {
     setCurrentFolder(folder);
     setSearch("");
     setPage(1);
-    setSourcedByFilter("all");
+    resetAllFilters();
   }
 
   function goToRoot() {
     setCurrentFolder(null);
     setSearch("");
     setPage(1);
-    setSourcedByFilter("all");
+    resetAllFilters();
   }
 
   const isAtRoot = currentFolder === null;
@@ -280,28 +315,41 @@ export default function SourcingVaultPage() {
           </p>
         </div>
 
-        {canEdit && (
-          <div className="flex gap-2">
-            {isAtRoot ? (
-              <Button
-                variant="outline"
-                onClick={() => setNewFolderOpen(true)}
-                className="gap-2"
-              >
-                <FolderPlus className="h-4 w-4" />
-                New Folder
-              </Button>
-            ) : (
-              <Button
-                onClick={() => setAddSupplierOpen(true)}
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Suppliers
-              </Button>
-            )}
-          </div>
-        )}
+        <div className="flex gap-2">
+          {!isAtRoot && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToRoot}
+              className="gap-1.5 font-medium"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Folders
+            </Button>
+          )}
+          {canEdit && (
+            <>
+              {isAtRoot ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setNewFolderOpen(true)}
+                  className="gap-2"
+                >
+                  <FolderPlus className="h-4 w-4" />
+                  New Folder
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => setAddSupplierOpen(true)}
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  List/Bulk Email Suppliers
+                </Button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Breadcrumb */}
@@ -327,30 +375,38 @@ export default function SourcingVaultPage() {
         )}
       </div>
 
-      {/* Back + Search + Sourced By filter */}
-      <div className="flex items-center gap-3">
-        {!isAtRoot && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={goToRoot}
-            className="gap-1 text-muted-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-        )}
-        {!isAtRoot && (
-          <div className="relative flex-1 max-w-sm">
+      {/* Root: folder search bar */}
+      {isAtRoot && folders.length > 0 && (
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search folders…"
+            className="pl-9"
+            value={folderSearch}
+            onChange={(e) => setFolderSearch(e.target.value)}
+          />
+          {folderSearch && (
+            <button
+              onClick={() => setFolderSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Folder view: search + column filters */}
+      {!isAtRoot && (
+        <div className="space-y-2">
+          {/* Text search */}
+          <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder={`Search in ${currentFolder?.name}…`}
               className="pl-9"
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             />
             {search && (
               <button
@@ -361,25 +417,83 @@ export default function SourcingVaultPage() {
               </button>
             )}
           </div>
-        )}
-        {!isAtRoot && creators.length > 0 && (
-          <select
-            value={sourcedByFilter}
-            onChange={(e) => {
-              setSourcedByFilter(e.target.value);
-              setPage(1);
-            }}
-            className="border border-border rounded-md text-sm px-3 h-9 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="all">All Employees</option>
-            {creators.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.fullName}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+
+          {/* Column filter dropdowns */}
+          <div className="flex flex-wrap items-center gap-2">
+            {uniqueCompanies.length > 0 && (
+              <select
+                value={filterCompany}
+                onChange={(e) => { setFilterCompany(e.target.value); setPage(1); }}
+                className="border border-border rounded-md text-sm px-3 h-8 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="all">All Companies</option>
+                {uniqueCompanies.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            )}
+            {uniqueContacts.length > 0 && (
+              <select
+                value={filterContact}
+                onChange={(e) => { setFilterContact(e.target.value); setPage(1); }}
+                className="border border-border rounded-md text-sm px-3 h-8 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="all">All Contacts</option>
+                {uniqueContacts.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            )}
+            {uniqueCountries.length > 0 && (
+              <select
+                value={filterCountry}
+                onChange={(e) => { setFilterCountry(e.target.value); setPage(1); }}
+                className="border border-border rounded-md text-sm px-3 h-8 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="all">All Countries</option>
+                {uniqueCountries.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            )}
+            {uniqueProducts.length > 0 && (
+              <select
+                value={filterProduct}
+                onChange={(e) => { setFilterProduct(e.target.value); setPage(1); }}
+                className="border border-border rounded-md text-sm px-3 h-8 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="all">All Products</option>
+                {uniqueProducts.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            )}
+            {uniqueEmailStatuses.length > 0 && (
+              <select
+                value={filterEmailStatus}
+                onChange={(e) => { setFilterEmailStatus(e.target.value); setPage(1); }}
+                className="border border-border rounded-md text-sm px-3 h-8 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="all">All Statuses</option>
+                {uniqueEmailStatuses.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            )}
+            {creators.length > 0 && (
+              <select
+                value={sourcedByFilter}
+                onChange={(e) => { setSourcedByFilter(e.target.value); setPage(1); }}
+                className="border border-border rounded-md text-sm px-3 h-8 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="all">All Employees</option>
+                {creators.map((c) => (
+                  <option key={c.id} value={c.id}>{c.fullName}</option>
+                ))}
+              </select>
+            )}
+            {hasActiveFilters && (
+              <button
+                onClick={resetAllFilters}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted transition-colors"
+              >
+                <X className="h-3 w-3" />
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Root view: folders grid ── */}
       {isAtRoot && (
@@ -408,10 +522,10 @@ export default function SourcingVaultPage() {
           ) : (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                Folders
+                Folders {folderSearch && `· ${folders.filter((f) => f.name.toLowerCase().includes(folderSearch.toLowerCase())).length} result${folders.filter((f) => f.name.toLowerCase().includes(folderSearch.toLowerCase())).length !== 1 ? "s" : ""}`}
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                {folders.map((folder) => {
+                {folders.filter((f) => f.name.toLowerCase().includes(folderSearch.toLowerCase())).map((folder) => {
                   const { Icon, gradient } = folderStyle(folder.name);
                   return (
                     <div key={folder.id} className="group relative">
@@ -848,7 +962,8 @@ function BulkAddDialog({
     const newErrors = new Set<number>();
     rows.forEach((r, i) => {
       const hasAnyData = Object.values(r).some((v) => v.trim());
-      if (hasAnyData && (!r.company.trim() || !r.email.trim())) newErrors.add(i);
+      if (hasAnyData && (!r.company.trim() || !r.email.trim()))
+        newErrors.add(i);
     });
 
     if (newErrors.size > 0) {

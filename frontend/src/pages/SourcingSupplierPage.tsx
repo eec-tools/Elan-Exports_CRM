@@ -26,6 +26,7 @@ import {
   Mail,
   ExternalLink,
   LayoutTemplate,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -52,6 +53,8 @@ interface SourcingSupplier {
     followup2SentAt?: string;
     followup3SentAt?: string;
   } | null;
+  createdBy?: string | null;
+  creator?: { fullName: string } | null;
   createdAt: string;
 }
 
@@ -70,35 +73,82 @@ interface Stats {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
-  pending:           { label: "Pending",            class: "bg-slate-100 text-slate-700" },
-  intro_sent:        { label: "Intro Sent",          class: "bg-blue-100 text-blue-700" },
-  followup1_sent:    { label: "Follow-up 1 Sent",    class: "bg-amber-100 text-amber-700" },
-  followup2_sent:    { label: "Follow-up 2 Sent",    class: "bg-orange-100 text-orange-700" },
-  followup3_sent:    { label: "Follow-up 3 Sent",    class: "bg-red-100 text-red-700" },
-  response_received: { label: "Responded",           class: "bg-green-100 text-green-700" },
-  no_response:       { label: "No Response",         class: "bg-red-100 text-red-700" },
-  converted_to_new:  { label: "Converted",           class: "bg-purple-100 text-purple-700" },
-  converted:         { label: "Converted",           class: "bg-purple-100 text-purple-700" },
+  pending: { label: "Pending", class: "bg-slate-100 text-slate-700" },
+  intro_sent: { label: "Intro Sent", class: "bg-blue-100 text-blue-700" },
+  followup1_sent: {
+    label: "Follow-up 1 Sent",
+    class: "bg-amber-100 text-amber-700",
+  },
+  followup2_sent: {
+    label: "Follow-up 2 Sent",
+    class: "bg-orange-100 text-orange-700",
+  },
+  followup3_sent: {
+    label: "Follow-up 3 Sent",
+    class: "bg-red-100 text-red-700",
+  },
+  response_received: {
+    label: "Responded",
+    class: "bg-green-100 text-green-700",
+  },
+  no_response: { label: "No Response", class: "bg-red-100 text-red-700" },
+  converted_to_new: {
+    label: "Converted",
+    class: "bg-purple-100 text-purple-700",
+  },
+  // 'converted' is a legacy alias — same display as converted_to_new
+  converted: { label: "Converted", class: "bg-purple-100 text-purple-700" },
 };
 
-const CAMPAIGN_STEP_LABEL: Record<number, string> = {
-  1: "Intro Sent",
-  2: "Follow-up 1 Sent",
-  3: "Follow-up 2 Sent",
-  4: "Follow-up 3 Sent",
-};
+// Deduplicated status options for the filter dropdown
+const STATUS_FILTER_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "intro_sent", label: "Intro Sent" },
+  { value: "followup1_sent", label: "Follow-up 1 Sent" },
+  { value: "followup2_sent", label: "Follow-up 2 Sent" },
+  { value: "followup3_sent", label: "Follow-up 3 Sent" },
+  { value: "response_received", label: "Responded" },
+  { value: "no_response", label: "No Response" },
+  { value: "converted_to_new", label: "Converted" },
+];
 
 export default function SourcingSupplierPage() {
   const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("suppliers") || hasEditPermission("sourcing_suppliers");
+  const canEdit =
+    hasEditPermission("suppliers") || hasEditPermission("sourcing_suppliers");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [filterCompany, setFilterCompany] = useState("all");
+  const [filterContact, setFilterContact] = useState("all");
+  const [filterCountry, setFilterCountry] = useState("all");
+  const [filterProduct, setFilterProduct] = useState("all");
+  const [filterSourcedBy, setFilterSourcedBy] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<SourcingSupplier | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SourcingSupplier | null>(
+    null,
+  );
+
+  const hasActiveFilters =
+    statusFilter !== "all" ||
+    filterCompany !== "all" ||
+    filterContact !== "all" ||
+    filterCountry !== "all" ||
+    filterProduct !== "all" ||
+    filterSourcedBy !== "all";
+
+  function resetAllFilters() {
+    setStatusFilter("all");
+    setFilterCompany("all");
+    setFilterContact("all");
+    setFilterCountry("all");
+    setFilterProduct("all");
+    setFilterSourcedBy("all");
+    setPage(1);
+  }
 
   // From-folder create state
   const [selectedFolderId, setSelectedFolderId] = useState("");
@@ -107,18 +157,46 @@ export default function SourcingSupplierPage() {
 
   // ─── Queries ────────────────────────────────────────
   const { data, isLoading } = useQuery({
-    queryKey: ["sourcing-suppliers", search, page, statusFilter],
+    queryKey: ["sourcing-suppliers", search, page, statusFilter, filterCompany, filterContact, filterCountry, filterProduct, filterSourcedBy],
     queryFn: async () => {
       const params = new URLSearchParams({
         search,
         page: String(page),
         limit: "20",
         ...(statusFilter !== "all" && { status: statusFilter }),
+        ...(filterCompany !== "all" && { company: filterCompany }),
+        ...(filterContact !== "all" && { contactPerson: filterContact }),
+        ...(filterCountry !== "all" && { country: filterCountry }),
+        ...(filterProduct !== "all" && { product: filterProduct }),
+        ...(filterSourcedBy !== "all" && { createdBy: filterSourcedBy }),
       });
       const res = await api.get(`/sourcing-suppliers?${params}`);
-      return res.data as { data: SourcingSupplier[]; pagination: { total: number; pages: number } };
+      return res.data as {
+        data: SourcingSupplier[];
+        pagination: { total: number; pages: number };
+      };
     },
   });
+
+  // Fetch all suppliers (no filters) to derive unique dropdown values
+  const { data: allSuppliersData } = useQuery({
+    queryKey: ["sourcing-suppliers-all"],
+    queryFn: async () => {
+      const res = await api.get("/sourcing-suppliers?limit=9999");
+      return res.data as { data: SourcingSupplier[] };
+    },
+  });
+  const allSuppliers = allSuppliersData?.data ?? [];
+  const uniqueCompanies = [...new Set(allSuppliers.map((s) => s.company).filter(Boolean))].sort();
+  const uniqueContacts = [...new Set(allSuppliers.map((s) => s.contactPerson ?? "").filter(Boolean))].sort();
+  const uniqueCountries = [...new Set(allSuppliers.map((s) => s.country ?? "").filter(Boolean))].sort();
+  const uniqueProducts = [...new Set(allSuppliers.map((s) => s.product ?? "").filter(Boolean))].sort();
+  const uniqueCreators = allSuppliers.reduce<{ id: string; name: string }[]>((acc, s) => {
+    if (s.createdBy && s.creator?.fullName && !acc.find((x) => x.id === s.createdBy)) {
+      acc.push({ id: s.createdBy, name: s.creator.fullName });
+    }
+    return acc;
+  }, []).sort((a, b) => a.name.localeCompare(b.name));
 
   const { data: stats } = useQuery({
     queryKey: ["sourcing-suppliers-stats"],
@@ -158,8 +236,16 @@ export default function SourcingSupplierPage() {
   const { data: notSentSuppliers = [], isLoading: notSentLoading } = useQuery({
     queryKey: ["vault-not-sent", selectedFolderId],
     queryFn: async () => {
-      const res = await api.get(`/sourcing-suppliers/from-folder?folderId=${selectedFolderId}`);
-      return res.data as { id: string; company: string; email?: string; country?: string; product?: string }[];
+      const res = await api.get(
+        `/sourcing-suppliers/from-folder?folderId=${selectedFolderId}`,
+      );
+      return res.data as {
+        id: string;
+        company: string;
+        email?: string;
+        country?: string;
+        product?: string;
+      }[];
     },
     enabled: !!selectedFolderId && createOpen,
   });
@@ -181,7 +267,9 @@ export default function SourcingSupplierPage() {
       setSelectedFolderId("");
       setSelectedGmailAccount("");
       setSelectedTemplateId("");
-      toast.success(`Added ${res.data.added} supplier${res.data.added !== 1 ? "s" : ""} to pipeline`);
+      toast.success(
+        `Added ${res.data.added} supplier${res.data.added !== 1 ? "s" : ""} to pipeline`,
+      );
     },
     onError: () => toast.error("Failed to add suppliers"),
   });
@@ -209,7 +297,8 @@ export default function SourcingSupplierPage() {
   });
 
   const markSentMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/sourcing-campaigns/${id}/send-followup`),
+    mutationFn: (id: string) =>
+      api.post(`/sourcing-campaigns/${id}/send-followup`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
@@ -219,7 +308,8 @@ export default function SourcingSupplierPage() {
   });
 
   const markResponseMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/sourcing-campaigns/${id}/mark-response`),
+    mutationFn: (id: string) =>
+      api.post(`/sourcing-campaigns/${id}/mark-response`),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
@@ -229,7 +319,6 @@ export default function SourcingSupplierPage() {
     },
     onError: () => toast.error("Failed to record response"),
   });
-
 
   // ─── Helpers ────────────────────────────────────────
   const copyFormLink = async (supplier: SourcingSupplier) => {
@@ -256,11 +345,19 @@ export default function SourcingSupplierPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Sourcing Suppliers</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Track outreach campaigns and manage supplier introduction forms</p>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Sourcing Suppliers
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Track outreach campaigns and manage supplier introduction forms
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate("/suppliers/form-templates")}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/suppliers/form-templates")}
+          >
             <LayoutTemplate className="h-4 w-4 mr-1.5" />
             Form Templates
           </Button>
@@ -278,12 +375,31 @@ export default function SourcingSupplierPage() {
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: "Total", value: stats.total, color: "text-slate-700" },
-            { label: "Active Campaigns", value: stats.activeCampaigns, color: "text-blue-700" },
-            { label: "Responded", value: stats.responseReceived, color: "text-green-700" },
-            { label: "Converted", value: stats.converted, color: "text-purple-700" },
-            { label: "No Response", value: stats.noResponse, color: "text-red-700" },
+            {
+              label: "Active Campaigns",
+              value: stats.activeCampaigns,
+              color: "text-blue-700",
+            },
+            {
+              label: "Responded",
+              value: stats.responseReceived,
+              color: "text-green-700",
+            },
+            {
+              label: "Converted",
+              value: stats.converted,
+              color: "text-purple-700",
+            },
+            {
+              label: "No Response",
+              value: stats.noResponse,
+              color: "text-red-700",
+            },
           ].map((s) => (
-            <div key={s.label} className="bg-white rounded-xl border border-slate-200 px-4 py-3">
+            <div
+              key={s.label}
+              className="bg-white rounded-xl border border-slate-200 px-4 py-3"
+            >
               <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
               <div className="text-xs text-slate-500 mt-0.5">{s.label}</div>
             </div>
@@ -292,8 +408,9 @@ export default function SourcingSupplierPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="space-y-2">
+        {/* Text search */}
+        <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             placeholder="Search by company, email, product..."
@@ -302,16 +419,79 @@ export default function SourcingSupplierPage() {
             className="pl-9 h-9"
           />
         </div>
-        <select
-          className="border border-slate-200 rounded-md text-sm px-3 h-9 bg-white text-slate-700"
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-        >
-          <option value="all">All Statuses</option>
-          {Object.entries(STATUS_CONFIG).map(([key, val]) => (
-            <option key={key} value={key}>{val.label}</option>
-          ))}
-        </select>
+
+        {/* Column filter dropdowns */}
+        <div className="flex flex-wrap items-center gap-2">
+          {uniqueCompanies.length > 0 && (
+            <select
+              value={filterCompany}
+              onChange={(e) => { setFilterCompany(e.target.value); setPage(1); }}
+              className="border border-slate-200 rounded-md text-sm px-3 h-8 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="all">All Companies</option>
+              {uniqueCompanies.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          )}
+          {uniqueContacts.length > 0 && (
+            <select
+              value={filterContact}
+              onChange={(e) => { setFilterContact(e.target.value); setPage(1); }}
+              className="border border-slate-200 rounded-md text-sm px-3 h-8 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="all">All Contacts</option>
+              {uniqueContacts.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          )}
+          {uniqueCountries.length > 0 && (
+            <select
+              value={filterCountry}
+              onChange={(e) => { setFilterCountry(e.target.value); setPage(1); }}
+              className="border border-slate-200 rounded-md text-sm px-3 h-8 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="all">All Countries</option>
+              {uniqueCountries.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          )}
+          {uniqueProducts.length > 0 && (
+            <select
+              value={filterProduct}
+              onChange={(e) => { setFilterProduct(e.target.value); setPage(1); }}
+              className="border border-slate-200 rounded-md text-sm px-3 h-8 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="all">All Products</option>
+              {uniqueProducts.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          )}
+          <select
+            className="border border-slate-200 rounded-md text-sm px-3 h-8 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          >
+            <option value="all">All Statuses</option>
+            {STATUS_FILTER_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          {uniqueCreators.length > 0 && (
+            <select
+              value={filterSourcedBy}
+              onChange={(e) => { setFilterSourcedBy(e.target.value); setPage(1); }}
+              className="border border-slate-200 rounded-md text-sm px-3 h-8 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="all">All Employees</option>
+              {uniqueCreators.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
+          {hasActiveFilters && (
+            <button
+              onClick={resetAllFilters}
+              className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded-md hover:bg-slate-100 transition-colors"
+            >
+              <span className="text-base leading-none">&times;</span>
+              Clear filters
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -324,80 +504,138 @@ export default function SourcingSupplierPage() {
           <div className="flex flex-col items-center justify-center py-16 text-slate-400">
             <Building2 className="h-10 w-10 mb-3 opacity-40" />
             <p className="font-medium">No sourcing suppliers found</p>
-            <p className="text-sm mt-1">Add your first supplier to start tracking outreach</p>
+            <p className="text-sm mt-1">
+              Add your first supplier to start tracking outreach
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="text-left font-medium text-slate-500 px-4 py-3">Company</th>
-                  <th className="text-left font-medium text-slate-500 px-4 py-3">Contact</th>
-                  <th className="text-left font-medium text-slate-500 px-4 py-3">Product</th>
-                  <th className="text-left font-medium text-slate-500 px-4 py-3">Status</th>
-                  <th className="text-left font-medium text-slate-500 px-4 py-3">Campaign</th>
-                  <th className="text-left font-medium text-slate-500 px-4 py-3">Next Follow-up</th>
-                  <th className="text-right font-medium text-slate-500 px-4 py-3">Actions</th>
+                  <th className="text-left font-medium text-slate-500 px-4 py-3">
+                    Company
+                  </th>
+                  <th className="text-left font-medium text-slate-500 px-4 py-3">
+                    Contact
+                  </th>
+                  <th className="text-left font-medium text-slate-500 px-4 py-3">
+                    Product
+                  </th>
+                  <th className="text-left font-medium text-slate-500 px-4 py-3">
+                    Sourced By
+                  </th>
+                  <th className="text-left font-medium text-slate-500 px-4 py-3">
+                    Status
+                  </th>
+                  <th className="text-left font-medium text-slate-500 px-4 py-3">
+                    Next Follow-up
+                  </th>
+                  <th className="text-right font-medium text-slate-500 px-4 py-3">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {suppliers.map((s) => {
-                  const statusCfg = STATUS_CONFIG[s.status] ?? { label: s.status, class: "bg-slate-100 text-slate-700" };
+                  const statusCfg = STATUS_CONFIG[s.status] ?? {
+                    label: s.status,
+                    class: "bg-slate-100 text-slate-700",
+                  };
                   const campaign = s.emailCampaign;
                   const due = campaign?.nextFollowupDue;
                   const overdue = isOverdue(due);
 
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
+                    <tr
+                      key={s.id}
+                      className="hover:bg-slate-50 transition-colors group"
+                    >
                       {/* Company */}
                       <td className="px-4 py-3">
                         <button
-                          onClick={() => navigate(`/suppliers/sourcing/${s.id}`)}
+                          onClick={() =>
+                            navigate(`/suppliers/sourcing/${s.id}`)
+                          }
                           className="font-medium text-slate-900 hover:text-brand-600 text-left"
                         >
                           {s.company}
                         </button>
-                        {s.country && <div className="text-xs text-slate-400">{s.country}</div>}
+                        {s.country && (
+                          <div className="text-xs text-slate-400">
+                            {s.country}
+                          </div>
+                        )}
                         {s.assignedGmailAccount && (
                           <div className="flex items-center gap-1 mt-0.5">
                             <Mail className="h-3 w-3 text-slate-400" />
-                            <span className="text-xs text-slate-400 truncate max-w-35">{s.assignedGmailAccount}</span>
+                            <span className="text-xs text-slate-400 truncate max-w-35">
+                              {s.assignedGmailAccount}
+                            </span>
                           </div>
                         )}
                         {!s.assignedGmailAccount && s.status === "pending" && (
-                          <div className="text-xs text-amber-500 mt-0.5">No email account</div>
+                          <div className="text-xs text-amber-500 mt-0.5">
+                            No email account
+                          </div>
                         )}
                       </td>
 
                       {/* Contact */}
                       <td className="px-4 py-3">
-                        <div className="text-slate-700">{s.contactPerson ?? "—"}</div>
-                        {s.email && <div className="text-xs text-slate-400">{s.email}</div>}
+                        <div className="text-slate-700">
+                          {s.contactPerson ?? "—"}
+                        </div>
+                        {s.email && (
+                          <div className="text-xs text-slate-400">
+                            {s.email}
+                          </div>
+                        )}
                       </td>
 
                       {/* Product */}
                       <td className="px-4 py-3">
                         <div className="text-slate-700">{s.product ?? "—"}</div>
-                        {s.productCategory && <div className="text-xs text-slate-400">{s.productCategory}</div>}
+                        {s.productCategory && (
+                          <div className="text-xs text-slate-400">
+                            {s.productCategory}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Sourced By */}
+                      <td className="px-4 py-3">
+                        {s.creator ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                              <Users className="h-3 w-3 text-emerald-600" />
+                            </div>
+                            <span className="text-sm text-slate-700">
+                              {s.creator.fullName}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
 
                       {/* Status */}
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCfg.class}`}>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCfg.class}`}
+                        >
                           {statusCfg.label}
                         </span>
-                      </td>
-
-                      {/* Campaign step */}
-                      <td className="px-4 py-3 text-slate-500">
-                        {campaign ? CAMPAIGN_STEP_LABEL[campaign.currentStep] ?? `Step ${campaign.currentStep}` : "—"}
                       </td>
 
                       {/* Next follow-up */}
                       <td className="px-4 py-3">
                         {due ? (
-                          <span className={`text-xs font-medium ${overdue ? "text-red-600" : "text-slate-600"}`}>
-                            {overdue ? "Overdue · " : ""}{new Date(due).toLocaleDateString()}
+                          <span
+                            className={`text-xs font-medium ${overdue ? "text-red-600" : "text-slate-600"}`}
+                          >
+                            {overdue ? "Overdue · " : ""}
+                            {new Date(due).toLocaleDateString()}
                           </span>
                         ) : (
                           <span className="text-slate-400 text-xs">—</span>
@@ -409,7 +647,12 @@ export default function SourcingSupplierPage() {
                         <div className="flex items-center gap-1.5 justify-end flex-wrap">
                           {/* Copy form link */}
                           {s.formToken && (
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => copyFormLink(s)}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => copyFormLink(s)}
+                            >
                               <Copy className="h-3.5 w-3.5 mr-1" />
                               Form Link
                             </Button>
@@ -418,39 +661,50 @@ export default function SourcingSupplierPage() {
                           {canEdit && (
                             <>
                               {/* Start campaign */}
-                              {!campaign && s.status !== "converted" && s.status !== "converted_to_new" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className={`h-7 px-2 text-xs ${!s.assignedGmailAccount ? "opacity-50 cursor-not-allowed" : ""}`}
-                                  title={!s.assignedGmailAccount ? "Assign a Gmail account first (open supplier details)" : "Send intro email"}
-                                  onClick={() => {
-                                    if (!s.assignedGmailAccount) {
-                                      toast.error("No Gmail account assigned — open supplier details to set one");
-                                      return;
+                              {!campaign &&
+                                s.status !== "converted" &&
+                                s.status !== "converted_to_new" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className={`h-7 px-2 text-xs ${!s.assignedGmailAccount ? "opacity-50 cursor-not-allowed" : ""}`}
+                                    title={
+                                      !s.assignedGmailAccount
+                                        ? "Assign a Gmail account first (open supplier details)"
+                                        : "Send intro email"
                                     }
-                                    startCampaignMutation.mutate(s.id);
-                                  }}
-                                  disabled={startCampaignMutation.isPending}
-                                >
-                                  <Mail className="h-3.5 w-3.5 mr-1" />
-                                  Start
-                                </Button>
-                              )}
+                                    onClick={() => {
+                                      if (!s.assignedGmailAccount) {
+                                        toast.error(
+                                          "No Gmail account assigned — open supplier details to set one",
+                                        );
+                                        return;
+                                      }
+                                      startCampaignMutation.mutate(s.id);
+                                    }}
+                                    disabled={startCampaignMutation.isPending}
+                                  >
+                                    <Mail className="h-3.5 w-3.5 mr-1" />
+                                    Start
+                                  </Button>
+                                )}
 
                               {/* Send next follow-up (only if campaign active and steps remain) */}
-                              {campaign?.status === "active" && campaign.currentStep < 4 && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className={`h-7 px-2 text-xs ${overdue ? "border-amber-400 text-amber-700 hover:bg-amber-50" : ""}`}
-                                  onClick={() => markSentMutation.mutate(s.id)}
-                                  disabled={markSentMutation.isPending}
-                                >
-                                  <Mail className="h-3.5 w-3.5 mr-1" />
-                                  Send FU{campaign.currentStep}
-                                </Button>
-                              )}
+                              {campaign?.status === "active" &&
+                                campaign.currentStep < 4 && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className={`h-7 px-2 text-xs ${overdue ? "border-amber-400 text-amber-700 hover:bg-amber-50" : ""}`}
+                                    onClick={() =>
+                                      markSentMutation.mutate(s.id)
+                                    }
+                                    disabled={markSentMutation.isPending}
+                                  >
+                                    <Mail className="h-3.5 w-3.5 mr-1" />
+                                    Send FU{campaign.currentStep}
+                                  </Button>
+                                )}
 
                               {/* Mark responded — auto-converts to New Supplier */}
                               {campaign?.status === "active" && (
@@ -458,7 +712,9 @@ export default function SourcingSupplierPage() {
                                   size="sm"
                                   variant="outline"
                                   className="h-7 px-2 text-xs border-green-400 text-green-700 hover:bg-green-50"
-                                  onClick={() => markResponseMutation.mutate(s.id)}
+                                  onClick={() =>
+                                    markResponseMutation.mutate(s.id)
+                                  }
                                   disabled={markResponseMutation.isPending}
                                 >
                                   <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
@@ -483,7 +739,9 @@ export default function SourcingSupplierPage() {
                             size="sm"
                             variant="ghost"
                             className="h-7 px-2 text-xs"
-                            onClick={() => navigate(`/suppliers/sourcing/${s.id}`)}
+                            onClick={() =>
+                              navigate(`/suppliers/sourcing/${s.id}`)
+                            }
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
                           </Button>
@@ -502,13 +760,24 @@ export default function SourcingSupplierPage() {
       {pagination && pagination.pages > 1 && (
         <div className="flex items-center justify-between text-sm text-slate-500">
           <span>
-            Showing {((page - 1) * 20) + 1}–{Math.min(page * 20, pagination.total)} of {pagination.total}
+            Showing {(page - 1) * 20 + 1}–
+            {Math.min(page * 20, pagination.total)} of {pagination.total}
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page === 1}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page === 1}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= pagination.pages}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= pagination.pages}
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -530,7 +799,8 @@ export default function SourcingSupplierPage() {
         <DialogContent className="max-w-lg">
           <DialogTitle>Add Sourcing Supplier</DialogTitle>
           <DialogDescription>
-            Select a Sourcing Vault folder to pull in all "Not Sent" staged suppliers.
+            Select a Sourcing Vault folder to pull in all "Not Sent" staged
+            suppliers.
           </DialogDescription>
 
           <div className="mt-3 space-y-4">
@@ -539,12 +809,16 @@ export default function SourcingSupplierPage() {
               <Label>Select Folder *</Label>
               <select
                 value={selectedFolderId}
-                onChange={(e) => { setSelectedFolderId(e.target.value); }}
+                onChange={(e) => {
+                  setSelectedFolderId(e.target.value);
+                }}
                 className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
               >
                 <option value="">Choose a vault folder…</option>
                 {vaultFolders.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -562,16 +836,24 @@ export default function SourcingSupplierPage() {
                   </div>
                 ) : notSentSuppliers.length === 0 ? (
                   <div className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    No "Not Sent" suppliers in this folder. Use the Sourcing Vault to add suppliers first.
+                    No "Not Sent" suppliers in this folder. Use the Sourcing
+                    Vault to add suppliers first.
                   </div>
                 ) : (
                   <div className="mt-1 max-h-44 overflow-y-auto rounded-md border border-slate-200 divide-y divide-slate-100">
                     {notSentSuppliers.map((s) => (
-                      <div key={s.id} className="flex items-center gap-3 px-3 py-2">
+                      <div
+                        key={s.id}
+                        className="flex items-center gap-3 px-3 py-2"
+                      >
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-800 truncate">{s.company}</p>
+                          <p className="text-sm font-medium text-slate-800 truncate">
+                            {s.company}
+                          </p>
                           <p className="text-xs text-slate-400 truncate">
-                            {[s.email, s.country, s.product].filter(Boolean).join(" · ") || "—"}
+                            {[s.email, s.country, s.product]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
                           </p>
                         </div>
                       </div>
@@ -580,7 +862,9 @@ export default function SourcingSupplierPage() {
                 )}
                 {notSentSuppliers.length > 0 && (
                   <p className="text-xs text-slate-400 mt-1">
-                    {notSentSuppliers.length} supplier{notSentSuppliers.length !== 1 ? "s" : ""} will be added to the pipeline
+                    {notSentSuppliers.length} supplier
+                    {notSentSuppliers.length !== 1 ? "s" : ""} will be added to
+                    the pipeline
                   </p>
                 )}
               </div>
@@ -592,7 +876,10 @@ export default function SourcingSupplierPage() {
               {connectedAccounts.length === 0 ? (
                 <div className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
                   No Gmail accounts connected.{" "}
-                  <a href="/settings/gmail" className="underline font-medium">Connect one</a> before starting campaigns.
+                  <a href="/settings/gmail" className="underline font-medium">
+                    Connect one
+                  </a>{" "}
+                  before starting campaigns.
                 </div>
               ) : (
                 <select
@@ -602,7 +889,9 @@ export default function SourcingSupplierPage() {
                 >
                   <option value="">Select sending account (optional)…</option>
                   {connectedAccounts.map((a) => (
-                    <option key={a.email} value={a.email}>{a.email}</option>
+                    <option key={a.email} value={a.email}>
+                      {a.email}
+                    </option>
                   ))}
                 </select>
               )}
@@ -619,16 +908,21 @@ export default function SourcingSupplierPage() {
                 <option value="">Default form</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name}{t.isDefault ? " (Default)" : ""}
+                    {t.name}
+                    {t.isDefault ? " (Default)" : ""}
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-slate-400 mt-1">Overrides the template used during vault staging</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Overrides the template used during vault staging
+              </p>
             </div>
           </div>
 
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
             <Button
               disabled={
                 !selectedFolderId ||
@@ -638,7 +932,9 @@ export default function SourcingSupplierPage() {
               }
               onClick={() => addFromFolderMutation.mutate()}
             >
-              {addFromFolderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              {addFromFolderMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : null}
               Add Supplier{notSentSuppliers.length > 1 ? "s" : ""}
             </Button>
           </div>
@@ -646,26 +942,36 @@ export default function SourcingSupplierPage() {
       </Dialog>
 
       {/* ── Delete Confirm ────────────────────────────── */}
-      <Dialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+      >
         <DialogContent className="max-w-sm">
           <DialogTitle>Delete Supplier?</DialogTitle>
           <DialogDescription>
-            This will permanently delete <strong>{deleteTarget?.company}</strong> and any associated campaign data. This action cannot be undone.
+            This will permanently delete{" "}
+            <strong>{deleteTarget?.company}</strong> and any associated campaign
+            data. This action cannot be undone.
           </DialogDescription>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               disabled={deleteMutation.isPending}
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              onClick={() =>
+                deleteTarget && deleteMutation.mutate(deleteTarget.id)
+              }
             >
-              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : null}
               Delete
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }
