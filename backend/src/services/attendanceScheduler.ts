@@ -27,7 +27,7 @@ async function createUserCheckoutReminder(params: {
       data: {
         type: "attendance_checkout_warning",
         title: "Checkout Reminder",
-        message: "Hurry up! Please check out in the next 10 minutes, otherwise your attendance will be auto-ended and counted as present.",
+        message: "Hurry up! Please check out in the next 10 minutes, otherwise your attendance will be auto-ended.",
         entityType: "attendance",
         entityId: params.attendanceId,
         entityName: `${params.fullName} Attendance`,
@@ -299,7 +299,7 @@ async function closePreviousDayOpenAttendances(): Promise<void> {
         attendance.heartbeats,
       );
 
-      // STRICT: stale open sessions = Absent
+      // User checked in but never checked out — count as Present
       await prisma.attendance.update({
         where: { id: attendance.id },
         data: {
@@ -307,7 +307,7 @@ async function closePreviousDayOpenAttendances(): Promise<void> {
           totalTimeMinutes: summary.totalTimeMinutes,
           idleTimeMinutes: 0,
           realTimeMinutes: summary.totalTimeMinutes,
-          status: AttendanceStatus.Absent,
+          status: AttendanceStatus.Present,
           earlyLogout: false,
           autoEnded: true,
         },

@@ -248,6 +248,14 @@ function getDateRangeParams(range: string): { from: string; to: string } {
 /* ─── Status Pill ──────────────────────────────────── */
 
 function StatusPill({ status, autoEnded }: { status: AttendanceStatus; autoEnded?: boolean }) {
+  if (autoEnded && status === "Present") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+        <Zap className="h-3 w-3" />
+        Auto-Present
+      </span>
+    );
+  }
   if (autoEnded) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
@@ -848,7 +856,7 @@ export default function AttendanceDashboardPage() {
               <StatCard label="Check Out" value={isDone ? formatDateTime(attendance.endTime) : "In Progress"} icon={LogOut} color={isDone ? "blue" : "amber"} />
               <StatCard
                 label="Status"
-                value={attendance.autoEnded ? "Auto-Absent" : attendance.status}
+                value={attendance.autoEnded ? (attendance.status === "Present" ? "Auto-Present" : "Auto-Absent") : attendance.status}
                 icon={Eye}
                 color={attendance.status === "Present" ? "emerald" : "rose"}
               />
@@ -897,7 +905,7 @@ export default function AttendanceDashboardPage() {
                 <StatCard label="Total Days" value={historyQuery.data.summary.totalDays} icon={Calendar} color="slate" />
                 <StatCard label="Present" value={historyQuery.data.summary.presentDays} icon={Eye} color="emerald" />
                 <StatCard label="Absent" value={historyQuery.data.summary.absentDays} icon={Eye} color="rose" />
-                <StatCard label="Auto-Absent" value={historyQuery.data.summary.autoEndedDays} icon={Zap} color="amber" />
+                <StatCard label="Auto-Present" value={historyQuery.data.summary.autoEndedDays} icon={Zap} color="emerald" />
               </div>
 
               {/* History Table */}
@@ -1223,7 +1231,7 @@ export default function AttendanceDashboardPage() {
                               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                                 isSelected ? "bg-slate-700 text-slate-300" : "bg-slate-100 border border-slate-200 text-slate-600"
                               }`}>
-                                <Zap className="h-3 w-3 mr-1" />{u.autoEndedDays}× Auto-Absent
+                                <Zap className="h-3 w-3 mr-1" />{u.autoEndedDays}× Auto-Present
                               </span>
                             )}
                           </div>
