@@ -336,6 +336,7 @@ model NewSupplier {
   updatedAt                  DateTime                  @updatedAt @map("updated_at")
   email                      String?
   phone                      String?
+  website                    String?
   supplierStage              String                    @default("Onboarding") @map("supplier_stage")
   formToken                  String?                   @unique @map("form_token")
   emailCampaign              NewSupplierEmailCampaign?

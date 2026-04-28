@@ -114,6 +114,7 @@ interface Supplier {
   notes?: string;
   phone?: string;
   email?: string;
+  website?: string;
   supplierStage?: string;
   // Section 1 — Identity
   tradeName?: string;
@@ -1482,6 +1483,17 @@ export default function NewSuppliersPage() {
                     onChange={(e) =>
                       setForm({ ...form, email: e.target.value })
                     }
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Website</Label>
+                  <Input
+                    type="url"
+                    value={form.website ?? ""}
+                    onChange={(e) =>
+                      setForm({ ...form, website: e.target.value })
+                    }
+                    placeholder="https://example.com"
                   />
                 </div>
               </div>

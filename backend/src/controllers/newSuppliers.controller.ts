@@ -215,7 +215,7 @@ export async function createNewSupplier(
         const {
             company, productCategory, product, country, accountManager,
             currentStatus, certifications, latestQuotation, reasonInactive,
-            dateMarkedInactive, reactivationPotential, notes, phone, email,
+            dateMarkedInactive, reactivationPotential, notes, phone, email, website,
             productCatalog, buyerIds: incomingBuyerIds,
             supplierProducts, productCatalogs, productCatalogImages,
             certificates, warehousePhotos, videoLinks, quotations,
@@ -250,7 +250,7 @@ export async function createNewSupplier(
                 data: {
                     company, productCategory, product, country, accountManager,
                     currentStatus, certifications, latestQuotation, reasonInactive,
-                    dateMarkedInactive, reactivationPotential, notes, phone, email,
+                    dateMarkedInactive, reactivationPotential, notes, phone, email, website,
                     productCatalog, buyerIds: buyerIdsArr,
                     supplierProducts: supplierProducts ?? [],
                     productCatalogs: productCatalogs ?? [],
@@ -429,7 +429,7 @@ export async function updateNewSupplier(
         const {
             company, productCategory, product, country, accountManager,
             currentStatus, certifications, latestQuotation, reasonInactive,
-            dateMarkedInactive, reactivationPotential, notes, phone, email,
+            dateMarkedInactive, reactivationPotential, notes, phone, email, website,
             productCatalog, buyerIds: incomingBuyerIds,
             supplierProducts, productCatalogs, productCatalogImages,
             certificates, warehousePhotos, videoLinks, quotations,
@@ -470,7 +470,7 @@ export async function updateNewSupplier(
                 data: {
                     company, productCategory, product, country, accountManager,
                     currentStatus, certifications, latestQuotation, reasonInactive,
-                    dateMarkedInactive, reactivationPotential, notes, phone, email,
+                    dateMarkedInactive, reactivationPotential, notes, phone, email, website,
                     productCatalog, buyerIds: incomingIds,
                     supplierProducts: supplierProducts ?? [],
                     productCatalogs: productCatalogs ?? [],
@@ -713,6 +713,7 @@ export async function updateNewSupplierStage(
                         ...commonData,
                         email: existing.email,
                         phone: existing.phone,
+                        website: existing.website,
                         remarks: existing.notes,
                         buyerIds: oldBuyerIds,
                     },

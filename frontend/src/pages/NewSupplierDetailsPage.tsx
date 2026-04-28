@@ -59,6 +59,7 @@ import {
   Factory,
   DollarSign,
   Briefcase,
+  Globe,
 } from "lucide-react";
 
 interface EmailCampaign {
@@ -102,6 +103,7 @@ interface NewSupplier {
   notes?: string;
   phone?: string;
   email?: string;
+  website?: string;
   createdAt?: string;
   tradeName?: string;
   yearEstablished?: string;
@@ -696,6 +698,11 @@ export default function NewSupplierDetailsPage() {
                   icon={Tag}
                   label="Supplier Type"
                   value={supplier.supplierType}
+                />
+                <InfoRow
+                  icon={Globe}
+                  label="Website"
+                  value={supplier.website}
                 />
               </CardContent>
             </Card>

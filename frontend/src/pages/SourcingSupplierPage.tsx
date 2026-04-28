@@ -127,6 +127,7 @@ export default function SourcingSupplierPage() {
   const [filterCountry, setFilterCountry] = useState("all");
   const [filterProduct, setFilterProduct] = useState("all");
   const [filterSourcedBy, setFilterSourcedBy] = useState("all");
+  const [filterEmailAccount, setFilterEmailAccount] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [createMode, setCreateMode] = useState<"single" | "vault">("single");
   const [formLinkDialog, setFormLinkDialog] = useState<{
@@ -148,7 +149,8 @@ export default function SourcingSupplierPage() {
     filterContact !== "all" ||
     filterCountry !== "all" ||
     filterProduct !== "all" ||
-    filterSourcedBy !== "all";
+    filterSourcedBy !== "all" ||
+    filterEmailAccount !== "all";
 
   function resetAllFilters() {
     setStatusFilter("all");
@@ -157,6 +159,7 @@ export default function SourcingSupplierPage() {
     setFilterCountry("all");
     setFilterProduct("all");
     setFilterSourcedBy("all");
+    setFilterEmailAccount("all");
     setPage(1);
   }
 
@@ -167,7 +170,7 @@ export default function SourcingSupplierPage() {
 
   // ─── Queries ────────────────────────────────────────
   const { data, isLoading } = useQuery({
-    queryKey: ["sourcing-suppliers", search, page, statusFilter, filterCompany, filterContact, filterCountry, filterProduct, filterSourcedBy],
+    queryKey: ["sourcing-suppliers", search, page, statusFilter, filterCompany, filterContact, filterCountry, filterProduct, filterSourcedBy, filterEmailAccount],
     queryFn: async () => {
       const params = new URLSearchParams({
         search,
@@ -179,6 +182,7 @@ export default function SourcingSupplierPage() {
         ...(filterCountry !== "all" && { country: filterCountry }),
         ...(filterProduct !== "all" && { product: filterProduct }),
         ...(filterSourcedBy !== "all" && { createdBy: filterSourcedBy }),
+        ...(filterEmailAccount !== "all" && { assignedGmailAccount: filterEmailAccount }),
       });
       const res = await api.get(`/sourcing-suppliers?${params}`);
       return res.data as {
@@ -207,6 +211,7 @@ export default function SourcingSupplierPage() {
     }
     return acc;
   }, []).sort((a, b) => a.name.localeCompare(b.name));
+  const uniqueEmailAccounts = [...new Set(allSuppliers.map((s) => s.assignedGmailAccount ?? "").filter(Boolean))].sort();
 
   const { data: stats } = useQuery({
     queryKey: ["sourcing-suppliers-stats"],
@@ -526,6 +531,16 @@ export default function SourcingSupplierPage() {
               {uniqueCreators.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
+          {uniqueEmailAccounts.length > 0 && (
+            <select
+              value={filterEmailAccount}
+              onChange={(e) => { setFilterEmailAccount(e.target.value); setPage(1); }}
+              className="border border-slate-200 rounded-md text-sm px-3 h-8 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="all">All Email Accounts</option>
+              {uniqueEmailAccounts.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          )}
           {hasActiveFilters && (
             <button
               onClick={resetAllFilters}
@@ -566,12 +581,9 @@ export default function SourcingSupplierPage() {
                   <th className="text-left font-medium text-slate-500 px-4 py-3">
                     Product
                   </th>
-                  <th className="text-left font-medium text-slate-500 px-4 py-3">
-                    Sourced By
-                  </th>
-                  <th className="text-left font-medium text-slate-500 px-4 py-3">
-                    Status
-                  </th>
+                  <th className="text-left font-medium text-slate-500 px-4 py-3">Sourced By</th>
+                  <th className="text-left font-medium text-slate-500 px-4 py-3">Email Used</th>
+                  <th className="text-left font-medium text-slate-500 px-4 py-3">Status</th>
                   <th className="text-left font-medium text-slate-500 px-4 py-3">
                     Next Follow-up
                   </th>
@@ -606,22 +618,10 @@ export default function SourcingSupplierPage() {
                           {s.company}
                         </button>
                         {s.country && (
-                          <div className="text-xs text-slate-400">
-                            {s.country}
-                          </div>
-                        )}
-                        {s.assignedGmailAccount && (
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Mail className="h-3 w-3 text-slate-400" />
-                            <span className="text-xs text-slate-400 truncate max-w-35">
-                              {s.assignedGmailAccount}
-                            </span>
-                          </div>
+                          <div className="text-xs text-slate-400">{s.country}</div>
                         )}
                         {!s.assignedGmailAccount && s.status === "pending" && (
-                          <div className="text-xs text-amber-500 mt-0.5">
-                            No email account
-                          </div>
+                          <div className="text-xs text-amber-500 mt-0.5">No email account</div>
                         )}
                       </td>
 
@@ -654,12 +654,22 @@ export default function SourcingSupplierPage() {
                             <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                               <Users className="h-3 w-3 text-emerald-600" />
                             </div>
-                            <span className="text-sm text-slate-700">
-                              {s.creator.fullName}
-                            </span>
+                            <span className="text-sm text-slate-700">{s.creator.fullName}</span>
                           </div>
                         ) : (
                           <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      {/* Email Used */}
+                      <td className="px-4 py-3">
+                        {s.assignedGmailAccount ? (
+                          <div className="flex items-center gap-1">
+                            <Mail className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                            <span className="text-xs text-slate-600 truncate max-w-[160px]">{s.assignedGmailAccount}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
                         )}
                       </td>
 

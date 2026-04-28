@@ -365,24 +365,6 @@ export default function DealsPage() {
             value: stats.total.toString(),
             bg: "bg-brand-50",
           },
-          {
-            icon: <DollarSign className="h-5 w-5 text-blue-600" />,
-            label: "Pipeline Value",
-            value: fmtMoney(stats.pipeline),
-            bg: "bg-blue-50",
-          },
-          {
-            icon: <TrendingUp className="h-5 w-5 text-purple-600" />,
-            label: "Weighted Revenue",
-            value: fmtMoney(stats.weighted),
-            bg: "bg-purple-50",
-          },
-          {
-            icon: <Percent className="h-5 w-5 text-amber-600" />,
-            label: "Avg Margin",
-            value: `${stats.avgMargin.toFixed(1)}%`,
-            bg: "bg-amber-50",
-          },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-3 shadow-sm">
             <div className={`rounded-lg p-2.5 ${s.bg}`}>{s.icon}</div>
@@ -524,14 +506,8 @@ export default function DealsPage() {
                 </div>
                 {field("Product", "product", "text", form, setForm, { placeholder: "e.g. Organic Red Lentils" })}
                 {field("HS Code", "hsCode", "text", form, setForm, { placeholder: "e.g. 0713.40" })}
-                {field("Volume", "volume", "text", form, setForm, { placeholder: "e.g. 500 MT" })}
-                {field("Price (per unit)", "price", "number", form, setForm, { placeholder: "0.00" })}
-                {field("Expected Revenue ($)", "expectedRevenue", "number", form, setForm, { placeholder: "0" })}
-                {field("Margin (%)", "margin", "number", form, setForm, { placeholder: "15" })}
-                {field("Probability (%)", "probability", "number", form, setForm, { placeholder: "20" })}
                 {field("Stage", "stage", "text", form, setForm, { options: STAGES.map((s) => s.id) })}
-                {field("Category", "category", "text", form, setForm, { options: CATEGORY_OPTIONS })}
-                {field("Risk Score", "riskScore", "text", form, setForm, { options: RISK_OPTIONS })}
+
                 <div className="col-span-2 flex flex-col gap-1">
                   <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Notes</label>
                   <Textarea
@@ -693,29 +669,7 @@ function DealCard({
       {deal.product && (
         <p className="text-xs text-slate-500 mb-2 truncate">{deal.product}</p>
       )}
-      <div className="flex items-center justify-between mt-2">
-        {deal.expectedRevenue ? (
-          <span className="text-sm font-bold" style={{ color: stageColor }}>
-            {fmtMoney(deal.expectedRevenue)}
-          </span>
-        ) : (
-          <span className="text-xs text-slate-400">No revenue</span>
-        )}
-        {deal.probability !== undefined && (
-          <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-            {deal.probability}%
-          </span>
-        )}
-      </div>
-      {deal.riskScore && (
-        <div className="flex items-center gap-1 mt-1.5">
-          <div
-            className="h-2 w-2 rounded-full"
-            style={{ background: riskColor(deal.riskScore) }}
-          />
-          <span className="text-xs text-slate-400">{deal.riskScore} risk</span>
-        </div>
-      )}
+      {/* Removed: Revenue, Probability, Risk indicators */}
     </div>
   );
 }
@@ -747,7 +701,7 @@ function TableView({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              {["Deal", "Buyer", "Stage", "Revenue", "Margin", "Risk", "Actions"].map((h) => (
+              {["Deal", "Buyer", "Stage", "Actions"].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                   {h}
                 </th>
@@ -778,21 +732,8 @@ function TableView({
                       {sc.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className="font-semibold text-brand-600">{fmtMoney(deal.expectedRevenue)}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {deal.margin !== undefined ? (
-                      <span className="text-brand-600 font-medium">{deal.margin}%</span>
-                    ) : "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-2.5 w-2.5 rounded-full" style={{ background: riskColor(deal.riskScore) }} />
-                      <span className="text-slate-600 text-xs">{deal.riskScore || "—"}</span>
-                    </div>
-                  </td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => onEdit(deal)}
@@ -936,61 +877,19 @@ function DetailPanel({
                   <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
                 </div>
               </div>
-              {[
-                { label: "Revenue ($)", key: "expectedRevenue" as keyof Deal, type: "number" },
-                { label: "Margin (%)", key: "margin" as keyof Deal, type: "number" },
-                { label: "Probability (%)", key: "probability" as keyof Deal, type: "number" },
-                { label: "Volume", key: "volume" as keyof Deal, type: "text" },
-              ].map(({ label, key, type }) => (
-                <div key={key} className="flex flex-col gap-0.5">
-                  <label className="text-xs text-slate-400 font-medium">{label}</label>
-                  <Input
-                    type={type}
-                    value={(editForm[key] as string | number) ?? ""}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        [key]: type === "number" ? parseFloat(e.target.value) || undefined : e.target.value,
-                      })
-                    }
-                    className="h-8 text-xs border-slate-200"
-                  />
-                </div>
-              ))}
-              <div className="flex flex-col gap-0.5">
-                <label className="text-xs text-slate-400 font-medium">Risk Score</label>
-                <select
-                  value={(editForm.riskScore as string) ?? ""}
-                  onChange={(e) => setEditForm({ ...editForm, riskScore: e.target.value })}
-                  className="h-8 text-xs border border-slate-200 rounded-md px-2"
-                >
-                  {RISK_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
+              {/* Removed: Revenue, Margin, Probability, Volume, Risk fields */}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               {[
                 { label: "Buyer", value: deal.buyer },
                 { label: "Supplier", value: deal.supplier },
-                { label: "Revenue", value: fmtMoney(deal.expectedRevenue) },
-                { label: "Margin", value: deal.margin !== undefined ? `${deal.margin}%` : "—" },
-                { label: "Probability", value: deal.probability !== undefined ? `${deal.probability}%` : "—" },
-                { label: "Volume", value: deal.volume },
-                { label: "Category", value: deal.category },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-slate-50 rounded-lg p-2.5">
                   <p className="text-xs text-slate-400 mb-0.5">{label}</p>
                   <p className="text-sm font-semibold text-slate-800 truncate">{value || "—"}</p>
                 </div>
               ))}
-              <div className="bg-slate-50 rounded-lg p-2.5">
-                <p className="text-xs text-slate-400 mb-0.5">Risk</p>
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-2 rounded-full" style={{ background: riskColor(deal.riskScore) }} />
-                  <p className="text-sm font-semibold text-slate-800">{deal.riskScore || "—"}</p>
-                </div>
-              </div>
             </div>
           )}
         </div>

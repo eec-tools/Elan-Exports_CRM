@@ -127,6 +127,7 @@ export async function listSourcingSuppliers(
       company,
       contactPerson,
       product,
+      assignedGmailAccount,
     } = req.query as Record<string, string>;
 
     const pageNum = Math.max(1, parseInt(page));
@@ -155,6 +156,9 @@ export async function listSourcingSuppliers(
     }
     if (createdBy && createdBy !== "all") {
       where.createdBy = createdBy;
+    }
+    if (assignedGmailAccount && assignedGmailAccount !== "all") {
+      where.assignedGmailAccount = { equals: assignedGmailAccount, mode: "insensitive" };
     }
     if (company && company !== "all") {
       where.company = { equals: company, mode: "insensitive" };
