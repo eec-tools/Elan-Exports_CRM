@@ -29,10 +29,16 @@ export function hhmmToMinutes(value: string): number | null {
   return parsed.hours * 60 + parsed.minutes;
 }
 
+// IST is UTC+5:30. We always store dates as UTC midnight of the IST calendar date
+// so PostgreSQL @db.Date saves the right date string regardless of server timezone.
+// setHours(0,0,0,0) returns IST midnight which is UTC 18:30 of the *previous* day,
+// causing PostgreSQL to store yesterday's date — hence the off-by-one bug.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
 export function startOfLocalDay(input: Date = new Date()): Date {
-  const date = new Date(input);
-  date.setHours(0, 0, 0, 0);
-  return date;
+  // Shift into IST to get the correct calendar date, then take UTC midnight of it.
+  const shifted = new Date(input.getTime() + IST_OFFSET_MS);
+  return new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()));
 }
 
 export function buildWorkDateTime(baseDate: Date, hhmm: string): Date | null {

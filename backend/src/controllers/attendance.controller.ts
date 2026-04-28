@@ -726,7 +726,13 @@ export async function getAttendanceHistory(req: AuthRequest, res: Response): Pro
       orderBy: { date: "desc" },
     });
 
-    const history = records.map((r) => serializeAttendance(r, user.minHoursPresent, user.workStartTime, user.workEndTime));
+    const rawHistory = records.map((r) => serializeAttendance(r, user.minHoursPresent, user.workStartTime, user.workEndTime));
+
+    // Exclude Sunday absent records — Sundays are paid holidays, not absent days
+    const history = rawHistory.filter((h) => {
+      if (h.status === "Absent") return new Date(h.date).getDay() !== 0;
+      return true;
+    });
 
     // Summary stats
     const totalDays = history.length;
@@ -905,11 +911,17 @@ export async function getAdminAttendanceHistory(
       orderBy: [{ date: "desc" }, { user: { fullName: "asc" } }],
     });
 
-    const history = records.map((r) => ({
+    const rawHistory = records.map((r) => ({
       ...serializeAttendance(r, r.user.minHoursPresent, r.user.workStartTime, r.user.workEndTime),
       fullName: r.user.fullName,
       email: r.user.email,
     }));
+
+    // Exclude Sunday absent records — Sundays are paid holidays, not absent days
+    const history = rawHistory.filter((h) => {
+      if (h.status === "Absent") return new Date(h.date).getDay() !== 0;
+      return true;
+    });
 
     // Per-user summary
     const userMap = new Map<string, {

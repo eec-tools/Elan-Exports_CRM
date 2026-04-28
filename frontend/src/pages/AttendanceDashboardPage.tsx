@@ -226,25 +226,13 @@ function isImageProof(file: AttendanceProofFile): boolean {
 }
 
 function getDateRangeParams(range: string): { from: string; to: string } {
-  const now = new Date();
-  const to = now.toISOString().split("T")[0];
-  let fromDate: Date;
-
-  switch (range) {
-    case "7d":
-      fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
-    case "30d":
-      fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
-    case "90d":
-      fromDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      break;
-    default:
-      fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  }
-
-  return { from: fromDate.toISOString().split("T")[0], to };
+  // Use IST date (en-CA gives YYYY-MM-DD). toISOString() gives UTC which can be
+  // yesterday in IST (UTC+5:30) and would exclude today's records.
+  const to = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const days = range === "7d" ? 7 : range === "90d" ? 90 : 30;
+  const fromMs = new Date(to).getTime() - days * 24 * 60 * 60 * 1000;
+  const from = new Date(fromMs).toISOString().split("T")[0];
+  return { from, to };
 }
 
 /* ─── Status Pill ──────────────────────────────────── */
@@ -474,6 +462,10 @@ export default function AttendanceDashboardPage() {
 
     return !email.includes("admin") && !name.includes("admin");
   });
+
+  const todayIsSunday = adminTodayQuery.data
+    ? new Date(adminTodayQuery.data.date).getDay() === 0
+    : new Date().getDay() === 0;
 
   /* ─── Mutations ──────────────────────────────────── */
 
@@ -992,10 +984,10 @@ export default function AttendanceDashboardPage() {
                     color="blue"
                   />
                   <StatCard
-                    label="Absent"
-                    value={adminTeamRows.filter((r) => !r.startTime).length}
+                    label={todayIsSunday ? "Holiday" : "Absent"}
+                    value={todayIsSunday ? "Sunday" : adminTeamRows.filter((r) => !r.startTime).length}
                     icon={Eye}
-                    color="rose"
+                    color={todayIsSunday ? "blue" : "rose"}
                   />
                 </div>
               )}
@@ -1060,7 +1052,15 @@ export default function AttendanceDashboardPage() {
                               )}
                             </td>
                             <td className="px-4 py-3 font-semibold text-slate-700 whitespace-nowrap">{row.realTimeLabel}</td>
-                            <td className="px-4 py-3"><StatusPill status={row.status} autoEnded={row.autoEnded} /></td>
+                            <td className="px-4 py-3">
+                              {todayIsSunday && !row.startTime ? (
+                                <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                                  Holiday
+                                </span>
+                              ) : (
+                                <StatusPill status={row.status} autoEnded={row.autoEnded} />
+                              )}
+                            </td>
                             <td className="px-4 py-3">
                               {row.attendanceId && (
                                 <DropdownMenu>
