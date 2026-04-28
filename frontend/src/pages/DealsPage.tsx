@@ -8,9 +8,7 @@ import {
   Trash2,
   ChevronRight,
   TrendingUp,
-  DollarSign,
   BarChart2,
-  Percent,
   AlertTriangle,
   CheckCircle2,
   Circle,
@@ -58,26 +56,11 @@ const STAGES = [
   { id: "Timeline (Product shipping.. etc) should be established from suppliers end", label: "Timeline established", color: "#22c55e", bg: "#f0fdf4", text: "#166534" },
 ];
 
-const RISK_OPTIONS = ["Low", "Medium", "High"];
-const CATEGORY_OPTIONS = ["Food", "Textiles", "Electronics", "Chemicals", "Machinery", "Other"];
-
 // ─── Helpers ──────────────────────────────────────────────────
 function stageConfig(id: string) {
   return STAGES.find((s) => s.id === id) ?? STAGES[0];
 }
 
-function riskColor(risk?: string) {
-  if (risk === "Low") return "#10b981";
-  if (risk === "High") return "#ef4444";
-  return "#f59e0b";
-}
-
-function fmtMoney(v?: number) {
-  if (!v) return "—";
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
-  return `$${v.toLocaleString()}`;
-}
 
 function authHeader(): Record<string, string> {
   const token = localStorage.getItem("token");
@@ -627,7 +610,6 @@ function KanbanBoard({
                   <DealCard
                     key={deal.id}
                     deal={deal}
-                    stageColor={stage.color}
                     onClick={() => onCardClick(deal)}
                     onDragStart={onDragStart}
                   />
@@ -644,12 +626,10 @@ function KanbanBoard({
 // ─── Deal Card ────────────────────────────────────────────────
 function DealCard({
   deal,
-  stageColor,
   onClick,
   onDragStart,
 }: {
   deal: Deal;
-  stageColor: string;
   onClick: () => void;
   onDragStart: (e: React.DragEvent, id: string) => void;
 }) {
