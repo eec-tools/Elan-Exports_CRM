@@ -94,7 +94,18 @@ interface BulkRow {
 
 // ─── Folder icon palette ──────────────────────────────
 
-const ICONS = [Package, Leaf, Wheat, ShoppingBag, Factory, Layers, Globe, Tag, Database, Box];
+const ICONS = [
+  Package,
+  Leaf,
+  Wheat,
+  ShoppingBag,
+  Factory,
+  Layers,
+  Globe,
+  Tag,
+  Database,
+  Box,
+];
 const GRADIENTS = [
   "from-amber-500 to-orange-500",
   "from-blue-500 to-indigo-500",
@@ -109,17 +120,32 @@ const GRADIENTS = [
 ];
 
 function folderStyle(name: string) {
-  const idx = Math.abs(name.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % ICONS.length;
+  const idx =
+    Math.abs(name.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) %
+    ICONS.length;
   return { Icon: ICONS[idx], gradient: GRADIENTS[idx] };
 }
 
 function emptyBulkRow(): BulkRow {
-  return { company: "", email: "", phone: "", contactPerson: "", country: "", product: "", notes: "" };
+  return {
+    company: "",
+    email: "",
+    phone: "",
+    contactPerson: "",
+    country: "",
+    product: "",
+    notes: "",
+  };
 }
 
-const BULK_COLS: { key: keyof BulkRow; label: string; required?: boolean; width: string }[] = [
+const BULK_COLS: {
+  key: keyof BulkRow;
+  label: string;
+  required?: boolean;
+  width: string;
+}[] = [
   { key: "company", label: "Company Name *", required: true, width: "180px" },
-  { key: "email", label: "Email", width: "180px" },
+  { key: "email", label: "Email *", required: true, width: "180px" },
   { key: "phone", label: "Phone", width: "130px" },
   { key: "contactPerson", label: "Contact Person", width: "150px" },
   { key: "country", label: "Country", width: "120px" },
@@ -131,7 +157,8 @@ const BULK_COLS: { key: keyof BulkRow; label: string; required?: boolean; width:
 
 export default function SourcingVaultPage() {
   const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("suppliers") || hasEditPermission("sourcing_suppliers");
+  const canEdit =
+    hasEditPermission("suppliers") || hasEditPermission("sourcing_suppliers");
   const queryClient = useQueryClient();
 
   const [currentFolder, setCurrentFolder] = useState<VaultFolder | null>(null);
@@ -141,11 +168,14 @@ export default function SourcingVaultPage() {
 
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [deleteFolderTarget, setDeleteFolderTarget] = useState<VaultFolder | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] =
+    useState<VaultFolder | null>(null);
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
 
   // ─── Root: folders query ───────────────────────────
-  const { data: folders = [], isLoading: foldersLoading } = useQuery<VaultFolder[]>({
+  const { data: folders = [], isLoading: foldersLoading } = useQuery<
+    VaultFolder[]
+  >({
     queryKey: ["sourcing-vault-folders"],
     queryFn: async () => {
       const res = await api.get("/sourcing-vault");
@@ -157,7 +187,9 @@ export default function SourcingVaultPage() {
   const { data: creators = [] } = useQuery<{ id: string; fullName: string }[]>({
     queryKey: ["sourcing-vault-creators", currentFolder?.id],
     queryFn: async () => {
-      const res = await api.get(`/sourcing-vault/${currentFolder!.id}/creators`);
+      const res = await api.get(
+        `/sourcing-vault/${currentFolder!.id}/creators`,
+      );
       return res.data;
     },
     enabled: !!currentFolder,
@@ -166,11 +198,19 @@ export default function SourcingVaultPage() {
   // ─── Folder view: vault suppliers query ───────────
   const PAGE_SIZE = 20;
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ["sourcing-vault-suppliers", currentFolder?.id, search, page, sourcedByFilter],
+    queryKey: [
+      "sourcing-vault-suppliers",
+      currentFolder?.id,
+      search,
+      page,
+      sourcedByFilter,
+    ],
     queryFn: async () => {
       const params = new URLSearchParams({ search });
       if (sourcedByFilter !== "all") params.set("createdBy", sourcedByFilter);
-      const res = await api.get(`/sourcing-vault/${currentFolder!.id}/suppliers?${params}`);
+      const res = await api.get(
+        `/sourcing-vault/${currentFolder!.id}/suppliers?${params}`,
+      );
       // backend returns a flat array; do client-side pagination
       const all: SourcingVaultSupplierItem[] = res.data;
       const total = all.length;
@@ -243,12 +283,19 @@ export default function SourcingVaultPage() {
         {canEdit && (
           <div className="flex gap-2">
             {isAtRoot ? (
-              <Button variant="outline" onClick={() => setNewFolderOpen(true)} className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setNewFolderOpen(true)}
+                className="gap-2"
+              >
                 <FolderPlus className="h-4 w-4" />
                 New Folder
               </Button>
             ) : (
-              <Button onClick={() => setAddSupplierOpen(true)} className="gap-2">
+              <Button
+                onClick={() => setAddSupplierOpen(true)}
+                className="gap-2"
+              >
                 <Plus className="h-4 w-4" />
                 Add Suppliers
               </Button>
@@ -283,7 +330,12 @@ export default function SourcingVaultPage() {
       {/* Back + Search + Sourced By filter */}
       <div className="flex items-center gap-3">
         {!isAtRoot && (
-          <Button variant="ghost" size="sm" onClick={goToRoot} className="gap-1 text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={goToRoot}
+            className="gap-1 text-muted-foreground"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
@@ -295,7 +347,10 @@ export default function SourcingVaultPage() {
               placeholder={`Search in ${currentFolder?.name}…`}
               className="pl-9"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
             />
             {search && (
               <button
@@ -310,12 +365,17 @@ export default function SourcingVaultPage() {
         {!isAtRoot && creators.length > 0 && (
           <select
             value={sourcedByFilter}
-            onChange={(e) => { setSourcedByFilter(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setSourcedByFilter(e.target.value);
+              setPage(1);
+            }}
             className="border border-border rounded-md text-sm px-3 h-9 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="all">All Employees</option>
             {creators.map((c) => (
-              <option key={c.id} value={c.id}>{c.fullName}</option>
+              <option key={c.id} value={c.id}>
+                {c.fullName}
+              </option>
             ))}
           </select>
         )}
@@ -334,7 +394,12 @@ export default function SourcingVaultPage() {
               <FolderOpen className="h-10 w-10 opacity-30" />
               <p className="text-sm">No folders yet</p>
               {canEdit && (
-                <Button size="sm" variant="outline" onClick={() => setNewFolderOpen(true)} className="gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setNewFolderOpen(true)}
+                  className="gap-1"
+                >
                   <FolderPlus className="h-3.5 w-3.5" />
                   Create your first folder
                 </Button>
@@ -354,13 +419,18 @@ export default function SourcingVaultPage() {
                         onClick={() => openFolder(folder)}
                         className="w-full flex flex-col items-center gap-2.5 rounded-xl border border-border bg-card p-4 text-center transition-all hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5 active:translate-y-0"
                       >
-                        <div className={`rounded-xl p-3 bg-gradient-to-br ${gradient} shadow-sm`}>
+                        <div
+                          className={`rounded-xl p-3 bg-gradient-to-br ${gradient} shadow-sm`}
+                        >
                           <Icon className="h-6 w-6 text-white" />
                         </div>
                         <div className="min-w-0 w-full">
-                          <p className="text-sm font-semibold truncate leading-tight">{folder.name}</p>
+                          <p className="text-sm font-semibold truncate leading-tight">
+                            {folder.name}
+                          </p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {folder.supplierCount} supplier{folder.supplierCount !== 1 ? "s" : ""}
+                            {folder.supplierCount} supplier
+                            {folder.supplierCount !== 1 ? "s" : ""}
                           </p>
                           {folder.creator && (
                             <p className="text-xs text-muted-foreground/70 mt-0.5 truncate">
@@ -377,7 +447,10 @@ export default function SourcingVaultPage() {
                             size="icon"
                             className="h-6 w-6 bg-card/80 backdrop-blur-sm shadow-sm hover:bg-red-50 hover:text-red-600"
                             title="Delete folder"
-                            onClick={(e) => { e.stopPropagation(); setDeleteFolderTarget(folder); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteFolderTarget(folder);
+                            }}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -405,7 +478,11 @@ export default function SourcingVaultPage() {
               <Building2 className="h-10 w-10 opacity-30" />
               <p className="text-sm">No suppliers in this folder yet</p>
               {canEdit && (
-                <Button size="sm" onClick={() => setAddSupplierOpen(true)} className="gap-1">
+                <Button
+                  size="sm"
+                  onClick={() => setAddSupplierOpen(true)}
+                  className="gap-1"
+                >
                   <Plus className="h-3.5 w-3.5" />
                   Add Suppliers
                 </Button>
@@ -416,28 +493,61 @@ export default function SourcingVaultPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Company</th>
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Contact</th>
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Country</th>
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Product</th>
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Email Status</th>
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Sourced By</th>
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Date Added</th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">
+                      Company
+                    </th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">
+                      Contact
+                    </th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">
+                      Country
+                    </th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">
+                      Product
+                    </th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">
+                      Email Status
+                    </th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">
+                      Sourced By
+                    </th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">
+                      Date Added
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {suppliers.map((s) => (
-                    <tr key={s.id} className="hover:bg-muted/30 transition-colors">
+                    <tr
+                      key={s.id}
+                      className="hover:bg-muted/30 transition-colors"
+                    >
                       <td className="px-4 py-3">
-                        <div className="font-medium text-foreground">{s.company}</div>
-                        {s.email && <div className="text-xs text-muted-foreground">{s.email}</div>}
+                        <div className="font-medium text-foreground">
+                          {s.company}
+                        </div>
+                        {s.email && (
+                          <div className="text-xs text-muted-foreground">
+                            {s.email}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-foreground">{s.contactPerson ?? "—"}</div>
-                        {s.phone && <div className="text-xs text-muted-foreground">{s.phone}</div>}
+                        <div className="text-foreground">
+                          {s.contactPerson ?? "—"}
+                        </div>
+                        {s.phone && (
+                          <div className="text-xs text-muted-foreground">
+                            {s.phone}
+                          </div>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{s.country ?? "—"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{s.product ?? "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {s.country ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {s.product ?? "—"}
+                      </td>
                       <td className="px-4 py-3">
                         <span
                           className={
@@ -455,7 +565,9 @@ export default function SourcingVaultPage() {
                             <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                               <Users className="h-3 w-3 text-emerald-600" />
                             </div>
-                            <span className="text-sm text-foreground">{s.creator.fullName}</span>
+                            <span className="text-sm text-foreground">
+                              {s.creator.fullName}
+                            </span>
                           </div>
                         ) : (
                           <span className="text-muted-foreground">—</span>
@@ -476,13 +588,24 @@ export default function SourcingVaultPage() {
               {pagination && pagination.pages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
                   <span className="text-xs text-muted-foreground">
-                    Page {page} of {pagination.pages} · {pagination.total} suppliers
+                    Page {page} of {pagination.pages} · {pagination.total}{" "}
+                    suppliers
                   </span>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => p - 1)}
+                    >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="outline" disabled={page >= pagination.pages} onClick={() => setPage((p) => p + 1)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={page >= pagination.pages}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
@@ -494,7 +617,15 @@ export default function SourcingVaultPage() {
       )}
 
       {/* ── New Folder Dialog ── */}
-      <Dialog open={newFolderOpen} onOpenChange={(v) => { if (!v) { setNewFolderOpen(false); setNewFolderName(""); } }}>
+      <Dialog
+        open={newFolderOpen}
+        onOpenChange={(v) => {
+          if (!v) {
+            setNewFolderOpen(false);
+            setNewFolderName("");
+          }
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>New Folder</DialogTitle>
@@ -517,14 +648,22 @@ export default function SourcingVaultPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setNewFolderOpen(false); setNewFolderName(""); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNewFolderOpen(false);
+                setNewFolderName("");
+              }}
+            >
               Cancel
             </Button>
             <Button
               disabled={!newFolderName.trim() || createFolderMutation.isPending}
               onClick={() => createFolderMutation.mutate(newFolderName.trim())}
             >
-              {createFolderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              {createFolderMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
               Create
             </Button>
           </DialogFooter>
@@ -532,20 +671,29 @@ export default function SourcingVaultPage() {
       </Dialog>
 
       {/* ── Delete Folder Confirm ── */}
-      <AlertDialog open={!!deleteFolderTarget} onOpenChange={(v) => !v && setDeleteFolderTarget(null)}>
+      <AlertDialog
+        open={!!deleteFolderTarget}
+        onOpenChange={(v) => !v && setDeleteFolderTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{deleteFolderTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete "{deleteFolderTarget?.name}"?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              The folder and all its staged suppliers will be permanently removed.
-              Suppliers already in the Sourcing Suppliers pipeline are not affected.
+              The folder and all its staged suppliers will be permanently
+              removed. Suppliers already in the Sourcing Suppliers pipeline are
+              not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => deleteFolderTarget && deleteFolderMutation.mutate(deleteFolderTarget.id)}
+              onClick={() =>
+                deleteFolderTarget &&
+                deleteFolderMutation.mutate(deleteFolderTarget.id)
+              }
             >
               Delete
             </AlertDialogAction>
@@ -560,10 +708,16 @@ export default function SourcingVaultPage() {
           folder={currentFolder}
           onClose={() => setAddSupplierOpen(false)}
           onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["sourcing-vault-suppliers"] });
-            queryClient.invalidateQueries({ queryKey: ["sourcing-vault-folders"] });
+            queryClient.invalidateQueries({
+              queryKey: ["sourcing-vault-suppliers"],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ["sourcing-vault-folders"],
+            });
             queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
-            queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
+            queryClient.invalidateQueries({
+              queryKey: ["sourcing-suppliers-stats"],
+            });
           }}
         />
       )}
@@ -584,7 +738,9 @@ function BulkAddDialog({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [rows, setRows] = useState<BulkRow[]>(() => Array.from({ length: 5 }, emptyBulkRow));
+  const [rows, setRows] = useState<BulkRow[]>(() =>
+    Array.from({ length: 5 }, emptyBulkRow),
+  );
   const [sharedGmail, setSharedGmail] = useState("");
   const [sharedTemplateId, setSharedTemplateId] = useState("");
   const [errors, setErrors] = useState<Set<number>>(new Set());
@@ -601,7 +757,9 @@ function BulkAddDialog({
   });
   const connectedAccounts = gmailAccounts.filter((a) => a.connected);
 
-  const { data: templates = [] } = useQuery<{ id: string; name: string; isDefault: boolean }[]>({
+  const { data: templates = [] } = useQuery<
+    { id: string; name: string; isDefault: boolean }[]
+  >({
     queryKey: ["supplier-form-templates"],
     queryFn: async () => {
       const res = await api.get("/supplier-form-templates");
@@ -610,17 +768,28 @@ function BulkAddDialog({
     enabled: open,
   });
 
-  const updateCell = useCallback((rowIdx: number, col: keyof BulkRow, value: string) => {
-    setRows((prev) => {
-      const next = [...prev];
-      next[rowIdx] = { ...next[rowIdx], [col]: value };
-      return next;
-    });
-    setErrors((prev) => { const n = new Set(prev); n.delete(rowIdx); return n; });
-  }, []);
+  const updateCell = useCallback(
+    (rowIdx: number, col: keyof BulkRow, value: string) => {
+      setRows((prev) => {
+        const next = [...prev];
+        next[rowIdx] = { ...next[rowIdx], [col]: value };
+        return next;
+      });
+      setErrors((prev) => {
+        const n = new Set(prev);
+        n.delete(rowIdx);
+        return n;
+      });
+    },
+    [],
+  );
 
   const handlePaste = useCallback(
-    (e: React.ClipboardEvent<HTMLInputElement>, rowIdx: number, colIdx: number) => {
+    (
+      e: React.ClipboardEvent<HTMLInputElement>,
+      rowIdx: number,
+      colIdx: number,
+    ) => {
       const text = e.clipboardData.getData("text");
       if (!text.includes("\t") && !text.includes("\n")) return;
       e.preventDefault();
@@ -639,23 +808,30 @@ function BulkAddDialog({
           cells.forEach((cell, ci) => {
             const targetCol = colIdx + ci;
             if (targetCol < BULK_COLS.length) {
-              next[targetRow] = { ...next[targetRow], [BULK_COLS[targetCol].key]: cell.trim() };
+              next[targetRow] = {
+                ...next[targetRow],
+                [BULK_COLS[targetCol].key]: cell.trim(),
+              };
             }
           });
         });
         return next;
       });
     },
-    []
+    [],
   );
 
-  const addRows = () => setRows((prev) => [...prev, ...Array.from({ length: 5 }, emptyBulkRow)]);
+  const addRows = () =>
+    setRows((prev) => [...prev, ...Array.from({ length: 5 }, emptyBulkRow)]);
 
   const removeRow = (idx: number) => {
     setRows((prev) => prev.filter((_, i) => i !== idx));
     setErrors((prev) => {
       const n = new Set<number>();
-      prev.forEach((e) => { if (e < idx) n.add(e); else if (e > idx) n.add(e - 1); });
+      prev.forEach((e) => {
+        if (e < idx) n.add(e);
+        else if (e > idx) n.add(e - 1);
+      });
       return n;
     });
   };
@@ -672,18 +848,30 @@ function BulkAddDialog({
     const newErrors = new Set<number>();
     rows.forEach((r, i) => {
       const hasAnyData = Object.values(r).some((v) => v.trim());
-      if (hasAnyData && !r.company.trim()) newErrors.add(i);
+      if (hasAnyData && (!r.company.trim() || !r.email.trim())) newErrors.add(i);
     });
 
     if (newErrors.size > 0) {
       setErrors(newErrors);
-      toast.error("Highlighted rows are missing Company Name");
+      toast.error("Highlighted rows are missing Company Name or Email");
       return null;
     }
 
     const validRows = rows.filter((r) => r.company.trim());
     if (validRows.length === 0) {
       toast.error("Please fill in at least one supplier");
+      return null;
+    }
+
+    // Ensure all filled rows have email
+    const missingEmail = validRows.some((r) => !r.email.trim());
+    if (missingEmail) {
+      const newErr = new Set<number>();
+      rows.forEach((r, i) => {
+        if (r.company.trim() && !r.email.trim()) newErr.add(i);
+      });
+      setErrors(newErr);
+      toast.error("All suppliers must have an Email address");
       return null;
     }
 
@@ -707,11 +895,14 @@ function BulkAddDialog({
           notes: r.notes.trim() || undefined,
         })),
       });
-      toast.success(`Added ${res.data.added} supplier${res.data.added !== 1 ? "s" : ""} to list`);
+      toast.success(
+        `Added ${res.data.added} supplier${res.data.added !== 1 ? "s" : ""} to list`,
+      );
       onSuccess();
       handleClose();
     } catch (err) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      const msg = (err as { response?: { data?: { error?: string } } })
+        ?.response?.data?.error;
       toast.error(msg ?? "Failed to add to list");
     } finally {
       setAddingToList(false);
@@ -724,24 +915,30 @@ function BulkAddDialog({
 
     setSendingEmail(true);
     try {
-      const res = await api.post(`/sourcing-vault/${folder.id}/suppliers/send`, {
-        suppliers: validRows.map((r) => ({
-          company: r.company.trim(),
-          email: r.email.trim() || undefined,
-          phone: r.phone.trim() || undefined,
-          contactPerson: r.contactPerson.trim() || undefined,
-          country: r.country.trim() || undefined,
-          product: r.product.trim() || undefined,
-          notes: r.notes.trim() || undefined,
-        })),
-        assignedGmailAccount: sharedGmail || undefined,
-        formTemplateId: sharedTemplateId || undefined,
-      });
-      toast.success(`Sent emails to ${res.data.added} supplier${res.data.added !== 1 ? "s" : ""}`);
+      const res = await api.post(
+        `/sourcing-vault/${folder.id}/suppliers/send`,
+        {
+          suppliers: validRows.map((r) => ({
+            company: r.company.trim(),
+            email: r.email.trim() || undefined,
+            phone: r.phone.trim() || undefined,
+            contactPerson: r.contactPerson.trim() || undefined,
+            country: r.country.trim() || undefined,
+            product: r.product.trim() || undefined,
+            notes: r.notes.trim() || undefined,
+          })),
+          assignedGmailAccount: sharedGmail || undefined,
+          formTemplateId: sharedTemplateId || undefined,
+        },
+      );
+      toast.success(
+        `Sent emails to ${res.data.added} supplier${res.data.added !== 1 ? "s" : ""}`,
+      );
       onSuccess();
       handleClose();
     } catch (err) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      const msg = (err as { response?: { data?: { error?: string } } })
+        ?.response?.data?.error;
       toast.error(msg ?? "Failed to send bulk email");
     } finally {
       setSendingEmail(false);
@@ -753,22 +950,27 @@ function BulkAddDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="max-w-[95vw] w-[1100px] max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-[1200px] w-full max-h-[95vh] flex flex-col p-4">
         <DialogHeader>
           <DialogTitle>Add Suppliers to "{folder.name}"</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Fill in rows or paste a table from SpreadSheets — columns auto-fill on paste.
+            Fill in rows or paste a table from SpreadSheets — columns auto-fill
+            on paste.
           </p>
         </DialogHeader>
 
         {/* Shared settings: Gmail + Form Template */}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 py-2 border-b border-border">
           <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium whitespace-nowrap">Campaign Email Account</Label>
+            <Label className="text-sm font-medium whitespace-nowrap">
+              Campaign Email Account
+            </Label>
             {connectedAccounts.length === 0 ? (
               <span className="text-xs text-amber-600">
                 No Gmail connected.{" "}
-                <a href="/settings/gmail" className="underline">Connect one</a>
+                <a href="/settings/gmail" className="underline">
+                  Connect one
+                </a>
               </span>
             ) : (
               <select
@@ -778,14 +980,18 @@ function BulkAddDialog({
               >
                 <option value="">Select account (optional)…</option>
                 {connectedAccounts.map((a) => (
-                  <option key={a.email} value={a.email}>{a.email}</option>
+                  <option key={a.email} value={a.email}>
+                    {a.email}
+                  </option>
                 ))}
               </select>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium whitespace-nowrap">Form Template</Label>
+            <Label className="text-sm font-medium whitespace-nowrap">
+              Form Template
+            </Label>
             <select
               value={sharedTemplateId}
               onChange={(e) => setSharedTemplateId(e.target.value)}
@@ -794,13 +1000,16 @@ function BulkAddDialog({
               <option value="">Default form</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}{t.isDefault ? " (Default)" : ""}
+                  {t.name}
+                  {t.isDefault ? " (Default)" : ""}
                 </option>
               ))}
             </select>
           </div>
 
-          <span className="text-xs text-muted-foreground ml-auto">Used only when sending emails</span>
+          <span className="text-xs text-muted-foreground ml-auto">
+            Used only when sending emails
+          </span>
         </div>
 
         {/* Spreadsheet grid */}
@@ -808,7 +1017,9 @@ function BulkAddDialog({
           <table className="w-max text-sm border-collapse">
             <thead>
               <tr className="bg-muted/50 border-b border-border">
-                <th className="w-8 px-2 py-2 text-center text-muted-foreground font-normal text-xs">#</th>
+                <th className="w-8 px-2 py-2 text-center text-muted-foreground font-normal text-xs">
+                  #
+                </th>
                 {BULK_COLS.map((col) => (
                   <th
                     key={col.key}
@@ -829,9 +1040,14 @@ function BulkAddDialog({
                     key={ri}
                     className={`border-b border-border/60 ${hasError ? "bg-red-50" : ri % 2 === 0 ? "bg-background" : "bg-muted/20"}`}
                   >
-                    <td className="px-2 py-1 text-center text-muted-foreground text-xs">{ri + 1}</td>
+                    <td className="px-2 py-1 text-center text-muted-foreground text-xs">
+                      {ri + 1}
+                    </td>
                     {BULK_COLS.map((col, ci) => (
-                      <td key={col.key} className="px-1 py-1 border-l border-border/60">
+                      <td
+                        key={col.key}
+                        className="px-1 py-1 border-l border-border/60"
+                      >
                         <input
                           type="text"
                           className={`w-full px-2 py-1.5 rounded text-sm outline-none focus:ring-2 bg-transparent ${
@@ -841,7 +1057,9 @@ function BulkAddDialog({
                           }`}
                           placeholder={col.required ? "Required" : ""}
                           value={row[col.key]}
-                          onChange={(e) => updateCell(ri, col.key, e.target.value)}
+                          onChange={(e) =>
+                            updateCell(ri, col.key, e.target.value)
+                          }
                           onPaste={(e) => handlePaste(e, ri, ci)}
                         />
                       </td>
@@ -865,24 +1083,35 @@ function BulkAddDialog({
         {errors.size > 0 && (
           <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            Rows in red are missing Company Name.
+            Rows in red are missing Company Name or Email.
           </div>
         )}
 
-        <DialogFooter className="flex items-center justify-between pt-2 border-t border-border">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
           <div className="flex items-center gap-3">
-            <Button type="button" variant="outline" size="sm" onClick={addRows} disabled={isWorking}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addRows}
+              disabled={isWorking}
+            >
               <Plus className="h-4 w-4 mr-1" />
               Add 5 Rows
             </Button>
             <span className="text-xs text-muted-foreground">
               {filledCount > 0
                 ? `${filledCount} supplier${filledCount !== 1 ? "s" : ""} ready`
-                : "Fill Company Name to continue"}
+                : "Fill Company Name and Email to continue"}
             </span>
           </div>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={isWorking}>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isWorking}
+            >
               Cancel
             </Button>
             <Button
@@ -892,7 +1121,10 @@ function BulkAddDialog({
               disabled={isWorking || filledCount === 0}
             >
               {addingToList ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Adding…</>
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                  Adding…
+                </>
               ) : (
                 "Add to List"
               )}
@@ -902,13 +1134,16 @@ function BulkAddDialog({
               disabled={isWorking || filledCount === 0}
             >
               {sendingEmail ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Sending…</>
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                  Sending…
+                </>
               ) : (
                 "Send Bulk Email"
               )}
             </Button>
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
