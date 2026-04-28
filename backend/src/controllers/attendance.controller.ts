@@ -1024,6 +1024,55 @@ export async function deleteUserAttendanceRecords(
   }
 }
 
+// ─── Admin: Update Attendance Status ─────────────────
+export async function updateAttendanceStatus(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const attendanceId = req.params.id;
+    const { status } = req.body;
+
+    if (status !== "Present" && status !== "Absent") {
+      res.status(400).json({ error: "Status must be Present or Absent" });
+      return;
+    }
+
+    const record = await prisma.attendance.findUnique({
+      where: { id: attendanceId },
+      include: { user: { select: { fullName: true } } },
+    });
+
+    if (!record) {
+      res.status(404).json({ error: "Attendance record not found" });
+      return;
+    }
+
+    const updated = await prisma.attendance.update({
+      where: { id: attendanceId },
+      data: { status: status as AttendanceStatus },
+    });
+
+    await logActivity(
+      req.user!.id,
+      "attendance_admin_status_update",
+      "attendance",
+      attendanceId,
+      {
+        targetUserId: record.userId,
+        targetUserName: record.user.fullName,
+        previousStatus: record.status,
+        newStatus: status,
+      },
+    );
+
+    res.json({ success: true, status: updated.status });
+  } catch (err) {
+    console.error("Update attendance status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
 // ─── Admin: Delete Attendance Record ─────────────────
 export async function deleteAttendanceRecord(
   req: AuthRequest,

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import {
   Calendar,
+  CheckCircle2,
   Clock,
   Download,
   Eye,
@@ -20,6 +21,7 @@ import {
   Upload,
   Users,
   X,
+  XCircle,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -521,6 +523,17 @@ export default function AttendanceDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-attendance-history"] });
     },
     onError: (err: unknown) => toast.error(getApiErrorMessage(err, "Could not remove records")),
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ attendanceId, status }: { attendanceId: string; status: AttendanceStatus }) =>
+      api.patch(`/attendance/admin/${attendanceId}/status`, { status }),
+    onSuccess: (_, { status }) => {
+      toast.success(`Marked as ${status}.`);
+      queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-attendance-history"] });
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, "Could not update status")),
   });
 
   const confirmDelete = useCallback((attendanceId: string, name: string, date: string) => {
@@ -1057,6 +1070,24 @@ export default function AttendanceDashboardPage() {
                                     </button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
+                                    {row.status === "Absent" && (
+                                      <DropdownMenuItem
+                                        className="text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50 gap-2"
+                                        onClick={() => updateStatusMutation.mutate({ attendanceId: row.attendanceId!, status: "Present" })}
+                                      >
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                        Mark as Present
+                                      </DropdownMenuItem>
+                                    )}
+                                    {row.status === "Present" && (
+                                      <DropdownMenuItem
+                                        className="text-amber-600 focus:text-amber-600 focus:bg-amber-50 gap-2"
+                                        onClick={() => updateStatusMutation.mutate({ attendanceId: row.attendanceId!, status: "Absent" })}
+                                      >
+                                        <XCircle className="h-3.5 w-3.5" />
+                                        Mark as Absent
+                                      </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem
                                       className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 gap-2"
                                       onClick={() => confirmDelete(row.attendanceId!, row.fullName, formatDateShort(new Date().toISOString()))}
@@ -1355,6 +1386,24 @@ export default function AttendanceDashboardPage() {
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
+                                  {r.status === "Absent" && (
+                                    <DropdownMenuItem
+                                      className="text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50 gap-2"
+                                      onClick={() => updateStatusMutation.mutate({ attendanceId: r.id, status: "Present" })}
+                                    >
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                      Mark as Present
+                                    </DropdownMenuItem>
+                                  )}
+                                  {r.status === "Present" && (
+                                    <DropdownMenuItem
+                                      className="text-amber-600 focus:text-amber-600 focus:bg-amber-50 gap-2"
+                                      onClick={() => updateStatusMutation.mutate({ attendanceId: r.id, status: "Absent" })}
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                      Mark as Absent
+                                    </DropdownMenuItem>
+                                  )}
                                   <DropdownMenuItem
                                     className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 gap-2"
                                     onClick={() => confirmDelete(r.id, r.fullName ?? "", formatDateShort(r.date))}

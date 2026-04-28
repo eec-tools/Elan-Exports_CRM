@@ -53,7 +53,7 @@ const PORT = process.env.PORT || 3001;
 
 // ─── Global Middleware ──────────────────────────────
 
-// Trust proxy for rate limiting behind reverse proxies (Render, Heroku, etc.)
+// Trust proxy for rate limiting behind reverse proxies (AWS ALB, etc.)
 app.set("trust proxy", 1);
 
 // Security headers
@@ -93,11 +93,6 @@ app.use(
 
       // Check against allowed origins
       if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      // Allow Vercel preview deployments (*.vercel.app)
-      if (/^https:\/\/.*\.vercel\.app$/.test(origin)) {
         return callback(null, true);
       }
 

@@ -9,6 +9,7 @@ import {
   getTodayAttendance,
   heartbeatAttendance,
   startAttendance,
+  updateAttendanceStatus,
   uploadAttendanceProof,
   uploadAttendanceProofFile,
 } from "../controllers/attendance.controller.js";
@@ -29,6 +30,7 @@ router.get("/history", getAttendanceHistory);
 // Admin endpoints
 router.get("/admin/today", requireAdmin, getAdminTodayAttendance);
 router.get("/admin/history", requireAdmin, getAdminAttendanceHistory);
+router.patch("/admin/:id/status", requireAdmin, updateAttendanceStatus);
 router.delete("/admin/user/:id", requireAdmin, deleteUserAttendanceRecords);
 router.delete("/admin/:id", requireAdmin, deleteAttendanceRecord);
 
