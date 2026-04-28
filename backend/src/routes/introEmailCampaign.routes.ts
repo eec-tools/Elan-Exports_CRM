@@ -12,7 +12,7 @@ import { authenticate, requirePermission } from "../middleware/auth.js";
 
 const router = Router();
 
-router.use(authenticate, requirePermission("suppliers"));
+router.use(authenticate, requirePermission(["suppliers", "signed_suppliers"]));
 
 router.get("/", listCampaigns);
 router.get("/due", getDueCampaigns);

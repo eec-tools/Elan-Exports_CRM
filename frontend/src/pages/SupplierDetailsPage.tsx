@@ -440,6 +440,10 @@ export default function SupplierDetailsPage() {
 
   const uploadContractDocument = async (file: File) => {
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Contract document must be under 5 MB");
+      return;
+    }
     setUploadingContract(true);
     try {
       const uploadRes = await uploadCatalogMutation.mutateAsync(file);

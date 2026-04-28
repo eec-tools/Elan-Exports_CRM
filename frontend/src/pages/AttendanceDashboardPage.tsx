@@ -541,6 +541,11 @@ export default function AttendanceDashboardPage() {
       toast.error("You can upload a maximum of 10 work proof files.");
       return;
     }
+    const oversized = incomingFiles.find((f) => f.size > 5 * 1024 * 1024);
+    if (oversized) {
+      toast.error(`"${oversized.name}" exceeds the 5 MB limit.`);
+      return;
+    }
 
     setIsUploadingProofs(true);
 
