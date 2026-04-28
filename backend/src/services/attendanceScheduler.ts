@@ -27,7 +27,7 @@ async function createUserCheckoutReminder(params: {
       data: {
         type: "attendance_checkout_warning",
         title: "Checkout Reminder",
-        message: "Hurry up! Please check out in the next 10 minutes, otherwise you will be marked absent.",
+        message: "Hurry up! Please check out in the next 10 minutes, otherwise your attendance will be auto-ended and counted as present.",
         entityType: "attendance",
         entityId: params.attendanceId,
         entityName: `${params.fullName} Attendance`,
@@ -140,7 +140,7 @@ async function processOpenAttendances(): Promise<void> {
         continue;
       }
 
-      // Phase 2: still not checked out after grace period => auto-absent.
+      // Phase 2: still not checked out after grace period => auto-end and count present.
       const safeEnd = reminderDeadline < attendance.startTime ? attendance.startTime : reminderDeadline;
       const summary = calculateAttendanceSummary(
         attendance.startTime,
@@ -155,20 +155,20 @@ async function processOpenAttendances(): Promise<void> {
           totalTimeMinutes: summary.totalTimeMinutes,
           idleTimeMinutes: 0,
           realTimeMinutes: summary.totalTimeMinutes,
-          status: AttendanceStatus.Absent,
+          status: AttendanceStatus.Present,
           earlyLogout: false,
           autoEnded: true,
           checkoutReminderSentAt: attendance.checkoutReminderSentAt ?? now,
         },
       });
 
-      await logActivity(attendance.userId, "attendance_auto_end_absent", "attendance", attendance.id, {
+      await logActivity(attendance.userId, "attendance_auto_end_present", "attendance", attendance.id, {
         endTime: safeEnd.toISOString(),
         totalTimeMinutes: summary.totalTimeMinutes,
         idleTimeMinutes: 0,
         realTimeMinutes: summary.totalTimeMinutes,
-        status: AttendanceStatus.Absent,
-        reason: `Forgot to check out within ${CHECKOUT_GRACE_MINUTES} minutes after work end — auto-ended and marked Absent`,
+        status: AttendanceStatus.Present,
+        reason: `Forgot to check out within ${CHECKOUT_GRACE_MINUTES} minutes after work end — auto-ended and marked Present`,
       });
     }
   } catch (err) {
