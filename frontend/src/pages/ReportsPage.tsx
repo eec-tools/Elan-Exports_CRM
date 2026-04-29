@@ -537,9 +537,6 @@ export default function ReportsPage() {
                 <th className="px-5 py-3.5 font-semibold w-[200px]">
                   Buyer & Supplier
                 </th>
-                <th className="px-5 py-3.5 font-semibold w-[220px]">
-                  Status Summary
-                </th>
                 <th className="px-5 py-3.5 font-semibold w-[150px]">
                   Deal Stage
                 </th>
@@ -561,7 +558,7 @@ export default function ReportsPage() {
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={canEditReports ? 8 : 7}
+                    colSpan={canEditReports ? 7 : 6}
                     className="h-32 text-center"
                   >
                     <div className="flex justify-center">
@@ -572,7 +569,7 @@ export default function ReportsPage() {
               ) : !items.length ? (
                 <tr>
                   <td
-                    colSpan={canEditReports ? 8 : 7}
+                    colSpan={canEditReports ? 7 : 6}
                     className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]"
                   >
                     <div className="flex flex-col items-center justify-center gap-3">
@@ -656,19 +653,7 @@ export default function ReportsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="flex flex-col gap-2 relative h-full">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider border w-fit ${getStatusColor(item.status)}`}
-                        >
-                          {item.status || "Unknown"}
-                        </span>
-                        <span className="text-[13px] text-slate-600 font-medium leading-relaxed line-clamp-3">
-                          {/* We re-use 'status' in the backend as a brief summary string based on the old schema */}
-                          {item.status}
-                        </span>
-                      </div>
-                    </td>
+
                     <td className="px-5 py-4">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                         {item.dealStage || "Communication"}

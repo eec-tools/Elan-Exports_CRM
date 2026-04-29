@@ -17,9 +17,11 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getCustomDealStages, addCustomDealStage, removeCustomDealStage } from "@/lib/customDealStages";
 import {
   Plus,
   Search,
@@ -48,13 +50,6 @@ import { Separator } from "@/components/ui/separator";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
 import { SelectWithOthers } from "@/components/SelectWithOthers";
 import { EntityLinkSelect } from "@/components/EntityLinkSelect";
-
-interface EmailCampaign {
-  supplierId: string;
-  status: "active" | "completed" | "response_received";
-  currentStep: number;
-  nextFollowupDue?: string | null;
-}
 
 interface OrganicCertRow { market: string; certNumber: string; expiryDate: string; }
 interface LabTestRow { testType: string; lastTestDate: string; labName: string; reportAttached: string; }
@@ -227,49 +222,6 @@ const DEAL_STAGES = [
   "No Ongoing Deal",
 ];
 
-const FOLLOWUP_LABELS: Record<number, string> = {
-  1: "Follow-up 1 Due",
-  2: "Follow-up 2 Due",
-  3: "Follow-up 3 Due",
-};
-
-function EmailCampaignBadge({ campaign }: { campaign?: EmailCampaign }) {
-  if (!campaign) {
-    return <span className="text-xs text-slate-400">No Campaign</span>;
-  }
-
-  const isDueToday =
-    campaign.status === "active" &&
-    campaign.nextFollowupDue &&
-    new Date(campaign.nextFollowupDue) <= new Date();
-
-  if (campaign.status === "response_received") {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200">
-        <Mail className="h-3 w-3" /> Responded
-      </span>
-    );
-  }
-  if (campaign.status === "completed") {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
-        <CheckCircle2 className="h-3 w-3" /> Completed
-      </span>
-    );
-  }
-  if (isDueToday) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200 animate-pulse">
-        <Bell className="h-3 w-3" /> {FOLLOWUP_LABELS[campaign.currentStep] ?? "Follow-up Due"}
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
-      <Mail className="h-3 w-3" /> Step {campaign.currentStep}/4
-    </span>
-  );
-}
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
   company: "",
@@ -301,6 +253,27 @@ export default function SuppliersPage() {
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(
     null,
   );
+  const [customStages, setCustomStages] = useState<string[]>(() => getCustomDealStages());
+  const [showAddStageDialog, setShowAddStageDialog] = useState(false);
+  const [newStageName, setNewStageName] = useState("");
+
+  const allDealStages = [...DEAL_STAGES, ...customStages.filter((s) => !DEAL_STAGES.includes(s))];
+
+  function handleAddStage() {
+    const trimmed = newStageName.trim();
+    if (!trimmed) return;
+    const updated = addCustomDealStage(trimmed);
+    setCustomStages(updated.filter((s) => !DEAL_STAGES.includes(s)));
+    setNewStageName("");
+    setShowAddStageDialog(false);
+    toast.success(`Deal stage "${trimmed}" added`);
+  }
+
+  function handleDeleteStage(stage: string) {
+    const updated = removeCustomDealStage(stage);
+    setCustomStages(updated.filter((s) => !DEAL_STAGES.includes(s)));
+    toast.success(`Deal stage "${stage}" removed`);
+  }
 
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
@@ -352,10 +325,7 @@ export default function SuppliersPage() {
     queryFn: () => api.get("/suppliers/stats").then((r) => r.data),
   });
 
-  const { data: campaigns } = useQuery<EmailCampaign[]>({
-    queryKey: ["intro-campaigns"],
-    queryFn: () => api.get("/intro-campaigns").then((r) => r.data),
-  });
+
 
   const { data: buyersListData, isLoading: buyersListLoading } = useQuery<{ id: string; company: string; name: string }[]>({
     queryKey: ["buyers-list"],
@@ -364,9 +334,7 @@ export default function SuppliersPage() {
     enabled: dialogOpen,
   });
 
-  const campaignMap = new Map<string, EmailCampaign>(
-    (campaigns ?? []).map((c) => [c.supplierId, c]),
-  );
+
 
   const createMutation = useMutation({
     mutationFn: (d: Partial<Supplier>) => api.post("/suppliers", d),
@@ -748,17 +716,15 @@ export default function SuppliersPage() {
                 <th className="px-5 py-3.5 font-semibold">Vetting</th>
                 <th className="px-5 py-3.5 font-semibold">Cert Expiry</th>
                 <th className="px-5 py-3.5 font-semibold">Remarks</th>
-                <th className="px-5 py-3.5 font-semibold">Status</th>
                 <th className="px-5 py-3.5 font-semibold">Deal Stage</th>
                 <th className="px-5 py-3.5 font-semibold">Stage</th>
-                <th className="px-5 py-3.5 font-semibold">Intro Email</th>
                 {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading && suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 14 : 13} className="h-32 text-center">
+                  <td colSpan={canEdit ? 12 : 11} className="h-32 text-center">
                     <div className="flex justify-center">
                       <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                     </div>
@@ -766,7 +732,7 @@ export default function SuppliersPage() {
                 </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 14 : 13} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                  <td colSpan={canEdit ? 12 : 11} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                         <Building2 className="h-6 w-6 text-slate-300" />
@@ -813,16 +779,14 @@ export default function SuppliersPage() {
                       })()}
                     </td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.remarks}>{s.remarks}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusStyles(s.currentStatus)} capitalize`}>
-                        <StatusIcon status={s.currentStatus} className="h-3 w-3 mr-1.5" />
-                        {s.currentStatus || "Active"}
-                      </span>
-                    </td>
                     <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
                       <Select
                         value={s.dealStage || "Communication"}
                         onValueChange={(val) => {
+                          if (val === "__add_new__") {
+                            setShowAddStageDialog(true);
+                            return;
+                          }
                           updateMutation.mutate({ id: s.id, d: { dealStage: val } });
                         }}
                         disabled={updateMutation.isPending}
@@ -834,6 +798,29 @@ export default function SuppliersPage() {
                           {DEAL_STAGES.map((stage) => (
                             <SelectItem key={stage} value={stage}>{stage}</SelectItem>
                           ))}
+                          {customStages.filter((s) => !DEAL_STAGES.includes(s)).map((stage) => (
+                            <SelectItem key={stage} value={stage}>
+                              <span className="flex items-center gap-2 w-full">
+                                <span className="flex-1 min-w-0 truncate">{stage}</span>
+                                <span
+                                  role="button"
+                                  className="inline-flex h-4 w-4 items-center justify-center rounded text-slate-300 hover:text-red-500 hover:bg-red-50 flex-shrink-0"
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onPointerUp={(e) => e.stopPropagation()}
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteStage(stage); }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                          <SelectSeparator />
+                          <SelectItem value="__add_new__" className="text-brand-600 font-medium">
+                            <span className="flex items-center gap-1.5">
+                              <Plus className="h-3.5 w-3.5" />
+                              Add Deal Stage
+                            </span>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </td>
@@ -852,9 +839,6 @@ export default function SuppliersPage() {
                           <SelectItem value="Closed">Closed</SelectItem>
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-5 py-3.5 border-r border-slate-100">
-                      <EmailCampaignBadge campaign={campaignMap.get(s.id)} />
                     </td>
                     {canEdit && (
                       <td className="px-5 py-3.5 text-right font-medium">
@@ -1379,6 +1363,38 @@ export default function SuppliersPage() {
             >
               Yes, delete supplier
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Deal Stage Dialog */}
+      <Dialog open={showAddStageDialog} onOpenChange={(open) => { setShowAddStageDialog(open); if (!open) setNewStageName(""); }}>
+        <DialogContent className="sm:max-w-sm p-6 bg-white rounded-xl shadow-2xl border-none">
+          <DialogTitle className="text-base font-bold text-slate-900">Add Deal Stage</DialogTitle>
+          <DialogDescription className="text-sm text-slate-500 mt-1">
+            Enter a name for the new deal stage. It will appear in the Deal Stage dropdown and the Deals pipeline.
+          </DialogDescription>
+          <div className="mt-4 flex flex-col gap-3">
+            <Input
+              autoFocus
+              placeholder="e.g. Due Diligence"
+              value={newStageName}
+              onChange={(e) => setNewStageName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAddStage(); }}
+              className="border-slate-200 text-sm"
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setShowAddStageDialog(false); setNewStageName(""); }}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-brand-600 hover:bg-brand-700 text-white"
+                onClick={handleAddStage}
+                disabled={!newStageName.trim()}
+              >
+                Add Stage
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

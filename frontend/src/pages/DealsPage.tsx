@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { getCustomDealStages } from "@/lib/customDealStages";
 import {
   Plus,
   LayoutGrid,
@@ -44,23 +45,84 @@ interface Deal {
 
 // ─── Stage Config ─────────────────────────────────────────────
 const STAGES = [
-  { id: "Communication", label: "Communication", color: "#64748b", bg: "#f1f5f9", text: "#334155" },
-  { id: "Sampling", label: "Sampling", color: "#8b5cf6", bg: "#f5f3ff", text: "#6d28d9" },
-  { id: "Quotation", label: "Quotation", color: "#3b82f6", bg: "#eff6ff", text: "#1d4ed8" },
-  { id: "Negotiation with EEC", label: "Negotiation with EEC", color: "#f59e0b", bg: "#fffbeb", text: "#b45309" },
-  { id: "Price quotation to Buyer after EEC approval", label: "Price quotation to Buyer", color: "#06b6d4", bg: "#ecfeff", text: "#0e7490" },
-  { id: "Negotiation with buyer", label: "Negotiation with buyer", color: "#f97316", bg: "#fff7ed", text: "#c2410c" },
-  { id: "Price approval by buyer", label: "Price approval by buyer", color: "#10b981", bg: "#ecfdf5", text: "#065f46" },
-  { id: "Quotation send to the supplier from buyer end", label: "Quotation to supplier", color: "#14b8a6", bg: "#f0fdfa", text: "#115e59" },
-  { id: "Orders confirmed from buyers end", label: "Orders confirmed", color: "#16a34a", bg: "#f0fdf4", text: "#14532d" },
-  { id: "Timeline (Product shipping.. etc) should be established from suppliers end", label: "Timeline established", color: "#22c55e", bg: "#f0fdf4", text: "#166534" },
+  {
+    id: "Communication",
+    label: "Communication",
+    color: "#64748b",
+    bg: "#f1f5f9",
+    text: "#334155",
+  },
+  {
+    id: "Sampling",
+    label: "Sampling",
+    color: "#8b5cf6",
+    bg: "#f5f3ff",
+    text: "#6d28d9",
+  },
+  {
+    id: "Quotation",
+    label: "Quotation",
+    color: "#3b82f6",
+    bg: "#eff6ff",
+    text: "#1d4ed8",
+  },
+  {
+    id: "Negotiation with EEC",
+    label: "Negotiation with EEC",
+    color: "#f59e0b",
+    bg: "#fffbeb",
+    text: "#b45309",
+  },
+  {
+    id: "Price quotation to Buyer after EEC approval",
+    label: "Price quotation to Buyer",
+    color: "#06b6d4",
+    bg: "#ecfeff",
+    text: "#0e7490",
+  },
+  {
+    id: "Negotiation with buyer",
+    label: "Negotiation with buyer",
+    color: "#f97316",
+    bg: "#fff7ed",
+    text: "#c2410c",
+  },
+  {
+    id: "Price approval by buyer",
+    label: "Price approval by buyer",
+    color: "#10b981",
+    bg: "#ecfdf5",
+    text: "#065f46",
+  },
+  {
+    id: "Quotation send to the supplier from buyer end",
+    label: "Quotation to supplier",
+    color: "#14b8a6",
+    bg: "#f0fdfa",
+    text: "#115e59",
+  },
+  {
+    id: "Orders confirmed from buyers end",
+    label: "Orders confirmed",
+    color: "#16a34a",
+    bg: "#f0fdf4",
+    text: "#14532d",
+  },
+  {
+    id: "Timeline (Product shipping.. etc) should be established from suppliers end",
+    label: "Timeline established",
+    color: "#22c55e",
+    bg: "#f0fdf4",
+    text: "#166534",
+  },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────
-function stageConfig(id: string) {
-  return STAGES.find((s) => s.id === id) ?? STAGES[0];
-}
+type StageConfig = { id: string; label: string; color: string; bg: string; text: string };
 
+// ─── Helpers ──────────────────────────────────────────────────
+function stageConfig(id: string, stages: StageConfig[]) {
+  return stages.find((s) => s.id === id) ?? stages[0];
+}
 
 function authHeader(): Record<string, string> {
   const token = localStorage.getItem("token");
@@ -112,6 +174,16 @@ export default function DealsPage() {
   // Drag-over state for kanban
   const [dragOver, setDragOver] = useState<string | null>(null);
 
+  // Custom stages from localStorage (added via supplier pages)
+  const [customStageIds] = useState<string[]>(() => getCustomDealStages());
+
+  const allStages = useMemo<StageConfig[]>(() => [
+    ...STAGES,
+    ...customStageIds
+      .filter((id) => !STAGES.some((s) => s.id === id))
+      .map((id) => ({ id, label: id, color: "#94a3b8", bg: "#f8fafc", text: "#475569" })),
+  ], [customStageIds]);
+
   // ─── Fetch ───────────────────────────────────────────────────
   async function fetchDeals() {
     setLoading(true);
@@ -137,7 +209,7 @@ export default function DealsPage() {
           : [];
         setBuyerOptions([...new Set(names)].sort());
       })
-      .catch(() => { });
+      .catch(() => {});
     fetch(`${API_BASE}/suppliers?limit=200`, { headers: authHeader() })
       .then((r) => r.json())
       .then((d) => {
@@ -146,7 +218,7 @@ export default function DealsPage() {
           : [];
         setSupplierOptions([...new Set(names)].sort());
       })
-      .catch(() => { });
+      .catch(() => {});
   }, []);
 
   // ─── Stats ───────────────────────────────────────────────────
@@ -155,7 +227,7 @@ export default function DealsPage() {
     const pipeline = deals.reduce((s, d) => s + (d.expectedRevenue ?? 0), 0);
     const weighted = deals.reduce(
       (s, d) => s + (d.expectedRevenue ?? 0) * ((d.probability ?? 20) / 100),
-      0
+      0,
     );
     const avgMargin =
       deals.length > 0
@@ -279,13 +351,15 @@ export default function DealsPage() {
     type: string,
     state: Partial<Deal>,
     setState: (v: Partial<Deal>) => void,
-    opts?: { placeholder?: string; options?: string[] }
+    opts?: { placeholder?: string; options?: string[] },
   ) {
     const val = state[key] ?? "";
     if (opts?.options) {
       return (
         <div key={key} className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            {label}
+          </label>
           <div className="relative">
             <select
               value={val as string}
@@ -294,7 +368,9 @@ export default function DealsPage() {
             >
               <option value="">Select {label}</option>
               {opts.options.map((o) => (
-                <option key={o} value={o}>{o}</option>
+                <option key={o} value={o}>
+                  {o}
+                </option>
               ))}
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
@@ -304,13 +380,21 @@ export default function DealsPage() {
     }
     return (
       <div key={key} className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
+        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          {label}
+        </label>
         <Input
           type={type}
           value={val as string | number}
           placeholder={opts?.placeholder}
           onChange={(e) =>
-            setState({ ...state, [key]: type === "number" ? parseFloat(e.target.value) || undefined : e.target.value })
+            setState({
+              ...state,
+              [key]:
+                type === "number"
+                  ? parseFloat(e.target.value) || undefined
+                  : e.target.value,
+            })
           }
           className="border-slate-200 text-sm"
         />
@@ -328,10 +412,15 @@ export default function DealsPage() {
             <TrendingUp className="h-6 w-6 text-brand-500" />
             Deals Pipeline
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">Track and manage your export deals across all stages</p>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Track and manage your export deals across all stages
+          </p>
         </div>
         <Button
-          onClick={() => { setShowNewDeal(true); setForm(emptyForm()); }}
+          onClick={() => {
+            setShowNewDeal(true);
+            setForm(emptyForm());
+          }}
           className="bg-brand-600 hover:bg-brand-700 text-white gap-2 shadow-sm"
         >
           <Plus className="h-4 w-4" />
@@ -349,7 +438,10 @@ export default function DealsPage() {
             bg: "bg-brand-50",
           },
         ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-3 shadow-sm">
+          <div
+            key={s.label}
+            className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-3 shadow-sm"
+          >
             <div className={`rounded-lg p-2.5 ${s.bg}`}>{s.icon}</div>
             <div>
               <p className="text-xs text-slate-500 font-medium">{s.label}</p>
@@ -364,20 +456,22 @@ export default function DealsPage() {
         <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
           <button
             onClick={() => setView("kanban")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${view === "kanban"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-              }`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${
+              view === "kanban"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
           >
             <LayoutGrid className="h-4 w-4" />
             Kanban
           </button>
           <button
             onClick={() => setView("table")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${view === "table"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-              }`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${
+              view === "table"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
           >
             <List className="h-4 w-4" />
             Table
@@ -399,6 +493,7 @@ export default function DealsPage() {
           ) : view === "kanban" ? (
             <KanbanBoard
               deals={deals}
+              stages={allStages}
               onCardClick={openDeal}
               onDragStart={handleDragStart}
               onDrop={handleDrop}
@@ -407,10 +502,14 @@ export default function DealsPage() {
             />
           ) : (
             <TableView
-              deals={deals.filter((d) => STAGES.some((s) => s.id === d.stage))}
+              deals={deals}
+              stages={allStages}
               onRowClick={openDeal}
               onDelete={(d) => setDeleteTarget(d)}
-              onEdit={(d) => { openDeal(d); setEditMode(true); }}
+              onEdit={(d) => {
+                openDeal(d);
+                setEditMode(true);
+              }}
             />
           )}
         </div>
@@ -419,14 +518,21 @@ export default function DealsPage() {
         {selectedDeal && (
           <DetailPanel
             deal={selectedDeal}
+            stages={allStages}
             editMode={editMode}
             editForm={editForm}
             setEditForm={setEditForm}
             saving={saving}
             buyerOptions={buyerOptions}
             supplierOptions={supplierOptions}
-            onClose={() => { setSelectedDeal(null); setEditMode(false); }}
-            onEdit={() => { setEditMode(true); setEditForm({ ...selectedDeal }); }}
+            onClose={() => {
+              setSelectedDeal(null);
+              setEditMode(false);
+            }}
+            onEdit={() => {
+              setEditMode(true);
+              setEditForm({ ...selectedDeal });
+            }}
             onSave={handleUpdate}
             onDelete={() => setDeleteTarget(selectedDeal)}
             onStageChange={(s) => moveStage(selectedDeal.id, s)}
@@ -437,14 +543,20 @@ export default function DealsPage() {
       {/* ── New Deal Modal ── */}
       {showNewDeal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: "90vh" }}>
+          <div
+            className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ maxHeight: "90vh" }}
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Plus className="h-5 w-5 text-brand-600" />
                 New Deal
               </h2>
-              <button onClick={() => setShowNewDeal(false)} className="text-slate-400 hover:text-slate-700 transition-colors">
+              <button
+                onClick={() => setShowNewDeal(false)}
+                className="text-slate-400 hover:text-slate-700 transition-colors"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -452,19 +564,29 @@ export default function DealsPage() {
             {/* Modal Body */}
             <div className="overflow-y-auto p-6 flex-1">
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">{field("Title *", "title", "text", form, setForm, { placeholder: "e.g. US Organic Lentils Q2" })}</div>
+                <div className="col-span-2">
+                  {field("Title *", "title", "text", form, setForm, {
+                    placeholder: "e.g. US Organic Lentils Q2",
+                  })}
+                </div>
                 {/* Buyer dropdown – real buyers data */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Buyer</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Buyer
+                  </label>
                   <div className="relative">
                     <select
                       value={form.buyer ?? ""}
-                      onChange={(e) => setForm({ ...form, buyer: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, buyer: e.target.value })
+                      }
                       className="w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 pr-8"
                     >
                       <option value="">Select Buyer</option>
                       {buyerOptions.map((b) => (
-                        <option key={b} value={b}>{b}</option>
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
                       ))}
                     </select>
                     <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
@@ -472,30 +594,46 @@ export default function DealsPage() {
                 </div>
                 {/* Supplier dropdown – real suppliers data */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Supplier</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Supplier
+                  </label>
                   <div className="relative">
                     <select
                       value={form.supplier ?? ""}
-                      onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, supplier: e.target.value })
+                      }
                       className="w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 pr-8"
                     >
                       <option value="">Select Supplier</option>
                       {supplierOptions.map((s) => (
-                        <option key={s} value={s}>{s}</option>
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
                       ))}
                     </select>
                     <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                   </div>
                 </div>
-                {field("Product", "product", "text", form, setForm, { placeholder: "e.g. Organic Red Lentils" })}
-                {field("HS Code", "hsCode", "text", form, setForm, { placeholder: "e.g. 0713.40" })}
-                {field("Stage", "stage", "text", form, setForm, { options: STAGES.map((s) => s.id) })}
+                {field("Product", "product", "text", form, setForm, {
+                  placeholder: "e.g. Organic Red Lentils",
+                })}
+                {field("HS Code", "hsCode", "text", form, setForm, {
+                  placeholder: "e.g. 0713.40",
+                })}
+                {field("Stage", "stage", "text", form, setForm, {
+                  options: allStages.map((s) => s.id),
+                })}
 
                 <div className="col-span-2 flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Notes</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Notes
+                  </label>
                   <Textarea
                     value={form.notes ?? ""}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, notes: e.target.value })
+                    }
                     rows={3}
                     className="border-slate-200 text-sm resize-none"
                     placeholder="Additional notes..."
@@ -506,13 +644,19 @@ export default function DealsPage() {
 
             {/* Modal Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
-              <Button variant="ghost" onClick={() => setShowNewDeal(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setShowNewDeal(false)}>
+                Cancel
+              </Button>
               <Button
                 onClick={handleCreate}
                 disabled={saving}
                 className="bg-brand-600 hover:bg-brand-700 text-white gap-2"
               >
-                {saving ? <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> : <Save className="h-4 w-4" />}
+                {saving ? (
+                  <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
                 Save Deal
               </Button>
             </div>
@@ -530,14 +674,21 @@ export default function DealsPage() {
               </div>
               <div>
                 <h3 className="font-bold text-slate-900">Delete Deal</h3>
-                <p className="text-sm text-slate-500">This action cannot be undone.</p>
+                <p className="text-sm text-slate-500">
+                  This action cannot be undone.
+                </p>
               </div>
             </div>
             <p className="text-sm text-slate-700 mb-5">
-              Are you sure you want to delete <span className="font-semibold">"{deleteTarget.title}"</span>?
+              Are you sure you want to delete{" "}
+              <span className="font-semibold">"{deleteTarget.title}"</span>?
             </p>
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setDeleteTarget(null)}
+              >
                 Cancel
               </Button>
               <Button
@@ -558,6 +709,7 @@ export default function DealsPage() {
 // ─── Kanban Board ─────────────────────────────────────────────
 function KanbanBoard({
   deals,
+  stages,
   onCardClick,
   onDragStart,
   onDrop,
@@ -565,30 +717,52 @@ function KanbanBoard({
   dragOver,
 }: {
   deals: Deal[];
+  stages: StageConfig[];
   onCardClick: (d: Deal) => void;
   onDragStart: (e: React.DragEvent, id: string) => void;
   onDrop: (e: React.DragEvent, stageId: string) => void;
   onDragOver: (id: string) => void;
   dragOver: string | null;
 }) {
+  const sortedStages = [...stages].sort(
+    (a, b) =>
+      deals.filter((d) => d.stage === b.id).length -
+      deals.filter((d) => d.stage === a.id).length
+  );
+
   return (
-    <div className="flex gap-3 overflow-x-auto pb-4 h-full" style={{ minHeight: 400 }}>
-      {STAGES.map((stage) => {
+    <div
+      className="flex gap-3 overflow-x-auto pb-4 h-full"
+      style={{ minHeight: 400 }}
+    >
+      {sortedStages.map((stage) => {
         const stageDeals = deals.filter((d) => d.stage === stage.id);
         return (
           <div
             key={stage.id}
-            className={`flex-shrink-0 w-64 flex flex-col rounded-xl border transition-all ${dragOver === stage.id ? "border-brand-400 bg-brand-50/60" : "border-slate-200 bg-slate-50"
-              }`}
-            onDragOver={(e) => { e.preventDefault(); onDragOver(stage.id); }}
+            className={`flex-shrink-0 w-64 flex flex-col rounded-xl border transition-all ${
+              dragOver === stage.id
+                ? "border-brand-400 bg-brand-50/60"
+                : "border-slate-200 bg-slate-50"
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              onDragOver(stage.id);
+            }}
             onDrop={(e) => onDrop(e, stage.id)}
           >
             {/* Column Header */}
             <div
               className="flex items-center justify-between px-3 py-2.5 rounded-t-xl"
-              style={{ borderTop: `3px solid ${stage.color}`, background: stage.bg }}
+              style={{
+                borderTop: `3px solid ${stage.color}`,
+                background: stage.bg,
+              }}
             >
-              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: stage.text }}>
+              <span
+                className="text-xs font-bold uppercase tracking-wider"
+                style={{ color: stage.text }}
+              >
                 {stage.label}
               </span>
               <span
@@ -657,11 +831,13 @@ function DealCard({
 // ─── Table View ───────────────────────────────────────────────
 function TableView({
   deals,
+  stages,
   onRowClick,
   onDelete,
   onEdit,
 }: {
   deals: Deal[];
+  stages: StageConfig[];
   onRowClick: (d: Deal) => void;
   onDelete: (d: Deal) => void;
   onEdit: (d: Deal) => void;
@@ -682,7 +858,10 @@ function TableView({
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               {["Deal", "Buyer", "Stage", "Actions"].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                <th
+                  key={h}
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap"
+                >
                   {h}
                 </th>
               ))}
@@ -690,20 +869,31 @@ function TableView({
           </thead>
           <tbody>
             {deals.map((deal, i) => {
-              const sc = stageConfig(deal.stage);
+              const sc = stageConfig(deal.stage, stages);
               return (
                 <tr
                   key={deal.id}
-                  className={`border-b border-slate-100 hover:bg-brand-50/40 cursor-pointer transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"
-                    }`}
+                  className={`border-b border-slate-100 hover:bg-brand-50/40 cursor-pointer transition-colors ${
+                    i % 2 === 0 ? "bg-white" : "bg-slate-50/30"
+                  }`}
                   onClick={() => onRowClick(deal)}
                 >
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-800 hover:text-brand-700">{deal.title}</p>
-                    {deal.product && <p className="text-xs text-slate-400">{deal.product}</p>}
-                    {deal.hsCode && <p className="text-xs text-slate-400">HS: {deal.hsCode}</p>}
+                    <p className="font-semibold text-slate-800 hover:text-brand-700">
+                      {deal.title}
+                    </p>
+                    {deal.product && (
+                      <p className="text-xs text-slate-400">{deal.product}</p>
+                    )}
+                    {deal.hsCode && (
+                      <p className="text-xs text-slate-400">
+                        HS: {deal.hsCode}
+                      </p>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{deal.buyer || "—"}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {deal.buyer || "—"}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold"
@@ -712,8 +902,10 @@ function TableView({
                       {sc.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-
+                  <td
+                    className="px-4 py-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => onEdit(deal)}
@@ -744,6 +936,7 @@ function TableView({
 // ─── Detail Panel ─────────────────────────────────────────────
 function DetailPanel({
   deal,
+  stages,
   editMode,
   editForm,
   setEditForm,
@@ -757,6 +950,7 @@ function DetailPanel({
   onStageChange,
 }: {
   deal: Deal;
+  stages: StageConfig[];
   editMode: boolean;
   editForm: Partial<Deal>;
   setEditForm: (v: Partial<Deal>) => void;
@@ -774,11 +968,22 @@ function DetailPanel({
       {/* Panel Header */}
       <div className="flex items-start justify-between p-4 border-b border-slate-100">
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-slate-900 text-base truncate">{deal.title}</h3>
-          {deal.product && <p className="text-xs text-slate-500 mt-0.5 truncate">{deal.product}</p>}
-          {deal.hsCode && <p className="text-xs text-slate-400">HS: {deal.hsCode}</p>}
+          <h3 className="font-bold text-slate-900 text-base truncate">
+            {deal.title}
+          </h3>
+          {deal.product && (
+            <p className="text-xs text-slate-500 mt-0.5 truncate">
+              {deal.product}
+            </p>
+          )}
+          {deal.hsCode && (
+            <p className="text-xs text-slate-400">HS: {deal.hsCode}</p>
+          )}
         </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors ml-2 flex-shrink-0">
+        <button
+          onClick={onClose}
+          className="text-slate-400 hover:text-slate-700 transition-colors ml-2 flex-shrink-0"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -786,22 +991,25 @@ function DetailPanel({
       <div className="flex-1 overflow-y-auto">
         {/* Stage Stepper */}
         <div className="p-4 border-b border-slate-100">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Pipeline Stage</p>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+            Pipeline Stage
+          </p>
           <div className="flex flex-col gap-1.5">
-            {STAGES.map((s, idx) => {
-              const currentIdx = STAGES.findIndex((x) => x.id === deal.stage);
+            {stages.map((s, idx) => {
+              const currentIdx = stages.findIndex((x) => x.id === deal.stage);
               const isPast = idx < currentIdx;
               const isCurrent = s.id === deal.stage;
               return (
                 <button
                   key={s.id}
                   onClick={() => onStageChange(s.id)}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${isCurrent
-                    ? "text-white shadow-sm"
-                    : isPast
-                      ? "text-slate-500 hover:bg-slate-100"
-                      : "text-slate-400 hover:bg-slate-50"
-                    }`}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    isCurrent
+                      ? "text-white shadow-sm"
+                      : isPast
+                        ? "text-slate-500 hover:bg-slate-100"
+                        : "text-slate-400 hover:bg-slate-50"
+                  }`}
                   style={isCurrent ? { background: s.color } : {}}
                 >
                   {isCurrent ? (
@@ -820,21 +1028,29 @@ function DetailPanel({
 
         {/* Info Grid */}
         <div className="p-4 border-b border-slate-100">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Deal Info</p>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+            Deal Info
+          </p>
           {editMode ? (
             <div className="flex flex-col gap-3">
               {/* Buyer dropdown */}
               <div className="flex flex-col gap-0.5">
-                <label className="text-xs text-slate-400 font-medium">Buyer</label>
+                <label className="text-xs text-slate-400 font-medium">
+                  Buyer
+                </label>
                 <div className="relative">
                   <select
                     value={(editForm.buyer as string) ?? ""}
-                    onChange={(e) => setEditForm({ ...editForm, buyer: e.target.value })}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, buyer: e.target.value })
+                    }
                     className="w-full appearance-none h-8 text-xs border border-slate-200 rounded-md px-2 pr-7 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="">Select Buyer</option>
                     {buyerOptions.map((b) => (
-                      <option key={b} value={b}>{b}</option>
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
@@ -842,16 +1058,22 @@ function DetailPanel({
               </div>
               {/* Supplier dropdown */}
               <div className="flex flex-col gap-0.5">
-                <label className="text-xs text-slate-400 font-medium">Supplier</label>
+                <label className="text-xs text-slate-400 font-medium">
+                  Supplier
+                </label>
                 <div className="relative">
                   <select
                     value={(editForm.supplier as string) ?? ""}
-                    onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, supplier: e.target.value })
+                    }
                     className="w-full appearance-none h-8 text-xs border border-slate-200 rounded-md px-2 pr-7 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="">Select Supplier</option>
                     {supplierOptions.map((s) => (
-                      <option key={s} value={s}>{s}</option>
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
@@ -867,7 +1089,9 @@ function DetailPanel({
               ].map(({ label, value }) => (
                 <div key={label} className="bg-slate-50 rounded-lg p-2.5">
                   <p className="text-xs text-slate-400 mb-0.5">{label}</p>
-                  <p className="text-sm font-semibold text-slate-800 truncate">{value || "—"}</p>
+                  <p className="text-sm font-semibold text-slate-800 truncate">
+                    {value || "—"}
+                  </p>
                 </div>
               ))}
             </div>
@@ -876,17 +1100,23 @@ function DetailPanel({
 
         {/* Notes */}
         <div className="p-4">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Notes</p>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            Notes
+          </p>
           {editMode ? (
             <Textarea
               value={(editForm.notes as string) ?? ""}
-              onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+              onChange={(e) =>
+                setEditForm({ ...editForm, notes: e.target.value })
+              }
               rows={4}
               className="text-xs border-slate-200 resize-none"
               placeholder="Add notes..."
             />
           ) : (
-            <p className="text-sm text-slate-600 leading-relaxed">{deal.notes || "No notes added."}</p>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              {deal.notes || "No notes added."}
+            </p>
           )}
         </div>
       </div>
@@ -899,7 +1129,9 @@ function DetailPanel({
               variant="ghost"
               size="sm"
               className="flex-1 text-xs"
-              onClick={() => { setEditForm({ ...deal }); }}
+              onClick={() => {
+                setEditForm({ ...deal });
+              }}
             >
               Cancel
             </Button>
@@ -909,7 +1141,11 @@ function DetailPanel({
               disabled={saving}
               onClick={onSave}
             >
-              {saving ? <div className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" /> : <Save className="h-3 w-3" />}
+              {saving ? (
+                <div className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              ) : (
+                <Save className="h-3 w-3" />
+              )}
               Save
             </Button>
           </>
