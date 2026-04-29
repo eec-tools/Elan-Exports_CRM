@@ -233,7 +233,7 @@ netSalary            = grossSalary − leaveSalaryDeduction − professionalTax
 ```
 
 > **Why Method B (explicit deduction)?**
-> `paidDays` includes ALL approved leaves so the gross shows what would have been earned.
+> `paidDays` includes ALL approved leaves so the gross shows what would have been earned..
 > The `leaveSalaryDeduction` line item is then shown separately on the payroll slip — the employee
 > can clearly see "you took 2 excess leave days, here is the exact amount deducted." This is more
 > transparent than silently lowering `paidDays` with no explanation.
