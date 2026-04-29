@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { createNotification } from "../services/notificationService.js";
+import { startCampaignForSupplier } from "./sourcingEmailCampaign.controller.js";
 
 const SOURCING_FIELDS = [
   "company",
@@ -324,7 +325,12 @@ export async function createSourcingSupplier(
       },
     });
 
-    res.status(201).json(supplier);
+    let campaignStarted = false;
+    if (assignedGmailAccount && email) {
+      campaignStarted = await startCampaignForSupplier(supplier.id, req.user?.id);
+    }
+
+    res.status(201).json({ ...supplier, campaignStarted });
   } catch (err) {
     console.error("Create sourcing supplier error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -378,8 +384,31 @@ export async function deleteSourcingSupplier(
 ): Promise<void> {
   try {
     const { id } = req.params;
+
+    const existing = await (prisma as any).sourcingSupplier.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      res.status(404).json({ error: "Sourcing supplier not found" });
+      return;
+    }
+
     await (prisma as any).sourcingSupplier.delete({ where: { id } });
-    res.json({ success: true });
+
+    let deletedFromVault = false;
+    if (existing.email) {
+      const vaultMatch = await (prisma as any).sourcingVaultSupplier.findFirst({
+        where: { company: existing.company, email: existing.email },
+      });
+      if (vaultMatch) {
+        await (prisma as any).sourcingVaultSupplier.delete({
+          where: { id: vaultMatch.id },
+        });
+        deletedFromVault = true;
+      }
+    }
+
+    res.json({ success: true, deletedFromVault });
   } catch (err) {
     console.error("Delete sourcing supplier error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -675,21 +704,38 @@ export async function addFromVaultFolder(
       createdBy: req.user!.id,
     }));
 
-    await (prisma as any).$transaction(async (tx: any) => {
-      await tx.sourcingSupplier.createMany({
-        data: supplierData,
-        skipDuplicates: true,
-      });
+    const createdSuppliers: any[] = await (prisma as any).$transaction(async (tx: any) => {
+      const created: any[] = [];
+      for (const data of supplierData) {
+        try {
+          const s = await tx.sourcingSupplier.create({ data });
+          created.push(s);
+        } catch (e: any) {
+          if (e?.code === "P2002") continue;
+          throw e;
+        }
+      }
 
       await tx.sourcingVaultSupplier.updateMany({
         where: { folderId, emailStatus: "Not Sent" },
         data: { emailStatus: "Sent" },
       });
+
+      return created;
     });
 
+    let emailsSent = 0;
+    for (const supplier of createdSuppliers) {
+      if (supplier.assignedGmailAccount && supplier.email) {
+        const sent = await startCampaignForSupplier(supplier.id, req.user?.id);
+        if (sent) emailsSent++;
+      }
+    }
+
     res.status(201).json({
-      added: supplierData.length,
-      suppliers: supplierData.map((s: any) => ({ company: s.company, formToken: s.formToken })),
+      added: createdSuppliers.length,
+      emailsSent,
+      suppliers: createdSuppliers.map((s: any) => ({ company: s.company, formToken: s.formToken })),
     });
   } catch (err) {
     console.error("Add from vault folder error:", err);

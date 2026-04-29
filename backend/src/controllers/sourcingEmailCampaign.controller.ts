@@ -216,7 +216,14 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
         fromEmail,
     });
 
-    await sendGmailEmail({ fromEmail, to: supplier.email, subject, html });
+    // Thread follow-ups into the same Gmail conversation as the intro email
+    await sendGmailEmail({
+        fromEmail,
+        to: supplier.email,
+        subject,
+        html,
+        threadId: campaign.gmailThreadId ?? undefined,
+    });
 
     const now = new Date();
     const isLastStep = nextStep === 4;
@@ -291,6 +298,70 @@ export async function executeMarkResponse(sourcingId: string, createdBy?: string
     });
 
     return newSupplierId;
+}
+
+// ─── Shared helper: start a campaign for a supplier (used internally) ────────
+
+export async function startCampaignForSupplier(sourcingId: string, userId?: string): Promise<boolean> {
+    try {
+        const supplier = await (prisma as any).sourcingSupplier.findUnique({ where: { id: sourcingId } });
+        if (!supplier?.assignedGmailAccount || !supplier?.email || !supplier?.formToken) return false;
+
+        const existing = await (prisma as any).sourcingEmailCampaign.findUnique({ where: { sourcingId } });
+        if (existing) return false;
+
+        const formLink = buildFormLink(supplier.formToken);
+        const { subject, html } = getTemplate(1, {
+            company: supplier.company,
+            contactPerson: supplier.contactPerson,
+            product: supplier.product ?? supplier.productCategory ?? null,
+            formLink,
+            fromEmail: supplier.assignedGmailAccount,
+        });
+
+        const { messageId, threadId } = await sendGmailEmail({
+            fromEmail: supplier.assignedGmailAccount,
+            to: supplier.email,
+            subject,
+            html,
+        });
+
+        const now = new Date();
+        await (prisma as any).$transaction(async (tx: any) => {
+            await tx.sourcingEmailCampaign.create({
+                data: {
+                    sourcingId,
+                    status: "active",
+                    currentStep: 1,
+                    introEmailSentAt: now,
+                    nextFollowupDue: addDays(now, 3),
+                    gmailThreadId: threadId,
+                    gmailMessageId: messageId,
+                    lastCheckedAt: now,
+                },
+            });
+            await tx.sourcingSupplier.update({
+                where: { id: sourcingId },
+                data: { status: "intro_sent" },
+            });
+        });
+
+        await createNotification({
+            type: "campaign_started",
+            title: "Campaign Started",
+            message: `Intro email sent to ${supplier.company} (${supplier.email}) via ${supplier.assignedGmailAccount}`,
+            entityType: "sourcing_supplier",
+            entityId: sourcingId,
+            entityName: supplier.company,
+            entityLink: `/suppliers/sourcing/${sourcingId}`,
+            createdBy: userId,
+        });
+
+        return true;
+    } catch (err) {
+        console.error(`[campaign] Auto-start failed for supplier ${sourcingId}:`, err);
+        return false;
+    }
 }
 
 // ─── Route handlers ──────────────────────────────────────────────────────────

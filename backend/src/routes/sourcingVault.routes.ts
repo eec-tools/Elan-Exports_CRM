@@ -7,6 +7,8 @@ import {
   addToList,
   sendBulkEmail,
   listVaultCreators,
+  updateVaultSupplier,
+  deleteVaultSupplier,
 } from "../controllers/sourcingVault.controller.js";
 import {
   authenticate,
@@ -40,6 +42,17 @@ router.post(
   "/:folderId/suppliers",
   requireEdit(["suppliers", "sourcing_suppliers"]),
   addToList,
+);
+
+router.put(
+  "/:folderId/suppliers/:supplierId",
+  requireEdit(["suppliers", "sourcing_suppliers"]),
+  updateVaultSupplier,
+);
+router.delete(
+  "/:folderId/suppliers/:supplierId",
+  requireEdit(["suppliers", "sourcing_suppliers"]),
+  deleteVaultSupplier,
 );
 
 router.delete(

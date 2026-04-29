@@ -1,7 +1,39 @@
 import cron from "node-cron";
 import prisma from "../config/db.js";
 import { checkForReply } from "./gmailService.js";
-import { executeMarkResponse, autoMoveToOldSupplier, executeSendStep } from "../controllers/sourcingEmailCampaign.controller.js";
+import { autoMoveToOldSupplier } from "../controllers/sourcingEmailCampaign.controller.js";
+import { createNotification } from "./notificationService.js";
+
+/**
+ * Mark a campaign as having received a reply WITHOUT auto-converting to New Supplier.
+ * The user sees a notification and converts manually via the "Responded" button.
+ */
+async function flagReplyReceived(sourcingId: string, company: string): Promise<void> {
+    await (prisma as any).$transaction([
+        (prisma as any).sourcingEmailCampaign.update({
+            where: { sourcingId },
+            data: {
+                status: "response_received",
+                responseReceivedAt: new Date(),
+                nextFollowupDue: null,
+            },
+        }),
+        (prisma as any).sourcingSupplier.update({
+            where: { id: sourcingId },
+            data: { status: "response_received" },
+        }),
+    ]);
+
+    await createNotification({
+        type: "campaign_responded",
+        title: "Supplier Replied — Action Required",
+        message: `${company} replied to your email. Open their record and click "Responded" to convert them to a New Supplier.`,
+        entityType: "sourcing_supplier",
+        entityId: sourcingId,
+        entityName: company,
+        entityLink: `/suppliers/sourcing/${sourcingId}`,
+    });
+}
 
 async function checkCampaignReplies() {
     try {
@@ -34,16 +66,16 @@ async function checkCampaignReplies() {
 
                 if (replied) {
                     repliesFound++;
-                    console.log(`[ReplyDetector] Reply detected from ${supplier.company} — converting to New Supplier`);
-                    await executeMarkResponse(campaign.sourcingId);
+                    console.log(`[ReplyDetector] Reply detected from ${supplier.company} — flagging for manual review`);
+                    // Flag as responded; do NOT auto-convert — user must click "Responded" to convert
+                    await flagReplyReceived(campaign.sourcingId, supplier.company);
                 } else {
-                    // Update lastCheckedAt so we know the check ran
                     await (prisma as any).sourcingEmailCampaign.update({
                         where: { sourcingId: campaign.sourcingId },
                         data: { lastCheckedAt: now },
                     });
 
-                    // If FU3 was sent AND nextFollowupDue has passed AND still no reply → move to Old Supplier
+                    // FU3 sent + grace period passed + still no reply → archive to Old Supplier
                     if (
                         campaign.currentStep === 4 &&
                         campaign.nextFollowupDue &&

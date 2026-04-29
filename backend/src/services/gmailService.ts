@@ -57,8 +57,9 @@ export async function sendGmailEmail(params: {
   to: string;
   subject: string;
   html: string;
+  threadId?: string;
 }): Promise<{ messageId: string; threadId: string }> {
-  const { fromEmail, to, subject, html } = params;
+  const { fromEmail, to, subject, html, threadId } = params;
   const auth = await getAuthedClient(fromEmail);
   const gmail = google.gmail({ version: "v1", auth });
 
@@ -66,13 +67,57 @@ export async function sendGmailEmail(params: {
 
   const res = await gmail.users.messages.send({
     userId: "me",
-    requestBody: { raw },
+    requestBody: {
+      raw,
+      // Thread follow-ups into the same Gmail conversation as the intro email
+      ...(threadId ? { threadId } : {}),
+    },
   });
 
   return {
     messageId: res.data.id ?? "",
     threadId: res.data.threadId ?? "",
   };
+}
+
+const AUTO_REPLY_SENDER_PATTERNS = [
+  "mailer-daemon",
+  "postmaster",
+  "noreply",
+  "no-reply",
+  "donotreply",
+  "do-not-reply",
+  "delivery-status",
+  "delivery+",
+  "bounce",
+  "undeliverable",
+];
+
+function isAutoReplyMessage(headers: Array<{ name?: string | null; value?: string | null }>): boolean {
+  const get = (name: string) =>
+    headers.find((h) => h.name?.toLowerCase() === name)?.value ?? "";
+
+  // RFC 3834: auto-generated messages set this header
+  const autoSubmitted = get("auto-submitted").toLowerCase();
+  if (autoSubmitted && autoSubmitted !== "no") return true;
+
+  // Common mail-system header
+  if (get("x-autoreply") || get("x-auto-response-suppress")) return true;
+
+  // Precedence: bulk / list / junk  is used by mailing lists and auto-responders
+  const precedence = get("precedence").toLowerCase();
+  if (precedence === "bulk" || precedence === "list" || precedence === "junk") return true;
+
+  // From address looks like a system/no-reply sender
+  const from = get("from").toLowerCase();
+  if (AUTO_REPLY_SENDER_PATTERNS.some((p) => from.includes(p))) return true;
+
+  // Subject hints at an auto-reply
+  const subject = get("subject").toLowerCase();
+  const autoSubjectPrefixes = ["out of office", "automatic reply", "auto-reply", "auto reply", "delivery status", "undeliverable", "delivery failed", "mail delivery"];
+  if (autoSubjectPrefixes.some((p) => subject.startsWith(p) || subject.includes(p))) return true;
+
+  return false;
 }
 
 export async function checkForReply(params: {
@@ -93,12 +138,19 @@ export async function checkForReply(params: {
     const messages = res.data.messages ?? [];
     if (messages.length <= 1) return false;
 
-    // Check if any message after the first is NOT from us (i.e. supplier replied)
     const ourEmail = accountEmail.toLowerCase();
     for (let i = 1; i < messages.length; i++) {
       const headers = messages[i].payload?.headers ?? [];
       const from = headers.find((h) => h.name?.toLowerCase() === "from")?.value ?? "";
-      if (!from.toLowerCase().includes(ourEmail)) return true;
+
+      // Skip our own outbound messages (follow-up emails in the thread)
+      if (from.toLowerCase().includes(ourEmail)) continue;
+
+      // Skip auto-replies, bounces, delivery notifications
+      if (isAutoReplyMessage(headers)) continue;
+
+      // A real human reply from the supplier
+      return true;
     }
     return false;
   } catch (err) {

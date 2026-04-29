@@ -2,6 +2,7 @@ import { Response } from "express";
 import { randomUUID } from "crypto";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
+import { startCampaignForSupplier } from "./sourcingEmailCampaign.controller.js";
 
 /**
  * GET /api/sourcing-vault
@@ -254,7 +255,7 @@ export async function sendBulkEmail(
       return;
     }
 
-    await (prisma as any).$transaction(async (tx: any) => {
+    const createdSuppliers: any[] = await (prisma as any).$transaction(async (tx: any) => {
       await tx.sourcingVaultSupplier.createMany({
         data: validRows.map((s) => ({
           folderId,
@@ -270,37 +271,142 @@ export async function sendBulkEmail(
         })),
       });
 
-      await tx.sourcingSupplier.createMany({
-        data: validRows.map((s) => ({
-          company: s.company.trim(),
-          email: s.email?.trim() || null,
-          phone: s.phone?.trim() || null,
-          contactPerson: s.contactPerson?.trim() || null,
-          country: s.country?.trim() || null,
-          product: s.product?.trim() || null,
-          notes: s.notes?.trim() || null,
-          productCategory: folder.name,
-          assignedGmailAccount: assignedGmailAccount ?? null,
-          formToken: randomUUID(),
-          status: "pending",
-          supplierStage: "Sourcing",
-          buyerIds: [],
-          supplierProducts: [],
-          productCatalogs: [],
-          productCatalogImages: [],
-          certificates: [],
-          warehousePhotos: [],
-          videoLinks: [],
-          quotations: [],
-          createdBy: req.user!.id,
-        })),
-        skipDuplicates: true,
-      });
+      const created: any[] = [];
+      for (const s of validRows) {
+        try {
+          const supplier = await tx.sourcingSupplier.create({
+            data: {
+              company: s.company.trim(),
+              email: s.email?.trim() || null,
+              phone: s.phone?.trim() || null,
+              contactPerson: s.contactPerson?.trim() || null,
+              country: s.country?.trim() || null,
+              product: s.product?.trim() || null,
+              notes: s.notes?.trim() || null,
+              productCategory: folder.name,
+              assignedGmailAccount: assignedGmailAccount ?? null,
+              formToken: randomUUID(),
+              status: "pending",
+              supplierStage: "Sourcing",
+              buyerIds: [],
+              supplierProducts: [],
+              productCatalogs: [],
+              productCatalogImages: [],
+              certificates: [],
+              warehousePhotos: [],
+              videoLinks: [],
+              quotations: [],
+              createdBy: req.user!.id,
+            },
+          });
+          created.push(supplier);
+        } catch (e: any) {
+          if (e?.code === "P2002") continue;
+          throw e;
+        }
+      }
+
+      return created;
     });
 
-    res.status(201).json({ added: validRows.length });
+    let emailsSent = 0;
+    for (const supplier of createdSuppliers) {
+      if (supplier.assignedGmailAccount && supplier.email) {
+        const sent = await startCampaignForSupplier(supplier.id, req.user?.id);
+        if (sent) emailsSent++;
+      }
+    }
+
+    res.status(201).json({ added: createdSuppliers.length, emailsSent });
   } catch (err) {
     console.error("Send bulk email error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * PUT /api/sourcing-vault/:folderId/suppliers/:supplierId
+ * Edit a vault supplier — only allowed when emailStatus is "Not Sent".
+ */
+export async function updateVaultSupplier(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const { folderId, supplierId } = req.params;
+    const { company, email, phone, contactPerson, country, product, notes } =
+      req.body;
+
+    const vaultSupplier = await (prisma as any).sourcingVaultSupplier.findUnique(
+      { where: { id: supplierId } },
+    );
+
+    if (!vaultSupplier || vaultSupplier.folderId !== folderId) {
+      res.status(404).json({ error: "Supplier not found in this folder" });
+      return;
+    }
+    if (vaultSupplier.emailStatus === "Sent") {
+      res.status(400).json({ error: "Cannot edit a supplier that has already been sent" });
+      return;
+    }
+
+    const updated = await (prisma as any).sourcingVaultSupplier.update({
+      where: { id: supplierId },
+      data: {
+        company: company?.trim() || vaultSupplier.company,
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        contactPerson: contactPerson?.trim() || null,
+        country: country?.trim() || null,
+        product: product?.trim() || null,
+        notes: notes?.trim() || null,
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Update vault supplier error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * DELETE /api/sourcing-vault/:folderId/suppliers/:supplierId
+ * Delete a vault supplier and, if a matching sourcing supplier exists (same
+ * company + email), delete that too.
+ */
+export async function deleteVaultSupplier(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const { folderId, supplierId } = req.params;
+
+    const vaultSupplier = await (prisma as any).sourcingVaultSupplier.findUnique(
+      { where: { id: supplierId } },
+    );
+
+    if (!vaultSupplier || vaultSupplier.folderId !== folderId) {
+      res.status(404).json({ error: "Supplier not found in this folder" });
+      return;
+    }
+
+    await (prisma as any).sourcingVaultSupplier.delete({ where: { id: supplierId } });
+
+    let deletedFromPipeline = false;
+    if (vaultSupplier.email) {
+      const match = await (prisma as any).sourcingSupplier.findFirst({
+        where: { company: vaultSupplier.company, email: vaultSupplier.email },
+      });
+      if (match) {
+        await (prisma as any).sourcingSupplier.delete({ where: { id: match.id } });
+        deletedFromPipeline = true;
+      }
+    }
+
+    res.json({ success: true, deletedFromPipeline });
+  } catch (err) {
+    console.error("Delete vault supplier error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 }

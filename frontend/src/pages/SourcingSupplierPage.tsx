@@ -14,6 +14,16 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Plus,
   Search,
   Trash2,
@@ -24,6 +34,7 @@ import {
   Copy,
   CheckCircle2,
   Mail,
+  Send,
   ExternalLink,
   LayoutTemplate,
   Users,
@@ -136,12 +147,14 @@ export default function SourcingSupplierPage() {
     link: string;
     company: string;
     suppliers: { company: string; link: string }[];
-  }>({ open: false, mode: "single", link: "", company: "", suppliers: [] });
+    emailsSent: number;
+  }>({ open: false, mode: "single", link: "", company: "", suppliers: [], emailsSent: 0 });
   const [form, setForm] = useState({ company: "", email: "", assignedGmailAccount: "" });
   const [createTemplateId, setCreateTemplateId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<SourcingSupplier | null>(
     null,
   );
+  const [confirmAction, setConfirmAction] = useState<"single" | "vault" | null>(null);
 
   const hasActiveFilters =
     statusFilter !== "all" ||
@@ -279,7 +292,7 @@ export default function SourcingSupplierPage() {
         const base = `${window.location.origin}/supplier-form/${created.formToken}`;
         const link = createTemplateId ? `${base}?t=${createTemplateId}` : base;
         setCreateTemplateId("");
-        setFormLinkDialog({ open: true, mode: "single", link, company: created.company, suppliers: [] });
+        setFormLinkDialog({ open: true, mode: "single", link, company: created.company, suppliers: [], emailsSent: created.campaignStarted ? 1 : 0 });
       } else {
         toast.success("Sourcing supplier created");
       }
@@ -315,6 +328,7 @@ export default function SourcingSupplierPage() {
             company: s.company,
             link: `${window.location.origin}/supplier-form/${s.formToken}`,
           })),
+          emailsSent: res.data.emailsSent ?? 0,
         });
       } else {
         toast.success(`Added ${res.data.added} supplier${res.data.added !== 1 ? "s" : ""} to pipeline`);
@@ -325,11 +339,16 @@ export default function SourcingSupplierPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/sourcing-suppliers/${id}`),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-vault-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-vault-folders"] });
       setDeleteTarget(null);
-      toast.success("Supplier deleted");
+      const msg = res.data?.deletedFromVault
+        ? "Supplier deleted from pipeline and Sourcing Vault"
+        : "Supplier deleted";
+      toast.success(msg);
     },
     onError: () => toast.error("Failed to delete supplier"),
   });
@@ -935,9 +954,9 @@ export default function SourcingSupplierPage() {
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
                 <Button
                   disabled={!form.company.trim() || !form.email.trim() || createMutation.isPending}
-                  onClick={() => createMutation.mutate(form)}
+                  onClick={() => setConfirmAction("single")}
                 >
-                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                  <Send className="h-4 w-4 mr-1.5" />
                   Add Supplier
                 </Button>
               </div>
@@ -1034,9 +1053,9 @@ export default function SourcingSupplierPage() {
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
                 <Button
                   disabled={!selectedFolderId || notSentSuppliers.length === 0 || notSentLoading || addFromFolderMutation.isPending}
-                  onClick={() => addFromFolderMutation.mutate()}
+                  onClick={() => setConfirmAction("vault")}
                 >
-                  {addFromFolderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                  <Send className="h-4 w-4 mr-1.5" />
                   Add Bulk Suppliers
                 </Button>
               </div>
@@ -1045,6 +1064,84 @@ export default function SourcingSupplierPage() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Add Supplier Confirmation ─────────────────── */}
+      <AlertDialog
+        open={!!confirmAction}
+        onOpenChange={(v) => !v && setConfirmAction(null)}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="h-11 w-11 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                <Mail className="h-5 w-5 text-blue-600" />
+              </div>
+              <AlertDialogTitle className="text-base leading-snug">
+                {confirmAction === "single"
+                  ? "Add supplier & send intro email?"
+                  : "Add suppliers & start automation?"}
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-slate-600 pt-1">
+                <p className="font-medium text-slate-700">
+                  Clicking <strong>Confirm &amp; Send</strong> will:
+                </p>
+                <ul className="space-y-2">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span>
+                      {confirmAction === "single" ? (
+                        <>Add <strong>{form.company}</strong> to the Sourcing pipeline</>
+                      ) : (
+                        <>Add <strong>{notSentSuppliers.length} supplier{notSentSuppliers.length !== 1 ? "s" : ""}</strong> to the Sourcing pipeline</>
+                      )}
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span>
+                      Send intro {confirmAction === "single" ? "email" : "emails"} <strong>immediately</strong>
+                      {(confirmAction === "single" ? form.assignedGmailAccount : selectedGmailAccount)
+                        ? <> via <strong>{confirmAction === "single" ? form.assignedGmailAccount : selectedGmailAccount}</strong></>
+                        : ""}
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span>
+                      Start the email automation sequence automatically — no further action needed
+                    </span>
+                  </li>
+                </ul>
+                {!(confirmAction === "single" ? form.assignedGmailAccount : selectedGmailAccount) && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    No Gmail account selected — supplier{confirmAction === "vault" ? "s" : ""} will be added to the pipeline but <strong>no emails will be sent</strong>. You can start campaigns manually later.
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-2">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={createMutation.isPending || addFromFolderMutation.isPending}
+              onClick={() => {
+                if (confirmAction === "single") createMutation.mutate(form);
+                else addFromFolderMutation.mutate();
+                setConfirmAction(null);
+              }}
+            >
+              {(createMutation.isPending || addFromFolderMutation.isPending) ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : (
+                <Send className="h-4 w-4 mr-1.5" />
+              )}
+              Confirm &amp; Send
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* ── Form Link Dialog ──────────────────────────── */}
       <Dialog open={formLinkDialog.open} onOpenChange={(v) => setFormLinkDialog((d) => ({ ...d, open: v }))}>
         <DialogContent className="max-w-md">
@@ -1052,7 +1149,7 @@ export default function SourcingSupplierPage() {
             <>
               <DialogTitle>Supplier Added</DialogTitle>
               <DialogDescription>
-                <strong>{formLinkDialog.company}</strong> has been created. Copy the form link below and send it to the supplier so they can fill in their details.
+                <strong>{formLinkDialog.company}</strong> has been created{formLinkDialog.emailsSent > 0 ? " and intro email sent automatically" : ""}. Copy the form link below to share with the supplier.
               </DialogDescription>
               <div className="mt-3 flex gap-2">
                 <Input readOnly value={formLinkDialog.link} className="text-xs font-mono" />
@@ -1073,7 +1170,7 @@ export default function SourcingSupplierPage() {
             <>
               <DialogTitle>Suppliers Added</DialogTitle>
               <DialogDescription>
-                {formLinkDialog.suppliers.length} supplier{formLinkDialog.suppliers.length !== 1 ? "s" : ""} added to the pipeline. Copy and send each form link to the respective supplier.
+                {formLinkDialog.suppliers.length} supplier{formLinkDialog.suppliers.length !== 1 ? "s" : ""} added to the pipeline{formLinkDialog.emailsSent > 0 ? `, ${formLinkDialog.emailsSent} intro email${formLinkDialog.emailsSent !== 1 ? "s" : ""} sent automatically` : ""}. Copy each form link to share with the respective supplier.
               </DialogDescription>
               <div className="mt-3 max-h-72 overflow-y-auto space-y-2">
                 {formLinkDialog.suppliers.map((s) => (
@@ -1114,7 +1211,8 @@ export default function SourcingSupplierPage() {
           <DialogDescription>
             This will permanently delete{" "}
             <strong>{deleteTarget?.company}</strong> and any associated campaign
-            data. This action cannot be undone.
+            data. If a matching entry exists in the Sourcing Vault it will also
+            be removed. This action cannot be undone.
           </DialogDescription>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>

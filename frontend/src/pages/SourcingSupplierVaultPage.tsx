@@ -10,12 +10,16 @@ import {
   Search,
   Plus,
   Trash2,
+  Pencil,
   Building2,
   Loader2,
   X,
   AlertCircle,
   Users,
   ChevronLeft,
+  Mail,
+  CheckCircle2,
+  Send,
   Package,
   Leaf,
   Wheat,
@@ -181,6 +185,16 @@ export default function SourcingVaultPage() {
     useState<VaultFolder | null>(null);
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
 
+  // ── Vault supplier edit / delete ──────────────────
+  const [deleteVaultSupplierTarget, setDeleteVaultSupplierTarget] =
+    useState<SourcingVaultSupplierItem | null>(null);
+  const [editVaultSupplierTarget, setEditVaultSupplierTarget] =
+    useState<SourcingVaultSupplierItem | null>(null);
+  const [editForm, setEditForm] = useState({
+    company: "", email: "", phone: "", contactPerson: "",
+    country: "", product: "", notes: "",
+  });
+
   // ─── Root: folders query ───────────────────────────
   const { data: folders = [], isLoading: foldersLoading } = useQuery<
     VaultFolder[]
@@ -258,6 +272,35 @@ export default function SourcingVaultPage() {
     setSourcedByFilter("all");
     setPage(1);
   }
+
+  // ─── Vault supplier mutations ──────────────────────
+  const deleteVaultSupplierMutation = useMutation({
+    mutationFn: (s: SourcingVaultSupplierItem) =>
+      api.delete(`/sourcing-vault/${s.folderId}/suppliers/${s.id}`),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["sourcing-vault-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-vault-folders"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
+      setDeleteVaultSupplierTarget(null);
+      const msg = res.data?.deletedFromPipeline
+        ? "Supplier deleted from Vault and Sourcing pipeline"
+        : "Supplier deleted from Vault";
+      toast.success(msg);
+    },
+    onError: () => toast.error("Failed to delete supplier"),
+  });
+
+  const updateVaultSupplierMutation = useMutation({
+    mutationFn: (data: { s: SourcingVaultSupplierItem; form: typeof editForm }) =>
+      api.put(`/sourcing-vault/${data.s.folderId}/suppliers/${data.s.id}`, data.form),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sourcing-vault-suppliers"] });
+      setEditVaultSupplierTarget(null);
+      toast.success("Supplier updated");
+    },
+    onError: () => toast.error("Failed to update supplier"),
+  });
 
   // ─── Create folder mutation ────────────────────────
   const createFolderMutation = useMutation({
@@ -628,6 +671,11 @@ export default function SourcingVaultPage() {
                     <th className="text-left font-medium text-muted-foreground px-4 py-3">
                       Date Added
                     </th>
+                    {canEdit && (
+                      <th className="text-right font-medium text-muted-foreground px-4 py-3">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -694,6 +742,41 @@ export default function SourcingVaultPage() {
                           year: "numeric",
                         })}
                       </td>
+                      {canEdit && (
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {s.emailStatus !== "Sent" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => {
+                                  setEditVaultSupplierTarget(s);
+                                  setEditForm({
+                                    company: s.company,
+                                    email: s.email ?? "",
+                                    phone: s.phone ?? "",
+                                    contactPerson: s.contactPerson ?? "",
+                                    country: s.country ?? "",
+                                    product: s.product ?? "",
+                                    notes: s.notes ?? "",
+                                  });
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => setDeleteVaultSupplierTarget(s)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -729,6 +812,97 @@ export default function SourcingVaultPage() {
           )}
         </>
       )}
+
+      {/* ── Delete Vault Supplier Confirm ── */}
+      <AlertDialog
+        open={!!deleteVaultSupplierTarget}
+        onOpenChange={(v) => !v && setDeleteVaultSupplierTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete "{deleteVaultSupplierTarget?.company}"?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove{" "}
+              <strong>{deleteVaultSupplierTarget?.company}</strong> from the
+              Sourcing Vault.{" "}
+              {deleteVaultSupplierTarget?.email
+                ? "If a matching entry exists in the Sourcing Suppliers pipeline (same company and email) it will also be deleted. "
+                : ""}
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteVaultSupplierMutation.isPending}
+              onClick={() =>
+                deleteVaultSupplierTarget &&
+                deleteVaultSupplierMutation.mutate(deleteVaultSupplierTarget)
+              }
+            >
+              {deleteVaultSupplierMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Edit Vault Supplier Dialog ── */}
+      <Dialog
+        open={!!editVaultSupplierTarget}
+        onOpenChange={(v) => !v && setEditVaultSupplierTarget(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Supplier</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            {(["company", "email", "phone", "contactPerson", "country", "product", "notes"] as const).map((field) => (
+              <div key={field}>
+                <Label className="capitalize text-xs">
+                  {field === "contactPerson" ? "Contact Person" : field}
+                  {field === "company" ? " *" : ""}
+                </Label>
+                <Input
+                  className="mt-1 h-8 text-sm"
+                  value={editForm[field]}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, [field]: e.target.value }))
+                  }
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditVaultSupplierTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!editForm.company.trim() || updateVaultSupplierMutation.isPending}
+              onClick={() =>
+                editVaultSupplierTarget &&
+                updateVaultSupplierMutation.mutate({
+                  s: editVaultSupplierTarget,
+                  form: editForm,
+                })
+              }
+            >
+              {updateVaultSupplierMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── New Folder Dialog ── */}
       <Dialog
@@ -860,6 +1034,8 @@ function BulkAddDialog({
   const [errors, setErrors] = useState<Set<number>>(new Set());
   const [sendingEmail, setSendingEmail] = useState(false);
   const [addingToList, setAddingToList] = useState(false);
+  const [confirmSendOpen, setConfirmSendOpen] = useState(false);
+  const [pendingRows, setPendingRows] = useState<BulkRow[]>([]);
 
   const { data: gmailAccounts = [] } = useQuery<GmailAccount[]>({
     queryKey: ["gmail-accounts"],
@@ -1024,16 +1200,21 @@ function BulkAddDialog({
     }
   }
 
-  async function handleSendBulkEmail() {
+  function handleSendBulkEmailClick() {
     const validRows = validateAndGetRows();
     if (!validRows) return;
+    setPendingRows(validRows);
+    setConfirmSendOpen(true);
+  }
 
+  async function handleSendBulkEmailConfirmed() {
+    setConfirmSendOpen(false);
     setSendingEmail(true);
     try {
       const res = await api.post(
         `/sourcing-vault/${folder.id}/suppliers/send`,
         {
-          suppliers: validRows.map((r) => ({
+          suppliers: pendingRows.map((r) => ({
             company: r.company.trim(),
             email: r.email.trim() || undefined,
             phone: r.phone.trim() || undefined,
@@ -1046,9 +1227,11 @@ function BulkAddDialog({
           formTemplateId: sharedTemplateId || undefined,
         },
       );
-      toast.success(
-        `Sent emails to ${res.data.added} supplier${res.data.added !== 1 ? "s" : ""}`,
-      );
+      const { added, emailsSent } = res.data;
+      const emailNote = emailsSent > 0
+        ? ` · ${emailsSent} intro email${emailsSent !== 1 ? "s" : ""} sent automatically`
+        : "";
+      toast.success(`${added} supplier${added !== 1 ? "s" : ""} added${emailNote}`);
       onSuccess();
       handleClose();
     } catch (err) {
@@ -1245,7 +1428,7 @@ function BulkAddDialog({
               )}
             </Button>
             <Button
-              onClick={handleSendBulkEmail}
+              onClick={handleSendBulkEmailClick}
               disabled={isWorking || filledCount === 0}
             >
               {sendingEmail ? (
@@ -1254,12 +1437,71 @@ function BulkAddDialog({
                   Sending…
                 </>
               ) : (
-                "Send Bulk Email"
+                <>
+                  <Send className="h-4 w-4 mr-1.5" />
+                  Send Bulk Email
+                </>
               )}
             </Button>
           </div>
         </div>
       </DialogContent>
+
+      {/* ── Send Bulk Email confirmation ── */}
+      <AlertDialog open={confirmSendOpen} onOpenChange={setConfirmSendOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="h-11 w-11 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                <Mail className="h-5 w-5 text-blue-600" />
+              </div>
+              <AlertDialogTitle className="text-base leading-snug">
+                Send emails &amp; start automation?
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-slate-600 pt-1">
+                <p className="font-medium text-slate-700">
+                  Clicking <strong>Confirm &amp; Send</strong> will:
+                </p>
+                <ul className="space-y-2">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span>
+                      Add <strong>{pendingRows.length} supplier{pendingRows.length !== 1 ? "s" : ""}</strong> to the Sourcing pipeline
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span>
+                      Send intro emails <strong>immediately</strong>
+                      {sharedGmail ? <> via <strong>{sharedGmail}</strong></> : ""}
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span>
+                      Start the email automation sequence automatically — no further action needed
+                    </span>
+                  </li>
+                </ul>
+                {!sharedGmail && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    No Gmail account selected — suppliers will be added to the pipeline but <strong>no emails will be sent</strong>. You can start campaigns manually later.
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-2">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSendBulkEmailConfirmed}>
+              <Send className="h-4 w-4 mr-1.5" />
+              Confirm &amp; Send
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
