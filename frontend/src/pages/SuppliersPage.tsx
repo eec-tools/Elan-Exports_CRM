@@ -39,8 +39,7 @@ import {
   FileCheck2,
   CheckCircle2,
   PauseCircle,
-  Bell,
-  Mail,
+
   Star,
   AlertTriangle,
 } from "lucide-react";
@@ -257,7 +256,7 @@ export default function SuppliersPage() {
   const [showAddStageDialog, setShowAddStageDialog] = useState(false);
   const [newStageName, setNewStageName] = useState("");
 
-  const allDealStages = [...DEAL_STAGES, ...customStages.filter((s) => !DEAL_STAGES.includes(s))];
+
 
   function handleAddStage() {
     const trimmed = newStageName.trim();
@@ -514,30 +513,7 @@ export default function SuppliersPage() {
   const suppliers = data?.data ?? [];
   const pagination = data?.pagination;
 
-  const statusStyles = (status?: string) => {
-    switch (status?.toLowerCase()) {
-      case "active":
-        return "text-brand-700 bg-brand-100 border-brand-200";
-      case "signed":
-        return "text-indigo-700 bg-indigo-100 border-indigo-200";
-      case "under review":
-        return "text-amber-700 bg-amber-100 border-amber-200";
-      case "inactive":
-        return "text-rose-700 bg-rose-100 border-rose-200";
-      default:
-        return "text-slate-600 bg-slate-100 border-slate-200";
-    }
-  };
 
-  const StatusIcon = ({ status, className }: { status?: string, className?: string }) => {
-    switch (status?.toLowerCase()) {
-      case "active": return <CheckCircle2 className={className} />;
-      case "signed": return <FileCheck2 className={className} />;
-      case "under review": return <Loader2 className={className} />;
-      case "inactive": return <PauseCircle className={className} />;
-      default: return null;
-    }
-  };
 
   return (
     <div className="flex flex-col h-full min-h-0 gap-0">

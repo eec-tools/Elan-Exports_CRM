@@ -54,11 +54,7 @@ import {
   Upload,
   X,
   Trash2,
-  Bell,
-  CheckCircle2,
-  Circle,
   Clock,
-  MessageSquareText,
   Plus,
 } from "lucide-react";
 

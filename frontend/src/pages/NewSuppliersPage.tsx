@@ -35,9 +35,7 @@ import {
   Building2,
   AlertCircle,
   X,
-  Bell,
-  Mail,
-  CheckCircle2,
+
   Upload,
   Star,
   AlertTriangle,
@@ -389,7 +387,7 @@ export default function NewSuppliersPage() {
   const [showAddStageDialog, setShowAddStageDialog] = useState(false);
   const [newStageName, setNewStageName] = useState("");
 
-  const allDealStages = [...DEAL_STAGES, ...customStages.filter((s) => !DEAL_STAGES.includes(s))];
+
 
   function handleAddStage() {
     const trimmed = newStageName.trim();

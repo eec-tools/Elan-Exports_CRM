@@ -370,24 +370,7 @@ export default function ReportsPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-      case "approved":
-      case "shipped":
-        return "bg-brand-100 text-brand-700 border-brand-200";
-      case "in progress":
-      case "pending":
-      case "reviewing":
-        return "bg-amber-100 text-amber-700 border-amber-200";
-      case "rejected":
-      case "cancelled":
-      case "delayed":
-        return "bg-rose-100 text-rose-700 border-rose-200";
-      default:
-        return "bg-blue-50 text-blue-700 border-blue-200";
-    }
-  };
+
 
   return (
     <div className="flex flex-col h-full min-h-0 gap-0">
