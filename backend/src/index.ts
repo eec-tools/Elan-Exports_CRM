@@ -80,35 +80,35 @@ const envOrigins = process.env.FRONTEND_URL
 
 const allowedOrigins = [...new Set([...hardcodedOrigins, ...envOrigins])];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. curl, Postman, mobile apps)
-      if (!origin) return callback(null, true);
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. curl, Postman, mobile apps)
+    if (!origin) return callback(null, true);
 
-      // Always allow localhost for development (any port)
-      if (/^http:\/\/localhost:\d+$/.test(origin)) {
-        return callback(null, true);
-      }
+    // Always allow localhost for development (any port)
+    if (/^http:\/\/localhost:\d+$/.test(origin)) {
+      return callback(null, true);
+    }
 
-      // Check against allowed origins
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+    // Check against allowed origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-      console.warn(`CORS blocked origin: ${origin}`);
-      callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    exposedHeaders: ["Content-Range", "X-Content-Range"],
-    maxAge: 600, // 10 minutes
-  }),
-);
+    console.warn(`CORS blocked origin: ${origin}`);
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  exposedHeaders: ["Content-Range", "X-Content-Range"],
+  maxAge: 600, // 10 minutes
+};
 
-// Handle preflight requests for all routes
-app.options("*", cors());
+app.use(cors(corsOptions));
+
+// Handle preflight requests using the same CORS options
+app.options("*", cors(corsOptions));
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));

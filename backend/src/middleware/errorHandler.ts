@@ -1,17 +1,21 @@
 import { Request, Response, NextFunction } from "express";
 
-/**
- * Global error handler — catches unhandled errors from route handlers
- */
 export function errorHandler(
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ) {
   console.error("Unhandled error:", err);
 
-  // Handle CORS errors specifically
+  // Ensure CORS headers are present on error responses so the browser
+  // can read the error body rather than showing a misleading CORS error.
+  const origin = req.headers.origin;
+  if (origin && !res.headersSent) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+
   if (err.message === "Not allowed by CORS") {
     res.status(403).json({
       error: "CORS policy violation",
@@ -20,7 +24,6 @@ export function errorHandler(
     return;
   }
 
-  // Handle specific error types
   const statusCode = (err as any).statusCode || 500;
 
   res.status(statusCode).json({
