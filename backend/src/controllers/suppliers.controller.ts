@@ -46,6 +46,22 @@ export const uploadSupplierFile = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
 });
 
+export async function getUploadSignature(_req: AuthRequest, res: Response): Promise<void> {
+  const timestamp = Math.round(Date.now() / 1000);
+  const params = { folder: "elan-suppliers", timestamp };
+  const signature = cloudinary.utils.api_sign_request(
+    params,
+    process.env.CLOUDINARY_API_SECRET!,
+  );
+  res.json({
+    signature,
+    timestamp,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    folder: "elan-suppliers",
+  });
+}
+
 /**
  * GET /api/suppliers/list
  * Lightweight list for dropdown population

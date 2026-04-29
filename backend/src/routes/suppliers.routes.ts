@@ -9,6 +9,7 @@ import {
   exportSuppliersCsv,
   uploadCatalog,
   uploadSupplierFile,
+  getUploadSignature,
   getSupplierStats,
   getSupplierFilters,
   updateSupplierStage,
@@ -30,6 +31,7 @@ router.get("/filters", getSupplierFilters);
 router.get("/export/csv", exportSuppliersCsv);
 router.get("/:id", getSupplier);
 
+router.get("/upload-signature", requireEdit(["suppliers", "signed_suppliers"]), getUploadSignature);
 router.post("/upload", requireEdit(["suppliers", "signed_suppliers"]), uploadSupplierFile.single("file"), uploadCatalog);
 router.post("/", requireEdit(["suppliers", "signed_suppliers"]), createSupplier);
 router.put("/:id", requireEdit(["suppliers", "signed_suppliers"]), updateSupplier);

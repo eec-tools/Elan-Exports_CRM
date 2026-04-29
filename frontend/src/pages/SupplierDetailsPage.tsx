@@ -323,12 +323,25 @@ export default function SupplierDetailsPage() {
 
   const uploadCatalogMutation = useMutation({
     mutationFn: async (file: File) => {
+      // Get a signed upload token from our backend
+      const sigRes = await api.get("/suppliers/upload-signature");
+      const { signature, timestamp, cloudName, apiKey, folder } = sigRes.data;
+
+      // Upload directly to Cloudinary — bypasses nginx body size limit
       const fd = new FormData();
       fd.append("file", file);
-      const res = await api.post("/suppliers/upload", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      return res.data;
+      fd.append("signature", signature);
+      fd.append("timestamp", String(timestamp));
+      fd.append("api_key", apiKey);
+      fd.append("folder", folder);
+
+      const cloudRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
+        { method: "POST", body: fd },
+      );
+      if (!cloudRes.ok) throw new Error("Cloudinary upload failed");
+      const data = await cloudRes.json();
+      return { url: data.secure_url };
     },
     onError: () => toast.error("Failed to upload catalog file"),
   });
