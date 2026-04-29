@@ -333,7 +333,7 @@ export async function updateVaultSupplier(
   res: Response,
 ): Promise<void> {
   try {
-    const { folderId, supplierId } = req.params;
+    const { folderId, supplierId } = req.params as { folderId: string; supplierId: string };
     const { company, email, phone, contactPerson, country, product, notes } =
       req.body;
 
@@ -380,7 +380,7 @@ export async function deleteVaultSupplier(
   res: Response,
 ): Promise<void> {
   try {
-    const { folderId, supplierId } = req.params;
+    const { folderId, supplierId } = req.params as { folderId: string; supplierId: string };
 
     const vaultSupplier = await (prisma as any).sourcingVaultSupplier.findUnique(
       { where: { id: supplierId } },
