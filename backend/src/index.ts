@@ -240,4 +240,14 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
+// Prevent unhandled promise rejections (e.g. Cloudinary upload failures)
+// from crashing the process and dropping all active SSE + in-flight requests.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection (caught to prevent crash):", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception (caught to prevent crash):", err);
+});
+
 export default app;
