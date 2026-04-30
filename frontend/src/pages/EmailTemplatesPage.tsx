@@ -350,10 +350,15 @@ export default function EmailTemplatesPage() {
 
             {/* Step tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-4 w-full">
+              <TabsList className="grid grid-cols-4 w-full h-auto! p-1">
                 {STEPS.map((s) => (
-                  <TabsTrigger key={s.key} value={s.key} className="text-xs">
-                    Step {s.stepNum} — {s.label}
+                  <TabsTrigger
+                    key={s.key}
+                    value={s.key}
+                    className="flex flex-col items-center gap-0.5 py-2 px-1 text-center"
+                  >
+                    <span className="text-[10px] font-normal text-slate-400 leading-none">Step {s.stepNum}</span>
+                    <span className="text-xs font-medium leading-tight">{s.label}</span>
                   </TabsTrigger>
                 ))}
               </TabsList>
