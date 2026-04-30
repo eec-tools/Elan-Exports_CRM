@@ -88,13 +88,6 @@ function emptyFields(defaults?: DefaultContent): StepFields {
   };
 }
 
-function insertVariable(text: string, cursor: number, variable: string): [string, number] {
-  const before = text.slice(0, cursor);
-  const after = text.slice(cursor);
-  const next = before + variable + after;
-  return [next, cursor + variable.length];
-}
-
 export default function EmailTemplatesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
