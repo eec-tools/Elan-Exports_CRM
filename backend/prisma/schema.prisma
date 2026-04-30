@@ -591,6 +591,7 @@ model SourcingSupplier {
   factoryVisitDate           String?                   @map("factory_visit_date")
   factoryVisitOutcome        String?                   @map("factory_visit_outcome")
   referralSource             String?                   @map("referral_source")
+  emailTemplateId            String?                   @map("email_template_id")
 
   @@map("sourcing_suppliers")
 }
@@ -632,6 +633,25 @@ model SupplierEmailReply {
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("supplier_email_replies")
+}
+
+model EmailCampaignTemplate {
+  id               String   @id @default(uuid())
+  name             String
+  isDefault        Boolean  @default(false) @map("is_default")
+  introSubject     String   @map("intro_subject")
+  introBody        String   @map("intro_body")
+  followup1Subject String   @map("followup1_subject")
+  followup1Body    String   @map("followup1_body")
+  followup2Subject String   @map("followup2_subject")
+  followup2Body    String   @map("followup2_body")
+  followup3Subject String   @map("followup3_subject")
+  followup3Body    String   @map("followup3_body")
+  createdBy        String?  @map("created_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("email_campaign_templates")
 }
 
 model SupplierFormTemplate {

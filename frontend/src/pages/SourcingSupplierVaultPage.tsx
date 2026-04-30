@@ -1031,6 +1031,7 @@ function BulkAddDialog({
   );
   const [sharedGmail, setSharedGmail] = useState("");
   const [sharedTemplateId, setSharedTemplateId] = useState("");
+  const [sharedEmailTemplateId, setSharedEmailTemplateId] = useState("");
   const [errors, setErrors] = useState<Set<number>>(new Set());
   const [sendingEmail, setSendingEmail] = useState(false);
   const [addingToList, setAddingToList] = useState(false);
@@ -1053,6 +1054,17 @@ function BulkAddDialog({
     queryKey: ["supplier-form-templates"],
     queryFn: async () => {
       const res = await api.get("/supplier-form-templates");
+      return res.data;
+    },
+    enabled: open,
+  });
+
+  const { data: emailTemplates = [] } = useQuery<
+    { id: string; name: string; isDefault: boolean }[]
+  >({
+    queryKey: ["email-campaign-templates"],
+    queryFn: async () => {
+      const res = await api.get("/email-campaign-templates");
       return res.data;
     },
     enabled: open,
@@ -1130,6 +1142,7 @@ function BulkAddDialog({
     setRows(Array.from({ length: 5 }, emptyBulkRow));
     setSharedGmail("");
     setSharedTemplateId("");
+    setSharedEmailTemplateId("");
     setErrors(new Set());
     onClose();
   };
@@ -1225,6 +1238,7 @@ function BulkAddDialog({
           })),
           assignedGmailAccount: sharedGmail || undefined,
           formTemplateId: sharedTemplateId || undefined,
+          emailTemplateId: sharedEmailTemplateId || undefined,
         },
       );
       const { added, emailsSent } = res.data;
@@ -1297,6 +1311,25 @@ function BulkAddDialog({
             >
               <option value="">Default form</option>
               {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                  {t.isDefault ? " (Default)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium whitespace-nowrap">
+              Email Template
+            </Label>
+            <select
+              value={sharedEmailTemplateId}
+              onChange={(e) => setSharedEmailTemplateId(e.target.value)}
+              className="border border-border rounded-md text-sm px-3 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">System default</option>
+              {emailTemplates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                   {t.isDefault ? " (Default)" : ""}

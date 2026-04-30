@@ -107,6 +107,7 @@ const SOURCING_FIELDS = [
   "factoryVisitDate",
   "factoryVisitOutcome",
   "referralSource",
+  "emailTemplateId",
 ] as const;
 
 /**
@@ -275,6 +276,7 @@ export async function createSourcingSupplier(
       company,
       email,
       assignedGmailAccount,
+      emailTemplateId,
       // kept for backwards-compat if sent, but not required in add dialog
       productCategory,
       product,
@@ -301,6 +303,7 @@ export async function createSourcingSupplier(
         company,
         email,
         assignedGmailAccount: assignedGmailAccount ?? null,
+        emailTemplateId: emailTemplateId ?? null,
         productCategory: productCategory ?? null,
         product: product ?? null,
         country: country ?? null,
@@ -650,10 +653,11 @@ export async function addFromVaultFolder(
   res: Response,
 ): Promise<void> {
   try {
-    const { folderId, assignedGmailAccount } = req.body as {
+    const { folderId, assignedGmailAccount, emailTemplateId } = req.body as {
       folderId: string;
       assignedGmailAccount?: string;
       formTemplateId?: string;
+      emailTemplateId?: string;
     };
 
     if (!folderId) {
@@ -690,6 +694,7 @@ export async function addFromVaultFolder(
       notes: s.notes,
       productCategory: folder.name,
       assignedGmailAccount: assignedGmailAccount ?? null,
+      emailTemplateId: emailTemplateId ?? null,
       formToken: randomUUID(),
       status: "pending",
       supplierStage: "Sourcing",

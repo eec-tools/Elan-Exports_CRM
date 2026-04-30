@@ -151,6 +151,8 @@ export default function SourcingSupplierPage() {
   }>({ open: false, mode: "single", link: "", company: "", suppliers: [], emailsSent: 0 });
   const [form, setForm] = useState({ company: "", email: "", assignedGmailAccount: "" });
   const [createTemplateId, setCreateTemplateId] = useState("");
+  const [createEmailTemplateId, setCreateEmailTemplateId] = useState("");
+  const [selectedEmailTemplateId, setSelectedEmailTemplateId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<SourcingSupplier | null>(
     null,
   );
@@ -242,6 +244,14 @@ export default function SourcingSupplierPage() {
     },
   });
 
+  const { data: emailTemplates = [] } = useQuery({
+    queryKey: ["email-campaign-templates"],
+    queryFn: async () => {
+      const res = await api.get("/email-campaign-templates");
+      return res.data as { id: string; name: string; isDefault: boolean }[];
+    },
+  });
+
   const { data: gmailAccounts = [] } = useQuery({
     queryKey: ["gmail-accounts"],
     queryFn: async () => {
@@ -280,7 +290,7 @@ export default function SourcingSupplierPage() {
 
   // ─── Mutations ──────────────────────────────────────
   const createMutation = useMutation({
-    mutationFn: (data: typeof form) => api.post("/sourcing-suppliers", data),
+    mutationFn: (data: typeof form & { emailTemplateId?: string }) => api.post("/sourcing-suppliers", data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
@@ -292,6 +302,7 @@ export default function SourcingSupplierPage() {
         const base = `${window.location.origin}/supplier-form/${created.formToken}`;
         const link = createTemplateId ? `${base}?t=${createTemplateId}` : base;
         setCreateTemplateId("");
+        setCreateEmailTemplateId("");
         setFormLinkDialog({ open: true, mode: "single", link, company: created.company, suppliers: [], emailsSent: created.campaignStarted ? 1 : 0 });
       } else {
         toast.success("Sourcing supplier created");
@@ -306,6 +317,7 @@ export default function SourcingSupplierPage() {
         folderId: selectedFolderId,
         assignedGmailAccount: selectedGmailAccount || undefined,
         formTemplateId: selectedTemplateId || undefined,
+        emailTemplateId: selectedEmailTemplateId || undefined,
       }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
@@ -317,6 +329,7 @@ export default function SourcingSupplierPage() {
       setSelectedFolderId("");
       setSelectedGmailAccount("");
       setSelectedTemplateId("");
+      setSelectedEmailTemplateId("");
       const created: { company: string; formToken: string }[] = res.data.suppliers ?? [];
       if (created.length > 0) {
         setFormLinkDialog({
@@ -421,6 +434,14 @@ export default function SourcingSupplierPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/suppliers/email-templates")}
+          >
+            <Mail className="h-4 w-4 mr-1.5" />
+            Email Templates
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -931,6 +952,20 @@ export default function SourcingSupplierPage() {
                 </select>
               </div>
               <div>
+                <Label>Email Template</Label>
+                <select
+                  value={createEmailTemplateId}
+                  onChange={(e) => setCreateEmailTemplateId(e.target.value)}
+                  className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">System default emails</option>
+                  {emailTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}{t.isDefault ? " (Default)" : ""}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-400 mt-1">Customise the intro and follow-up email content</p>
+              </div>
+              <div>
                 <Label>Campaign Email Account</Label>
                 {connectedAccounts.length === 0 ? (
                   <div className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -1049,6 +1084,21 @@ export default function SourcingSupplierPage() {
                 <p className="text-xs text-slate-400 mt-1">Overrides the template used during vault staging</p>
               </div>
 
+              <div>
+                <Label>Email Template</Label>
+                <select
+                  value={selectedEmailTemplateId}
+                  onChange={(e) => setSelectedEmailTemplateId(e.target.value)}
+                  className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">System default emails</option>
+                  {emailTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}{t.isDefault ? " (Default)" : ""}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-400 mt-1">Customise the intro and follow-up email content</p>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
                 <Button
@@ -1126,7 +1176,7 @@ export default function SourcingSupplierPage() {
             <AlertDialogAction
               disabled={createMutation.isPending || addFromFolderMutation.isPending}
               onClick={() => {
-                if (confirmAction === "single") createMutation.mutate(form);
+                if (confirmAction === "single") createMutation.mutate({ ...form, emailTemplateId: createEmailTemplateId || undefined });
                 else addFromFolderMutation.mutate();
                 setConfirmAction(null);
               }}

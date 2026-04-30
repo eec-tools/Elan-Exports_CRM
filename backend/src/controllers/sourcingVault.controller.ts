@@ -222,7 +222,7 @@ export async function sendBulkEmail(
 ): Promise<void> {
   try {
     const { folderId } = req.params as { folderId: string };
-    const { suppliers, assignedGmailAccount, formTemplateId } = req.body as {
+    const { suppliers, assignedGmailAccount, formTemplateId, emailTemplateId } = req.body as {
       suppliers: Array<{
         company: string;
         email?: string;
@@ -234,6 +234,7 @@ export async function sendBulkEmail(
       }>;
       assignedGmailAccount?: string;
       formTemplateId?: string;
+      emailTemplateId?: string;
     };
 
     const folder = await (prisma as any).sourcingVaultFolder.findUnique({
@@ -285,6 +286,7 @@ export async function sendBulkEmail(
               notes: s.notes?.trim() || null,
               productCategory: folder.name,
               assignedGmailAccount: assignedGmailAccount ?? null,
+              emailTemplateId: emailTemplateId ?? null,
               formToken: randomUUID(),
               status: "pending",
               supplierStage: "Sourcing",

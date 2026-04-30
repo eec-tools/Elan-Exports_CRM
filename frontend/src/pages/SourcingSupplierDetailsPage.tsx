@@ -123,6 +123,7 @@ interface SourcingSupplier {
   factoryVisitDate?: string;
   factoryVisitOutcome?: string;
   referralSource?: string;
+  emailTemplateId?: string | null;
   assignedGmailAccount?: string | null;
   emailCampaign?: {
     status: string;
@@ -139,6 +140,12 @@ interface SourcingSupplier {
 }
 
 interface FormTemplate {
+  id: string;
+  name: string;
+  isDefault: boolean;
+}
+
+interface EmailTemplate {
   id: string;
   name: string;
   isDefault: boolean;
@@ -251,6 +258,14 @@ export default function SourcingSupplierDetailsPage() {
     queryFn: async () => {
       const res = await api.get("/supplier-form-templates");
       return res.data as FormTemplate[];
+    },
+  });
+
+  const { data: emailTemplates = [] } = useQuery({
+    queryKey: ["email-campaign-templates"],
+    queryFn: async () => {
+      const res = await api.get("/email-campaign-templates");
+      return res.data as EmailTemplate[];
     },
   });
 
@@ -457,6 +472,40 @@ export default function SourcingSupplierDetailsPage() {
               <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3 pb-3 border-b border-slate-100">
                 <Mail className="h-3.5 w-3.5 shrink-0" />
                 <span className="font-medium">{fields.assignedGmailAccount ?? supplier.assignedGmailAccount}</span>
+              </div>
+            )}
+
+            {/* Email template selector (locked once campaign starts) */}
+            {emailTemplates.length > 0 && (
+              <div className="mb-3 pb-3 border-b border-slate-100">
+                <Label className="text-xs text-slate-500 font-medium">Email Template</Label>
+                {canEdit && !supplier.emailCampaign ? (
+                  <>
+                    <select
+                      value={(fields.emailTemplateId as string) ?? ""}
+                      onChange={(e) => {
+                        setFields((f) => ({ ...f, emailTemplateId: e.target.value || null }));
+                        setIsDirty(true);
+                      }}
+                      className="mt-1 w-full border border-slate-200 rounded-md text-sm px-3 py-1.5 bg-white text-slate-700"
+                    >
+                      <option value="">System default emails</option>
+                      {emailTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}{t.isDefault ? " (Default)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-400 mt-1">Customise the intro and follow-up email content for this supplier.</p>
+                  </>
+                ) : (
+                  <div className="mt-1 text-sm text-slate-600 flex items-center gap-1.5 h-8">
+                    {(fields.emailTemplateId as string)
+                      ? <><span className="font-medium">{emailTemplates.find((t) => t.id === fields.emailTemplateId)?.name ?? "Custom template"}</span>{supplier.emailCampaign && <span className="text-xs text-slate-400">(locked)</span>}</>
+                      : <span className="text-slate-400 italic">System default</span>
+                    }
+                  </div>
+                )}
               </div>
             )}
 

@@ -249,6 +249,103 @@ ${formLinkBox(data.formLink)}
   };
 }
 
+// ─── Custom template support ─────────────────────────────────────────────────
+
+export interface CustomEmailTemplate {
+    introSubject: string;
+    introBody: string;
+    followup1Subject: string;
+    followup1Body: string;
+    followup2Subject: string;
+    followup2Body: string;
+    followup3Subject: string;
+    followup3Body: string;
+}
+
+function renderSubject(subjectTemplate: string, data: TemplateData): string {
+    return subjectTemplate
+        .replace(/\{\{company\}\}/g, data.company)
+        .replace(/\{\{product\}\}/g, data.product ?? "your product category")
+        .replace(/\{\{contactPerson\}\}/g, data.contactPerson ?? "");
+}
+
+function renderBodyText(bodyTemplate: string, data: TemplateData): string {
+    const greeting = data.contactPerson ? `Dear ${data.contactPerson},` : `Dear Sir/Madam,`;
+    const productLine = data.product ?? "your product category";
+    const formButtonHtml = `${ctaButton(data.formLink, "Fill in Supplier Form →")}${formLinkBox(data.formLink)}`;
+
+    let text = bodyTemplate
+        .replace(/\{\{greeting\}\}/g, greeting)
+        .replace(/\{\{company\}\}/g, data.company)
+        .replace(/\{\{contactPerson\}\}/g, data.contactPerson ?? "")
+        .replace(/\{\{product\}\}/g, productLine)
+        .replace(/\{\{fromEmail\}\}/g, data.fromEmail)
+        .replace(/\{\{formButton\}\}/g, formButtonHtml)
+        .replace(/\{\{formLink\}\}/g, data.formLink);
+
+    const blocks: string[] = [];
+    for (const para of text.split(/\n\n+/)) {
+        const trimmed = para.trim();
+        if (!trimmed) continue;
+
+        // Already HTML from {{formButton}} substitution
+        if (trimmed.startsWith("<")) {
+            blocks.push(trimmed);
+            continue;
+        }
+
+        const lines = trimmed.split("\n");
+        const listLines = lines.filter((l) => /^[-•]\s/.test(l.trim()));
+
+        if (listLines.length > 0 && listLines.length >= lines.length - 1) {
+            const prefixLines = lines.filter((l) => !/^[-•]\s/.test(l.trim()) && l.trim());
+            if (prefixLines.length > 0) {
+                blocks.push(`<p style="margin:0 0 8px;color:#374151;font-size:15px;line-height:1.6;">${prefixLines.join("<br />")}</p>`);
+            }
+            const liHtml = listLines.map((l) => `<li>${l.trim().replace(/^[-•]\s+/, "")}</li>`).join("");
+            blocks.push(`<ul style="margin:8px 0 16px;padding-left:20px;color:#374151;font-size:15px;line-height:1.8;">${liHtml}</ul>`);
+            continue;
+        }
+
+        const htmlPara = trimmed.replace(/\n/g, "<br />");
+        blocks.push(`<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">${htmlPara}</p>`);
+    }
+
+    return blocks.join("\n");
+}
+
+export function getCustomTemplate(step: number, customTpl: CustomEmailTemplate, data: TemplateData): EmailTemplate {
+    const introSubject = renderSubject(customTpl.introSubject, data);
+    let subject: string;
+    let bodyText: string;
+
+    switch (step) {
+        case 1:
+            subject = introSubject;
+            bodyText = customTpl.introBody;
+            break;
+        case 2:
+            subject = `Re: ${introSubject}`;
+            bodyText = customTpl.followup1Body;
+            break;
+        case 3:
+            subject = `Re: ${introSubject}`;
+            bodyText = customTpl.followup2Body;
+            break;
+        case 4:
+            subject = `Re: ${introSubject}`;
+            bodyText = customTpl.followup3Body;
+            break;
+        default:
+            throw new Error(`Unknown campaign step: ${step}`);
+    }
+
+    return {
+        subject,
+        html: baseLayout(renderBodyText(bodyText, data), data.fromEmail),
+    };
+}
+
 export function getTemplate(step: number, data: TemplateData): EmailTemplate {
   switch (step) {
     case 1: return introEmailTemplate(data);

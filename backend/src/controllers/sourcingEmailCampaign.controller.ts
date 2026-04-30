@@ -4,7 +4,7 @@ import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { createNotification } from "../services/notificationService.js";
 import { sendGmailEmail, fetchThreadReplies, getSmtpMessageId } from "../services/gmailService.js";
-import { getTemplate } from "../services/emailTemplates.js";
+import { getTemplate, getCustomTemplate, CustomEmailTemplate } from "../services/emailTemplates.js";
 
 function addDays(date: Date, days: number): Date {
     const result = new Date(date);
@@ -192,7 +192,7 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
                 select: {
                     id: true, company: true, email: true, contactPerson: true,
                     formToken: true, assignedGmailAccount: true, status: true,
-                    product: true, productCategory: true,
+                    product: true, productCategory: true, emailTemplateId: true,
                 },
             },
         },
@@ -209,23 +209,27 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
     if (nextStep > 4) return; // all done
 
     const formLink = buildFormLink(supplier.formToken);
-    const { html } = getTemplate(nextStep, {
+    const templateData = {
         company: supplier.company,
         contactPerson: supplier.contactPerson,
         product: supplier.product ?? supplier.productCategory ?? null,
         formLink,
         fromEmail,
-    });
+    };
 
-    // Use the intro email's subject with "Re:" so follow-ups land in the same thread
-    const { subject: introSubject } = getTemplate(1, {
-        company: supplier.company,
-        contactPerson: supplier.contactPerson,
-        product: supplier.product ?? supplier.productCategory ?? null,
-        formLink,
-        fromEmail,
-    });
-    const replySubject = `Re: ${introSubject}`;
+    let customTpl: CustomEmailTemplate | null = null;
+    if (supplier.emailTemplateId) {
+        customTpl = await (prisma as any).emailCampaignTemplate.findUnique({ where: { id: supplier.emailTemplateId } }) ?? null;
+    }
+
+    // getCustomTemplate already produces "Re: {introSubject}" for steps 2-4
+    const { subject: replySubject, html } = customTpl
+        ? getCustomTemplate(nextStep, customTpl, templateData)
+        : (() => {
+            const { html: h } = getTemplate(nextStep, templateData);
+            const { subject: introSubject } = getTemplate(1, templateData);
+            return { subject: `Re: ${introSubject}`, html: h };
+        })();
 
     // Fetch the intro email's SMTP Message-ID so recipients see follow-ups as replies
     const smtpMessageId = campaign.gmailMessageId
@@ -329,13 +333,20 @@ export async function startCampaignForSupplier(sourcingId: string, userId?: stri
         if (existing) return false;
 
         const formLink = buildFormLink(supplier.formToken);
-        const { subject, html } = getTemplate(1, {
+        const templateData = {
             company: supplier.company,
             contactPerson: supplier.contactPerson,
             product: supplier.product ?? supplier.productCategory ?? null,
             formLink,
             fromEmail: supplier.assignedGmailAccount,
-        });
+        };
+        let customTpl: CustomEmailTemplate | null = null;
+        if (supplier.emailTemplateId) {
+            customTpl = await (prisma as any).emailCampaignTemplate.findUnique({ where: { id: supplier.emailTemplateId } }) ?? null;
+        }
+        const { subject, html } = customTpl
+            ? getCustomTemplate(1, customTpl, templateData)
+            : getTemplate(1, templateData);
 
         const { messageId, threadId } = await sendGmailEmail({
             fromEmail: supplier.assignedGmailAccount,

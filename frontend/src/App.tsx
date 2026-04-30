@@ -39,6 +39,7 @@ import SourcingSupplierPage from "@/pages/SourcingSupplierPage";
 import SourcingSupplierDetailsPage from "@/pages/SourcingSupplierDetailsPage";
 import SourcingSupplierVaultPage from "@/pages/SourcingSupplierVaultPage";
 import FormTemplatesPage from "@/pages/FormTemplatesPage";
+import EmailTemplatesPage from "@/pages/EmailTemplatesPage";
 import PublicSupplierFormPage from "@/pages/PublicSupplierFormPage";
 import QuotationsPage from "@/pages/QuotationsPage";
 import QuotationDetailsPage from "@/pages/QuotationDetailsPage";
@@ -170,6 +171,14 @@ export default function App() {
                   element={
                     <PermissionGate permission="new_suppliers">
                       <FormTemplatesPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="suppliers/email-templates"
+                  element={
+                    <PermissionGate permission="suppliers">
+                      <EmailTemplatesPage />
                     </PermissionGate>
                   }
                 />
