@@ -622,6 +622,8 @@ model SupplierEmailReply {
   id             String   @id @default(uuid())
   sourcingId     String?  @map("sourcing_id")
   gmailMessageId String?  @map("gmail_message_id")
+  direction      String   @default("received") @map("direction")
+  // "sent" = email we sent to supplier | "received" = reply from supplier
   fromEmail      String   @map("from_email")
   fromName       String?  @map("from_name")
   subject        String?

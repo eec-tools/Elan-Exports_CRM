@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { createNotification } from "../services/notificationService.js";
-import { sendGmailEmail } from "../services/gmailService.js";
+import { sendGmailEmail, fetchThreadReplies } from "../services/gmailService.js";
 import { getTemplate } from "../services/emailTemplates.js";
 
 function addDays(date: Date, days: number): Date {
@@ -270,18 +270,19 @@ export async function executeMarkResponse(sourcingId: string, createdBy?: string
         where: { sourcingId },
         include: { sourcingSupplier: { select: { company: true } } },
     });
-    if (!campaign || campaign.status === "response_received") {
-        return "";
-    }
+    if (!campaign) return "";
 
-    await (prisma as any).sourcingEmailCampaign.update({
-        where: { sourcingId },
-        data: {
-            status: "response_received",
-            responseReceivedAt: new Date(),
-            nextFollowupDue: null,
-        },
-    });
+    // If already flagged by the cron detector, skip the status update but still convert
+    if (campaign.status !== "response_received") {
+        await (prisma as any).sourcingEmailCampaign.update({
+            where: { sourcingId },
+            data: {
+                status: "response_received",
+                responseReceivedAt: new Date(),
+                nextFollowupDue: null,
+            },
+        });
+    }
 
     const newSupplierId = await autoConvertToNewSupplier(sourcingId);
     const company = campaign.sourcingSupplier.company;
@@ -573,10 +574,6 @@ export async function markResponseReceived(req: AuthRequest, res: Response): Pro
             res.status(404).json({ error: "No campaign found for this supplier" });
             return;
         }
-        if (campaign.status === "response_received") {
-            res.status(400).json({ error: "Response already recorded" });
-            return;
-        }
 
         const newSupplierId = await executeMarkResponse(sourcingId!, req.user!.id);
 
@@ -600,43 +597,137 @@ export async function markResponseReceived(req: AuthRequest, res: Response): Pro
  */
 export { sendFollowup as markEmailSent };
 
+async function syncThreadToDb(sourcingId: string, accountEmail: string | null | undefined, threadId: string | null | undefined): Promise<void> {
+    if (!accountEmail || !threadId) return;
+    const messages = await fetchThreadReplies({ accountEmail, threadId });
+    if (messages.length === 0) return;
+
+    const existing = await (prisma as any).supplierEmailReply.findMany({
+        where: { sourcingId },
+        select: { gmailMessageId: true },
+    });
+    const existingIds = new Set(existing.map((r: any) => r.gmailMessageId));
+    const newMessages = messages.filter((m) => !existingIds.has(m.gmailMessageId));
+
+    if (newMessages.length > 0) {
+        await (prisma as any).supplierEmailReply.createMany({
+            data: newMessages.map((m) => ({
+                sourcingId,
+                gmailMessageId: m.gmailMessageId,
+                direction: m.direction,
+                fromEmail: m.fromEmail,
+                fromName: m.fromName ?? null,
+                subject: m.subject ?? null,
+                body: m.body,
+                receivedAt: m.receivedAt,
+            })),
+        });
+    }
+}
+
 /**
  * GET /api/sourcing-campaigns/:id/replies
- * Returns email replies stored for a sourcing supplier
+ * Returns all thread messages. Auto-syncs from Gmail on first load if DB is empty.
  */
 export async function getSourceReplies(req: AuthRequest, res: Response): Promise<void> {
     try {
-        const sourcingId = req.params.id;
-        const replies = await (prisma as any).supplierEmailReply.findMany({
+        const sourcingId = req.params.id!;
+        const stored = await (prisma as any).supplierEmailReply.findMany({
             where: { sourcingId },
             orderBy: { receivedAt: "asc" },
         });
-        res.json(replies);
+
+        if (stored.length === 0) {
+            const campaign = await (prisma as any).sourcingEmailCampaign.findUnique({
+                where: { sourcingId },
+                include: { sourcingSupplier: { select: { assignedGmailAccount: true } } },
+            });
+            const threadId = (campaign?.gmailThreadId as string) || "";
+            const gmailAccount = (campaign?.sourcingSupplier?.assignedGmailAccount as string) || "";
+            if (threadId && gmailAccount) {
+                await syncThreadToDb(sourcingId, gmailAccount, threadId);
+                const refreshed = await (prisma as any).supplierEmailReply.findMany({
+                    where: { sourcingId },
+                    orderBy: { receivedAt: "asc" },
+                });
+                res.json(refreshed);
+                return;
+            }
+        }
+
+        res.json(stored);
     } catch {
         res.status(500).json({ error: "Failed to fetch replies" });
     }
 }
 
 /**
+ * POST /api/sourcing-campaigns/:id/sync-replies
+ * Fetches real reply messages from Gmail and stores them.
+ * Used when a supplier is already flagged as responded but replies weren't captured.
+ */
+export async function syncReplies(req: AuthRequest, res: Response): Promise<void> {
+    try {
+        const sourcingId = req.params.id!;
+        const campaign = await (prisma as any).sourcingEmailCampaign.findUnique({
+            where: { sourcingId },
+            include: { sourcingSupplier: { select: { assignedGmailAccount: true } } },
+        });
+        const threadId = (campaign?.gmailThreadId as string) || "";
+        const gmailAccount = (campaign?.sourcingSupplier?.assignedGmailAccount as string) || "";
+        if (!threadId || !gmailAccount) { res.json([]); return; }
+
+        await syncThreadToDb(sourcingId, gmailAccount, threadId);
+        const all = await (prisma as any).supplierEmailReply.findMany({
+            where: { sourcingId },
+            orderBy: { receivedAt: "asc" },
+        });
+        res.json(all);
+    } catch (err: any) {
+        console.error("[syncReplies] error:", err);
+        res.status(500).json({ error: err?.message ?? "Failed to sync replies" });
+    }
+}
+
+/**
  * GET /api/new-suppliers/:id/replies
- * Returns email replies for a new supplier via its convertedFromSourcingId
+ * Returns all thread messages for a new supplier via its convertedFromSourcingId.
+ * Auto-syncs from Gmail on first load if DB is empty.
  */
 export async function getNewSupplierReplies(req: AuthRequest, res: Response): Promise<void> {
     try {
-        const newSupplierId = req.params.id;
+        const newSupplierId = req.params.id!;
         const supplier = await (prisma as any).newSupplier.findUnique({
             where: { id: newSupplierId },
             select: { convertedFromSourcingId: true },
         });
-        if (!supplier?.convertedFromSourcingId) {
-            res.json([]);
-            return;
-        }
-        const replies = await (prisma as any).supplierEmailReply.findMany({
-            where: { sourcingId: supplier.convertedFromSourcingId },
+        if (!supplier?.convertedFromSourcingId) { res.json([]); return; }
+
+        const sourcingId: string = supplier.convertedFromSourcingId;
+        const stored = await (prisma as any).supplierEmailReply.findMany({
+            where: { sourcingId },
             orderBy: { receivedAt: "asc" },
         });
-        res.json(replies);
+
+        if (stored.length === 0) {
+            const campaign = await (prisma as any).sourcingEmailCampaign.findUnique({
+                where: { sourcingId },
+                include: { sourcingSupplier: { select: { assignedGmailAccount: true } } },
+            });
+            const threadId = (campaign?.gmailThreadId as string) || "";
+            const gmailAccount = (campaign?.sourcingSupplier?.assignedGmailAccount as string) || "";
+            if (threadId && gmailAccount) {
+                await syncThreadToDb(sourcingId, gmailAccount, threadId);
+                const refreshed = await (prisma as any).supplierEmailReply.findMany({
+                    where: { sourcingId },
+                    orderBy: { receivedAt: "asc" },
+                });
+                res.json(refreshed);
+                return;
+            }
+        }
+
+        res.json(stored);
     } catch {
         res.status(500).json({ error: "Failed to fetch replies" });
     }

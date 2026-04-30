@@ -61,8 +61,24 @@ import {
 
 
 
+function stripQuotedText(body: string): string {
+  const lines = body.split("\n");
+  const result: string[] = [];
+  for (const line of lines) {
+    const t = line.trimStart();
+    if (t.startsWith(">")) break;
+    if (/^On \w{3},\s/.test(t)) break;
+    if (/^[-_]{4,}/.test(t)) break;
+    if (/^From:\s+\S/.test(t) && result.length > 0) break;
+    result.push(line);
+  }
+  while (result.length > 0 && result[result.length - 1].trim() === "") result.pop();
+  return result.join("\n").trim();
+}
+
 interface EmailReply {
   id: string;
+  direction: "sent" | "received";
   fromEmail: string;
   fromName?: string;
   subject?: string;
@@ -1681,10 +1697,10 @@ export default function NewSupplierDetailsPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-slate-500" />
-                Email Replies
+                Email Thread
                 {emailReplies.length > 0 && (
                   <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                    {emailReplies.length}
+                    {emailReplies.length} messages
                   </span>
                 )}
               </CardTitle>
@@ -1693,44 +1709,42 @@ export default function NewSupplierDetailsPage() {
               {emailReplies.length === 0 ? (
                 <div className="text-center py-10 text-slate-400">
                   <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">No replies yet</p>
-                  <p className="text-xs mt-1">Replies from this supplier will appear here automatically</p>
+                  <p className="text-sm">No email thread yet</p>
+                  <p className="text-xs mt-1">Messages will appear here once the campaign starts</p>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-120 overflow-y-auto pr-1">
-                  {emailReplies.map((reply) => (
-                    <div key={reply.id} className="flex gap-3">
-                      <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="text-xs font-semibold text-emerald-700">
-                          {(reply.fromName ?? reply.fromEmail).charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl rounded-tl-none px-4 py-3">
-                          <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
-                            <span className="text-sm font-semibold text-slate-800 truncate">
-                              {reply.fromName ?? reply.fromEmail}
-                            </span>
-                            {reply.fromName && (
-                              <span className="text-xs text-slate-400 truncate">{reply.fromEmail}</span>
-                            )}
+                <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
+                  {emailReplies.map((msg) => {
+                    const isSent = msg.direction === "sent";
+                    const name = isSent ? "Élan Exports" : (msg.fromName ?? msg.fromEmail);
+                    const email = msg.fromEmail;
+                    const initial = name.charAt(0).toUpperCase();
+                    const cleanBody = stripQuotedText(msg.body);
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`rounded-lg border text-sm ${isSent ? "border-blue-100 bg-blue-50" : "border-slate-200 bg-white"}`}
+                      >
+                        {/* Header */}
+                        <div className={`flex items-center gap-3 px-4 py-3 border-b ${isSent ? "border-blue-100" : "border-slate-100"}`}>
+                          <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isSent ? "bg-blue-600 text-white" : "bg-emerald-100 text-emerald-700"}`}>
+                            {initial}
                           </div>
-                          {reply.subject && (
-                            <p className="text-xs text-slate-500 mb-1.5 font-medium">Re: {reply.subject}</p>
-                          )}
-                          <p className="text-sm text-slate-700 whitespace-pre-wrap wrap-break-word leading-relaxed">
-                            {reply.body}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-800 truncate">{name}</p>
+                            <p className="text-xs text-slate-400 truncate">{email}</p>
+                          </div>
+                          <span className="text-xs text-slate-400 shrink-0 text-right">
+                            {new Date(msg.receivedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                          </span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-1 px-1">
-                          {new Date(reply.receivedAt).toLocaleString(undefined, {
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                          })}
-                        </p>
+                        {/* Body */}
+                        <div className="px-4 py-3 text-slate-700 leading-relaxed whitespace-pre-wrap">
+                          {cleanBody || <span className="text-slate-400 italic">No content</span>}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

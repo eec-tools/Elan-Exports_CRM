@@ -122,6 +122,7 @@ function isAutoReplyMessage(headers: Array<{ name?: string | null; value?: strin
 
 export interface EmailReplyMessage {
   gmailMessageId: string;
+  direction: "sent" | "received";
   fromEmail: string;
   fromName?: string;
   subject?: string;
@@ -137,8 +138,32 @@ function decodeBase64Body(data: string): string {
   }
 }
 
+function stripQuotedContent(text: string): string {
+  const lines = text.split("\n");
+  const result: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+    // Quoted lines in plain-text email
+    if (trimmed.startsWith(">")) break;
+    // Gmail attribution: "On Mon, 29 Apr 2026 at 19:09, ..."
+    if (/^On \w{3},\s/.test(trimmed)) break;
+    // Outlook-style separator lines
+    if (/^[-_]{4,}/.test(trimmed)) break;
+    // Forwarded message "From:" block
+    if (/^From:\s+\S/.test(trimmed) && result.length > 0) break;
+    result.push(line);
+  }
+
+  while (result.length > 0 && result[result.length - 1].trim() === "") {
+    result.pop();
+  }
+  return result.join("\n").trim();
+}
+
 function extractTextBody(payload: any): string {
   if (!payload) return "";
+  // Prefer plain text
   if (payload.mimeType === "text/plain" && payload.body?.data) {
     return decodeBase64Body(payload.body.data);
   }
@@ -147,6 +172,14 @@ function extractTextBody(payload: any): string {
     return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   }
   if (payload.parts) {
+    // Try plain text parts first
+    for (const part of payload.parts) {
+      if (part.mimeType === "text/plain") {
+        const text = extractTextBody(part);
+        if (text) return text;
+      }
+    }
+    // Fall back to any part
     for (const part of payload.parts) {
       const text = extractTextBody(part);
       if (text) return text;
@@ -155,6 +188,11 @@ function extractTextBody(payload: any): string {
   return "";
 }
 
+/**
+ * Fetches ALL messages in a Gmail thread — both emails we sent and replies from
+ * the supplier. Returns them in chronological order with a direction flag.
+ * Auto-replies, bounces, and delivery notifications are excluded.
+ */
 export async function fetchThreadReplies(params: {
   accountEmail: string;
   threadId: string;
@@ -172,27 +210,32 @@ export async function fetchThreadReplies(params: {
 
     const messages = res.data.messages ?? [];
     const ourEmail = accountEmail.toLowerCase();
-    const replies: EmailReplyMessage[] = [];
+    const result: EmailReplyMessage[] = [];
 
-    for (let i = 1; i < messages.length; i++) {
-      const msg = messages[i];
+    for (const msg of messages) {
       const headers = msg.payload?.headers ?? [];
       const getHeader = (name: string) =>
         headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
 
       const from = getHeader("from");
-      if (from.toLowerCase().includes(ourEmail)) continue;
+
+      // Skip bounces / delivery notifications / auto-replies regardless of direction
       if (isAutoReplyMessage(headers)) continue;
+
+      const isSentByUs = from.toLowerCase().includes(ourEmail);
+      const direction: "sent" | "received" = isSentByUs ? "sent" : "received";
 
       const fromMatch = from.match(/^(?:"?(.+?)"?\s+)?<?([^>]+)>?$/);
       const fromName = fromMatch?.[1]?.replace(/"/g, "").trim() || undefined;
       const fromEmail = fromMatch?.[2]?.trim() || from;
 
-      const body = extractTextBody(msg.payload);
+      const rawBody = extractTextBody(msg.payload);
+      const body = stripQuotedContent(rawBody);
       const internalDate = msg.internalDate ? new Date(Number(msg.internalDate)) : new Date();
 
-      replies.push({
+      result.push({
         gmailMessageId: msg.id ?? "",
+        direction,
         fromEmail,
         fromName,
         subject: getHeader("subject") || undefined,
@@ -201,7 +244,7 @@ export async function fetchThreadReplies(params: {
       });
     }
 
-    return replies;
+    return result;
   } catch (err) {
     console.error(`[gmailService] fetchThreadReplies error for thread ${threadId}:`, err);
     return [];

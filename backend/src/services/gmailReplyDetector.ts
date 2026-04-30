@@ -1,12 +1,20 @@
 import cron from "node-cron";
 import prisma from "../config/db.js";
-import { checkForReply, fetchThreadReplies } from "./gmailService.js";
+import { fetchThreadReplies } from "./gmailService.js";
 import { autoMoveToOldSupplier } from "../controllers/sourcingEmailCampaign.controller.js";
 import { createNotification } from "./notificationService.js";
 
-async function storeReplies(sourcingId: string, accountEmail: string, threadId: string): Promise<void> {
-    const replies = await fetchThreadReplies({ accountEmail, threadId });
-    if (replies.length === 0) return;
+/**
+ * Fetch all messages in a thread and persist any that aren't already stored.
+ * Returns true if at least one "received" (supplier-sent) message was found.
+ */
+async function syncThreadMessages(
+    sourcingId: string,
+    accountEmail: string,
+    threadId: string,
+): Promise<boolean> {
+    const messages = await fetchThreadReplies({ accountEmail, threadId });
+    if (messages.length === 0) return false;
 
     const existing = await (prisma as any).supplierEmailReply.findMany({
         where: { sourcingId },
@@ -14,27 +22,27 @@ async function storeReplies(sourcingId: string, accountEmail: string, threadId: 
     });
     const existingIds = new Set(existing.map((r: any) => r.gmailMessageId));
 
-    const newReplies = replies.filter((r) => !existingIds.has(r.gmailMessageId));
-    if (newReplies.length === 0) return;
+    const newMessages = messages.filter((m) => !existingIds.has(m.gmailMessageId));
+    if (newMessages.length > 0) {
+        await (prisma as any).supplierEmailReply.createMany({
+            data: newMessages.map((m) => ({
+                sourcingId,
+                gmailMessageId: m.gmailMessageId,
+                direction: m.direction,
+                fromEmail: m.fromEmail,
+                fromName: m.fromName ?? null,
+                subject: m.subject ?? null,
+                body: m.body,
+                receivedAt: m.receivedAt,
+            })),
+        });
+    }
 
-    await (prisma as any).supplierEmailReply.createMany({
-        data: newReplies.map((r) => ({
-            sourcingId,
-            gmailMessageId: r.gmailMessageId,
-            fromEmail: r.fromEmail,
-            fromName: r.fromName ?? null,
-            subject: r.subject ?? null,
-            body: r.body,
-            receivedAt: r.receivedAt,
-        })),
-    });
+    // A "received" message anywhere in the thread means the supplier replied
+    return messages.some((m) => m.direction === "received");
 }
 
-/**
- * Mark a campaign as having received a reply WITHOUT auto-converting to New Supplier.
- * The user sees a notification and converts manually via the "Responded" button.
- */
-async function flagReplyReceived(sourcingId: string, company: string, accountEmail: string, threadId: string): Promise<void> {
+async function flagReplyReceived(sourcingId: string, company: string): Promise<void> {
     await (prisma as any).$transaction([
         (prisma as any).sourcingEmailCampaign.update({
             where: { sourcingId },
@@ -50,12 +58,10 @@ async function flagReplyReceived(sourcingId: string, company: string, accountEma
         }),
     ]);
 
-    await storeReplies(sourcingId, accountEmail, threadId);
-
     await createNotification({
         type: "campaign_responded",
         title: "Supplier Replied — Action Required",
-        message: `${company} replied to your email. Open their record and click "Responded" to convert them to a New Supplier.`,
+        message: `${company} replied to your email. Open their record and click "Convert" to move them to New Supplier.`,
         entityType: "sourcing_supplier",
         entityId: sourcingId,
         entityName: company,
@@ -65,14 +71,16 @@ async function flagReplyReceived(sourcingId: string, company: string, accountEma
 
 async function checkCampaignReplies() {
     try {
+        // Check both active campaigns (for new replies) and response_received
+        // (to keep syncing any additional messages in the thread)
         const campaigns = await (prisma as any).sourcingEmailCampaign.findMany({
             where: {
-                status: "active",
+                status: { in: ["active", "response_received"] },
                 gmailThreadId: { not: null },
             },
             include: {
                 sourcingSupplier: {
-                    select: { id: true, company: true, assignedGmailAccount: true },
+                    select: { id: true, company: true, assignedGmailAccount: true, status: true },
                 },
             },
         });
@@ -87,17 +95,17 @@ async function checkCampaignReplies() {
             if (!supplier.assignedGmailAccount || !campaign.gmailThreadId) continue;
 
             try {
-                const replied = await checkForReply({
-                    accountEmail: supplier.assignedGmailAccount,
-                    threadId: campaign.gmailThreadId,
-                });
+                const hasReply = await syncThreadMessages(
+                    campaign.sourcingId,
+                    supplier.assignedGmailAccount,
+                    campaign.gmailThreadId,
+                );
 
-                if (replied) {
+                if (hasReply && campaign.status === "active") {
                     repliesFound++;
-                    console.log(`[ReplyDetector] Reply detected from ${supplier.company} — flagging for manual review`);
-                    // Flag as responded; do NOT auto-convert — user must click "Responded" to convert
-                    await flagReplyReceived(campaign.sourcingId, supplier.company, supplier.assignedGmailAccount, campaign.gmailThreadId);
-                } else {
+                    console.log(`[ReplyDetector] Reply detected from ${supplier.company} — flagging`);
+                    await flagReplyReceived(campaign.sourcingId, supplier.company);
+                } else if (!hasReply && campaign.status === "active") {
                     await (prisma as any).sourcingEmailCampaign.update({
                         where: { sourcingId: campaign.sourcingId },
                         data: { lastCheckedAt: now },
@@ -109,16 +117,18 @@ async function checkCampaignReplies() {
                         campaign.nextFollowupDue &&
                         new Date(campaign.nextFollowupDue) <= now
                     ) {
-                        console.log(`[ReplyDetector] No reply after FU3 for ${supplier.company} — moving to Old Supplier`);
+                        console.log(`[ReplyDetector] No reply after FU3 for ${supplier.company} — archiving`);
                         await autoMoveToOldSupplier(campaign.sourcingId);
                     }
                 }
             } catch (err) {
-                console.error(`[ReplyDetector] Error checking campaign for ${supplier.company}:`, err);
+                console.error(`[ReplyDetector] Error for ${supplier.company}:`, err);
             }
         }
 
-        console.log(`[ReplyDetector] Checked ${campaigns.length} campaigns — ${repliesFound} replies found`);
+        if (repliesFound > 0) {
+            console.log(`[ReplyDetector] Checked ${campaigns.length} campaigns — ${repliesFound} new replies`);
+        }
     } catch (err) {
         console.error("[ReplyDetector] Fatal error:", err);
     }
@@ -129,7 +139,7 @@ export function startGmailReplyDetector() {
         console.log("[ReplyDetector] GMAIL_CLIENT_ID/SECRET not set — reply detection disabled");
         return;
     }
-    // Every 30 minutes
-    cron.schedule("*/30 * * * *", checkCampaignReplies);
-    console.log("[ReplyDetector] Gmail reply detection scheduled every 30 minutes");
+    // Every minute
+    cron.schedule("* * * * *", checkCampaignReplies);
+    console.log("[ReplyDetector] Gmail reply detection scheduled every minute");
 }
