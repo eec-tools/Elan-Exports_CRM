@@ -12,6 +12,7 @@ import {
     uploadNewSupplierCatalog,
     uploadNewSupplierFile,
 } from "../controllers/newSuppliers.controller.js";
+import { getNewSupplierReplies } from "../controllers/sourcingEmailCampaign.controller.js";
 import {
     authenticate,
     requirePermission,
@@ -27,6 +28,7 @@ router.get("/list", listNewSuppliersForDropdown);
 router.get("/filters", getNewSupplierFilters);
 router.get("/export/csv", exportNewSuppliersCsv);
 router.get("/:id", getNewSupplier);
+router.get("/:id/replies", getNewSupplierReplies);
 
 router.post("/upload", requireEdit(["suppliers", "new_suppliers"]), uploadNewSupplierFile.single("file"), uploadNewSupplierCatalog);
 router.post("/", requireEdit(["suppliers", "new_suppliers"]), createNewSupplier);

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../config/db.js";
 import { v2 as cloudinary } from "cloudinary";
+import { executeMarkResponse } from "./sourcingEmailCampaign.controller.js";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 
@@ -130,7 +131,7 @@ export async function getPublicForm(req: Request, res: Response): Promise<void> 
 export async function submitPublicForm(req: Request, res: Response): Promise<void> {
     try {
         const { token } = req.params;
-        const { fields } = req.body as { fields: Record<string, unknown> };
+        const { fields, finalSubmit } = req.body as { fields: Record<string, unknown>; finalSubmit?: boolean };
 
         if (!fields || typeof fields !== "object") {
             res.status(400).json({ error: "Invalid form data" });
@@ -162,21 +163,38 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
             delete update[key];
         }
 
-        if (Object.keys(update).length === 0) {
-            res.json({ success: true, message: "No new data to save" });
-            return;
-        }
-
         // Try sourcing supplier
         const sourcing = await (prisma as any).sourcingSupplier.findUnique({
             where: { formToken: token },
         });
 
         if (sourcing) {
-            await (prisma as any).sourcingSupplier.update({
-                where: { formToken: token },
-                data: update,
-            });
+            if (Object.keys(update).length > 0) {
+                await (prisma as any).sourcingSupplier.update({
+                    where: { formToken: token },
+                    data: update,
+                });
+            }
+
+            // Auto-convert to New Supplier on final submission if not already converted
+            if (finalSubmit && sourcing.status !== "converted_to_new") {
+                try {
+                    const newSupplierId = await executeMarkResponse(sourcing.id);
+                    if (newSupplierId) {
+                        // Store the sourcing origin on the new supplier record
+                        await (prisma as any).newSupplier.update({
+                            where: { id: newSupplierId },
+                            data: { convertedFromSourcingId: sourcing.id },
+                        });
+                    }
+                    res.json({ success: true, converted: true, newSupplierId });
+                    return;
+                } catch (convErr) {
+                    console.error("Auto-convert error after form submit:", convErr);
+                    // Non-fatal — form data is already saved
+                }
+            }
+
             res.json({ success: true });
             return;
         }
@@ -187,10 +205,12 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
         });
 
         if (newSupplier) {
-            await (prisma as any).newSupplier.update({
-                where: { formToken: token },
-                data: update,
-            });
+            if (Object.keys(update).length > 0) {
+                await (prisma as any).newSupplier.update({
+                    where: { formToken: token },
+                    data: update,
+                });
+            }
             res.json({ success: true });
             return;
         }

@@ -440,6 +440,7 @@ model NewSupplier {
   factoryVisitDate           String?                   @map("factory_visit_date")
   factoryVisitOutcome        String?                   @map("factory_visit_outcome")
   referralSource             String?                   @map("referral_source")
+  convertedFromSourcingId    String?                   @map("converted_from_sourcing_id")
 
   @@map("new_suppliers")
 }
@@ -615,6 +616,20 @@ model SourcingEmailCampaign {
   sourcingSupplier   SourcingSupplier @relation(fields: [sourcingId], references: [id], onDelete: Cascade)
 
   @@map("sourcing_email_campaigns")
+}
+
+model SupplierEmailReply {
+  id             String   @id @default(uuid())
+  sourcingId     String?  @map("sourcing_id")
+  gmailMessageId String?  @map("gmail_message_id")
+  fromEmail      String   @map("from_email")
+  fromName       String?  @map("from_name")
+  subject        String?
+  body           String
+  receivedAt     DateTime @map("received_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("supplier_email_replies")
 }
 
 model SupplierFormTemplate {

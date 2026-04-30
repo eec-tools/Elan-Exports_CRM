@@ -585,6 +585,7 @@ export default function PublicSupplierFormPage() {
     try {
       await axios.post(`${API_BASE}/public/supplier-form/${token}`, {
         fields: allFields(),
+        finalSubmit: true,
       });
       setSubmitted(true);
     } catch (err: any) {

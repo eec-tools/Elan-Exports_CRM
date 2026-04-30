@@ -599,3 +599,45 @@ export async function markResponseReceived(req: AuthRequest, res: Response): Pro
  * Alias to sendFollowup
  */
 export { sendFollowup as markEmailSent };
+
+/**
+ * GET /api/sourcing-campaigns/:id/replies
+ * Returns email replies stored for a sourcing supplier
+ */
+export async function getSourceReplies(req: AuthRequest, res: Response): Promise<void> {
+    try {
+        const sourcingId = req.params.id;
+        const replies = await (prisma as any).supplierEmailReply.findMany({
+            where: { sourcingId },
+            orderBy: { receivedAt: "asc" },
+        });
+        res.json(replies);
+    } catch {
+        res.status(500).json({ error: "Failed to fetch replies" });
+    }
+}
+
+/**
+ * GET /api/new-suppliers/:id/replies
+ * Returns email replies for a new supplier via its convertedFromSourcingId
+ */
+export async function getNewSupplierReplies(req: AuthRequest, res: Response): Promise<void> {
+    try {
+        const newSupplierId = req.params.id;
+        const supplier = await (prisma as any).newSupplier.findUnique({
+            where: { id: newSupplierId },
+            select: { convertedFromSourcingId: true },
+        });
+        if (!supplier?.convertedFromSourcingId) {
+            res.json([]);
+            return;
+        }
+        const replies = await (prisma as any).supplierEmailReply.findMany({
+            where: { sourcingId: supplier.convertedFromSourcingId },
+            orderBy: { receivedAt: "asc" },
+        });
+        res.json(replies);
+    } catch {
+        res.status(500).json({ error: "Failed to fetch replies" });
+    }
+}

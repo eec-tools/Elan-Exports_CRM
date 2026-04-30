@@ -1,14 +1,40 @@
 import cron from "node-cron";
 import prisma from "../config/db.js";
-import { checkForReply } from "./gmailService.js";
+import { checkForReply, fetchThreadReplies } from "./gmailService.js";
 import { autoMoveToOldSupplier } from "../controllers/sourcingEmailCampaign.controller.js";
 import { createNotification } from "./notificationService.js";
+
+async function storeReplies(sourcingId: string, accountEmail: string, threadId: string): Promise<void> {
+    const replies = await fetchThreadReplies({ accountEmail, threadId });
+    if (replies.length === 0) return;
+
+    const existing = await (prisma as any).supplierEmailReply.findMany({
+        where: { sourcingId },
+        select: { gmailMessageId: true },
+    });
+    const existingIds = new Set(existing.map((r: any) => r.gmailMessageId));
+
+    const newReplies = replies.filter((r) => !existingIds.has(r.gmailMessageId));
+    if (newReplies.length === 0) return;
+
+    await (prisma as any).supplierEmailReply.createMany({
+        data: newReplies.map((r) => ({
+            sourcingId,
+            gmailMessageId: r.gmailMessageId,
+            fromEmail: r.fromEmail,
+            fromName: r.fromName ?? null,
+            subject: r.subject ?? null,
+            body: r.body,
+            receivedAt: r.receivedAt,
+        })),
+    });
+}
 
 /**
  * Mark a campaign as having received a reply WITHOUT auto-converting to New Supplier.
  * The user sees a notification and converts manually via the "Responded" button.
  */
-async function flagReplyReceived(sourcingId: string, company: string): Promise<void> {
+async function flagReplyReceived(sourcingId: string, company: string, accountEmail: string, threadId: string): Promise<void> {
     await (prisma as any).$transaction([
         (prisma as any).sourcingEmailCampaign.update({
             where: { sourcingId },
@@ -23,6 +49,8 @@ async function flagReplyReceived(sourcingId: string, company: string): Promise<v
             data: { status: "response_received" },
         }),
     ]);
+
+    await storeReplies(sourcingId, accountEmail, threadId);
 
     await createNotification({
         type: "campaign_responded",
@@ -68,7 +96,7 @@ async function checkCampaignReplies() {
                     repliesFound++;
                     console.log(`[ReplyDetector] Reply detected from ${supplier.company} — flagging for manual review`);
                     // Flag as responded; do NOT auto-convert — user must click "Responded" to convert
-                    await flagReplyReceived(campaign.sourcingId, supplier.company);
+                    await flagReplyReceived(campaign.sourcingId, supplier.company, supplier.assignedGmailAccount, campaign.gmailThreadId);
                 } else {
                     await (prisma as any).sourcingEmailCampaign.update({
                         where: { sourcingId: campaign.sourcingId },

@@ -120,6 +120,94 @@ function isAutoReplyMessage(headers: Array<{ name?: string | null; value?: strin
   return false;
 }
 
+export interface EmailReplyMessage {
+  gmailMessageId: string;
+  fromEmail: string;
+  fromName?: string;
+  subject?: string;
+  body: string;
+  receivedAt: Date;
+}
+
+function decodeBase64Body(data: string): string {
+  try {
+    return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8");
+  } catch {
+    return "";
+  }
+}
+
+function extractTextBody(payload: any): string {
+  if (!payload) return "";
+  if (payload.mimeType === "text/plain" && payload.body?.data) {
+    return decodeBase64Body(payload.body.data);
+  }
+  if (payload.mimeType === "text/html" && payload.body?.data) {
+    const html = decodeBase64Body(payload.body.data);
+    return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  }
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      const text = extractTextBody(part);
+      if (text) return text;
+    }
+  }
+  return "";
+}
+
+export async function fetchThreadReplies(params: {
+  accountEmail: string;
+  threadId: string;
+}): Promise<EmailReplyMessage[]> {
+  const { accountEmail, threadId } = params;
+  try {
+    const auth = await getAuthedClient(accountEmail);
+    const gmail = google.gmail({ version: "v1", auth });
+
+    const res = await gmail.users.threads.get({
+      userId: "me",
+      id: threadId,
+      format: "FULL",
+    });
+
+    const messages = res.data.messages ?? [];
+    const ourEmail = accountEmail.toLowerCase();
+    const replies: EmailReplyMessage[] = [];
+
+    for (let i = 1; i < messages.length; i++) {
+      const msg = messages[i];
+      const headers = msg.payload?.headers ?? [];
+      const getHeader = (name: string) =>
+        headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
+
+      const from = getHeader("from");
+      if (from.toLowerCase().includes(ourEmail)) continue;
+      if (isAutoReplyMessage(headers)) continue;
+
+      const fromMatch = from.match(/^(?:"?(.+?)"?\s+)?<?([^>]+)>?$/);
+      const fromName = fromMatch?.[1]?.replace(/"/g, "").trim() || undefined;
+      const fromEmail = fromMatch?.[2]?.trim() || from;
+
+      const body = extractTextBody(msg.payload);
+      const internalDate = msg.internalDate ? new Date(Number(msg.internalDate)) : new Date();
+
+      replies.push({
+        gmailMessageId: msg.id ?? "",
+        fromEmail,
+        fromName,
+        subject: getHeader("subject") || undefined,
+        body: body.slice(0, 5000),
+        receivedAt: internalDate,
+      });
+    }
+
+    return replies;
+  } catch (err) {
+    console.error(`[gmailService] fetchThreadReplies error for thread ${threadId}:`, err);
+    return [];
+  }
+}
+
 export async function checkForReply(params: {
   accountEmail: string;
   threadId: string;

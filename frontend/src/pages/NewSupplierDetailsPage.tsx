@@ -56,9 +56,19 @@ import {
   DollarSign,
   Briefcase,
   Globe,
+  MessageSquare,
 } from "lucide-react";
 
 
+
+interface EmailReply {
+  id: string;
+  fromEmail: string;
+  fromName?: string;
+  subject?: string;
+  body: string;
+  receivedAt: string;
+}
 
 interface OrganicCertRow {
   market: string;
@@ -305,6 +315,13 @@ export default function NewSupplierDetailsPage() {
     queryKey: ["new-supplier", id],
     queryFn: () => api.get(`/new-suppliers/${id}`).then((r) => r.data),
     enabled: !!id,
+  });
+
+  const { data: emailReplies = [] } = useQuery<EmailReply[]>({
+    queryKey: ["new-supplier-replies", id],
+    queryFn: () => api.get(`/new-suppliers/${id}/replies`).then((r) => r.data),
+    enabled: !!id,
+    refetchInterval: 60_000,
   });
 
   const updateMutation = useMutation({
@@ -1658,6 +1675,66 @@ export default function NewSupplierDetailsPage() {
             </Card>
           )}
 
+
+          {/* ── Email Replies ── */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-slate-500" />
+                Email Replies
+                {emailReplies.length > 0 && (
+                  <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                    {emailReplies.length}
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {emailReplies.length === 0 ? (
+                <div className="text-center py-10 text-slate-400">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No replies yet</p>
+                  <p className="text-xs mt-1">Replies from this supplier will appear here automatically</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-120 overflow-y-auto pr-1">
+                  {emailReplies.map((reply) => (
+                    <div key={reply.id} className="flex gap-3">
+                      <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="text-xs font-semibold text-emerald-700">
+                          {(reply.fromName ?? reply.fromEmail).charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl rounded-tl-none px-4 py-3">
+                          <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
+                            <span className="text-sm font-semibold text-slate-800 truncate">
+                              {reply.fromName ?? reply.fromEmail}
+                            </span>
+                            {reply.fromName && (
+                              <span className="text-xs text-slate-400 truncate">{reply.fromEmail}</span>
+                            )}
+                          </div>
+                          {reply.subject && (
+                            <p className="text-xs text-slate-500 mb-1.5 font-medium">Re: {reply.subject}</p>
+                          )}
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap wrap-break-word leading-relaxed">
+                            {reply.body}
+                          </p>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1 px-1">
+                          {new Date(reply.receivedAt).toLocaleString(undefined, {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
         </TabsContent>
 
