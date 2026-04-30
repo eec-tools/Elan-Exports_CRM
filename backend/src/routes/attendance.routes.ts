@@ -6,6 +6,7 @@ import {
   getAdminAttendanceHistory,
   getAdminTodayAttendance,
   getAttendanceHistory,
+  getAttendanceUploadSignature,
   getTodayAttendance,
   heartbeatAttendance,
   startAttendance,
@@ -23,6 +24,7 @@ router.use(authenticate);
 router.get("/today", getTodayAttendance);
 router.post("/start", startAttendance);
 router.post("/end", endAttendance);
+router.get("/upload-signature", getAttendanceUploadSignature);
 router.post("/upload-proof", uploadAttendanceProofFile.single("file"), uploadAttendanceProof);
 router.post("/heartbeat", heartbeatAttendance);
 router.get("/history", getAttendanceHistory);

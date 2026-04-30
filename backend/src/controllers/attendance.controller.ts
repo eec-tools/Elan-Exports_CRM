@@ -109,6 +109,22 @@ export const uploadAttendanceProofFile = multer({
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
+export async function getAttendanceUploadSignature(_req: AuthRequest, res: Response): Promise<void> {
+  const timestamp = Math.round(Date.now() / 1000);
+  const params = { folder: "elan-attendance-proofs", timestamp };
+  const signature = cloudinary.utils.api_sign_request(
+    params,
+    process.env.CLOUDINARY_API_SECRET!
+  );
+  res.json({
+    signature,
+    timestamp,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    folder: "elan-attendance-proofs",
+  });
+}
+
 function normalizeCheckoutProofs(value: unknown): CheckoutProofFile[] {
   if (!Array.isArray(value)) return [];
 
