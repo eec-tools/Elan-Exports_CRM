@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { createNotification } from "../services/notificationService.js";
-import { sendGmailEmail, fetchThreadReplies } from "../services/gmailService.js";
+import { sendGmailEmail, fetchThreadReplies, getSmtpMessageId } from "../services/gmailService.js";
 import { getTemplate } from "../services/emailTemplates.js";
 
 function addDays(date: Date, days: number): Date {
@@ -47,6 +47,7 @@ export async function autoConvertToNewSupplier(sourcingId: string): Promise<stri
 
     const newSupplier = await (prisma as any).newSupplier.create({
         data: {
+            convertedFromSourcingId: sourcingId,
             company: sourcing.company,
             email: sourcing.email,
             phone: sourcing.phone,
@@ -208,7 +209,7 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
     if (nextStep > 4) return; // all done
 
     const formLink = buildFormLink(supplier.formToken);
-    const { subject, html } = getTemplate(nextStep, {
+    const { html } = getTemplate(nextStep, {
         company: supplier.company,
         contactPerson: supplier.contactPerson,
         product: supplier.product ?? supplier.productCategory ?? null,
@@ -216,13 +217,29 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
         fromEmail,
     });
 
-    // Thread follow-ups into the same Gmail conversation as the intro email
+    // Use the intro email's subject with "Re:" so follow-ups land in the same thread
+    const { subject: introSubject } = getTemplate(1, {
+        company: supplier.company,
+        contactPerson: supplier.contactPerson,
+        product: supplier.product ?? supplier.productCategory ?? null,
+        formLink,
+        fromEmail,
+    });
+    const replySubject = `Re: ${introSubject}`;
+
+    // Fetch the intro email's SMTP Message-ID so recipients see follow-ups as replies
+    const smtpMessageId = campaign.gmailMessageId
+        ? await getSmtpMessageId(fromEmail, campaign.gmailMessageId)
+        : null;
+
     await sendGmailEmail({
         fromEmail,
         to: supplier.email,
-        subject,
+        subject: replySubject,
         html,
         threadId: campaign.gmailThreadId ?? undefined,
+        inReplyTo: smtpMessageId ?? undefined,
+        references: smtpMessageId ?? undefined,
     });
 
     const now = new Date();
@@ -699,11 +716,24 @@ export async function getNewSupplierReplies(req: AuthRequest, res: Response): Pr
         const newSupplierId = req.params.id!;
         const supplier = await (prisma as any).newSupplier.findUnique({
             where: { id: newSupplierId },
-            select: { convertedFromSourcingId: true },
+            select: { convertedFromSourcingId: true, email: true, company: true },
         });
-        if (!supplier?.convertedFromSourcingId) { res.json([]); return; }
+        if (!supplier) { res.json([]); return; }
 
-        const sourcingId: string = supplier.convertedFromSourcingId;
+        // Prefer the direct link; fall back to matching by email/company for older records
+        let sourcingId: string = supplier.convertedFromSourcingId ?? "";
+        if (!sourcingId && (supplier.email || supplier.company)) {
+            const match = await (prisma as any).sourcingSupplier.findFirst({
+                where: {
+                    status: "converted_to_new",
+                    ...(supplier.email ? { email: supplier.email } : { company: supplier.company }),
+                },
+                select: { id: true },
+                orderBy: { createdAt: "desc" },
+            });
+            if (match) sourcingId = match.id;
+        }
+        if (!sourcingId) { res.json([]); return; }
         const stored = await (prisma as any).supplierEmailReply.findMany({
             where: { sourcingId },
             orderBy: { receivedAt: "asc" },

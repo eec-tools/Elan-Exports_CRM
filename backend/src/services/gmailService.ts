@@ -29,8 +29,10 @@ function buildRawMessage(params: {
   to: string;
   subject: string;
   html: string;
+  inReplyTo?: string;
+  references?: string;
 }): string {
-  const { from, to, subject, html } = params;
+  const { from, to, subject, html, inReplyTo, references } = params;
 
   // RFC 2047 encode any header value that may contain non-ASCII characters
   const encodeHeader = (v: string) => `=?UTF-8?B?${Buffer.from(v, "utf-8").toString("base64")}?=`;
@@ -38,18 +40,24 @@ function buildRawMessage(params: {
   // Base64-encode the HTML body and wrap at 76 chars (MIME requirement)
   const encodedBody = Buffer.from(html, "utf-8").toString("base64").match(/.{1,76}/g)!.join("\r\n");
 
-  const message = [
+  const headers: string[] = [
     `From: ${encodeHeader("Élan Exports")} <${from}>`,
     `To: ${to}`,
     `Subject: ${encodeHeader(subject)}`,
+  ];
+
+  if (inReplyTo) headers.push(`In-Reply-To: ${inReplyTo}`);
+  if (references) headers.push(`References: ${references}`);
+
+  headers.push(
     `MIME-Version: 1.0`,
     `Content-Type: text/html; charset=UTF-8`,
     `Content-Transfer-Encoding: base64`,
     ``,
     encodedBody,
-  ].join("\r\n");
+  );
 
-  return Buffer.from(message).toString("base64url");
+  return Buffer.from(headers.join("\r\n")).toString("base64url");
 }
 
 export async function sendGmailEmail(params: {
@@ -58,18 +66,19 @@ export async function sendGmailEmail(params: {
   subject: string;
   html: string;
   threadId?: string;
+  inReplyTo?: string;
+  references?: string;
 }): Promise<{ messageId: string; threadId: string }> {
-  const { fromEmail, to, subject, html, threadId } = params;
+  const { fromEmail, to, subject, html, threadId, inReplyTo, references } = params;
   const auth = await getAuthedClient(fromEmail);
   const gmail = google.gmail({ version: "v1", auth });
 
-  const raw = buildRawMessage({ from: fromEmail, to, subject, html });
+  const raw = buildRawMessage({ from: fromEmail, to, subject, html, inReplyTo, references });
 
   const res = await gmail.users.messages.send({
     userId: "me",
     requestBody: {
       raw,
-      // Thread follow-ups into the same Gmail conversation as the intro email
       ...(threadId ? { threadId } : {}),
     },
   });
@@ -78,6 +87,23 @@ export async function sendGmailEmail(params: {
     messageId: res.data.id ?? "",
     threadId: res.data.threadId ?? "",
   };
+}
+
+export async function getSmtpMessageId(accountEmail: string, gmailMessageId: string): Promise<string | null> {
+  try {
+    const auth = await getAuthedClient(accountEmail);
+    const gmail = google.gmail({ version: "v1", auth });
+    const res = await gmail.users.messages.get({
+      userId: "me",
+      id: gmailMessageId,
+      format: "METADATA",
+      metadataHeaders: ["Message-ID"],
+    });
+    const headers = res.data.payload?.headers ?? [];
+    return (headers as any[]).find((h: any) => h.name?.toLowerCase() === "message-id")?.value ?? null;
+  } catch {
+    return null;
+  }
 }
 
 const AUTO_REPLY_SENDER_PATTERNS = [
