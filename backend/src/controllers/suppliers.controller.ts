@@ -204,9 +204,13 @@ export async function createSupplier(
   res: Response,
 ): Promise<void> {
   try {
+    const _spArr = Array.isArray(req.body.supplierProducts) ? req.body.supplierProducts : [];
+    const derivedProducts = _spArr.map((p: any) => p.product).filter(Boolean).join(", ") || req.body.products || "";
+
     const supplier = await prisma.supplier.create({
       data: {
         ...req.body,
+        products: derivedProducts,
         createdBy: req.user!.id,
       },
     });
@@ -352,6 +356,9 @@ export async function updateSupplier(
     }
 
     const { id, createdBy, createdAt, updatedAt, creator, ...updateData } = req.body;
+
+    const _spArr = Array.isArray(updateData.supplierProducts) ? updateData.supplierProducts : [];
+    updateData.products = _spArr.map((p: any) => p.product).filter(Boolean).join(", ") || updateData.products || "";
 
     const supplierId = req.params.id;
     const incomingIds: string[] = Array.isArray(updateData.buyerIds)
@@ -582,6 +589,10 @@ export async function updateSupplierStage(
     const oldBuyerIds: string[] = (existing.buyerIds as string[]) ?? [];
 
     if (stage === "Onboarding") {
+      const _sp = (existing.supplierProducts as any[]) ?? [];
+      const derivedProduct = _sp.map((p: any) => p.product).filter(Boolean).join(", ") || (existing as any).products || "";
+      const derivedProductCategory = _sp.map((p: any) => p.productCategory).filter(Boolean).join(", ") || "";
+
       const result = await prisma.$transaction(async (tx) => {
         const newSupplier = await (tx as any).newSupplier.create({
           data: {
@@ -590,6 +601,15 @@ export async function updateSupplierStage(
             phone: existing.phone,
             notes: existing.remarks,
             buyerIds: oldBuyerIds,
+            product: derivedProduct,
+            productCategory: derivedProductCategory,
+            supplierProducts: _sp,
+            productCatalogs: (existing.productCatalogs as any[]) ?? [],
+            productCatalogImages: (existing.productCatalogImages as any[]) ?? [],
+            certificates: (existing.documents as any[]) ?? [],
+            warehousePhotos: (existing.warehousePhotos as any[]) ?? [],
+            videoLinks: (existing.videoLinks as any[]) ?? [],
+            quotations: (existing.quotations as any[]) ?? [],
           },
         });
         // Update each linked buyer's supplierLinks from type "signed" → "new"

@@ -200,6 +200,8 @@ interface Supplier {
   supplierProducts?: SupplierProduct[];
   productCatalogs?: ProductCatalogEntry[];
   productCatalogImages?: ProductCatalogEntry[];
+  warehousePhotos?: { name: string; url: string }[];
+  videoLinks?: { label: string; url: string }[];
   // EEC Internal Fields
   vettingScore?: number | null;
   exclusivityArrangement?: string;
@@ -286,6 +288,7 @@ export default function SupplierDetailsPage() {
   const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
   const [catalogImageFiles, setCatalogImageFiles] = useState<File[]>([]);
   const [quotationFiles, setQuotationFiles] = useState<File[]>([]);
+  const [warehousePhotoFiles, setWarehousePhotoFiles] = useState<File[]>([]);
   const [productImageFiles, setProductImageFiles] = useState<Record<number, File>>({});
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [uploadingContract, setUploadingContract] = useState(false);
@@ -526,7 +529,17 @@ export default function SupplierDetailsPage() {
       }
     }
 
-    const payload = { ...form, supplierProducts: finalProducts, productCatalogShared: catalogUrl, documents: finalDocuments, productCatalogs: finalCatalogs, productCatalogImages: finalCatalogImages, quotations: finalQuotations };
+    const finalWarehousePhotos = [...(form.warehousePhotos || [])];
+    if (warehousePhotoFiles.length > 0) {
+      for (const file of warehousePhotoFiles) {
+        try {
+          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
+          finalWarehousePhotos.push({ name: file.name, url: uploadRes.url });
+        } catch (error) { console.error('Upload failed', error); }
+      }
+    }
+
+    const payload = { ...form, supplierProducts: finalProducts, productCatalogShared: catalogUrl, documents: finalDocuments, productCatalogs: finalCatalogs, productCatalogImages: finalCatalogImages, quotations: finalQuotations, warehousePhotos: finalWarehousePhotos };
 
     if (supplier?.id) {
       updateMutation.mutate({ id: supplier.id, d: payload });
@@ -553,6 +566,7 @@ export default function SupplierDetailsPage() {
     setCatalogFiles([]);
     setCatalogImageFiles([]);
     setQuotationFiles([]);
+    setWarehousePhotoFiles([]);
     setProductImageFiles({});
     setDialogOpen(true);
   };
@@ -991,11 +1005,26 @@ export default function SupplierDetailsPage() {
               label="Factory Videos Shared"
               value={supplier.factoryVideosShared}
             />
-            <InfoRow
-              icon={Factory}
-              label="Warehouse Videos Shared"
-              value={supplier.warehouseVideosShared}
-            />
+            {(supplier.warehousePhotos ?? []).length > 0 && (
+              <div className="py-2">
+                <p className="text-xs text-muted-foreground mb-1">Warehouse Photos</p>
+                <div className="flex flex-col gap-1">
+                  {(supplier.warehousePhotos ?? []).map((p, i) => (
+                    <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">{p.name}</a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(supplier.videoLinks ?? []).length > 0 && (
+              <div className="py-2">
+                <p className="text-xs text-muted-foreground mb-1">Video Links</p>
+                <div className="flex flex-col gap-1">
+                  {(supplier.videoLinks ?? []).map((v, i) => (
+                    <a key={i} href={v.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">{v.label || v.url}</a>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -1841,7 +1870,28 @@ export default function SupplierDetailsPage() {
               </div>
 
               <div className="space-y-2 sm:col-span-2"><Label>Factory Videos Shared</Label><Input value={form.factoryVideosShared ?? ""} onChange={(e) => setForm({ ...form, factoryVideosShared: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Warehouse Videos Shared</Label><Input value={form.warehouseVideosShared ?? ""} onChange={(e) => setForm({ ...form, warehouseVideosShared: e.target.value })} /></div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Warehouse Photos</Label>
+                <div className="flex flex-col gap-2">
+                  <input type="file" accept=".png,.jpg,.jpeg,.jfif" multiple className="hidden" id="warehouse-photos-upload-edit" onChange={(e) => { if (e.target.files) setWarehousePhotoFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); e.currentTarget.value = ""; }} />
+                  <Button type="button" variant="outline" onClick={() => document.getElementById("warehouse-photos-upload-edit")?.click()} className="w-full justify-start truncate"><Upload className="mr-2 h-4 w-4 shrink-0" /><span className="truncate">Upload Warehouse Photos</span></Button>
+                  {(form.warehousePhotos || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.warehousePhotos || []).map((p, idx) => (<div key={`wp-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={p.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{p.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.warehousePhotos || [])]; updated.splice(idx, 1); setForm({ ...form, warehousePhotos: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
+                  {warehousePhotoFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{warehousePhotoFiles.map((f, idx) => (<div key={`pending-wp-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setWarehousePhotoFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-4 w-4" /></button></div>))}</div>)}
+                </div>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Video Links</Label>
+                <div className="flex flex-col gap-2">
+                  {(form.videoLinks || []).map((v, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <Input placeholder="Label" value={v.label} onChange={(e) => { const updated = [...(form.videoLinks || [])]; updated[idx] = { ...updated[idx], label: e.target.value }; setForm({ ...form, videoLinks: updated }); }} className="h-8 text-sm flex-1" />
+                      <Input placeholder="URL" value={v.url} onChange={(e) => { const updated = [...(form.videoLinks || [])]; updated[idx] = { ...updated[idx], url: e.target.value }; setForm({ ...form, videoLinks: updated }); }} className="h-8 text-sm flex-1" />
+                      <button type="button" onClick={() => { const updated = (form.videoLinks || []).filter((_, i) => i !== idx); setForm({ ...form, videoLinks: updated }); }} className="text-slate-400 hover:text-rose-600 shrink-0"><X className="h-4 w-4" /></button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" className="w-fit gap-1 text-slate-600 border-slate-200" onClick={() => setForm({ ...form, videoLinks: [...(form.videoLinks || []), { label: "", url: "" }] })}>+ Add Video Link</Button>
+                </div>
+              </div>
               <div className="space-y-2 sm:col-span-2"><Label>Remarks</Label><Textarea value={form.remarks ?? ""} onChange={(e) => setForm({ ...form, remarks: e.target.value })} rows={3} /></div>
             </div></div>
 

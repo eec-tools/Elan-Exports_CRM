@@ -259,6 +259,8 @@ model Supplier {
   productCatalogs            Json?                  @default("[]") @map("product_catalogs")
   productCatalogImages       Json?                  @default("[]") @map("product_catalog_images")
   quotations                 Json?                  @default("[]") @map("quotations")
+  warehousePhotos            Json?                  @default("[]") @map("warehouse_photos")
+  videoLinks                 Json?                  @default("[]") @map("video_links")
   buyerIds                   Json                   @default("[]") @map("buyer_ids")
   dealStage                  String                 @default("Communication") @map("deal_stage")
   // Section 12 — EEC Internal Fields

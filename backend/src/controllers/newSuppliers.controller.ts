@@ -245,10 +245,14 @@ export async function createNewSupplier(
 
         const buyerIdsArr: string[] = Array.isArray(incomingBuyerIds) ? incomingBuyerIds : [];
 
+        const _spArr = Array.isArray(supplierProducts) ? supplierProducts : [];
+        const derivedProductCategory = _spArr.map((p: any) => p.productCategory).filter(Boolean).join(", ") || productCategory || "";
+        const derivedProduct = _spArr.map((p: any) => p.product).filter(Boolean).join(", ") || product || "";
+
         const supplier = await (prisma as any).$transaction(async (tx: any) => {
             const created = await tx.newSupplier.create({
                 data: {
-                    company, productCategory, product, country, accountManager,
+                    company, productCategory: derivedProductCategory, product: derivedProduct, country, accountManager,
                     currentStatus, certifications, latestQuotation, reasonInactive,
                     dateMarkedInactive, reactivationPotential, notes, phone, email, website,
                     productCatalog, buyerIds: buyerIdsArr,
@@ -454,6 +458,10 @@ export async function updateNewSupplier(
             factoryVisitOutcome, referralSource,
         } = req.body;
 
+        const _spArr = Array.isArray(supplierProducts) ? supplierProducts : [];
+        const derivedProductCategory = _spArr.map((p: any) => p.productCategory).filter(Boolean).join(", ") || productCategory || "";
+        const derivedProduct = _spArr.map((p: any) => p.product).filter(Boolean).join(", ") || product || "";
+
         console.log("Updating new supplier with payload:", req.body);
 
         const supplierId = req.params.id;
@@ -468,7 +476,7 @@ export async function updateNewSupplier(
             const updated = await tx.newSupplier.update({
                 where: { id: supplierId },
                 data: {
-                    company, productCategory, product, country, accountManager,
+                    company, productCategory: derivedProductCategory, product: derivedProduct, country, accountManager,
                     currentStatus, certifications, latestQuotation, reasonInactive,
                     dateMarkedInactive, reactivationPotential, notes, phone, email, website,
                     productCatalog, buyerIds: incomingIds,
@@ -707,6 +715,9 @@ export async function updateNewSupplierStage(
         const oldBuyerIds: string[] = (existing.buyerIds as string[]) ?? [];
 
         if (stage === "Signed") {
+            const _sp = (existing.supplierProducts as any[]) ?? [];
+            const derivedProducts = _sp.map((p: any) => p.product).filter(Boolean).join(", ") || existing.product || "";
+
             const result = await (prisma as any).$transaction(async (tx: any) => {
                 const supplier = await tx.supplier.create({
                     data: {
@@ -716,6 +727,14 @@ export async function updateNewSupplierStage(
                         website: existing.website,
                         remarks: existing.notes,
                         buyerIds: oldBuyerIds,
+                        products: derivedProducts,
+                        supplierProducts: _sp,
+                        productCatalogs: (existing.productCatalogs as any[]) ?? [],
+                        productCatalogImages: (existing.productCatalogImages as any[]) ?? [],
+                        quotations: (existing.quotations as any[]) ?? [],
+                        documents: (existing.certificates as any[]) ?? [],
+                        warehousePhotos: (existing.warehousePhotos as any[]) ?? [],
+                        videoLinks: (existing.videoLinks as any[]) ?? [],
                     },
                 });
                 // Update each linked buyer's supplierLinks from type "new" → "signed"
