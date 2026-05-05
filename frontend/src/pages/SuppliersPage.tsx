@@ -39,9 +39,9 @@ import {
   FileCheck2,
   CheckCircle2,
   PauseCircle,
-
   Star,
   AlertTriangle,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -73,6 +73,8 @@ interface ProductCatalogEntry {
   name: string;
   url: string;
 }
+
+type PendingUpload = { id: string; name: string; status: "uploading" | "ready" | "error"; url?: string; };
 
 const EMPTY_SUPPLIER_PRODUCT = (): SupplierProduct => ({
   id: String(Date.now() + Math.random()),
@@ -276,10 +278,10 @@ export default function SuppliersPage() {
     toast.success(`Deal stage "${stage}" removed`);
   }
 
-  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
-  const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
-  const [catalogImageFiles, setCatalogImageFiles] = useState<File[]>([]);
-  const [warehousePhotoFiles, setWarehousePhotoFiles] = useState<File[]>([]);
+  const [documentPending, setDocumentPending] = useState<PendingUpload[]>([]);
+  const [catalogPending, setCatalogPending] = useState<PendingUpload[]>([]);
+  const [catalogImagePending, setCatalogImagePending] = useState<PendingUpload[]>([]);
+  const [warehousePhotoPending, setWarehousePhotoPending] = useState<PendingUpload[]>([]);
   const [productImageFiles, setProductImageFiles] = useState<Record<number, File>>({});
 
   // Product helpers
@@ -398,104 +400,61 @@ export default function SuppliersPage() {
 
   const uploadCatalogMutation = useMutation({
     mutationFn: async (file: File) => {
+      const { data: sig } = await api.get("/suppliers/upload-signature");
+      const isRaw = /\.(pdf|doc|docx|xls|xlsx|csv|zip)$/i.test(file.name) || file.type === "application/pdf";
       const fd = new FormData();
       fd.append("file", file);
-      const res = await api.post("/suppliers/upload", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      return res.data;
+      fd.append("signature", sig.signature);
+      fd.append("timestamp", String(sig.timestamp));
+      fd.append("api_key", sig.apiKey);
+      fd.append("folder", sig.folder);
+      const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/${isRaw ? "raw" : "auto"}/upload`, { method: "POST", body: fd });
+      const data = await cloudRes.json();
+      if (!data.secure_url) throw new Error("Upload failed");
+      return { url: data.secure_url as string };
     },
-    onError: () => toast.error("Failed to upload product catalog"),
+    onError: () => toast.error("File upload failed"),
   });
+
+  function triggerUpload(file: File, id: string, setter: React.Dispatch<React.SetStateAction<PendingUpload[]>>) {
+    uploadCatalogMutation.mutateAsync(file)
+      .then((res) => setter((prev) => prev.map((p) => p.id === id ? { ...p, status: "ready" as const, url: res.url } : p)))
+      .catch(() => setter((prev) => prev.map((p) => p.id === id ? { ...p, status: "error" as const } : p)));
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const finalDocuments = [...(form.documents || [])];
-
-    if (documentFiles.length > 0) {
-      for (const file of documentFiles) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalDocuments.push({ name: file.name, url: uploadRes.url });
-        } catch {
-          return;
-        }
+    const upload = (f: File) => uploadCatalogMutation.mutateAsync(f).then((r) => ({ name: f.name, url: r.url }));
+    try {
+      const finalProducts = [...(form.supplierProducts || [])];
+      for (const [idxStr, file] of Object.entries(productImageFiles)) {
+        const idx = parseInt(idxStr);
+        if (idx < finalProducts.length) { const r = await upload(file); finalProducts[idx] = { ...finalProducts[idx], imageUrl: r.url }; }
       }
-    }
-
-    // Upload multi-catalog files
-    const finalCatalogs = [...(form.productCatalogs || [])];
-    if (catalogFiles.length > 0) {
-      for (const file of catalogFiles) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalCatalogs.push({ name: file.name, url: uploadRes.url });
-        } catch (error) { console.error('Upload failed', error); }
-      }
-    }
-
-    // Upload multi-catalog image files
-    const finalCatalogImages = [...(form.productCatalogImages || [])];
-    if (catalogImageFiles.length > 0) {
-      for (const file of catalogImageFiles) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalCatalogImages.push({ name: file.name, url: uploadRes.url });
-        } catch (error) { console.error('Upload failed', error); }
-      }
-    }
-
-    // Upload product images
-    const finalProducts = [...(form.supplierProducts || [])];
-    for (const [idxStr, file] of Object.entries(productImageFiles)) {
-      const idx = parseInt(idxStr);
-      if (idx >= 0 && idx < finalProducts.length) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalProducts[idx] = { ...finalProducts[idx], imageUrl: uploadRes.url };
-        } catch (error) { console.error('Product image upload failed', error); }
-      }
-    }
-
-    const finalWarehousePhotos = [...(form.warehousePhotos || [])];
-    if (warehousePhotoFiles.length > 0) {
-      for (const file of warehousePhotoFiles) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalWarehousePhotos.push({ name: file.name, url: uploadRes.url });
-        } catch (error) { console.error('Upload failed', error); }
-      }
-    }
-
-    const payload = { ...form, supplierProducts: finalProducts, documents: finalDocuments, productCatalogs: finalCatalogs, productCatalogImages: finalCatalogImages, warehousePhotos: finalWarehousePhotos };
-
-    if (editing?.id) {
-      updateMutation.mutate({ id: editing.id, d: payload });
-    } else {
-      createMutation.mutate(payload);
-    }
+      const payload = {
+        ...form,
+        supplierProducts: finalProducts,
+        documents: [...(form.documents || []), ...documentPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! }))],
+        productCatalogs: [...(form.productCatalogs || []), ...catalogPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! }))],
+        productCatalogImages: [...(form.productCatalogImages || []), ...catalogImagePending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! }))],
+        warehousePhotos: [...(form.warehousePhotos || []), ...warehousePhotoPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! }))],
+      };
+      if (editing?.id) { updateMutation.mutate({ id: editing.id, d: payload }); }
+      else { createMutation.mutate(payload); }
+    } catch { toast.error("File upload failed. Please try again."); }
   };
 
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_SUPPLIER);
-    setDocumentFiles([]);
-    setCatalogFiles([]);
-    setCatalogImageFiles([]);
-    setWarehousePhotoFiles([]);
-    setProductImageFiles({});
+    setDocumentPending([]); setCatalogPending([]); setCatalogImagePending([]); setWarehousePhotoPending([]); setProductImageFiles({});
     setDialogOpen(true);
   };
 
   const openEdit = (s: Supplier) => {
     setEditing(s);
     setForm({ ...s, supplierProducts: s.supplierProducts || [], productCatalogs: s.productCatalogs || [], productCatalogImages: s.productCatalogImages || [] });
-    setDocumentFiles([]);
-    setCatalogFiles([]);
-    setCatalogImageFiles([]);
-    setWarehousePhotoFiles([]);
-    setProductImageFiles({});
+    setDocumentPending([]); setCatalogPending([]); setCatalogImagePending([]); setWarehousePhotoPending([]); setProductImageFiles({});
     setDialogOpen(true);
   };
 
@@ -1273,39 +1232,39 @@ export default function SuppliersPage() {
                 <div className="space-y-2">
                   <Label>Product Catalogs</Label>
                   <div className="flex flex-col gap-2">
-                    <input type="file" accept="application/pdf,.doc,.docx" multiple className="hidden" id="multi-catalog-upload" onChange={(e) => { if (e.target.files) setCatalogFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                    <input type="file" accept="application/pdf,.doc,.docx" multiple className="hidden" id="multi-catalog-upload" onChange={(e) => { const files = Array.from(e.target.files || []); const items = files.map((f) => ({ id: crypto.randomUUID(), name: f.name, status: "uploading" as const })); setCatalogPending((prev) => [...prev, ...items]); files.forEach((f, i) => triggerUpload(f, items[i].id, setCatalogPending)); e.currentTarget.value = ""; }} />
                     <Button type="button" variant="outline" onClick={() => document.getElementById("multi-catalog-upload")?.click()} className="w-full justify-start"><Upload className="mr-2 h-4 w-4 shrink-0" /><span>Upload Product Catalogs</span></Button>
-                    {(form.productCatalogs || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogs || []).map((cat, idx) => (<div key={`cat-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={cat.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{cat.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogs || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogs: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
-                    {catalogFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogFiles.map((f, idx) => (<div key={`pend-cat-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
+                    {(form.productCatalogs || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogs || []).map((cat, idx) => (<div key={`cat-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={cat.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{cat.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const u = [...(form.productCatalogs || [])]; u.splice(idx, 1); setForm({ ...form, productCatalogs: u }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
+                    {catalogPending.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogPending.map((p) => (<div key={p.id} className={`flex items-center justify-between p-2 rounded border text-sm ${p.status === "ready" ? "bg-green-50 border-green-200" : p.status === "error" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-100"}`}><div className="flex items-center gap-2 flex-1 min-w-0">{p.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />}{p.status === "ready" && <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />}{p.status === "error" && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}<span className="truncate text-xs">{p.status === "error" ? `${p.name} — upload failed` : p.name}</span></div><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogPending((prev) => prev.filter((x) => x.id !== p.id))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
                   </div>
                 </div>
                 {/* Multi Product Catalog Images */}
                 <div className="space-y-2">
                   <Label>Product Catalog Images</Label>
                   <div className="flex flex-col gap-2">
-                    <input type="file" accept=".png,.jpg,.jpeg,.jfif,.webp" multiple className="hidden" id="multi-catalog-img-upload" onChange={(e) => { if (e.target.files) setCatalogImageFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                    <input type="file" accept=".png,.jpg,.jpeg,.jfif,.webp" multiple className="hidden" id="multi-catalog-img-upload" onChange={(e) => { const files = Array.from(e.target.files || []); const items = files.map((f) => ({ id: crypto.randomUUID(), name: f.name, status: "uploading" as const })); setCatalogImagePending((prev) => [...prev, ...items]); files.forEach((f, i) => triggerUpload(f, items[i].id, setCatalogImagePending)); e.currentTarget.value = ""; }} />
                     <Button type="button" variant="outline" onClick={() => document.getElementById("multi-catalog-img-upload")?.click()} className="w-full justify-start"><Upload className="mr-2 h-4 w-4 shrink-0" /><span>Upload Catalog Images</span></Button>
-                    {(form.productCatalogImages || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogImages || []).map((img, idx) => (<div key={`catimg-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={img.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{img.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.productCatalogImages || [])]; updated.splice(idx, 1); setForm({ ...form, productCatalogImages: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
-                    {catalogImageFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogImageFiles.map((f, idx) => (<div key={`pend-catimg-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogImageFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
+                    {(form.productCatalogImages || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.productCatalogImages || []).map((img, idx) => (<div key={`catimg-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={img.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{img.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const u = [...(form.productCatalogImages || [])]; u.splice(idx, 1); setForm({ ...form, productCatalogImages: u }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
+                    {catalogImagePending.length > 0 && (<div className="flex flex-col gap-1 mt-1">{catalogImagePending.map((p) => (<div key={p.id} className={`flex items-center justify-between p-2 rounded border text-sm ${p.status === "ready" ? "bg-green-50 border-green-200" : p.status === "error" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-100"}`}><div className="flex items-center gap-2 flex-1 min-w-0">{p.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />}{p.status === "ready" && <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />}{p.status === "error" && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}<span className="truncate text-xs">{p.status === "error" ? `${p.name} — upload failed` : p.name}</span></div><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogImagePending((prev) => prev.filter((x) => x.id !== p.id))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Upload Documents</Label>
                   <div className="flex flex-col gap-2">
-                    <input type="file" accept="application/pdf" multiple className="hidden" id="documents-upload" onChange={(e) => { if (e.target.files) setDocumentFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); }} />
+                    <input type="file" accept="application/pdf" multiple className="hidden" id="documents-upload" onChange={(e) => { const files = Array.from(e.target.files || []); const items = files.map((f) => ({ id: crypto.randomUUID(), name: f.name, status: "uploading" as const })); setDocumentPending((prev) => [...prev, ...items]); files.forEach((f, i) => triggerUpload(f, items[i].id, setDocumentPending)); e.currentTarget.value = ""; }} />
                     <Button type="button" variant="outline" onClick={() => document.getElementById("documents-upload")?.click()} className="w-full justify-start"><Upload className="mr-2 h-4 w-4 shrink-0" /><span>Add Document PDFs</span></Button>
                     {form.documents && form.documents.length > 0 && (<div className="flex flex-col gap-1 mt-2">{form.documents.map((doc, idx) => (<div key={`stored-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{doc.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...form.documents!]; updated.splice(idx, 1); setForm({ ...form, documents: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
-                    {documentFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{documentFiles.map((f, idx) => (<div key={`pending-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setDocumentFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-4 w-4" /></button></div>))}</div>)}
+                    {documentPending.length > 0 && (<div className="flex flex-col gap-1 mt-1">{documentPending.map((p) => (<div key={p.id} className={`flex items-center justify-between p-2 rounded border text-sm ${p.status === "ready" ? "bg-green-50 border-green-200" : p.status === "error" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-100"}`}><div className="flex items-center gap-2 flex-1 min-w-0">{p.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />}{p.status === "ready" && <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />}{p.status === "error" && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}<span className="truncate text-xs">{p.status === "error" ? `${p.name} — upload failed` : p.name}</span></div><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setDocumentPending((prev) => prev.filter((x) => x.id !== p.id))}><X className="h-4 w-4" /></button></div>))}</div>)}
                   </div>
                 </div>
                 <div className="space-y-2 sm:col-span-2"><Label>Factory Videos Shared</Label><Input value={form.factoryVideosShared ?? ""} onChange={(e) => setForm({ ...form, factoryVideosShared: e.target.value })} /></div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Warehouse Photos</Label>
                   <div className="flex flex-col gap-2">
-                    <input type="file" accept=".png,.jpg,.jpeg,.jfif" multiple className="hidden" id="warehouse-photos-upload-sp" onChange={(e) => { if (e.target.files) setWarehousePhotoFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); e.currentTarget.value = ""; }} />
+                    <input type="file" accept=".png,.jpg,.jpeg,.jfif" multiple className="hidden" id="warehouse-photos-upload-sp" onChange={(e) => { const files = Array.from(e.target.files || []); const items = files.map((f) => ({ id: crypto.randomUUID(), name: f.name, status: "uploading" as const })); setWarehousePhotoPending((prev) => [...prev, ...items]); files.forEach((f, i) => triggerUpload(f, items[i].id, setWarehousePhotoPending)); e.currentTarget.value = ""; }} />
                     <Button type="button" variant="outline" onClick={() => document.getElementById("warehouse-photos-upload-sp")?.click()} className="w-full justify-start"><Upload className="mr-2 h-4 w-4 shrink-0" /><span>Upload Warehouse Photos</span></Button>
-                    {(form.warehousePhotos || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.warehousePhotos || []).map((p, idx) => (<div key={`wp-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={p.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{p.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const updated = [...(form.warehousePhotos || [])]; updated.splice(idx, 1); setForm({ ...form, warehousePhotos: updated }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
-                    {warehousePhotoFiles.length > 0 && (<div className="flex flex-col gap-1 mt-1">{warehousePhotoFiles.map((f, idx) => (<div key={`pending-wp-${idx}`} className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"><span className="truncate text-slate-700 text-xs flex-1 mr-2">{f.name} (Pending)</span><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setWarehousePhotoFiles((prev) => prev.filter((_, i) => i !== idx))}><X className="h-4 w-4" /></button></div>))}</div>)}
+                    {(form.warehousePhotos || []).length > 0 && (<div className="flex flex-col gap-1 mt-2">{(form.warehousePhotos || []).map((p, idx) => (<div key={`wp-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"><a href={p.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{p.name}</a><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const u = [...(form.warehousePhotos || [])]; u.splice(idx, 1); setForm({ ...form, warehousePhotos: u }); }}><X className="h-4 w-4" /></button></div>))}</div>)}
+                    {warehousePhotoPending.length > 0 && (<div className="flex flex-col gap-1 mt-1">{warehousePhotoPending.map((p) => (<div key={p.id} className={`flex items-center justify-between p-2 rounded border text-sm ${p.status === "ready" ? "bg-green-50 border-green-200" : p.status === "error" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-100"}`}><div className="flex items-center gap-2 flex-1 min-w-0">{p.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />}{p.status === "ready" && <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />}{p.status === "error" && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}<span className="truncate text-xs">{p.status === "error" ? `${p.name} — upload failed` : p.name}</span></div><button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setWarehousePhotoPending((prev) => prev.filter((x) => x.id !== p.id))}><X className="h-3.5 w-3.5" /></button></div>))}</div>)}
                   </div>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
