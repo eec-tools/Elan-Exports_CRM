@@ -56,8 +56,6 @@ import {
   Trash2,
   Clock,
   Plus,
-  Check,
-  AlertCircle,
 } from "lucide-react";
 
 interface OrganicCertRow { market: string; certNumber: string; expiryDate: string; }
@@ -299,6 +297,12 @@ export default function SupplierDetailsPage() {
   const [quotationPending, setQuotationPending] = useState<PendingUpload[]>([]);
   const [warehousePhotoPending, setWarehousePhotoPending] = useState<PendingUpload[]>([]);
   const [productImagePending, setProductImagePending] = useState<Record<number, PendingUpload>>({});
+  const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
+  const [catalogImageFiles, setCatalogImageFiles] = useState<File[]>([]);
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+  const [quotationFiles, setQuotationFiles] = useState<File[]>([]);
+  const [warehousePhotoFiles, setWarehousePhotoFiles] = useState<File[]>([]);
+  const [productImageFiles, setProductImageFiles] = useState<Record<number, File>>({});
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [uploadingContract, setUploadingContract] = useState(false);
 
@@ -359,41 +363,7 @@ export default function SupplierDetailsPage() {
     onError: () => toast.error("File upload failed"),
   });
 
-  function triggerUpload(
-    file: File,
-    id: string,
-    setter: React.Dispatch<React.SetStateAction<PendingUpload[]>>,
-  ) {
-    uploadCatalogMutation
-      .mutateAsync(file)
-      .then((res) =>
-        setter((prev) =>
-          prev.map((p) => p.id === id ? { ...p, status: "ready" as const, url: res.url } : p),
-        ),
-      )
-      .catch(() =>
-        setter((prev) =>
-          prev.map((p) => p.id === id ? { ...p, status: "error" as const } : p),
-        ),
-      );
-  }
 
-  function triggerProductImageUpload(file: File, idx: number) {
-    uploadCatalogMutation
-      .mutateAsync(file)
-      .then((res) =>
-        setProductImagePending((prev) => ({
-          ...prev,
-          [idx]: { ...prev[idx], status: "ready" as const, url: res.url },
-        })),
-      )
-      .catch(() =>
-        setProductImagePending((prev) => ({
-          ...prev,
-          [idx]: { ...prev[idx], status: "error" as const },
-        })),
-      );
-  }
 
   const uploadDocuments = async (files: FileList) => {
     if (!files || files.length === 0) return;
@@ -502,14 +472,7 @@ export default function SupplierDetailsPage() {
     })
     : "";
 
-  const isAnyUploading =
-    catalogFilePending?.status === "uploading" ||
-    [...documentPending, ...catalogPending, ...catalogImagePending, ...quotationPending, ...warehousePhotoPending].some(
-      (p) => p.status === "uploading",
-    ) ||
-    Object.values(productImagePending).some((p) => p.status === "uploading");
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.company) return;
 
@@ -518,38 +481,43 @@ export default function SupplierDetailsPage() {
         ? catalogFilePending.url
         : form.productCatalogShared;
 
-    const finalDocuments = [
-      ...(form.documents || []),
-      ...documentPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! })),
-    ];
-    const finalCatalogs = [
-      ...(form.productCatalogs || []),
-      ...catalogPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! })),
-    ];
-    const finalCatalogImages = [
-      ...(form.productCatalogImages || []),
-      ...catalogImagePending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! })),
-    ];
-    const finalQuotations = [
-      ...((form as any).quotations || []),
-      ...quotationPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! })),
-    ];
-    const finalWarehousePhotos = [
-      ...(form.warehousePhotos || []),
-      ...warehousePhotoPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! })),
-    ];
-    const finalProducts = [...(form.supplierProducts || [])];
-    for (const [idxStr, pending] of Object.entries(productImagePending)) {
-      const idx = parseInt(idxStr);
-      if (pending.status === "ready" && pending.url && idx < finalProducts.length) {
-        finalProducts[idx] = { ...finalProducts[idx], imageUrl: pending.url };
+    try {
+      const upload = (f: File) => uploadCatalogMutation.mutateAsync(f).then((r) => ({ name: f.name, url: r.url }));
+      const [upCatalogs, upCatalogImages, upDocs, upQuotations, upWarehouse] = await Promise.all([
+        Promise.all(catalogFiles.map(upload)),
+        Promise.all(catalogImageFiles.map(upload)),
+        Promise.all(documentFiles.map(upload)),
+        Promise.all(quotationFiles.map(upload)),
+        Promise.all(warehousePhotoFiles.map(upload)),
+      ]);
+
+      const finalDocuments = [...(form.documents || []), ...documentPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! })), ...upDocs];
+      const finalCatalogs = [...(form.productCatalogs || []), ...catalogPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! })), ...upCatalogs];
+      const finalCatalogImages = [...(form.productCatalogImages || []), ...catalogImagePending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! })), ...upCatalogImages];
+      const finalQuotations = [...((form as any).quotations || []), ...quotationPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! })), ...upQuotations];
+      const finalWarehousePhotos = [...(form.warehousePhotos || []), ...warehousePhotoPending.filter((p) => p.status === "ready" && p.url).map((p) => ({ name: p.name, url: p.url! })), ...upWarehouse];
+
+      const finalProducts = [...(form.supplierProducts || [])];
+      for (const [idxStr, pending] of Object.entries(productImagePending)) {
+        const idx = parseInt(idxStr);
+        if (pending.status === "ready" && pending.url && idx < finalProducts.length) {
+          finalProducts[idx] = { ...finalProducts[idx], imageUrl: pending.url };
+        }
       }
-    }
+      for (const [idxStr, file] of Object.entries(productImageFiles)) {
+        const idx = parseInt(idxStr);
+        if (idx < finalProducts.length) {
+          const res = await upload(file);
+          finalProducts[idx] = { ...finalProducts[idx], imageUrl: res.url };
+        }
+      }
 
-    const payload = { ...form, supplierProducts: finalProducts, productCatalogShared: catalogUrl, documents: finalDocuments, productCatalogs: finalCatalogs, productCatalogImages: finalCatalogImages, quotations: finalQuotations, warehousePhotos: finalWarehousePhotos };
-
-    if (supplier?.id) {
-      updateMutation.mutate({ id: supplier.id, d: payload });
+      const payload = { ...form, supplierProducts: finalProducts, productCatalogShared: catalogUrl, documents: finalDocuments, productCatalogs: finalCatalogs, productCatalogImages: finalCatalogImages, quotations: finalQuotations, warehousePhotos: finalWarehousePhotos };
+      if (supplier?.id) {
+        updateMutation.mutate({ id: supplier.id, d: payload });
+      }
+    } catch {
+      toast.error("File upload failed. Please try again.");
     }
   };
 
@@ -576,6 +544,12 @@ export default function SupplierDetailsPage() {
     setQuotationPending([]);
     setWarehousePhotoPending([]);
     setProductImagePending({});
+    setCatalogFiles([]);
+    setCatalogImageFiles([]);
+    setDocumentFiles([]);
+    setQuotationFiles([]);
+    setWarehousePhotoFiles([]);
+    setProductImageFiles({});
     setDialogOpen(true);
   };
 
