@@ -45,6 +45,28 @@ export const uploadNewSupplierFile = multer({
 });
 
 /**
+ * GET /api/new-suppliers/upload-signature
+ */
+export async function getNewSupplierUploadSignature(
+    _req: AuthRequest,
+    res: Response,
+): Promise<void> {
+    const timestamp = Math.round(Date.now() / 1000);
+    const params = { folder: "elan-new-suppliers", timestamp };
+    const signature = cloudinary.utils.api_sign_request(
+        params,
+        process.env.CLOUDINARY_API_SECRET!,
+    );
+    res.json({
+        signature,
+        timestamp,
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: process.env.CLOUDINARY_API_KEY,
+        folder: "elan-new-suppliers",
+    });
+}
+
+/**
  * POST /api/new-suppliers/upload
  */
 export async function uploadNewSupplierCatalog(

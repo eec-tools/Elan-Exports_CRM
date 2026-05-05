@@ -11,6 +11,7 @@ import {
     updateNewSupplierStage,
     uploadNewSupplierCatalog,
     uploadNewSupplierFile,
+    getNewSupplierUploadSignature,
 } from "../controllers/newSuppliers.controller.js";
 import { getNewSupplierReplies } from "../controllers/sourcingEmailCampaign.controller.js";
 import {
@@ -27,11 +28,11 @@ router.get("/", listNewSuppliers);
 router.get("/list", listNewSuppliersForDropdown);
 router.get("/filters", getNewSupplierFilters);
 router.get("/export/csv", exportNewSuppliersCsv);
-router.get("/:id", getNewSupplier);
-router.get("/:id/replies", getNewSupplierReplies);
-
+router.get("/upload-signature", requireEdit(["suppliers", "new_suppliers"]), getNewSupplierUploadSignature);
 router.post("/upload", requireEdit(["suppliers", "new_suppliers"]), uploadNewSupplierFile.single("file"), uploadNewSupplierCatalog);
 router.post("/", requireEdit(["suppliers", "new_suppliers"]), createNewSupplier);
+router.get("/:id", getNewSupplier);
+router.get("/:id/replies", getNewSupplierReplies);
 router.put("/:id", requireEdit(["suppliers", "new_suppliers"]), updateNewSupplier);
 router.patch("/:id/stage", requireEdit(["suppliers", "new_suppliers"]), updateNewSupplierStage);
 router.delete("/:id", requireEdit(["suppliers", "new_suppliers"]), deleteNewSupplier);

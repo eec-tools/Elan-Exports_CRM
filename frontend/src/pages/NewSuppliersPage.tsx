@@ -39,6 +39,7 @@ import {
   Upload,
   Star,
   AlertTriangle,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -191,6 +192,13 @@ interface ProductCatalogEntry {
   name: string;
   url: string;
 }
+
+type PendingUpload = {
+  id: string;
+  name: string;
+  status: "uploading" | "ready" | "error";
+  url?: string;
+};
 
 const EMPTY_SUPPLIER_PRODUCT = (): SupplierProduct => ({
   id: String(Date.now() + Math.random()),
@@ -370,15 +378,13 @@ export default function NewSuppliersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<Supplier> | null>(null);
   const [form, setForm] = useState<Partial<Supplier>>(EMPTY_SUPPLIER);
-  const [catalogFile, setCatalogFile] = useState<File | null>(null);
-  const [catalogFiles, setCatalogFiles] = useState<File[]>([]);
-  const [catalogImageFiles, setCatalogImageFiles] = useState<File[]>([]);
-  const [certificateFiles, setCertificateFiles] = useState<File[]>([]);
-  const [warehousePhotoFiles, setWarehousePhotoFiles] = useState<File[]>([]);
-  const [quotationFiles, setQuotationFiles] = useState<File[]>([]);
-  const [productImageFiles, setProductImageFiles] = useState<
-    Record<number, File>
-  >({});
+  const [catalogFilePending, setCatalogFilePending] = useState<PendingUpload | null>(null);
+  const [catalogPending, setCatalogPending] = useState<PendingUpload[]>([]);
+  const [catalogImagePending, setCatalogImagePending] = useState<PendingUpload[]>([]);
+  const [certificatePending, setCertificatePending] = useState<PendingUpload[]>([]);
+  const [warehousePhotoPending, setWarehousePhotoPending] = useState<PendingUpload[]>([]);
+  const [quotationPending, setQuotationPending] = useState<PendingUpload[]>([]);
+  const [productImagePending, setProductImagePending] = useState<Record<number, PendingUpload>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(
     null,
@@ -539,107 +545,122 @@ export default function NewSuppliersPage() {
 
   const uploadCatalogMutation = useMutation({
     mutationFn: async (file: File) => {
+      const { data: sig } = await api.get("/new-suppliers/upload-signature");
+      const isRaw =
+        /\.(pdf|doc|docx|xls|xlsx|csv|zip)$/i.test(file.name) ||
+        file.type === "application/pdf";
+      const resourceType = isRaw ? "raw" : "auto";
       const fd = new FormData();
       fd.append("file", file);
-      const res = await api.post("/new-suppliers/upload", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      return res.data;
+      fd.append("signature", sig.signature);
+      fd.append("timestamp", String(sig.timestamp));
+      fd.append("api_key", sig.apiKey);
+      fd.append("folder", sig.folder);
+      const cloudRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${sig.cloudName}/${resourceType}/upload`,
+        { method: "POST", body: fd },
+      );
+      const data = await cloudRes.json();
+      if (!data.secure_url) throw new Error("Upload failed");
+      return { url: data.secure_url as string };
     },
-    onError: () => toast.error("Failed to upload product catalog"),
+    onError: () => toast.error("File upload failed"),
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  function triggerUpload(
+    file: File,
+    id: string,
+    setter: React.Dispatch<React.SetStateAction<PendingUpload[]>>,
+  ) {
+    uploadCatalogMutation
+      .mutateAsync(file)
+      .then((res) =>
+        setter((prev) =>
+          prev.map((p) =>
+            p.id === id ? { ...p, status: "ready" as const, url: res.url } : p,
+          ),
+        ),
+      )
+      .catch(() =>
+        setter((prev) =>
+          prev.map((p) =>
+            p.id === id ? { ...p, status: "error" as const } : p,
+          ),
+        ),
+      );
+  }
+
+  function triggerProductImageUpload(file: File, idx: number) {
+    uploadCatalogMutation
+      .mutateAsync(file)
+      .then((res) =>
+        setProductImagePending((prev) => ({
+          ...prev,
+          [idx]: { ...prev[idx], status: "ready" as const, url: res.url },
+        })),
+      )
+      .catch(() =>
+        setProductImagePending((prev) => ({
+          ...prev,
+          [idx]: { ...prev[idx], status: "error" as const },
+        })),
+      );
+  }
+
+  const isAnyUploading =
+    catalogFilePending?.status === "uploading" ||
+    [
+      ...catalogPending,
+      ...catalogImagePending,
+      ...certificatePending,
+      ...warehousePhotoPending,
+      ...quotationPending,
+    ].some((p) => p.status === "uploading") ||
+    Object.values(productImagePending).some((p) => p.status === "uploading");
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    let catalogUrl = form.productCatalog;
-    if (catalogFile) {
-      try {
-        const uploadRes = await uploadCatalogMutation.mutateAsync(catalogFile);
-        catalogUrl = uploadRes.url;
-      } catch {
-        return;
-      }
-    }
 
-    // Upload new catalog files for multi-catalog
-    const finalCatalogs = [...(form.productCatalogs || [])];
-    if (catalogFiles.length > 0) {
-      for (const file of catalogFiles) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalCatalogs.push({ name: file.name, url: uploadRes.url });
-        } catch (error) {
-          console.error("Upload failed", error);
-        }
-      }
-    }
+    const catalogUrl =
+      catalogFilePending?.status === "ready" && catalogFilePending.url
+        ? catalogFilePending.url
+        : form.productCatalog;
 
-    // Upload new catalog image files
-    const finalCatalogImages = [...(form.productCatalogImages || [])];
-    if (catalogImageFiles.length > 0) {
-      for (const file of catalogImageFiles) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalCatalogImages.push({ name: file.name, url: uploadRes.url });
-        } catch (error) {
-          console.error("Upload failed", error);
-        }
-      }
-    }
-
-    // Upload new certificate files
-    const finalCertificates = [...(form.certificates || [])];
-    if (certificateFiles.length > 0) {
-      for (const file of certificateFiles) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalCertificates.push({ name: file.name, url: uploadRes.url });
-        } catch (error) {
-          console.error("Upload failed", error);
-        }
-      }
-    }
-
-    // Upload new warehouse photos
-    const finalWarehousePhotos = [...(form.warehousePhotos || [])];
-    if (warehousePhotoFiles.length > 0) {
-      for (const file of warehousePhotoFiles) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalWarehousePhotos.push({ name: file.name, url: uploadRes.url });
-        } catch (error) {
-          console.error("Upload failed", error);
-        }
-      }
-    }
-
-    // Upload quotation files
-    const finalQuotations = [...((form as any).quotations || [])];
-    if (quotationFiles.length > 0) {
-      for (const file of quotationFiles) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalQuotations.push({ name: file.name, url: uploadRes.url });
-        } catch (error) {
-          console.error("Upload failed", error);
-        }
-      }
-    }
-
-    // Upload product images
+    const finalCatalogs = [
+      ...(form.productCatalogs || []),
+      ...catalogPending
+        .filter((p) => p.status === "ready" && p.url)
+        .map((p) => ({ name: p.name, url: p.url! })),
+    ];
+    const finalCatalogImages = [
+      ...(form.productCatalogImages || []),
+      ...catalogImagePending
+        .filter((p) => p.status === "ready" && p.url)
+        .map((p) => ({ name: p.name, url: p.url! })),
+    ];
+    const finalCertificates = [
+      ...(form.certificates || []),
+      ...certificatePending
+        .filter((p) => p.status === "ready" && p.url)
+        .map((p) => ({ name: p.name, url: p.url! })),
+    ];
+    const finalWarehousePhotos = [
+      ...(form.warehousePhotos || []),
+      ...warehousePhotoPending
+        .filter((p) => p.status === "ready" && p.url)
+        .map((p) => ({ name: p.name, url: p.url! })),
+    ];
+    const finalQuotations = [
+      ...((form as any).quotations || []),
+      ...quotationPending
+        .filter((p) => p.status === "ready" && p.url)
+        .map((p) => ({ name: p.name, url: p.url! })),
+    ];
     const finalProducts = [...(form.supplierProducts || [])];
-    for (const [idxStr, file] of Object.entries(productImageFiles)) {
+    for (const [idxStr, pending] of Object.entries(productImagePending)) {
       const idx = parseInt(idxStr);
-      if (idx >= 0 && idx < finalProducts.length) {
-        try {
-          const uploadRes = await uploadCatalogMutation.mutateAsync(file);
-          finalProducts[idx] = {
-            ...finalProducts[idx],
-            imageUrl: uploadRes.url,
-          };
-        } catch (error) {
-          console.error("Product image upload failed", error);
-        }
+      if (pending.status === "ready" && pending.url && idx < finalProducts.length) {
+        finalProducts[idx] = { ...finalProducts[idx], imageUrl: pending.url };
       }
     }
 
@@ -652,9 +673,7 @@ export default function NewSuppliersPage() {
       certificates: finalCertificates,
       warehousePhotos: finalWarehousePhotos,
       quotations: finalQuotations,
-      // videoLinks are already in form.videoLinks
     };
-    console.log("Submitting form with payload:", payload);
     if (editing?.id) {
       updateMutation.mutate({ id: editing.id, d: payload });
     } else {
@@ -662,16 +681,20 @@ export default function NewSuppliersPage() {
     }
   };
 
+  const resetPendingUploads = () => {
+    setCatalogFilePending(null);
+    setCatalogPending([]);
+    setCatalogImagePending([]);
+    setCertificatePending([]);
+    setWarehousePhotoPending([]);
+    setQuotationPending([]);
+    setProductImagePending({});
+  };
+
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_SUPPLIER);
-    setCatalogFile(null);
-    setCatalogFiles([]);
-    setCatalogImageFiles([]);
-    setCertificateFiles([]);
-    setWarehousePhotoFiles([]);
-    setQuotationFiles([]);
-    setProductImageFiles({});
+    resetPendingUploads();
     setDialogOpen(true);
   };
 
@@ -686,13 +709,7 @@ export default function NewSuppliersPage() {
       warehousePhotos: s.warehousePhotos || [],
       videoLinks: s.videoLinks || [],
     });
-    setCatalogFile(null);
-    setCatalogFiles([]);
-    setCatalogImageFiles([]);
-    setCertificateFiles([]);
-    setWarehousePhotoFiles([]);
-    setQuotationFiles([]);
-    setProductImageFiles({});
+    resetPendingUploads();
     setDialogOpen(true);
   };
 
@@ -1539,24 +1556,19 @@ export default function NewSuppliersPage() {
                     </Label>
                     <div className="flex items-center gap-4">
                       <div className="relative group h-24 w-24 rounded-lg border-2 border-dashed border-slate-300 bg-white flex items-center justify-center overflow-hidden hover:border-brand-500 transition-colors shrink-0">
-                        {productImageFiles[i] ? (
-                          <img
-                            src={URL.createObjectURL(productImageFiles[i])}
-                            alt="Preview"
-                            className="h-full w-full object-cover"
-                          />
+                        {productImagePending[i]?.status === "uploading" ? (
+                          <div className="flex flex-col items-center text-amber-500 p-1 text-center">
+                            <Loader2 className="h-6 w-6 animate-spin mb-1" />
+                            <span className="text-[9px] uppercase font-bold tracking-wider">Uploading</span>
+                          </div>
+                        ) : productImagePending[i]?.status === "ready" && productImagePending[i]?.url ? (
+                          <img src={productImagePending[i].url} alt="Preview" className="h-full w-full object-cover" />
                         ) : prod.imageUrl ? (
-                          <img
-                            src={prod.imageUrl}
-                            alt={prod.product || "Product"}
-                            className="h-full w-full object-cover"
-                          />
+                          <img src={prod.imageUrl} alt={prod.product || "Product"} className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex flex-col items-center text-slate-400 p-1 text-center">
                             <Upload className="h-6 w-6 mb-1 opacity-50" />
-                            <span className="text-[9px] uppercase font-bold tracking-wider">
-                              No Image
-                            </span>
+                            <span className="text-[9px] uppercase font-bold tracking-wider">No Image</span>
                           </div>
                         )}
                         <label className="absolute inset-0 bg-slate-900/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
@@ -1570,26 +1582,24 @@ export default function NewSuppliersPage() {
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              if (file.size > 5 * 1024 * 1024) {
-                                toast.error("Image must be under 5MB");
-                                return;
-                              }
-                              setProductImageFiles((prev) => ({
+                              const id = crypto.randomUUID();
+                              setProductImagePending((prev) => ({
                                 ...prev,
-                                [i]: file,
+                                [i]: { id, name: file.name, status: "uploading" },
                               }));
+                              triggerProductImageUpload(file, i);
                             }}
                           />
                         </label>
                       </div>
-                      {(productImageFiles[i] || prod.imageUrl) && (
+                      {(productImagePending[i] || prod.imageUrl) && (
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-7 px-2"
                           onClick={() => {
-                            setProductImageFiles((prev) => {
+                            setProductImagePending((prev) => {
                               const n = { ...prev };
                               delete n[i];
                               return n;
@@ -2777,11 +2787,10 @@ export default function NewSuppliersPage() {
                       className="hidden"
                       id="multi-cert-upload-ns"
                       onChange={(e) => {
-                        if (e.target.files)
-                          setCertificateFiles((prev) => [
-                            ...prev,
-                            ...Array.from(e.target.files || []),
-                          ]);
+                        const files = Array.from(e.target.files || []);
+                        const newItems = files.map((file) => ({ id: crypto.randomUUID(), name: file.name, status: "uploading" as const }));
+                        setCertificatePending((prev) => [...prev, ...newItems]);
+                        files.forEach((file, i) => triggerUpload(file, newItems[i].id, setCertificatePending));
                       }}
                     />
                     <Button
@@ -2798,54 +2807,24 @@ export default function NewSuppliersPage() {
                     {(form.certificates || []).length > 0 && (
                       <div className="flex flex-col gap-1 mt-2">
                         {(form.certificates || []).map((doc, idx) => (
-                          <div
-                            key={`cert-${idx}`}
-                            className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"
-                          >
-                            <a
-                              href={doc.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs"
-                            >
-                              {doc.name}
-                            </a>
-                            <button
-                              type="button"
-                              className="text-slate-400 hover:text-rose-600 shrink-0"
-                              onClick={() => {
-                                const updated = [...(form.certificates || [])];
-                                updated.splice(idx, 1);
-                                setForm({ ...form, certificates: updated });
-                              }}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                          <div key={`cert-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm">
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{doc.name}</a>
+                            <button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const u = [...(form.certificates || [])]; u.splice(idx, 1); setForm({ ...form, certificates: u }); }}><X className="h-3.5 w-3.5" /></button>
                           </div>
                         ))}
                       </div>
                     )}
-                    {certificateFiles.length > 0 && (
+                    {certificatePending.length > 0 && (
                       <div className="flex flex-col gap-1 mt-1">
-                        {certificateFiles.map((f, idx) => (
-                          <div
-                            key={`pend-cert-${idx}`}
-                            className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"
-                          >
-                            <span className="truncate text-slate-700 text-xs flex-1 mr-2">
-                              {f.name} (Pending)
-                            </span>
-                            <button
-                              type="button"
-                              className="text-slate-400 hover:text-rose-600 shrink-0"
-                              onClick={() =>
-                                setCertificateFiles((prev) =>
-                                  prev.filter((_, i) => i !== idx),
-                                )
-                              }
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                        {certificatePending.map((p) => (
+                          <div key={p.id} className={`flex items-center justify-between p-2 rounded border text-sm ${p.status === "ready" ? "bg-green-50 border-green-200" : p.status === "error" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-100"}`}>
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {p.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />}
+                              {p.status === "ready" && <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />}
+                              {p.status === "error" && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                              <span className="truncate text-xs">{p.status === "error" ? `${p.name} — upload failed` : p.name}</span>
+                            </div>
+                            <button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCertificatePending((prev) => prev.filter((x) => x.id !== p.id))}><X className="h-3.5 w-3.5" /></button>
                           </div>
                         ))}
                       </div>
@@ -2866,11 +2845,10 @@ export default function NewSuppliersPage() {
                       className="hidden"
                       id="multi-photo-upload-ns"
                       onChange={(e) => {
-                        if (e.target.files)
-                          setWarehousePhotoFiles((prev) => [
-                            ...prev,
-                            ...Array.from(e.target.files || []),
-                          ]);
+                        const files = Array.from(e.target.files || []);
+                        const newItems = files.map((file) => ({ id: crypto.randomUUID(), name: file.name, status: "uploading" as const }));
+                        setWarehousePhotoPending((prev) => [...prev, ...newItems]);
+                        files.forEach((file, i) => triggerUpload(file, newItems[i].id, setWarehousePhotoPending));
                       }}
                     />
                     <Button
@@ -2878,67 +2856,31 @@ export default function NewSuppliersPage() {
                       variant="outline"
                       size="sm"
                       className="gap-2 text-slate-600 border-slate-200 w-fit"
-                      onClick={() =>
-                        document
-                          .getElementById("multi-photo-upload-ns")
-                          ?.click()
-                      }
+                      onClick={() => document.getElementById("multi-photo-upload-ns")?.click()}
                     >
                       <Upload className="h-3.5 w-3.5" /> Upload Warehouse Photos
                     </Button>
                     {(form.warehousePhotos || []).length > 0 && (
                       <div className="flex flex-col gap-1 mt-2">
                         {(form.warehousePhotos || []).map((doc, idx) => (
-                          <div
-                            key={`photo-${idx}`}
-                            className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"
-                          >
-                            <a
-                              href={doc.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs"
-                            >
-                              {doc.name}
-                            </a>
-                            <button
-                              type="button"
-                              className="text-slate-400 hover:text-rose-600 shrink-0"
-                              onClick={() => {
-                                const updated = [
-                                  ...(form.warehousePhotos || []),
-                                ];
-                                updated.splice(idx, 1);
-                                setForm({ ...form, warehousePhotos: updated });
-                              }}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                          <div key={`photo-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm">
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{doc.name}</a>
+                            <button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const u = [...(form.warehousePhotos || [])]; u.splice(idx, 1); setForm({ ...form, warehousePhotos: u }); }}><X className="h-3.5 w-3.5" /></button>
                           </div>
                         ))}
                       </div>
                     )}
-                    {warehousePhotoFiles.length > 0 && (
+                    {warehousePhotoPending.length > 0 && (
                       <div className="flex flex-col gap-1 mt-1">
-                        {warehousePhotoFiles.map((f, idx) => (
-                          <div
-                            key={`pend-photo-${idx}`}
-                            className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"
-                          >
-                            <span className="truncate text-slate-700 text-xs flex-1 mr-2">
-                              {f.name} (Pending)
-                            </span>
-                            <button
-                              type="button"
-                              className="text-slate-400 hover:text-rose-600 shrink-0"
-                              onClick={() =>
-                                setWarehousePhotoFiles((prev) =>
-                                  prev.filter((_, i) => i !== idx),
-                                )
-                              }
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                        {warehousePhotoPending.map((p) => (
+                          <div key={p.id} className={`flex items-center justify-between p-2 rounded border text-sm ${p.status === "ready" ? "bg-green-50 border-green-200" : p.status === "error" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-100"}`}>
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {p.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />}
+                              {p.status === "ready" && <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />}
+                              {p.status === "error" && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                              <span className="truncate text-xs">{p.status === "error" ? `${p.name} — upload failed` : p.name}</span>
+                            </div>
+                            <button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setWarehousePhotoPending((prev) => prev.filter((x) => x.id !== p.id))}><X className="h-3.5 w-3.5" /></button>
                           </div>
                         ))}
                       </div>
@@ -3074,11 +3016,10 @@ export default function NewSuppliersPage() {
                     className="hidden"
                     id="multi-catalog-upload-ns"
                     onChange={(e) => {
-                      if (e.target.files)
-                        setCatalogFiles((prev) => [
-                          ...prev,
-                          ...Array.from(e.target.files || []),
-                        ]);
+                      const files = Array.from(e.target.files || []);
+                      const newItems = files.map((file) => ({ id: crypto.randomUUID(), name: file.name, status: "uploading" as const }));
+                      setCatalogPending((prev) => [...prev, ...newItems]);
+                      files.forEach((file, i) => triggerUpload(file, newItems[i].id, setCatalogPending));
                     }}
                   />
                   <Button
@@ -3086,66 +3027,31 @@ export default function NewSuppliersPage() {
                     variant="outline"
                     size="sm"
                     className="gap-2 text-slate-600 border-slate-200"
-                    onClick={() =>
-                      document
-                        .getElementById("multi-catalog-upload-ns")
-                        ?.click()
-                    }
+                    onClick={() => document.getElementById("multi-catalog-upload-ns")?.click()}
                   >
-                    <Upload className="h-4 w-4" /> Upload Product Catalogs
-                    (PDFs)
+                    <Upload className="h-4 w-4" /> Upload Product Catalogs (PDFs)
                   </Button>
                   {(form.productCatalogs || []).length > 0 && (
                     <div className="flex flex-col gap-1 mt-2">
                       {(form.productCatalogs || []).map((cat, idx) => (
-                        <div
-                          key={`cat-${idx}`}
-                          className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"
-                        >
-                          <a
-                            href={cat.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs"
-                          >
-                            {cat.name}
-                          </a>
-                          <button
-                            type="button"
-                            className="text-slate-400 hover:text-rose-600 shrink-0"
-                            onClick={() => {
-                              const updated = [...(form.productCatalogs || [])];
-                              updated.splice(idx, 1);
-                              setForm({ ...form, productCatalogs: updated });
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                        <div key={`cat-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm">
+                          <a href={cat.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{cat.name}</a>
+                          <button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const u = [...(form.productCatalogs || [])]; u.splice(idx, 1); setForm({ ...form, productCatalogs: u }); }}><X className="h-4 w-4" /></button>
                         </div>
                       ))}
                     </div>
                   )}
-                  {catalogFiles.length > 0 && (
+                  {catalogPending.length > 0 && (
                     <div className="flex flex-col gap-1 mt-1">
-                      {catalogFiles.map((f, idx) => (
-                        <div
-                          key={`pend-cat-${idx}`}
-                          className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"
-                        >
-                          <span className="truncate text-slate-700 text-xs flex-1 mr-2">
-                            {f.name} (Pending)
-                          </span>
-                          <button
-                            type="button"
-                            className="text-slate-400 hover:text-rose-600 shrink-0"
-                            onClick={() =>
-                              setCatalogFiles((prev) =>
-                                prev.filter((_, i) => i !== idx),
-                              )
-                            }
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
+                      {catalogPending.map((p) => (
+                        <div key={p.id} className={`flex items-center justify-between p-2 rounded border text-sm ${p.status === "ready" ? "bg-green-50 border-green-200" : p.status === "error" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-100"}`}>
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {p.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />}
+                            {p.status === "ready" && <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />}
+                            {p.status === "error" && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                            <span className="truncate text-xs">{p.status === "error" ? `${p.name} — upload failed` : p.name}</span>
+                          </div>
+                          <button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogPending((prev) => prev.filter((x) => x.id !== p.id))}><X className="h-3.5 w-3.5" /></button>
                         </div>
                       ))}
                     </div>
@@ -3167,11 +3073,10 @@ export default function NewSuppliersPage() {
                     className="hidden"
                     id="multi-catalog-image-upload-ns"
                     onChange={(e) => {
-                      if (e.target.files)
-                        setCatalogImageFiles((prev) => [
-                          ...prev,
-                          ...Array.from(e.target.files || []),
-                        ]);
+                      const files = Array.from(e.target.files || []);
+                      const newItems = files.map((file) => ({ id: crypto.randomUUID(), name: file.name, status: "uploading" as const }));
+                      setCatalogImagePending((prev) => [...prev, ...newItems]);
+                      files.forEach((file, i) => triggerUpload(file, newItems[i].id, setCatalogImagePending));
                     }}
                   />
                   <Button
@@ -3179,71 +3084,31 @@ export default function NewSuppliersPage() {
                     variant="outline"
                     size="sm"
                     className="gap-2 text-slate-600 border-slate-200"
-                    onClick={() =>
-                      document
-                        .getElementById("multi-catalog-image-upload-ns")
-                        ?.click()
-                    }
+                    onClick={() => document.getElementById("multi-catalog-image-upload-ns")?.click()}
                   >
-                    <Upload className="h-4 w-4" /> Upload Product Catalogs
-                    (Images)
+                    <Upload className="h-4 w-4" /> Upload Product Catalogs (Images)
                   </Button>
                   {(form.productCatalogImages || []).length > 0 && (
                     <div className="flex flex-col gap-1 mt-2">
                       {(form.productCatalogImages || []).map((img, idx) => (
-                        <div
-                          key={`catimg-${idx}`}
-                          className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"
-                        >
-                          <a
-                            href={img.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs"
-                          >
-                            {img.name}
-                          </a>
-                          <button
-                            type="button"
-                            className="text-slate-400 hover:text-rose-600 shrink-0"
-                            onClick={() => {
-                              const updated = [
-                                ...(form.productCatalogImages || []),
-                              ];
-                              updated.splice(idx, 1);
-                              setForm({
-                                ...form,
-                                productCatalogImages: updated,
-                              });
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                        <div key={`catimg-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm">
+                          <a href={img.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{img.name}</a>
+                          <button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const u = [...(form.productCatalogImages || [])]; u.splice(idx, 1); setForm({ ...form, productCatalogImages: u }); }}><X className="h-4 w-4" /></button>
                         </div>
                       ))}
                     </div>
                   )}
-                  {catalogImageFiles.length > 0 && (
+                  {catalogImagePending.length > 0 && (
                     <div className="flex flex-col gap-1 mt-1">
-                      {catalogImageFiles.map((f, idx) => (
-                        <div
-                          key={`pend-catimg-${idx}`}
-                          className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"
-                        >
-                          <span className="truncate text-slate-700 text-xs flex-1 mr-2">
-                            {f.name} (Pending)
-                          </span>
-                          <button
-                            type="button"
-                            className="text-slate-400 hover:text-rose-600 shrink-0"
-                            onClick={() =>
-                              setCatalogImageFiles((prev) =>
-                                prev.filter((_, i) => i !== idx),
-                              )
-                            }
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
+                      {catalogImagePending.map((p) => (
+                        <div key={p.id} className={`flex items-center justify-between p-2 rounded border text-sm ${p.status === "ready" ? "bg-green-50 border-green-200" : p.status === "error" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-100"}`}>
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {p.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />}
+                            {p.status === "ready" && <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />}
+                            {p.status === "error" && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                            <span className="truncate text-xs">{p.status === "error" ? `${p.name} — upload failed` : p.name}</span>
+                          </div>
+                          <button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setCatalogImagePending((prev) => prev.filter((x) => x.id !== p.id))}><X className="h-3.5 w-3.5" /></button>
                         </div>
                       ))}
                     </div>
@@ -3267,11 +3132,10 @@ export default function NewSuppliersPage() {
                   className="hidden"
                   id="multi-quotation-upload-ns"
                   onChange={(e) => {
-                    if (e.target.files)
-                      setQuotationFiles((prev) => [
-                        ...prev,
-                        ...Array.from(e.target.files || []),
-                      ]);
+                    const files = Array.from(e.target.files || []);
+                    const newItems = files.map((file) => ({ id: crypto.randomUUID(), name: file.name, status: "uploading" as const }));
+                    setQuotationPending((prev) => [...prev, ...newItems]);
+                    files.forEach((file, i) => triggerUpload(file, newItems[i].id, setQuotationPending));
                   }}
                 />
                 <Button
@@ -3279,69 +3143,31 @@ export default function NewSuppliersPage() {
                   variant="outline"
                   size="sm"
                   className="gap-2 text-slate-600 border-slate-200 w-fit"
-                  onClick={() =>
-                    document
-                      .getElementById("multi-quotation-upload-ns")
-                      ?.click()
-                  }
+                  onClick={() => document.getElementById("multi-quotation-upload-ns")?.click()}
                 >
                   <Upload className="h-3.5 w-3.5" /> Upload Quotation Files
                 </Button>
                 {((form as any).quotations || []).length > 0 && (
                   <div className="flex flex-col gap-1 mt-2">
-                    {((form as any).quotations || []).map(
-                      (doc: any, idx: number) => (
-                        <div
-                          key={`quot-${idx}`}
-                          className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm"
-                        >
-                          <a
-                            href={doc.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs"
-                          >
-                            {doc.name}
-                          </a>
-                          <button
-                            type="button"
-                            className="text-slate-400 hover:text-rose-600 shrink-0"
-                            onClick={() => {
-                              const updated = [
-                                ...((form as any).quotations || []),
-                              ];
-                              updated.splice(idx, 1);
-                              setForm({ ...form, quotations: updated } as any);
-                            }}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ),
-                    )}
+                    {((form as any).quotations || []).map((doc: any, idx: number) => (
+                      <div key={`quot-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-sm">
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="truncate text-brand-600 hover:underline flex-1 mr-2 text-xs">{doc.name}</a>
+                        <button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => { const u = [...((form as any).quotations || [])]; u.splice(idx, 1); setForm({ ...form, quotations: u } as any); }}><X className="h-3.5 w-3.5" /></button>
+                      </div>
+                    ))}
                   </div>
                 )}
-                {quotationFiles.length > 0 && (
+                {quotationPending.length > 0 && (
                   <div className="flex flex-col gap-1 mt-1">
-                    {quotationFiles.map((f, idx) => (
-                      <div
-                        key={`pend-quot-${idx}`}
-                        className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-100 text-sm"
-                      >
-                        <span className="truncate text-slate-700 text-xs flex-1 mr-2">
-                          {f.name} (Pending)
-                        </span>
-                        <button
-                          type="button"
-                          className="text-slate-400 hover:text-rose-600 shrink-0"
-                          onClick={() =>
-                            setQuotationFiles((prev) =>
-                              prev.filter((_, i) => i !== idx),
-                            )
-                          }
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
+                    {quotationPending.map((p) => (
+                      <div key={p.id} className={`flex items-center justify-between p-2 rounded border text-sm ${p.status === "ready" ? "bg-green-50 border-green-200" : p.status === "error" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-100"}`}>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          {p.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />}
+                          {p.status === "ready" && <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />}
+                          {p.status === "error" && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                          <span className="truncate text-xs">{p.status === "error" ? `${p.name} — upload failed` : p.name}</span>
+                        </div>
+                        <button type="button" className="text-slate-400 hover:text-rose-600 shrink-0" onClick={() => setQuotationPending((prev) => prev.filter((x) => x.id !== p.id))}><X className="h-3.5 w-3.5" /></button>
                       </div>
                     ))}
                   </div>
@@ -3383,18 +3209,12 @@ export default function NewSuppliersPage() {
               <Button
                 type="submit"
                 className="bg-brand-600 hover:bg-brand-700 text-white shadow-sm"
-                disabled={
-                  createMutation.isPending ||
-                  updateMutation.isPending ||
-                  uploadCatalogMutation.isPending
-                }
+                disabled={createMutation.isPending || updateMutation.isPending || isAnyUploading}
               >
-                {(createMutation.isPending ||
-                  updateMutation.isPending ||
-                  uploadCatalogMutation.isPending) && (
+                {(createMutation.isPending || updateMutation.isPending || isAnyUploading) && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                {editing?.id ? "Update Supplier" : "Create Supplier"}
+                {isAnyUploading ? "Uploading..." : editing?.id ? "Update Supplier" : "Create Supplier"}
               </Button>
             </div>
           </form>
