@@ -42,6 +42,7 @@ interface SourcingSupplier {
   notes?: string;
   status: string;
   formToken?: string;
+  formTemplateId?: string | null;
   tradeName?: string;
   yearEstablished?: string;
   manufacturingAddress?: string;
@@ -344,7 +345,7 @@ export default function SourcingSupplierDetailsPage() {
 
   // ─── Helpers ────────────────────────────────────────
   const formLink = supplier?.formToken
-    ? `${window.location.origin}/supplier-form/${supplier.formToken}`
+    ? `${window.location.origin}/supplier-form/${supplier.formToken}${supplier.formTemplateId ? `?t=${supplier.formTemplateId}` : ""}`
     : null;
 
   const copyLink = async () => {

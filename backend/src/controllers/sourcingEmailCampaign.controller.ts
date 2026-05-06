@@ -12,10 +12,11 @@ function addDays(date: Date, days: number): Date {
     return result;
 }
 
-function buildFormLink(formToken: string): string {
+function buildFormLink(formToken: string, formTemplateId?: string | null): string {
     const baseUrl = "https://crm.eectrade.com";
     const normalizedToken = formToken.replace(/^\/+/, "");
-    return `${baseUrl}/supplier-form/${normalizedToken}`;
+    const base = `${baseUrl}/supplier-form/${normalizedToken}`;
+    return formTemplateId ? `${base}?t=${formTemplateId}` : base;
 }
 
 const STEP_STATUS: Record<number, string> = {
@@ -190,7 +191,7 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
             sourcingSupplier: {
                 select: {
                     id: true, company: true, email: true, contactPerson: true,
-                    formToken: true, assignedGmailAccount: true, status: true,
+                    formToken: true, formTemplateId: true, assignedGmailAccount: true, status: true,
                     product: true, productCategory: true, emailTemplateId: true,
                 },
             },
@@ -207,7 +208,7 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
     const nextStep = campaign.currentStep + 1;
     if (nextStep > 4) return; // all done
 
-    const formLink = buildFormLink(supplier.formToken);
+    const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId);
     const templateData = {
         company: supplier.company,
         contactPerson: supplier.contactPerson,
@@ -331,7 +332,7 @@ export async function startCampaignForSupplier(sourcingId: string, userId?: stri
         const existing = await (prisma as any).sourcingEmailCampaign.findUnique({ where: { sourcingId } });
         if (existing) return false;
 
-        const formLink = buildFormLink(supplier.formToken);
+        const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId);
         const templateData = {
             company: supplier.company,
             contactPerson: supplier.contactPerson,
@@ -491,7 +492,7 @@ export async function startCampaign(req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        const formLink = buildFormLink(supplier.formToken);
+        const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId);
         const { subject, html } = getTemplate(1, {
             company: supplier.company,
             contactPerson: supplier.contactPerson,

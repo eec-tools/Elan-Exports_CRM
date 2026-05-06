@@ -277,6 +277,7 @@ export async function createSourcingSupplier(
       email,
       assignedGmailAccount,
       emailTemplateId,
+      formTemplateId,
       // kept for backwards-compat if sent, but not required in add dialog
       productCategory,
       product,
@@ -304,6 +305,7 @@ export async function createSourcingSupplier(
         email,
         assignedGmailAccount: assignedGmailAccount ?? null,
         emailTemplateId: emailTemplateId ?? null,
+        formTemplateId: formTemplateId ?? null,
         productCategory: productCategory ?? null,
         product: product ?? null,
         country: country ?? null,

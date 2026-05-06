@@ -55,6 +55,7 @@ interface SourcingSupplier {
   status: string;
   assignedGmailAccount?: string | null;
   formToken?: string;
+  formTemplateId?: string | null;
   emailCampaign?: {
     status: string;
     currentStep: number;
@@ -290,7 +291,7 @@ export default function SourcingSupplierPage() {
 
   // ─── Mutations ──────────────────────────────────────
   const createMutation = useMutation({
-    mutationFn: (data: typeof form & { emailTemplateId?: string }) => api.post("/sourcing-suppliers", data),
+    mutationFn: (data: typeof form & { emailTemplateId?: string; formTemplateId?: string }) => api.post("/sourcing-suppliers", data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
@@ -404,7 +405,7 @@ export default function SourcingSupplierPage() {
   // ─── Helpers ────────────────────────────────────────
   const copyFormLink = async (supplier: SourcingSupplier) => {
     if (!supplier.formToken) return;
-    const link = `${window.location.origin}/supplier-form/${supplier.formToken}`;
+    const link = `${window.location.origin}/supplier-form/${supplier.formToken}${supplier.formTemplateId ? `?t=${supplier.formTemplateId}` : ""}`;
     const success = await copyToClipboard(link);
     if (success) {
       toast.success("Form link copied to clipboard");
@@ -1176,7 +1177,7 @@ export default function SourcingSupplierPage() {
             <AlertDialogAction
               disabled={createMutation.isPending || addFromFolderMutation.isPending}
               onClick={() => {
-                if (confirmAction === "single") createMutation.mutate({ ...form, emailTemplateId: createEmailTemplateId || undefined });
+                if (confirmAction === "single") createMutation.mutate({ ...form, emailTemplateId: createEmailTemplateId || undefined, formTemplateId: createTemplateId || undefined });
                 else addFromFolderMutation.mutate();
                 setConfirmAction(null);
               }}
