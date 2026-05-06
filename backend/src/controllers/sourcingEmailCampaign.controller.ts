@@ -13,10 +13,9 @@ function addDays(date: Date, days: number): Date {
 }
 
 function buildFormLink(formToken: string): string {
-    const baseUrl = (process.env.FRONTEND_URL?.split(",")[0] ?? "http://localhost:5173").trim();
-    const normalizedBase = baseUrl.replace(/\/+$/, "");
+    const baseUrl = "https://crm.eectrade.com";
     const normalizedToken = formToken.replace(/^\/+/, "");
-    return `${normalizedBase}/supplier-form/${normalizedToken}`;
+    return `${baseUrl}/supplier-form/${normalizedToken}`;
 }
 
 const STEP_STATUS: Record<number, string> = {
