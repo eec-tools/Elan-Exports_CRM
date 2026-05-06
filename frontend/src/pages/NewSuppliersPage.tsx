@@ -3127,7 +3127,7 @@ export default function NewSuppliersPage() {
               <div className="flex flex-col gap-2">
                 <input
                   type="file"
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.jfif"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.jfif"
                   multiple
                   className="hidden"
                   id="multi-quotation-upload-ns"

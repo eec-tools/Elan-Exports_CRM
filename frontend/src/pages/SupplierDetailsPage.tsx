@@ -210,6 +210,7 @@ interface Supplier {
   productCatalogs?: ProductCatalogEntry[];
   productCatalogImages?: ProductCatalogEntry[];
   warehousePhotos?: { name: string; url: string }[];
+  quotations?: { name: string; url: string }[];
   videoLinks?: { label: string; url: string }[];
   // EEC Internal Fields
   vettingScore?: number | null;
@@ -1272,6 +1273,30 @@ export default function SupplierDetailsPage() {
         </CardContent>
       </Card>
 
+      {/* ── Quotation Files ── */}
+      {(supplier.quotations ?? []).length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Quotation Files
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-2">
+              {supplier.quotations!.map((doc, idx) => (
+                <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                  <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                  <a href={getCatalogViewUrl(doc.url)} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">
+                    {doc.name}
+                  </a>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Remarks ── */}
       {supplier.remarks && (
         <Card>
@@ -1825,7 +1850,7 @@ export default function SupplierDetailsPage() {
               <div className="space-y-2 sm:col-span-2">
                 <Label>Quotation Files</Label>
                 <div className="flex flex-col gap-2">
-                  <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.jfif" multiple className="hidden" id="quotation-upload-edit" onChange={(e) => { const files = Array.from(e.target.files || []); const items = files.map((f) => ({ id: crypto.randomUUID(), name: f.name, status: "uploading" as const })); setQuotationPending((prev) => [...prev, ...items]); files.forEach((f, i) => triggerUpload(f, items[i].id, setQuotationPending)); e.currentTarget.value = ""; }} />
+                  <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.jfif" multiple className="hidden" id="quotation-upload-edit" onChange={(e) => { const files = Array.from(e.target.files || []); const items = files.map((f) => ({ id: crypto.randomUUID(), name: f.name, status: "uploading" as const })); setQuotationPending((prev) => [...prev, ...items]); files.forEach((f, i) => triggerUpload(f, items[i].id, setQuotationPending)); e.currentTarget.value = ""; }} />
                   <Button type="button" variant="outline" size="sm" className="gap-2 text-slate-600 border-slate-200 w-fit" onClick={() => document.getElementById("quotation-upload-edit")?.click()}>
                     <Upload className="h-3.5 w-3.5" /> Upload Quotation Files
                   </Button>

@@ -1274,6 +1274,36 @@ export default function NewSupplierDetailsPage() {
             </Card>
           )}
 
+          {/* ── Quotation Files ── */}
+          {(supplier.quotations ?? []).length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Quotation Files
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {(supplier.quotations ?? []).map((doc, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-100"
+                  >
+                    <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                    <a
+                      href={doc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-brand-600 hover:underline truncate"
+                    >
+                      {doc.name}
+                    </a>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {/* ── Media & Documents ── */}
           {((supplier.certificates ?? []).length > 0 ||
             (supplier.warehousePhotos ?? []).length > 0 ||
@@ -1837,7 +1867,8 @@ export default function NewSupplierDetailsPage() {
                 supplier.productCatalogImages.length === 0) &&
               (!supplier.warehousePhotos ||
                 supplier.warehousePhotos.length === 0) &&
-              (!supplier.videoLinks || supplier.videoLinks.length === 0) ? (
+              (!supplier.videoLinks || supplier.videoLinks.length === 0) &&
+              (!supplier.quotations || supplier.quotations.length === 0) ? (
                 <p className="text-sm text-slate-500 py-4 text-center">
                   No documents uploaded yet.
                 </p>
@@ -1970,6 +2001,31 @@ export default function NewSupplierDetailsPage() {
                               className="text-sm text-brand-600 hover:underline truncate"
                             >
                               {v.label || v.url}
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {supplier.quotations && supplier.quotations.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                        Quotation Files
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {supplier.quotations.map((doc, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-lg"
+                          >
+                            <FileText className="h-4 w-4 text-brand-500 shrink-0" />
+                            <a
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-brand-600 hover:underline truncate"
+                            >
+                              {doc.name}
                             </a>
                           </div>
                         ))}
@@ -4053,7 +4109,7 @@ export default function NewSupplierDetailsPage() {
               <div className="flex flex-col gap-2">
                 <input
                   type="file"
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.jfif"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.jfif"
                   multiple
                   className="hidden"
                   id="multi-quotation-upload-nsd"
