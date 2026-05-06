@@ -2074,7 +2074,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Manufacturing Address</Label>
+                  <Label>Manufacturing / Processing Facility Address</Label>
                   <Textarea
                     value={form.manufacturingAddress ?? ""}
                     onChange={(e) =>
@@ -2111,7 +2111,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone</Label>
+                  <Label>Phone Number</Label>
                   <Input
                     value={form.phone ?? ""}
                     onChange={(e) =>
@@ -2146,6 +2146,17 @@ export default function NewSupplierDetailsPage() {
                     onChange={(e) =>
                       setForm({ ...form, email: e.target.value })
                     }
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Website</Label>
+                  <Input
+                    type="url"
+                    value={form.website ?? ""}
+                    onChange={(e) =>
+                      setForm({ ...form, website: e.target.value })
+                    }
+                    placeholder="https://example.com"
                   />
                 </div>
               </div>
@@ -2407,7 +2418,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Lead Time (days)</Label>
+                  <Label>Sample Lead Time (days)</Label>
                   <Input
                     value={form.sampleLeadTime ?? ""}
                     onChange={(e) =>
@@ -2467,7 +2478,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Min Exportable Batch</Label>
+                  <Label>Min Exportable Batch Size</Label>
                   <Input
                     value={form.minExportableBatch ?? ""}
                     onChange={(e) =>
@@ -2476,7 +2487,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>MOQ</Label>
+                  <Label>Minimum Order Quantity (MOQ)</Label>
                   <Input
                     value={form.moq ?? ""}
                     onChange={(e) => setForm({ ...form, moq: e.target.value })}
@@ -2572,12 +2583,23 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Target Export Markets</Label>
+                  <Label>Current Export Markets</Label>
+                  <Input
+                    value={form.latestQuotation ?? ""}
+                    onChange={(e) =>
+                      setForm({ ...form, latestQuotation: e.target.value })
+                    }
+                    placeholder="Countries currently exporting to"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Target / New Export Markets</Label>
                   <Input
                     value={form.targetExportMarkets ?? ""}
                     onChange={(e) =>
                       setForm({ ...form, targetExportMarkets: e.target.value })
                     }
+                    placeholder="Countries you wish to enter"
                   />
                 </div>
                 <div className="space-y-2">
@@ -2590,7 +2612,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Payment Terms</Label>
+                  <Label>Payment Terms Accepted</Label>
                   <MultiSelectDropdown
                     value={form.paymentTerms ?? ""}
                     onChange={(v) => setForm({ ...form, paymentTerms: v })}
@@ -2625,7 +2647,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>GST Number</Label>
+                  <Label>GST Registration Number</Label>
                   <Input
                     value={form.gstNumber ?? ""}
                     onChange={(e) =>
@@ -2634,7 +2656,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>FSSAI Central License</Label>
+                  <Label>FSSAI Central License (Export Category)</Label>
                   <Input
                     value={form.fssaiLicense ?? ""}
                     onChange={(e) =>
@@ -2643,7 +2665,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>APEDA Registration</Label>
+                  <Label>APEDA Registration Number</Label>
                   <Input
                     value={form.apedaNumber ?? ""}
                     onChange={(e) =>
@@ -2652,7 +2674,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>FDA Registration Number</Label>
+                  <Label>FDA Facility Registration Number (USA)</Label>
                   <Input
                     value={form.fdaRegistrationNumber ?? ""}
                     onChange={(e) =>
@@ -2684,7 +2706,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>COI Capability?</Label>
+                  <Label>COI (Certificate of Inspection) Capability?</Label>
                   <SelectWithOthers
                     value={form.coiCapability ?? ""}
                     onChange={(v) => setForm({ ...form, coiCapability: v })}
@@ -2693,7 +2715,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>DAFF Biosecurity (Australia)?</Label>
+                  <Label>DAFF Biosecurity Compliance (Australia)?</Label>
                   <SelectWithOthers
                     value={form.daffBiosecurity ?? ""}
                     onChange={(v) => setForm({ ...form, daffBiosecurity: v })}
@@ -2731,7 +2753,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>ISO/FSSC 22000 Cert No.</Label>
+                  <Label>ISO 22000 / FSSC 22000 Certificate No.</Label>
                   <Input
                     value={form.isoFsscCertNo ?? ""}
                     onChange={(e) =>
@@ -2740,7 +2762,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>ISO Cert Validity Date</Label>
+                  <Label>ISO Certificate Validity Date</Label>
                   <Input
                     value={form.isoCertValidityDate ?? ""}
                     onChange={(e) =>
@@ -2749,7 +2771,7 @@ export default function NewSupplierDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Auditing Body</Label>
+                  <Label>Auditing Body Name</Label>
                   <Input
                     value={form.auditingBodyName ?? ""}
                     onChange={(e) =>
