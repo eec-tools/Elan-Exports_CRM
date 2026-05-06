@@ -320,7 +320,7 @@ function SignedSuppliersTab({ from, to }: { from: string; to: string }) {
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => fmtMoney(v)} />
               <YAxis type="category" dataKey="company" tick={{ fontSize: 11 }} width={95} />
-              <Tooltip formatter={(v: number) => [fmtMoney(v), "Pipeline"]} />
+              <Tooltip formatter={(v: number | undefined) => [v !== undefined ? fmtMoney(v) : "-", "Pipeline"]} />
               <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} name="Pipeline Value" />
             </BarChart>
           </ResponsiveContainer>
@@ -364,7 +364,7 @@ function SignedSuppliersTab({ from, to }: { from: string; to: string }) {
                   <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v: number) => [v, "Suppliers"]} />
+              <Tooltip formatter={(v: number | undefined) => [v, "Suppliers"]} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
@@ -517,7 +517,7 @@ function OldSuppliersTab({ from, to }: { from: string; to: string }) {
                   <Cell key={i} fill={REACT_COLORS[entry.potential] ?? CHART_COLORS[i % CHART_COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v: number) => [v, "Suppliers"]} />
+              <Tooltip formatter={(v: number | undefined) => [v, "Suppliers"]} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
