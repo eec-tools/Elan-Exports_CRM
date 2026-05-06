@@ -18,6 +18,9 @@ import OldSuppliersPage from "@/pages/OldSuppliersPage";
 import NewSuppliersPage from "@/pages/NewSuppliersPage";
 import NewSupplierDetailsPage from "@/pages/NewSupplierDetailsPage";
 import ReportsPage from "@/pages/ReportsPage";
+import ReportsBuyersPage from "@/pages/reports/ReportsBuyersPage";
+import ReportsSuppliersPage from "@/pages/reports/ReportsSuppliersPage";
+import ReportsEmployeesPage from "@/pages/reports/ReportsEmployeesPage";
 import MembersPage from "@/pages/MembersPage";
 import ActivityPage from "@/pages/ActivityPage";
 import AccessRequestsPage from "@/pages/AccessRequestsPage";
@@ -219,6 +222,30 @@ export default function App() {
                   element={
                     <PermissionGate permission="reports">
                       <ReportsPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="reports/buyers"
+                  element={
+                    <PermissionGate permission="reports">
+                      <ReportsBuyersPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="reports/suppliers"
+                  element={
+                    <PermissionGate permission="reports">
+                      <ReportsSuppliersPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="reports/employees"
+                  element={
+                    <PermissionGate permission="reports">
+                      <ReportsEmployeesPage />
                     </PermissionGate>
                   }
                 />

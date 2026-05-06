@@ -26,6 +26,9 @@ import {
   ClipboardList,
   Lock,
   Database,
+  BarChart3,
+  UserCheck,
+  PieChart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -251,7 +254,73 @@ export function AppLayout() {
         {/* Nav links */}
         <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-4 custom-scrollbar-light">
           {visibleNav.map((item) => {
-            if (item.label === "Suppliers") {
+            if (item.label === "Reports") {
+            const reportsLinks = [
+              { to: "/reports", label: "Report Tracker", icon: FileText, end: true },
+              { to: "/reports/buyers", label: "Buyers Report", icon: Users, end: false },
+              { to: "/reports/suppliers", label: "Suppliers Report", icon: BarChart3, end: false },
+              { to: "/reports/employees", label: "Employees Report", icon: UserCheck, end: false },
+            ];
+            return (
+              <div key="reports-group" className="mt-4 mb-2">
+                <div
+                  className={`flex items-center gap-3 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1 ${sidebarCollapsed ? "justify-center px-0" : ""}`}
+                  title={sidebarCollapsed ? "REPORTS" : undefined}
+                >
+                  {!sidebarCollapsed && <span>Reports Area</span>}
+                  {sidebarCollapsed && <PieChart className="h-4 w-4 text-slate-400" />}
+                </div>
+                <div className="space-y-1">
+                  {reportsLinks.map((link) => (
+                    <NavLink
+                      key={link.to}
+                      to={link.to}
+                      end={link.end}
+                      onClick={() => setSidebarOpen(false)}
+                      className={({ isActive }) =>
+                        `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative ${
+                          sidebarCollapsed ? "justify-center" : ""
+                        } ${
+                          isActive
+                            ? "bg-brand-50 text-brand-700"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        }`
+                      }
+                      title={sidebarCollapsed ? link.label : undefined}
+                    >
+                      {({ isActive }) => {
+                        const hasAccess = hasPermission("reports");
+                        return (
+                          <>
+                            {isActive && !sidebarCollapsed && (
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-500 rounded-r-md" />
+                            )}
+                            <link.icon
+                              className={`h-5 w-5 shrink-0 ${isActive ? "text-brand-600" : "text-slate-400 group-hover:text-brand-600 transition-colors"}`}
+                            />
+                            {!sidebarCollapsed && (
+                              <span className="truncate">{link.label}</span>
+                            )}
+                            {!hasAccess && (
+                              <Lock
+                                className={`h-4 w-4 shrink-0 ${sidebarCollapsed ? "absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5" : "ml-auto"} text-slate-400 font-bold`}
+                                strokeWidth={3}
+                              />
+                            )}
+                          </>
+                        );
+                      }}
+                    </NavLink>
+                  ))}
+                </div>
+                {!sidebarCollapsed && (
+                  <Separator className="bg-slate-100 my-4 w-[calc(100%-1.5rem)] mx-auto" />
+                )}
+              </div>
+            );
+          }
+
+          if (item.label === "Suppliers") {
               return (
                 <div key="suppliers-group" className="mt-4 mb-2">
                   <div
