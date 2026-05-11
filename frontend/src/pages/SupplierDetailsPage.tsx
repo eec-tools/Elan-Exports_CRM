@@ -27,6 +27,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
+
+const CERTIFICATIONS_OPTIONS = [
+  "BRCGS Food Safety", "IFS", "Better Cotton Initiative (BCI)", "BEPI",
+  "Global Recycled Standard (GRS)", "HACCP", "Kosher Certified", "Halal",
+  "Sedex", "BSCI", "ISO 14001", "WRAP", "GLOBALG.A.P.",
+  "GLOBALG.A.P. GRASP", "GOTS", "OEKO-TEX Made in Green",
+  "OEKO-TEX Standard 100", "CE",
+];
 import { EntityLinkSelect } from "@/components/EntityLinkSelect";
 import { SelectWithOthers } from "@/components/SelectWithOthers";
 import {
@@ -815,7 +823,7 @@ export default function SupplierDetailsPage() {
                         <div><span className="text-muted-foreground">Category:</span> {prod.productCategory || "—"}</div>
                         <div><span className="text-muted-foreground">HS Code:</span> {prod.hsCode || "—"}</div>
                         <div><span className="text-muted-foreground">Organic:</span> {prod.organicStatus || "—"}</div>
-                        <div><span className="text-muted-foreground">Certs:</span> {prod.certifications || "—"}</div>
+                        <div><span className="text-muted-foreground">Certs:</span>{" "}{prod.certifications ? prod.certifications.split(",").map((c: string) => c.trim()).filter(Boolean).map((c: string) => (<span key={c} className="inline-block rounded bg-brand-100 px-1.5 py-0.5 text-xs font-medium text-brand-700 mr-1">{c}</span>)) : "—"}</div>
                         <div><span className="text-muted-foreground">Shelf Life:</span> {prod.shelfLife || "—"}</div>
                         <div><span className="text-muted-foreground">Storage:</span> {prod.storageConditions || "—"}</div>
                       </div>
@@ -1557,7 +1565,7 @@ export default function SupplierDetailsPage() {
                     <div className="space-y-1.5"><Label className="text-xs">Product Category</Label><Input className="h-8 text-sm" value={prod.productCategory} onChange={(e) => updateProduct(i, "productCategory", e.target.value)} /></div>
                     <div className="space-y-1.5"><Label className="text-xs">HS Code</Label><Input className="h-8 text-sm" value={prod.hsCode} onChange={(e) => updateProduct(i, "hsCode", e.target.value)} /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Organic Status</Label><SelectWithOthers value={prod.organicStatus} onChange={(v) => updateProduct(i, "organicStatus", v)} options={["Certified Organic","In Conversion","Conventional"]} placeholder="Select…" /></div>
-                    <div className="space-y-1.5"><Label className="text-xs">Certifications</Label><Input className="h-8 text-sm" value={prod.certifications} onChange={(e) => updateProduct(i, "certifications", e.target.value)} /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">Certifications</Label><MultiSelectDropdown value={prod.certifications} onChange={(val) => updateProduct(i, "certifications", val)} options={CERTIFICATIONS_OPTIONS} placeholder="Select certifications…" /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Shelf Life</Label><Input className="h-8 text-sm" value={prod.shelfLife} onChange={(e) => updateProduct(i, "shelfLife", e.target.value)} /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Storage Conditions</Label><Input className="h-8 text-sm" value={prod.storageConditions} onChange={(e) => updateProduct(i, "storageConditions", e.target.value)} /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Packaging Type</Label><Input className="h-8 text-sm" value={prod.packagingType} onChange={(e) => updateProduct(i, "packagingType", e.target.value)} /></div>

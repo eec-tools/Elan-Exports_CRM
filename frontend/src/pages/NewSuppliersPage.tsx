@@ -48,6 +48,14 @@ import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
 import { Separator } from "@/components/ui/separator";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
+
+const CERTIFICATIONS_OPTIONS = [
+  "BRCGS Food Safety", "IFS", "Better Cotton Initiative (BCI)", "BEPI",
+  "Global Recycled Standard (GRS)", "HACCP", "Kosher Certified", "Halal",
+  "Sedex", "BSCI", "ISO 14001", "WRAP", "GLOBALG.A.P.",
+  "GLOBALG.A.P. GRASP", "GOTS", "OEKO-TEX Made in Green",
+  "OEKO-TEX Standard 100", "CE",
+];
 import { SelectWithOthers } from "@/components/SelectWithOthers";
 import { EntityLinkSelect } from "@/components/EntityLinkSelect";
 
@@ -1150,9 +1158,9 @@ export default function NewSuppliersPage() {
                     </td>
                     <td
                       className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate"
-                      title={s.certifications}
+                      title={[...new Set((s.supplierProducts || []).flatMap((p: any) => (p.certifications || "").split(",").map((c: string) => c.trim()).filter(Boolean)))].join(", ") || undefined}
                     >
-                      {s.certifications}
+                      {[...new Set((s.supplierProducts || []).flatMap((p: any) => (p.certifications || "").split(",").map((c: string) => c.trim()).filter(Boolean)))].join(", ") || "—"}
                     </td>
                     <td className="px-5 py-3.5 border-r border-slate-100">
                       {s.vettingScore != null ? (
@@ -1700,13 +1708,11 @@ export default function NewSuppliersPage() {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Certifications</Label>
-                      <Input
-                        className="h-8 text-sm"
+                      <MultiSelectDropdown
                         value={prod.certifications}
-                        onChange={(e) =>
-                          updateProduct(i, "certifications", e.target.value)
-                        }
-                        placeholder="e.g. USDA, EU Organic"
+                        onChange={(val) => updateProduct(i, "certifications", val)}
+                        options={CERTIFICATIONS_OPTIONS}
+                        placeholder="Select certifications…"
                       />
                     </div>
                     <div className="space-y-1.5">

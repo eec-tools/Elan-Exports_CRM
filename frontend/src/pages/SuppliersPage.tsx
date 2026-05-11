@@ -47,6 +47,14 @@ import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
 import { Separator } from "@/components/ui/separator";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
+
+const CERTIFICATIONS_OPTIONS = [
+  "BRCGS Food Safety", "IFS", "Better Cotton Initiative (BCI)", "BEPI",
+  "Global Recycled Standard (GRS)", "HACCP", "Kosher Certified", "Halal",
+  "Sedex", "BSCI", "ISO 14001", "WRAP", "GLOBALG.A.P.",
+  "GLOBALG.A.P. GRASP", "GOTS", "OEKO-TEX Made in Green",
+  "OEKO-TEX Standard 100", "CE",
+];
 import { SelectWithOthers } from "@/components/SelectWithOthers";
 import { EntityLinkSelect } from "@/components/EntityLinkSelect";
 
@@ -711,7 +719,7 @@ export default function SuppliersPage() {
                     <td className="px-5 py-3.5 border-r border-slate-100">{s.contactPerson}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.email}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.products}>{s.products}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[180px] truncate" title={s.certifications}>{s.certifications}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[180px] truncate" title={[...new Set((s.supplierProducts || []).flatMap((p: any) => (p.certifications || "").split(",").map((c: string) => c.trim()).filter(Boolean)))].join(", ") || undefined}>{[...new Set((s.supplierProducts || []).flatMap((p: any) => (p.certifications || "").split(",").map((c: string) => c.trim()).filter(Boolean)))].join(", ") || "—"}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100">
                       {s.vettingScore != null ? (
                         <div className="flex items-center gap-1">
@@ -968,7 +976,7 @@ export default function SuppliersPage() {
                     <div className="space-y-1.5"><Label className="text-xs">Product Category</Label><Input className="h-8 text-sm" value={prod.productCategory} onChange={(e) => updateProduct(i, "productCategory", e.target.value)} placeholder="e.g. Rice, Spices" /></div>
                     <div className="space-y-1.5"><Label className="text-xs">HS Code (6–8 digit)</Label><Input className="h-8 text-sm" value={prod.hsCode} onChange={(e) => updateProduct(i, "hsCode", e.target.value)} placeholder="e.g. 100630" /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Organic Status</Label><SelectWithOthers value={prod.organicStatus} onChange={(v) => updateProduct(i, "organicStatus", v)} options={["Certified Organic", "In Conversion", "Conventional"]} placeholder="Select…" /></div>
-                    <div className="space-y-1.5"><Label className="text-xs">Certifications</Label><Input className="h-8 text-sm" value={prod.certifications} onChange={(e) => updateProduct(i, "certifications", e.target.value)} placeholder="e.g. USDA, EU Organic" /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">Certifications</Label><MultiSelectDropdown value={prod.certifications} onChange={(val) => updateProduct(i, "certifications", val)} options={CERTIFICATIONS_OPTIONS} placeholder="Select certifications…" /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Shelf Life (months)</Label><Input className="h-8 text-sm" value={prod.shelfLife} onChange={(e) => updateProduct(i, "shelfLife", e.target.value)} /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Storage Conditions</Label><Input className="h-8 text-sm" value={prod.storageConditions} onChange={(e) => updateProduct(i, "storageConditions", e.target.value)} /></div>
                     <div className="space-y-1.5"><Label className="text-xs">Packaging Type & Material</Label><Input className="h-8 text-sm" value={prod.packagingType} onChange={(e) => updateProduct(i, "packagingType", e.target.value)} /></div>

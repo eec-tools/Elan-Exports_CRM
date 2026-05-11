@@ -15,6 +15,14 @@ import {
 } from "@/components/ui/dialog";
 import { PermissionGate } from "@/components/PermissionGate";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
+
+const CERTIFICATIONS_OPTIONS = [
+  "BRCGS Food Safety", "IFS", "Better Cotton Initiative (BCI)", "BEPI",
+  "Global Recycled Standard (GRS)", "HACCP", "Kosher Certified", "Halal",
+  "Sedex", "BSCI", "ISO 14001", "WRAP", "GLOBALG.A.P.",
+  "GLOBALG.A.P. GRASP", "GOTS", "OEKO-TEX Made in Green",
+  "OEKO-TEX Standard 100", "CE",
+];
 import { SelectWithOthers } from "@/components/SelectWithOthers";
 import { EntityLinkSelect } from "@/components/EntityLinkSelect";
 import { Badge } from "@/components/ui/badge";
@@ -793,7 +801,11 @@ export default function NewSupplierDetailsPage() {
                               <span className="text-muted-foreground">
                                 Certs:
                               </span>{" "}
-                              {prod.certifications || "—"}
+                              {prod.certifications
+                                ? prod.certifications.split(",").map((c: string) => c.trim()).filter(Boolean).map((c: string) => (
+                                    <span key={c} className="inline-block rounded bg-brand-100 px-1.5 py-0.5 text-xs font-medium text-brand-700 mr-1">{c}</span>
+                                  ))
+                                : "—"}
                             </div>
                             <div>
                               <span className="text-muted-foreground">
@@ -2379,12 +2391,11 @@ export default function NewSupplierDetailsPage() {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Certifications</Label>
-                      <Input
-                        className="h-8 text-sm"
+                      <MultiSelectDropdown
                         value={prod.certifications}
-                        onChange={(e) =>
-                          updateProduct(i, "certifications", e.target.value)
-                        }
+                        onChange={(val) => updateProduct(i, "certifications", val)}
+                        options={CERTIFICATIONS_OPTIONS}
+                        placeholder="Select certifications…"
                       />
                     </div>
                     <div className="space-y-1.5">
