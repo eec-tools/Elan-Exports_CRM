@@ -33,12 +33,6 @@ interface EmailSignature {
   createdAt: string;
 }
 
-interface GmailAccount {
-  email: string;
-  connected: boolean;
-  label: string;
-}
-
 const GMAIL_ACCOUNTS = [
   "procurement1@eectrade.com",
   "partners@eectrade.com",
