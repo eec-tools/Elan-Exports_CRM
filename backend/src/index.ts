@@ -28,7 +28,7 @@ import introEmailCampaignRoutes from "./routes/introEmailCampaign.routes.js";
 import newSupplierEmailCampaignRoutes from "./routes/newSupplierEmailCampaign.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import { startEmailCampaignScheduler } from "./services/emailCampaignScheduler.js";
-import { startEmailSyncScheduler } from "./services/emailSyncScheduler.js";
+import { startGmailInboxScheduler } from "./services/gmailInboxScheduler.js";
 import { startGmailReplyDetector } from "./services/gmailReplyDetector.js";
 import attendanceRoutes from "./routes/attendance.routes.js";
 import { startAttendanceScheduler } from "./services/attendanceScheduler.js";
@@ -229,7 +229,7 @@ app.listen(PORT, () => {
   console.log(`Allowed origins: ${allowedOrigins.join(", ") || "localhost only"}`);
   startEmailCampaignScheduler();
   startAttendanceScheduler();
-  startEmailSyncScheduler();
+  startGmailInboxScheduler();
   startGmailReplyDetector();
 });
 

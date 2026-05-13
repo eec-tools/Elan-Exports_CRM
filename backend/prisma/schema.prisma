@@ -802,17 +802,22 @@ model EmailTracker {
   status          String    @default("Not Started")
   notes           String?
   emailLink       String?   @map("email_link")
-  // Outlook / Graph API sync fields
+  // Gmail sync fields
+  gmailAccount    String?   @map("gmail_account")
   messageId       String?   @unique @map("message_id")
-  conversationId  String?   @map("conversation_id")
+  threadId        String?   @map("thread_id")
   bodyPreview     String?   @map("body_preview")
-  importance      String?
   isRead          Boolean   @default(false) @map("is_read")
-  source          String    @default("manual")
+  source          String    @default("gmail")
   syncedAt        DateTime? @map("synced_at")
+  // Legacy Outlook fields (kept for existing rows)
+  conversationId  String?   @map("conversation_id")
+  importance      String?
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
+  @@index([gmailAccount])
+  @@index([threadId])
   @@index([conversationId])
   @@map("email_tracker")
 }
