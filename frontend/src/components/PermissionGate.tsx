@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AccessDeniedPage } from "@/components/AccessDeniedPage";
 
 interface PermissionGateProps {
-  permission?: string;
+  permission?: string | string[];
   editOnly?: boolean;
   adminOnly?: boolean;
   children: ReactNode;
@@ -32,11 +32,13 @@ export function PermissionGate({
   if (adminOnly && !isAdmin) return <>{fallback}</>;
 
   if (permission && editOnly) {
-    if (!hasEditPermission(permission)) return <>{fallback}</>;
+    const perms = Array.isArray(permission) ? permission : [permission];
+    if (!perms.some((p) => hasEditPermission(p))) return <>{fallback}</>;
   }
 
   if (permission && !editOnly) {
-    if (!hasPermission(permission)) return <AccessDeniedPage />;
+    const perms = Array.isArray(permission) ? permission : [permission];
+    if (!perms.some((p) => hasPermission(p))) return <AccessDeniedPage />;
   }
 
   return <>{children}</>;

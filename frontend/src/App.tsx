@@ -180,7 +180,7 @@ export default function App() {
                 <Route
                   path="suppliers/email-templates"
                   element={
-                    <PermissionGate permission="suppliers">
+                    <PermissionGate permission={["suppliers", "sourcing_suppliers"]}>
                       <EmailTemplatesPage />
                     </PermissionGate>
                   }

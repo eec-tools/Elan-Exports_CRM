@@ -205,7 +205,7 @@ export default function EmailTemplatesPage() {
             </p>
           </div>
         </div>
-        <PermissionGate permission="suppliers" editOnly>
+        <PermissionGate permission={["suppliers", "sourcing_suppliers"]} editOnly>
           <Button size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1.5" />
             New Template
