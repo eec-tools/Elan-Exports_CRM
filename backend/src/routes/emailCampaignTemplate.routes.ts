@@ -11,14 +11,14 @@ import { authenticate, requirePermission, requireEdit } from "../middleware/auth
 
 const router = Router();
 
-router.use(authenticate, requirePermission("suppliers"));
+router.use(authenticate, requirePermission(["suppliers", "sourcing_suppliers"]));
 
 router.get("/", listEmailTemplates);
 router.get("/default-content", getDefaultContent);
 router.get("/:id", getEmailTemplate);
 
-router.post("/", requireEdit("suppliers"), createEmailTemplate);
-router.put("/:id", requireEdit("suppliers"), updateEmailTemplate);
-router.delete("/:id", requireEdit("suppliers"), deleteEmailTemplate);
+router.post("/", requireEdit(["suppliers", "sourcing_suppliers"]), createEmailTemplate);
+router.put("/:id", requireEdit(["suppliers", "sourcing_suppliers"]), updateEmailTemplate);
+router.delete("/:id", requireEdit(["suppliers", "sourcing_suppliers"]), deleteEmailTemplate);
 
 export default router;
