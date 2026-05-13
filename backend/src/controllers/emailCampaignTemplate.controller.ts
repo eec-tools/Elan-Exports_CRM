@@ -34,11 +34,7 @@ Please note that buyer-specific details are not being disclosed at this stage, a
 
 Please note that Elan Exports Consultancy operates through a structured sourcing and execution model, where we remain the central point of coordination across supplier evaluation, commercial discussions, and transaction management. This approach ensures consistency, pricing discipline, and smooth execution across all stages of the sourcing process. Accordingly, all communication and commercial alignment are managed through EEC.
 
-We look forward to reviewing your profile and exploring a potential working relationship.
-
-Warm regards,
-Élan Exports
-Elan Exports Consultancy`;
+We look forward to reviewing your profile and exploring a potential working relationship.`;
 
 const DEFAULT_FOLLOWUP1_SUBJECT = "Following Up — Supplier Form | Élan Exports × {{company}}";
 
@@ -50,11 +46,7 @@ In case my earlier email was missed, I wanted to share the Supplier Information 
 
 {{formButton}}
 
-If you have any questions or would prefer to connect over a call, please do not hesitate to reach out directly.
-
-Best regards,
-Élan Exports
-Élan Exports & Consultancy`;
+If you have any questions or would prefer to connect over a call, please do not hesitate to reach out directly.`;
 
 const DEFAULT_FOLLOWUP2_SUBJECT = "Reminder — Partnership Opportunity with Élan Exports | {{company}}";
 
@@ -66,11 +58,7 @@ Please take a moment to complete the Supplier Information Form — it helps us u
 
 {{formButton}}
 
-If this is not the right time or you are not interested, no worries at all — please let us know and we will not follow up further.
-
-Best regards,
-Élan Exports
-Élan Exports & Consultancy`;
+If this is not the right time or you are not interested, no worries at all — please let us know and we will not follow up further.`;
 
 const DEFAULT_FOLLOWUP3_SUBJECT = "Last Follow-Up — Élan Exports Partnership Inquiry | {{company}}";
 
@@ -82,11 +70,7 @@ If you are interested in exploring an export partnership with Élan Exports, we 
 
 {{formButton}}
 
-If we do not hear back, we will close this inquiry — but you are always welcome to reach out to us directly in the future if circumstances change.
-
-Best regards,
-Élan Exports
-Élan Exports & Consultancy`;
+If we do not hear back, we will close this inquiry — but you are always welcome to reach out to us directly in the future if circumstances change.`;
 
 export const DEFAULT_TEMPLATE_CONTENT = {
     introSubject: DEFAULT_INTRO_SUBJECT,

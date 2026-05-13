@@ -790,6 +790,19 @@ model AppSetting {
   @@map("app_settings")
 }
 
+model EmailSignature {
+  id        String   @id @default(uuid())
+  name      String
+  role      String   @default("")
+  company   String   @default("")
+  tagline   String   @default("")
+  links     Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("email_signatures")
+}
+
 model EmailTracker {
   id              String    @id @default(uuid())
   dateReceived    DateTime  @map("date_received")

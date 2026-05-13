@@ -14,17 +14,15 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Plus,
-  Trash2,
-  Pencil,
-  Loader2,
-  Star,
-  Mail,
-  ArrowLeft,
+  Plus, Trash2, Pencil, Loader2, Star, Mail, ArrowLeft,
+  Settings, PenLine, User, Briefcase, Building2, AlignLeft,
+  Link2, GripVertical, X, CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { PermissionGate } from "@/components/PermissionGate";
+
+// ─── Email Template types ─────────────────────────────────────────────────────
 
 interface EmailTemplate {
   id: string;
@@ -42,15 +40,40 @@ interface EmailTemplate {
 }
 
 interface DefaultContent {
-  introSubject: string;
-  introBody: string;
-  followup1Subject: string;
-  followup1Body: string;
-  followup2Subject: string;
-  followup2Body: string;
-  followup3Subject: string;
-  followup3Body: string;
+  introSubject: string; introBody: string;
+  followup1Subject: string; followup1Body: string;
+  followup2Subject: string; followup2Body: string;
+  followup3Subject: string; followup3Body: string;
 }
+
+// ─── Signature types ──────────────────────────────────────────────────────────
+
+interface SigLink { label: string; url: string; }
+
+interface EmailSignature {
+  id: string;
+  name: string;
+  role: string;
+  company: string;
+  tagline: string;
+  links: SigLink[];
+  createdAt: string;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const GMAIL_ACCOUNTS = [
+  "procurement1@eectrade.com",
+  "partners@eectrade.com",
+  "procurement2@eectrade.com",
+];
+
+const LINK_PRESETS = [
+  { label: "Email",    urlPrefix: "mailto:" },
+  { label: "Website",  urlPrefix: "https://" },
+  { label: "LinkedIn", urlPrefix: "https://" },
+  { label: "Phone",    urlPrefix: "tel:" },
+];
 
 const VARIABLES = [
   { placeholder: "{{greeting}}", description: "Dear [Contact Name], or Dear Sir/Madam," },
@@ -62,7 +85,7 @@ const VARIABLES = [
 ];
 
 const STEPS = [
-  { key: "intro",    label: "Intro",       subjectField: "introSubject",    bodyField: "introBody",    stepNum: 1 },
+  { key: "intro",     label: "Intro",       subjectField: "introSubject",     bodyField: "introBody",     stepNum: 1 },
   { key: "followup1", label: "Follow-up 1", subjectField: "followup1Subject", bodyField: "followup1Body", stepNum: 2 },
   { key: "followup2", label: "Follow-up 2", subjectField: "followup2Subject", bodyField: "followup2Body", stepNum: 3 },
   { key: "followup3", label: "Follow-up 3", subjectField: "followup3Subject", bodyField: "followup3Body", stepNum: 4 },
@@ -77,16 +100,43 @@ type StepFields = {
 
 function emptyFields(defaults?: DefaultContent): StepFields {
   return {
-    introSubject:    defaults?.introSubject    ?? "",
-    introBody:       defaults?.introBody       ?? "",
+    introSubject:     defaults?.introSubject     ?? "",
+    introBody:        defaults?.introBody        ?? "",
     followup1Subject: defaults?.followup1Subject ?? "",
-    followup1Body:   defaults?.followup1Body   ?? "",
+    followup1Body:    defaults?.followup1Body    ?? "",
     followup2Subject: defaults?.followup2Subject ?? "",
-    followup2Body:   defaults?.followup2Body   ?? "",
+    followup2Body:    defaults?.followup2Body    ?? "",
     followup3Subject: defaults?.followup3Subject ?? "",
-    followup3Body:   defaults?.followup3Body   ?? "",
+    followup3Body:    defaults?.followup3Body    ?? "",
   };
 }
+
+// ─── Signature preview ────────────────────────────────────────────────────────
+
+function SigPreview({ sig }: { sig: Partial<EmailSignature> }) {
+  return (
+    <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 text-sm font-sans text-slate-700 leading-relaxed">
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Preview</p>
+      <div>
+        Warm regards,<br />
+        <strong className="text-slate-900">{sig.name || "Your Name"}</strong><br />
+        {sig.role    && <><span className="text-brand-600 text-xs">{sig.role}</span><br /></>}
+        {sig.company && <><span className="text-slate-600 font-semibold text-xs">{sig.company}</span><br /></>}
+        <div className="mt-1 space-y-0.5">
+          {(sig.links ?? []).map((l, i) => (
+            <div key={i} className="text-xs text-slate-500">
+              <span className="font-medium text-slate-700">{l.label}:</span>{" "}
+              <span className="text-blue-600">{l.url.replace(/^mailto:|^tel:/, "")}</span>
+            </div>
+          ))}
+        </div>
+        {sig.tagline && <p className="text-[11px] text-slate-400 italic mt-1.5">{sig.tagline}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function EmailTemplatesPage() {
   const navigate = useNavigate();
@@ -94,6 +144,7 @@ export default function EmailTemplatesPage() {
   const { hasEditPermission } = useAuth();
   const canEdit = hasEditPermission("suppliers") || hasEditPermission("sourcing_suppliers");
 
+  // ── Template state ──
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
   const [name, setName] = useState("");
@@ -102,22 +153,50 @@ export default function EmailTemplatesPage() {
   const [deleteTarget, setDeleteTarget] = useState<EmailTemplate | null>(null);
   const [activeTab, setActiveTab] = useState("intro");
 
+  // ── Signature dialog state ──
+  const [sigOpen, setSigOpen] = useState(false);
+  const [sigView, setSigView] = useState<"list" | "form">("list");   // list = all sigs, form = create/edit
+  const [sigEditing, setSigEditing] = useState<EmailSignature | null>(null);
+  const [sigDeleteTarget, setSigDeleteTarget] = useState<EmailSignature | null>(null);
+  // Signature form fields
+  const [sigName, setSigName]       = useState("");
+  const [sigRole, setSigRole]       = useState("");
+  const [sigCompany, setSigCompany] = useState("");
+  const [sigTagline, setSigTagline] = useState("");
+  const [sigLinks, setSigLinks]     = useState<SigLink[]>([]);
+
+  // ── Queries ──
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["email-campaign-templates"],
-    queryFn: async () => {
-      const res = await api.get("/email-campaign-templates");
-      return res.data as EmailTemplate[];
-    },
+    queryFn: async () => (await api.get("/email-campaign-templates")).data as EmailTemplate[],
   });
 
   const { data: defaultContent } = useQuery<DefaultContent>({
     queryKey: ["email-campaign-templates-default"],
-    queryFn: async () => {
-      const res = await api.get("/email-campaign-templates/default-content");
-      return res.data;
-    },
+    queryFn: async () => (await api.get("/email-campaign-templates/default-content")).data,
   });
 
+  const { data: signatures = [] } = useQuery<EmailSignature[]>({
+    queryKey: ["email-signatures"],
+    queryFn: async () => (await api.get("/email-signatures")).data,
+    enabled: sigOpen,
+  });
+
+  const { data: accountDefaults = {} } = useQuery<Record<string, string | null>>({
+    queryKey: ["signature-defaults"],
+    queryFn: async () => {
+      const results = await Promise.all(
+        GMAIL_ACCOUNTS.map(async (acc) => {
+          const res = await api.get("/email-signatures/default", { params: { account: acc } });
+          return [acc, res.data?.id ?? null] as [string, string | null];
+        })
+      );
+      return Object.fromEntries(results);
+    },
+    enabled: sigOpen,
+  });
+
+  // ── Template mutations ──
   const saveMutation = useMutation({
     mutationFn: (data: { name: string; isDefault: boolean } & StepFields) =>
       editingTemplate
@@ -151,10 +230,46 @@ export default function EmailTemplatesPage() {
     onError: () => toast.error("Failed to update default"),
   });
 
+  // ── Signature mutations ──
+  const saveSigMutation = useMutation({
+    mutationFn: (data: Omit<EmailSignature, "id" | "createdAt">) =>
+      sigEditing
+        ? api.put(`/email-signatures/${sigEditing.id}`, data)
+        : api.post("/email-signatures", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["email-signatures"] });
+      setSigView("list");
+      setSigEditing(null);
+      toast.success(sigEditing ? "Signature updated" : "Signature created");
+    },
+    onError: () => toast.error("Failed to save signature"),
+  });
+
+  const deleteSigMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/email-signatures/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["email-signatures"] });
+      queryClient.invalidateQueries({ queryKey: ["signature-defaults"] });
+      setSigDeleteTarget(null);
+      toast.success("Signature deleted");
+    },
+    onError: () => toast.error("Failed to delete signature"),
+  });
+
+  const setDefaultSigMutation = useMutation({
+    mutationFn: (data: { account: string; signatureId: string | null }) =>
+      api.post("/email-signatures/default", { account: data.account, signatureId: data.signatureId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["signature-defaults"] });
+      toast.success("Default signature updated");
+    },
+    onError: () => toast.error("Failed to update default"),
+  });
+
+  // ── Template handlers ──
   const openCreate = () => {
     setEditingTemplate(null);
-    setName("");
-    setIsDefault(false);
+    setName(""); setIsDefault(false);
     setFields(emptyFields(defaultContent));
     setActiveTab("intro");
     setEditorOpen(true);
@@ -162,25 +277,17 @@ export default function EmailTemplatesPage() {
 
   const openEdit = (t: EmailTemplate) => {
     setEditingTemplate(t);
-    setName(t.name);
-    setIsDefault(t.isDefault);
-    setFields({
-      introSubject: t.introSubject,
-      introBody: t.introBody,
-      followup1Subject: t.followup1Subject,
-      followup1Body: t.followup1Body,
-      followup2Subject: t.followup2Subject,
-      followup2Body: t.followup2Body,
-      followup3Subject: t.followup3Subject,
-      followup3Body: t.followup3Body,
-    });
+    setName(t.name); setIsDefault(t.isDefault);
+    setFields({ introSubject: t.introSubject, introBody: t.introBody,
+      followup1Subject: t.followup1Subject, followup1Body: t.followup1Body,
+      followup2Subject: t.followup2Subject, followup2Body: t.followup2Body,
+      followup3Subject: t.followup3Subject, followup3Body: t.followup3Body });
     setActiveTab("intro");
     setEditorOpen(true);
   };
 
-  const setField = (key: keyof StepFields) => (value: string) => {
+  const setField = (key: keyof StepFields) => (value: string) =>
     setFields((f) => ({ ...f, [key]: value }));
-  };
 
   const handleSave = () => {
     if (!name.trim()) { toast.error("Template name is required"); return; }
@@ -189,9 +296,41 @@ export default function EmailTemplatesPage() {
     saveMutation.mutate({ name: name.trim(), isDefault, ...fields });
   };
 
+  // ── Signature handlers ──
+  const openSigCreate = () => {
+    setSigEditing(null);
+    setSigName(""); setSigRole(""); setSigCompany(""); setSigTagline(""); setSigLinks([]);
+    setSigView("form");
+  };
+
+  const openSigEdit = (sig: EmailSignature) => {
+    setSigEditing(sig);
+    setSigName(sig.name); setSigRole(sig.role); setSigCompany(sig.company);
+    setSigTagline(sig.tagline); setSigLinks(sig.links ?? []);
+    setSigView("form");
+  };
+
+  const addSigLink = () => setSigLinks((p) => [...p, { label: "", url: "" }]);
+  const removeSigLink = (i: number) => setSigLinks((p) => p.filter((_, idx) => idx !== i));
+  const updateSigLink = (i: number, field: keyof SigLink, val: string) =>
+    setSigLinks((p) => p.map((l, idx) => idx === i ? { ...l, [field]: val } : l));
+  const applyPreset = (i: number, preset: typeof LINK_PRESETS[0]) =>
+    setSigLinks((p) => p.map((l, idx) =>
+      idx === i ? { label: preset.label, url: l.url.startsWith(preset.urlPrefix) ? l.url : preset.urlPrefix } : l
+    ));
+
+  const handleSaveSig = () => {
+    if (!sigName.trim()) { toast.error("Name is required"); return; }
+    const cleanLinks = sigLinks.filter((l) => l.label.trim() && l.url.trim());
+    saveSigMutation.mutate({ name: sigName.trim(), role: sigRole, company: sigCompany, tagline: sigTagline, links: cleanLinks });
+  };
+
+  const sigPreview: Partial<EmailSignature> = { name: sigName, role: sigRole, company: sigCompany, tagline: sigTagline, links: sigLinks };
+
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      {/* Header */}
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate("/suppliers/sourcing")}>
@@ -205,15 +344,29 @@ export default function EmailTemplatesPage() {
             </p>
           </div>
         </div>
-        <PermissionGate permission={["suppliers", "sourcing_suppliers"]} editOnly>
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Template
+        <div className="flex items-center gap-2">
+          {/* Signature Settings */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setSigView("list"); setSigOpen(true); }}
+            className="gap-1.5 border-slate-200 text-slate-600 hover:text-brand-600 hover:border-brand-200 hover:bg-brand-50"
+            title="Manage email signatures"
+          >
+            <Settings className="h-4 w-4" />
+            Signatures
           </Button>
-        </PermissionGate>
+
+          <PermissionGate permission={["suppliers", "sourcing_suppliers"]} editOnly>
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Template
+            </Button>
+          </PermissionGate>
+        </div>
       </div>
 
-      {/* Template list */}
+      {/* ── Template list ── */}
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
@@ -236,17 +389,13 @@ export default function EmailTemplatesPage() {
       ) : (
         <div className="space-y-3">
           {templates.map((t) => (
-            <div
-              key={t.id}
-              className="bg-white rounded-xl border border-slate-200 p-4 flex items-start gap-4"
-            >
+            <div key={t.id} className="bg-white rounded-xl border border-slate-200 p-4 flex items-start gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-slate-800">{t.name}</span>
                   {t.isDefault && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-xs font-medium">
-                      <Star className="h-3 w-3" />
-                      Default
+                      <Star className="h-3 w-3" /> Default
                     </span>
                   )}
                 </div>
@@ -260,20 +409,13 @@ export default function EmailTemplatesPage() {
                     <p className="text-sm text-slate-600 truncate">{t.followup1Subject}</p>
                   </div>
                 </div>
-                <p className="mt-1.5 text-xs text-slate-400">
-                  Created {new Date(t.createdAt).toLocaleDateString()}
-                </p>
+                <p className="mt-1.5 text-xs text-slate-400">Created {new Date(t.createdAt).toLocaleDateString()}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {!t.isDefault && canEdit && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-slate-400 hover:text-amber-600"
-                    title="Set as default"
+                  <Button variant="ghost" size="sm" className="text-slate-400 hover:text-amber-600" title="Set as default"
                     onClick={() => setDefaultMutation.mutate({ id: t.id, isDefault: true })}
-                    disabled={setDefaultMutation.isPending}
-                  >
+                    disabled={setDefaultMutation.isPending}>
                     <Star className="h-4 w-4" />
                   </Button>
                 )}
@@ -283,12 +425,8 @@ export default function EmailTemplatesPage() {
                   </Button>
                 )}
                 {canEdit && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-400 hover:text-red-600"
-                    onClick={() => setDeleteTarget(t)}
-                  >
+                  <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600"
+                    onClick={() => setDeleteTarget(t)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
@@ -298,49 +436,37 @@ export default function EmailTemplatesPage() {
         </div>
       )}
 
-      {/* ── Editor Dialog ── */}
+      {/* ── Template Editor Dialog ── */}
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden p-0">
           <div className="px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
             <DialogTitle>{editingTemplate ? "Edit Template" : "New Email Template"}</DialogTitle>
             <DialogDescription>
-              Use variables like <code className="text-xs bg-slate-100 px-1 rounded">{"{{company}}"}</code> to personalise content. Include <code className="text-xs bg-slate-100 px-1 rounded">{"{{formButton}}"}</code> to insert the supplier form CTA.
+              Use variables like <code className="text-xs bg-slate-100 px-1 rounded">{"{{company}}"}</code> to personalise content.
+              Include <code className="text-xs bg-slate-100 px-1 rounded">{"{{formButton}}"}</code> to insert the supplier form CTA.
             </DialogDescription>
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-            {/* Name + Default */}
             <div className="flex gap-4 items-end">
               <div className="flex-1">
                 <Label className="text-xs text-slate-500 font-medium">Template Name</Label>
-                <Input
-                  className="mt-1"
-                  placeholder="e.g. Standard Outreach, Organic Suppliers…"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
+                <Input className="mt-1" placeholder="e.g. Standard Outreach, Organic Suppliers…"
+                  value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <label className="flex items-center gap-2 cursor-pointer pb-2 shrink-0">
-                <input
-                  type="checkbox"
-                  checked={isDefault}
-                  onChange={(e) => setIsDefault(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
+                <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300" />
                 <span className="text-sm text-slate-600">Set as default</span>
               </label>
             </div>
 
-            {/* Variable reference */}
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Available Variables</p>
               <div className="flex flex-wrap gap-2">
                 {VARIABLES.map((v) => (
-                  <span
-                    key={v.placeholder}
-                    title={v.description}
-                    className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded px-2 py-0.5 text-xs font-mono text-slate-700 cursor-default"
-                  >
+                  <span key={v.placeholder} title={v.description}
+                    className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded px-2 py-0.5 text-xs font-mono text-slate-700 cursor-default">
                     {v.placeholder}
                     <span className="text-slate-400 font-sans font-normal">— {v.description}</span>
                   </span>
@@ -348,15 +474,10 @@ export default function EmailTemplatesPage() {
               </div>
             </div>
 
-            {/* Step tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid grid-cols-4 w-full h-auto! p-1">
                 {STEPS.map((s) => (
-                  <TabsTrigger
-                    key={s.key}
-                    value={s.key}
-                    className="flex flex-col items-center gap-0.5 py-2 px-1 text-center"
-                  >
+                  <TabsTrigger key={s.key} value={s.key} className="flex flex-col items-center gap-0.5 py-2 px-1 text-center">
                     <span className="text-[10px] font-normal text-slate-400 leading-none">Step {s.stepNum}</span>
                     <span className="text-xs font-medium leading-tight">{s.label}</span>
                   </TabsTrigger>
@@ -371,28 +492,18 @@ export default function EmailTemplatesPage() {
                     </p>
                   )}
                   <div>
-                    <Label className="text-xs text-slate-500 font-medium">
-                      Subject{s.stepNum > 1 ? " (used as intro subject — follow-ups thread automatically)" : ""}
-                    </Label>
-                    <Input
-                      className="mt-1 font-mono text-sm"
-                      placeholder={`e.g. Export Supply Partnership Inquiry – {{product}}`}
-                      value={fields[s.subjectField]}
-                      onChange={(e) => setField(s.subjectField)(e.target.value)}
-                    />
+                    <Label className="text-xs text-slate-500 font-medium">Subject</Label>
+                    <Input className="mt-1 font-mono text-sm" placeholder="e.g. Export Supply Partnership Inquiry – {{product}}"
+                      value={fields[s.subjectField]} onChange={(e) => setField(s.subjectField)(e.target.value)} />
                   </div>
                   <div>
                     <Label className="text-xs text-slate-500 font-medium">Email Body</Label>
                     <p className="text-xs text-slate-400 mt-0.5 mb-1">
                       Plain text with blank lines between paragraphs. Lists: start lines with <code className="bg-slate-100 px-1 rounded">- </code>. HTML is also accepted.
                     </p>
-                    <Textarea
-                      className="mt-1 font-mono text-sm leading-relaxed"
-                      rows={18}
-                      placeholder={`{{greeting}}\n\nYour email body here...\n\n{{formButton}}\n\nBest regards,\nHarsh Patel`}
-                      value={fields[s.bodyField]}
-                      onChange={(e) => setField(s.bodyField)(e.target.value)}
-                    />
+                    <Textarea className="mt-1 font-mono text-sm leading-relaxed" rows={18}
+                      placeholder={`{{greeting}}\n\nYour email body here...\n\n{{formButton}}\n\nBest regards,\nÉlan Exports`}
+                      value={fields[s.bodyField]} onChange={(e) => setField(s.bodyField)(e.target.value)} />
                   </div>
                 </TabsContent>
               ))}
@@ -400,9 +511,7 @@ export default function EmailTemplatesPage() {
           </div>
 
           <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">
-            <Button variant="outline" onClick={() => setEditorOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setEditorOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saveMutation.isPending}>
               {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
               {editingTemplate ? "Save Changes" : "Create Template"}
@@ -411,7 +520,7 @@ export default function EmailTemplatesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Delete Confirm Dialog ── */}
+      {/* ── Delete Template Dialog ── */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogTitle>Delete Template</DialogTitle>
@@ -419,20 +528,272 @@ export default function EmailTemplatesPage() {
             Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? Suppliers already using this template will fall back to the system default.
           </DialogDescription>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-              disabled={deleteMutation.isPending}
-            >
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}>
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
               Delete
             </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ══════════════════════════════════════════════════════════
+          SIGNATURE SETTINGS DIALOG
+      ══════════════════════════════════════════════════════════ */}
+      <Dialog open={sigOpen} onOpenChange={(o) => { setSigOpen(o); if (!o) setSigView("list"); }}>
+        <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden bg-white rounded-xl shadow-2xl border-none">
+
+          {/* ── List view ── */}
+          {sigView === "list" && (
+            <>
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+                <div>
+                  <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <PenLine className="h-4 w-4 text-brand-500" /> Email Signatures
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                    Assign a signature per Gmail account — appended automatically to campaign emails.
+                  </DialogDescription>
+                </div>
+                <Button size="sm" onClick={openSigCreate}
+                  className="gap-1.5 bg-brand-600 hover:bg-brand-700 text-white shrink-0">
+                  <Plus className="h-3.5 w-3.5" /> New
+                </Button>
+              </div>
+
+              <div className="overflow-y-auto max-h-[72vh] p-5 space-y-6">
+
+                {/* Saved signatures */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Saved Signatures</p>
+                  {signatures.length === 0 ? (
+                    <div className="text-center py-8 rounded-xl border border-dashed border-slate-200">
+                      <PenLine className="h-7 w-7 text-slate-200 mx-auto mb-2" />
+                      <p className="text-sm text-slate-400">No signatures yet — create one above</p>
+                    </div>
+                  ) : (
+                    signatures.map((sig) => (
+                      <div key={sig.id} className="flex items-start gap-3 bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-900 text-sm">{sig.name}</p>
+                          {sig.role    && <p className="text-xs text-brand-600 font-medium">{sig.role}</p>}
+                          {sig.company && <p className="text-xs text-slate-500">{sig.company}</p>}
+                          {sig.links.length > 0 && (
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                              {sig.links.map((l, i) => (
+                                <span key={i} className="text-[11px] text-slate-400 flex items-center gap-1">
+                                  <Link2 className="h-2.5 w-2.5" />
+                                  <span className="font-medium text-slate-600">{l.label}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {sig.tagline && <p className="text-[11px] text-slate-400 italic mt-1">{sig.tagline}</p>}
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <button onClick={() => openSigEdit(sig)}
+                            className="p-1.5 rounded-lg hover:bg-brand-50 text-slate-400 hover:text-brand-600 transition-colors">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => setSigDeleteTarget(sig)}
+                            className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Per-account defaults */}
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Default per Gmail Account</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Selected signature is auto-appended when sending from that account.</p>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+                    {GMAIL_ACCOUNTS.map((acc) => {
+                      const currentId = accountDefaults[acc] ?? null;
+                      const currentSig = signatures.find((s) => s.id === currentId);
+                      return (
+                        <div key={acc} className="flex items-center justify-between px-4 py-3 gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-800 truncate">{acc}</p>
+                            {currentSig ? (
+                              <p className="text-[11px] text-emerald-600 flex items-center gap-1 mt-0.5">
+                                <CheckCircle2 className="h-3 w-3" /> {currentSig.name}
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-slate-400 mt-0.5">No default set</p>
+                            )}
+                          </div>
+                          <select
+                            value={currentId ?? ""}
+                            onChange={(e) => setDefaultSigMutation.mutate({ account: acc, signatureId: e.target.value || null })}
+                            className="h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50 min-w-[140px] shrink-0"
+                          >
+                            <option value="">No signature</option>
+                            {signatures.map((s) => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── Create / Edit form view ── */}
+          {sigView === "form" && (
+            <>
+              <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50">
+                <button onClick={() => { setSigView("list"); setSigEditing(null); }}
+                  className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 transition-colors">
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <div>
+                  <DialogTitle className="text-base font-bold text-slate-900">
+                    {sigEditing ? "Edit Signature" : "New Signature"}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                    Appended at the bottom of campaign emails.
+                  </DialogDescription>
+                </div>
+              </div>
+
+              <div className="overflow-y-auto max-h-[72vh] p-5 space-y-4">
+                {/* Name */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5" /> Full Name *
+                  </label>
+                  <Input placeholder="e.g. Mohita Vadrevu" value={sigName}
+                    onChange={(e) => setSigName(e.target.value)} className="h-9 text-sm border-slate-200" />
+                </div>
+
+                {/* Role */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                    <Briefcase className="h-3.5 w-3.5" /> Job Title / Role
+                  </label>
+                  <Input placeholder="e.g. Strategic Partnerships Lead" value={sigRole}
+                    onChange={(e) => setSigRole(e.target.value)} className="h-9 text-sm border-slate-200" />
+                </div>
+
+                {/* Company */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" /> Company Name
+                  </label>
+                  <Input placeholder="e.g. Elan Exports Consultancy Pte Ltd" value={sigCompany}
+                    onChange={(e) => setSigCompany(e.target.value)} className="h-9 text-sm border-slate-200" />
+                </div>
+
+                {/* Links */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                    <Link2 className="h-3.5 w-3.5" /> Links
+                  </label>
+                  <div className="space-y-2">
+                    {sigLinks.map((link, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <GripVertical className="h-4 w-4 text-slate-300 shrink-0" />
+                        <select
+                          value={link.label}
+                          onChange={(e) => {
+                            const preset = LINK_PRESETS.find((p) => p.label === e.target.value);
+                            if (preset) applyPreset(i, preset);
+                            else updateSigLink(i, "label", e.target.value);
+                          }}
+                          className="h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50 w-28 shrink-0"
+                        >
+                          <option value="">Label…</option>
+                          {LINK_PRESETS.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
+                          {link.label && !LINK_PRESETS.find((p) => p.label === link.label) && (
+                            <option value={link.label}>{link.label}</option>
+                          )}
+                        </select>
+                        <Input placeholder="URL or value" value={link.url}
+                          onChange={(e) => updateSigLink(i, "url", e.target.value)}
+                          className="h-9 text-sm border-slate-200 flex-1" />
+                        <button onClick={() => removeSigLink(i)}
+                          className="p-1.5 rounded-md text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors shrink-0">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={addSigLink}
+                    className="w-fit gap-1.5 text-slate-600 border-slate-200 hover:bg-slate-50 h-8 text-xs">
+                    <Plus className="h-3.5 w-3.5" /> Add Link
+                  </Button>
+                </div>
+
+                {/* Tagline */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                    <AlignLeft className="h-3.5 w-3.5" /> Tagline
+                  </label>
+                  <Input placeholder="e.g. Global Trade | Textiles & Food Commodities | 15+ Countries"
+                    value={sigTagline} onChange={(e) => setSigTagline(e.target.value)}
+                    className="h-9 text-sm border-slate-200" />
+                </div>
+
+                {/* Preview */}
+                <SigPreview sig={sigPreview} />
+              </div>
+
+              <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+                <Button variant="outline" onClick={() => { setSigView("list"); setSigEditing(null); }}
+                  className="border-slate-200 text-slate-700">
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveSig} disabled={saveSigMutation.isPending}
+                  className="bg-brand-600 hover:bg-brand-700 text-white gap-2">
+                  {saveSigMutation.isPending
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <CheckCircle2 className="h-4 w-4" />}
+                  {sigEditing ? "Save Changes" : "Create Signature"}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Signature Confirm ── */}
+      <Dialog open={!!sigDeleteTarget} onOpenChange={(o) => { if (!o) setSigDeleteTarget(null); }}>
+        <DialogContent className="sm:max-w-sm p-6 bg-white rounded-xl shadow-2xl border-none">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+              <Trash2 className="h-5 w-5 text-rose-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-base font-bold text-slate-900">Delete Signature</DialogTitle>
+              <DialogDescription className="text-slate-500 text-sm mt-0.5">
+                This will also unset it as default for any accounts using it.
+              </DialogDescription>
+            </div>
+          </div>
+          <p className="text-sm bg-slate-50 border border-slate-100 rounded-lg p-3 font-semibold text-slate-700 mb-4">
+            "{sigDeleteTarget?.name}"
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setSigDeleteTarget(null)} className="border-slate-200">Cancel</Button>
+            <Button variant="destructive" disabled={deleteSigMutation.isPending}
+              onClick={() => sigDeleteTarget && deleteSigMutation.mutate(sigDeleteTarget.id)}
+              className="bg-rose-600 hover:bg-rose-700 text-white">
+              {deleteSigMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

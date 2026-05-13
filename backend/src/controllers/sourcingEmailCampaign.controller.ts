@@ -5,6 +5,7 @@ import { AuthRequest } from "../types/index.js";
 import { createNotification } from "../services/notificationService.js";
 import { sendGmailEmail, fetchThreadReplies, getSmtpMessageId } from "../services/gmailService.js";
 import { getTemplate, getCustomTemplate, CustomEmailTemplate } from "../services/emailTemplates.js";
+import { fetchDefaultSignatureForAccount } from "./emailSignatures.controller.js";
 
 function addDays(date: Date, days: number): Date {
     const result = new Date(date);
@@ -209,12 +210,14 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
     if (nextStep > 4) return; // all done
 
     const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId);
+    const signature = await fetchDefaultSignatureForAccount(fromEmail);
     const templateData = {
         company: supplier.company,
         contactPerson: supplier.contactPerson,
         product: supplier.product ?? supplier.productCategory ?? null,
         formLink,
         fromEmail,
+        signature,
     };
 
     let customTpl: CustomEmailTemplate | null = null;
@@ -333,12 +336,14 @@ export async function startCampaignForSupplier(sourcingId: string, userId?: stri
         if (existing) return false;
 
         const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId);
+        const signature = await fetchDefaultSignatureForAccount(supplier.assignedGmailAccount);
         const templateData = {
             company: supplier.company,
             contactPerson: supplier.contactPerson,
             product: supplier.product ?? supplier.productCategory ?? null,
             formLink,
             fromEmail: supplier.assignedGmailAccount,
+            signature,
         };
         let customTpl: CustomEmailTemplate | null = null;
         if (supplier.emailTemplateId) {
@@ -493,13 +498,22 @@ export async function startCampaign(req: AuthRequest, res: Response): Promise<vo
         }
 
         const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId);
-        const { subject, html } = getTemplate(1, {
+        const signature = await fetchDefaultSignatureForAccount(supplier.assignedGmailAccount);
+        let customTplForStart: CustomEmailTemplate | null = null;
+        if (supplier.emailTemplateId) {
+            customTplForStart = await (prisma as any).emailCampaignTemplate.findUnique({ where: { id: supplier.emailTemplateId } }) ?? null;
+        }
+        const templateDataForStart = {
             company: supplier.company,
             contactPerson: supplier.contactPerson,
             product: supplier.product ?? supplier.productCategory ?? null,
             formLink,
             fromEmail: supplier.assignedGmailAccount,
-        });
+            signature,
+        };
+        const { subject, html } = customTplForStart
+            ? getCustomTemplate(1, customTplForStart, templateDataForStart)
+            : getTemplate(1, templateDataForStart);
 
         const { messageId, threadId } = await sendGmailEmail({
             fromEmail: supplier.assignedGmailAccount,

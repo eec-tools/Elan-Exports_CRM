@@ -48,6 +48,7 @@ import QuotationsPage from "@/pages/QuotationsPage";
 import QuotationDetailsPage from "@/pages/QuotationDetailsPage";
 import PublicQuotationFormPage from "@/pages/PublicQuotationFormPage";
 import GmailSettingsPage from "@/pages/GmailSettingsPage";
+import SignaturesPage from "@/pages/SignaturesPage";
 import { Loader2 } from "lucide-react";
 
 const backendApiUrl = (import.meta.env.VITE_API_URL || "http://localhost:3001/api").replace(/\/+$/, "");
@@ -289,6 +290,7 @@ export default function App() {
                 <Route path="payroll" element={<PayrollPage />} />
 
                 <Route path="settings/gmail" element={<GmailSettingsPage />} />
+                <Route path="settings/signatures" element={<SignaturesPage />} />
 
                 {/* Admin-only routes */}
                 <Route element={<AdminRoute />}>

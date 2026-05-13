@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle, Loader2, Mail } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Mail, PenLine } from "lucide-react";
 
 interface GmailAccount {
   email: string;
@@ -50,11 +50,19 @@ export default function GmailSettingsPage() {
 
   return (
     <div className="p-6 max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Gmail Settings</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Connect Gmail accounts used to send sourcing supplier campaign emails (intro + follow-ups).
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Gmail Settings</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Connect Gmail accounts used to send sourcing supplier campaign emails (intro + follow-ups).
+          </p>
+        </div>
+        <Link to="/settings/signatures">
+          <Button variant="outline" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 shrink-0">
+            <PenLine className="h-4 w-4 text-brand-500" />
+            Manage Signatures
+          </Button>
+        </Link>
       </div>
 
       {/* Account list */}

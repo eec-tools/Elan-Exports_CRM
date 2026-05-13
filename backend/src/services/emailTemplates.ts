@@ -1,9 +1,58 @@
+export interface SignatureLink {
+  label: string;
+  url: string;
+}
+
+export interface SignatureData {
+  name: string;
+  role?: string;
+  company?: string;
+  tagline?: string;
+  links?: SignatureLink[];
+}
+
 interface TemplateData {
   company: string;
   contactPerson?: string | null;
   product?: string | null;
   formLink: string;
   fromEmail: string;
+  signature?: SignatureData | null;
+}
+
+function displayUrl(url: string): string {
+  if (url.startsWith("mailto:")) return url.slice(7);
+  if (url.startsWith("tel:")) return url.slice(4);
+  return url.replace(/^https?:\/\/(www\.)?/, "");
+}
+
+function buildSignatureHtml(sig: SignatureData | null | undefined, salutation: string, _fallbackEmail: string): string {
+  if (!sig) {
+    return `<p style="margin:24px 0 0;color:#374151;font-size:15px;">${salutation},</p>`;
+  }
+
+  const linkRows = (sig.links ?? [])
+    .map((l) => `
+      <p style="margin:0 0 2px;">
+        <span style="color:#6b7280;font-size:12px;">${l.label}: </span>
+        <a href="${l.url}" style="color:#1a1a2e;font-size:12px;text-decoration:none;">${displayUrl(l.url)}</a>
+      </p>`)
+    .join("");
+
+  return `
+<p style="margin:24px 0 8px;color:#374151;font-size:15px;">${salutation},</p>
+<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+  <tr>
+    <td style="width:3px;background:#d97706;border-radius:2px;">&nbsp;</td>
+    <td style="padding-left:12px;">
+      <p style="margin:0 0 1px;font-size:16px;font-weight:bold;color:#1a1a2e;">${sig.name}</p>
+      ${sig.role ? `<p style="margin:0 0 1px;font-size:13px;color:#d97706;font-weight:600;">${sig.role}</p>` : ""}
+      ${sig.company ? `<p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#374151;">${sig.company}</p>` : `<p style="margin:0 0 8px;"></p>`}
+      ${linkRows}
+      ${sig.tagline ? `<p style="margin:8px 0 0;font-size:11px;color:#9ca3af;font-style:italic;">${sig.tagline}</p>` : ""}
+    </td>
+  </tr>
+</table>`;
 }
 
 interface EmailTemplate {
@@ -137,12 +186,7 @@ ${formLinkBox(data.formLink)}
   We look forward to reviewing your profile and exploring a potential working relationship.
 </p>
 
-<p style="margin:24px 0 0;color:#374151;font-size:15px;">
-  Warm regards,<br />
-  <strong>Élan Exports</strong><br />
-  <span style="color:#6b7280;font-size:13px;">Elan Exports Consultancy</span><br />
-  <a href="mailto:${data.fromEmail}" style="color:#1a1a2e;font-size:13px;">${data.fromEmail}</a>
-</p>`;
+${buildSignatureHtml(data.signature, "Warm regards", data.fromEmail)}`;
 
   return {
     subject: `Export Supply Partnership Inquiry – ${productLine}`,
@@ -170,12 +214,7 @@ ${formLinkBox(data.formLink)}
   If you have any questions or would prefer to connect over a call, please do not hesitate to reach out directly.
 </p>
 
-<p style="margin:24px 0 0;color:#374151;font-size:15px;">
-  Best regards,<br />
-  <strong>Élan Exports</strong><br />
-  <span style="color:#6b7280;font-size:13px;">Élan Exports &amp; Consultancy</span><br />
-  <a href="mailto:${data.fromEmail}" style="color:#1a1a2e;font-size:13px;">${data.fromEmail}</a>
-</p>`;
+${buildSignatureHtml(data.signature, "Best regards", data.fromEmail)}`;
 
   return {
     subject: `Following Up — Supplier Form | Élan Exports × ${data.company}`,
@@ -203,12 +242,7 @@ ${formLinkBox(data.formLink)}
   If this is not the right time or you are not interested, no worries at all — please let us know and we will not follow up further.
 </p>
 
-<p style="margin:24px 0 0;color:#374151;font-size:15px;">
-  Best regards,<br />
-  <strong>Élan Exports</strong><br />
-  <span style="color:#6b7280;font-size:13px;">Élan Exports &amp; Consultancy</span><br />
-  <a href="mailto:${data.fromEmail}" style="color:#1a1a2e;font-size:13px;">${data.fromEmail}</a>
-</p>`;
+${buildSignatureHtml(data.signature, "Best regards", data.fromEmail)}`;
 
   return {
     subject: `Reminder — Partnership Opportunity with Élan Exports | ${data.company}`,
@@ -236,12 +270,7 @@ ${formLinkBox(data.formLink)}
   If we do not hear back, we will close this inquiry — but you are always welcome to reach out to us directly in the future if circumstances change.
 </p>
 
-<p style="margin:24px 0 0;color:#374151;font-size:15px;">
-  Best regards,<br />
-  <strong>Élan Exports</strong><br />
-  <span style="color:#6b7280;font-size:13px;">Élan Exports &amp; Consultancy</span><br />
-  <a href="mailto:${data.fromEmail}" style="color:#1a1a2e;font-size:13px;">${data.fromEmail}</a>
-</p>`;
+${buildSignatureHtml(data.signature, "Best regards", data.fromEmail)}`;
 
   return {
     subject: `Last Follow-Up — Élan Exports Partnership Inquiry | ${data.company}`,
@@ -260,6 +289,13 @@ export interface CustomEmailTemplate {
     followup2Body: string;
     followup3Subject: string;
     followup3Body: string;
+}
+
+function stripTrailingSignoff(text: string): string {
+    // Remove any trailing sign-off block (e.g. "Warm regards,\nJohn\nCompany") so the dynamic signature isn't duplicated
+    return text
+        .replace(/[\r\n\s]*(warm regards|best regards|kind regards|regards|sincerely|yours sincerely|best|cheers)[,.]?[\s\S]*$/i, "")
+        .trimEnd();
 }
 
 function renderSubject(subjectTemplate: string, data: TemplateData): string {
@@ -318,31 +354,38 @@ export function getCustomTemplate(step: number, customTpl: CustomEmailTemplate, 
     const introSubject = renderSubject(customTpl.introSubject, data);
     let subject: string;
     let bodyText: string;
+    let salutation: string;
 
     switch (step) {
         case 1:
             subject = introSubject;
             bodyText = customTpl.introBody;
+            salutation = "Warm regards";
             break;
         case 2:
             subject = `Re: ${introSubject}`;
             bodyText = customTpl.followup1Body;
+            salutation = "Best regards";
             break;
         case 3:
             subject = `Re: ${introSubject}`;
             bodyText = customTpl.followup2Body;
+            salutation = "Best regards";
             break;
         case 4:
             subject = `Re: ${introSubject}`;
             bodyText = customTpl.followup3Body;
+            salutation = "Best regards";
             break;
         default:
             throw new Error(`Unknown campaign step: ${step}`);
     }
 
+    const bodyHtml = renderBodyText(stripTrailingSignoff(bodyText), data) + "\n" + buildSignatureHtml(data.signature, salutation, data.fromEmail);
+
     return {
         subject,
-        html: baseLayout(renderBodyText(bodyText, data), data.fromEmail),
+        html: baseLayout(bodyHtml, data.fromEmail),
     };
 }
 
