@@ -139,7 +139,7 @@ ${formLinkBox(data.formLink)}
 
 <p style="margin:24px 0 0;color:#374151;font-size:15px;">
   Warm regards,<br />
-  <strong>Harsh Patel</strong><br />
+  <strong>Élan Exports</strong><br />
   <span style="color:#6b7280;font-size:13px;">Elan Exports Consultancy</span><br />
   <a href="mailto:${data.fromEmail}" style="color:#1a1a2e;font-size:13px;">${data.fromEmail}</a>
 </p>`;
@@ -172,7 +172,7 @@ ${formLinkBox(data.formLink)}
 
 <p style="margin:24px 0 0;color:#374151;font-size:15px;">
   Best regards,<br />
-  <strong>Harsh Patel</strong><br />
+  <strong>Élan Exports</strong><br />
   <span style="color:#6b7280;font-size:13px;">Élan Exports &amp; Consultancy</span><br />
   <a href="mailto:${data.fromEmail}" style="color:#1a1a2e;font-size:13px;">${data.fromEmail}</a>
 </p>`;
@@ -205,7 +205,7 @@ ${formLinkBox(data.formLink)}
 
 <p style="margin:24px 0 0;color:#374151;font-size:15px;">
   Best regards,<br />
-  <strong>Harsh Patel</strong><br />
+  <strong>Élan Exports</strong><br />
   <span style="color:#6b7280;font-size:13px;">Élan Exports &amp; Consultancy</span><br />
   <a href="mailto:${data.fromEmail}" style="color:#1a1a2e;font-size:13px;">${data.fromEmail}</a>
 </p>`;
@@ -238,7 +238,7 @@ ${formLinkBox(data.formLink)}
 
 <p style="margin:24px 0 0;color:#374151;font-size:15px;">
   Best regards,<br />
-  <strong>Harsh Patel</strong><br />
+  <strong>Élan Exports</strong><br />
   <span style="color:#6b7280;font-size:13px;">Élan Exports &amp; Consultancy</span><br />
   <a href="mailto:${data.fromEmail}" style="color:#1a1a2e;font-size:13px;">${data.fromEmail}</a>
 </p>`;
