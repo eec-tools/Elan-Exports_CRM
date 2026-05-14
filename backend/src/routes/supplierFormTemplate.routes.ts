@@ -10,13 +10,13 @@ import { authenticate, requirePermission, requireEdit } from "../middleware/auth
 
 const router = Router();
 
-router.use(authenticate, requirePermission("suppliers"));
+router.use(authenticate, requirePermission(["suppliers", "sourcing_suppliers"]));
 
 router.get("/", listTemplates);
 router.get("/:id", getTemplate);
 
-router.post("/", requireEdit("suppliers"), createTemplate);
-router.put("/:id", requireEdit("suppliers"), updateTemplate);
-router.delete("/:id", requireEdit("suppliers"), deleteTemplate);
+router.post("/", requireEdit(["suppliers", "sourcing_suppliers"]), createTemplate);
+router.put("/:id", requireEdit(["suppliers", "sourcing_suppliers"]), updateTemplate);
+router.delete("/:id", requireEdit(["suppliers", "sourcing_suppliers"]), deleteTemplate);
 
 export default router;
