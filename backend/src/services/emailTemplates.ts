@@ -77,7 +77,6 @@ function baseLayout(content: string, fromEmail: string): string {
           <tr>
             <td style="background:#1a1a2e;padding:24px 32px;">
               <p style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;letter-spacing:0.5px;">Élan Exports</p>
-              <p style="margin:4px 0 0;color:#a0aec0;font-size:12px;">Premium Agri-Commodity Trading</p>
             </td>
           </tr>
           <!-- Body -->
@@ -88,13 +87,10 @@ function baseLayout(content: string, fromEmail: string): string {
           </tr>
           <!-- Footer -->
           <tr>
-            <td style="background:#f9fafb;padding:20px 32px;border-top:1px solid #e5e7eb;">
+            <td style="background:#f9fafb;padding:16px 32px;border-top:1px solid #e5e7eb;">
               <p style="margin:0;color:#6b7280;font-size:12px;">
                 Élan Exports &amp; Consultancy &nbsp;|&nbsp;
                 <a href="mailto:${fromEmail}" style="color:#1a1a2e;text-decoration:none;">${fromEmail}</a>
-              </p>
-              <p style="margin:6px 0 0;color:#9ca3af;font-size:11px;">
-                This email was sent as part of a supplier onboarding process. If you believe this was sent in error, please ignore this email.
               </p>
             </td>
           </tr>
