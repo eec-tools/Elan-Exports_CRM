@@ -180,7 +180,8 @@ const UPLOAD_CATEGORIES = [
 // ─── Main Page ───────────────────────────────────────
 
 export default function VaultPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, hasEditPermission } = useAuth();
+  const canEdit = isAdmin || hasEditPermission("vault");
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
@@ -411,7 +412,7 @@ export default function VaultPage() {
             Google Drive-style document storage with auto-organized supplier files
           </p>
         </div>
-        {isAdmin && (
+        {canEdit && (
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -531,7 +532,7 @@ export default function VaultPage() {
             <>
               <FolderOpen className="h-10 w-10 opacity-30" />
               <p className="text-sm">This folder is empty</p>
-              {isAdmin && (
+              {canEdit && (
                 <div className="flex gap-2">
                   <Button
                     size="sm"
@@ -595,7 +596,7 @@ export default function VaultPage() {
                         </div>
                       </button>
                       {/* Folder actions (hover) */}
-                      {isAdmin && (
+                      {canEdit && (
                         <div className="absolute top-1.5 right-1.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
@@ -723,7 +724,7 @@ export default function VaultPage() {
 
                         {/* Actions */}
                         <div className="flex items-center justify-end gap-1 px-4 py-3">
-                          {isAdmin && (
+                          {canEdit && (
                             <>
                               <Button
                                 variant="ghost"
