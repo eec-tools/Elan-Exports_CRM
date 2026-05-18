@@ -26,6 +26,9 @@ import {
   Package,
   Camera,
   FileSignature,
+  Loader2,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/client";
@@ -245,27 +248,75 @@ export default function VaultPage() {
   const folders = documents.filter((d) => d.isFolder);
   const files = documents.filter((d) => !d.isFolder);
 
-  // ─── Upload mutation ─────────────────────────────────
+  // Upload status: idle | uploading | saving | done | error
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "saving" | "done" | "error">("idle");
 
-  const uploadMutation = useMutation({
-    mutationFn: async (fd: FormData) => {
-      const res = await api.post("/vault/upload", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
+  // ─── Upload: direct-to-Cloudinary (mirrors NewSupplier pattern) ──────
+
+  function deriveFileType(mimetype: string): string {
+    if (mimetype === "application/pdf") return "pdf";
+    if (mimetype.startsWith("image/")) return "image";
+    if (mimetype.includes("word") || mimetype.includes("document") || mimetype.includes("wordprocessingml")) return "doc";
+    if (mimetype.includes("excel") || mimetype.includes("sheet") || mimetype.includes("spreadsheetml")) return "sheet";
+    return "file";
+  }
+
+  async function uploadToCloudinaryAndSave() {
+    if (!uploadFile) { toast.error("Please select a file"); return; }
+    if (!uploadForm.name || !uploadForm.category) { toast.error("Name and category are required"); return; }
+
+    try {
+      // Step 1 — get signed params from backend
+      setUploadStatus("uploading");
+      const { data: sig } = await api.get("/vault/upload-signature");
+
+      const isRaw =
+        /\.(pdf|doc|docx|xls|xlsx|csv|zip)$/i.test(uploadFile.name) ||
+        uploadFile.type === "application/pdf";
+      const resourceType = isRaw ? "raw" : "auto";
+
+      // Step 2 — upload directly to Cloudinary (no backend proxy)
+      const fd = new FormData();
+      fd.append("file", uploadFile);
+      fd.append("signature", sig.signature);
+      fd.append("timestamp", String(sig.timestamp));
+      fd.append("api_key", sig.apiKey);
+      fd.append("folder", sig.folder);
+
+      const cloudRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${sig.cloudName}/${resourceType}/upload`,
+        { method: "POST", body: fd },
+      );
+      const cloudData = await cloudRes.json();
+      if (!cloudData.secure_url) throw new Error("Cloudinary upload failed");
+
+      // Step 3 — save metadata to backend (plain JSON, no CORS / size issues)
+      setUploadStatus("saving");
+      await api.post("/vault/upload", {
+        name: uploadForm.name,
+        category: uploadForm.category,
+        region: uploadForm.region,
+        parentId: currentFolderId || undefined,
+        fileUrl: cloudData.secure_url as string,
+        publicId: cloudData.public_id as string,
+        fileType: deriveFileType(uploadFile.type),
       });
-      return res.data;
-    },
-    onSuccess: () => {
+
+      setUploadStatus("done");
       toast.success("Document uploaded successfully");
       queryClient.invalidateQueries({ queryKey: ["vault-documents"] });
       queryClient.invalidateQueries({ queryKey: ["vault-categories"] });
-      setUploadOpen(false);
-      setUploadForm({ name: "", category: "", region: "Global" });
-      setUploadFile(null);
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error ?? "Upload failed");
-    },
-  });
+      setTimeout(() => {
+        setUploadOpen(false);
+        setUploadForm({ name: "", category: "", region: "Global" });
+        setUploadFile(null);
+        setUploadStatus("idle");
+      }, 800);
+    } catch (err: any) {
+      setUploadStatus("error");
+      toast.error(err?.message ?? "Upload failed");
+    }
+  }
 
   // ─── Folder mutation ─────────────────────────────────
 
@@ -351,21 +402,7 @@ export default function VaultPage() {
   }
 
   function handleUploadSubmit() {
-    if (!uploadFile) {
-      toast.error("Please select a file");
-      return;
-    }
-    if (!uploadForm.name || !uploadForm.category) {
-      toast.error("Name and category are required");
-      return;
-    }
-    const fd = new FormData();
-    fd.append("file", uploadFile);
-    fd.append("name", uploadForm.name);
-    fd.append("category", uploadForm.category);
-    fd.append("region", uploadForm.region);
-    if (currentFolderId) fd.append("parentId", currentFolderId);
-    uploadMutation.mutate(fd);
+    uploadToCloudinaryAndSave();
   }
 
   function handleFileDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -885,22 +922,44 @@ export default function VaultPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setUploadOpen(false)}
-              disabled={uploadMutation.isPending}
+              onClick={() => {
+                setUploadOpen(false);
+                setUploadStatus("idle");
+              }}
+              disabled={uploadStatus === "uploading" || uploadStatus === "saving"}
             >
               Cancel
             </Button>
             <Button
               onClick={handleUploadSubmit}
-              disabled={uploadMutation.isPending}
+              disabled={uploadStatus === "uploading" || uploadStatus === "saving" || uploadStatus === "done"}
               className="gap-2"
             >
-              {uploadMutation.isPending ? (
+              {uploadStatus === "uploading" && (
                 <>
-                  <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Uploading…
                 </>
-              ) : (
+              )}
+              {uploadStatus === "saving" && (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              )}
+              {uploadStatus === "done" && (
+                <>
+                  <Check className="h-4 w-4" />
+                  Done
+                </>
+              )}
+              {uploadStatus === "error" && (
+                <>
+                  <AlertCircle className="h-4 w-4" />
+                  Retry
+                </>
+              )}
+              {uploadStatus === "idle" && (
                 <>
                   <Upload className="h-4 w-4" />
                   Upload

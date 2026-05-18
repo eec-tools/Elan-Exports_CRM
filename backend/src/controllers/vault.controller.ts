@@ -3,6 +3,7 @@ import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { PrismaClient } from "@prisma/client";
+import { AuthRequest } from "../types/index.js";
 
 const prisma = new PrismaClient();
 
@@ -64,6 +65,26 @@ function deriveFileType(mimetype: string): string {
 }
 
 // ─── Controllers ────────────────────────────────────
+
+/** GET /api/vault/upload-signature - generate a signed Cloudinary upload params */
+export async function getVaultUploadSignature(
+  _req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  const timestamp = Math.round(Date.now() / 1000);
+  const params = { folder: "elan-vault", timestamp };
+  const signature = cloudinary.utils.api_sign_request(
+    params,
+    process.env.CLOUDINARY_API_SECRET!,
+  );
+  res.json({
+    signature,
+    timestamp,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    folder: "elan-vault",
+  });
+}
 
 /** GET /api/vault - list documents/folders in a given parent (or root) */
 export async function listDocuments(
@@ -212,22 +233,25 @@ export async function createFolder(
   }
 }
 
-/** POST /api/vault/upload - upload a new document */
+/**
+ * POST /api/vault/upload
+ * Accepts a JSON body with the Cloudinary result already uploaded from the frontend.
+ * { name, category, region, parentId, fileUrl, publicId, fileType }
+ */
 export async function uploadDocument(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
   try {
-    const file = req.file as any;
-    if (!file) {
-      res.status(400).json({ error: "No file uploaded" });
-      return;
-    }
+    const { name, category, region, parentId, fileUrl, publicId, fileType } = req.body;
 
-    const { name, category, region, parentId } = req.body;
     if (!name || !category) {
       res.status(400).json({ error: "Name and category are required" });
+      return;
+    }
+    if (!fileUrl) {
+      res.status(400).json({ error: "fileUrl is required" });
       return;
     }
 
@@ -238,9 +262,9 @@ export async function uploadDocument(
         name,
         category,
         region: region || "Global",
-        fileUrl: file.path || file.secure_url || file.url,
-        publicId: file.filename || file.public_id,
-        fileType: deriveFileType(file.mimetype),
+        fileUrl,
+        publicId: publicId || null,
+        fileType: fileType || "file",
         isFolder: false,
         parentId: parentId || null,
         uploadedBy: userId ?? null,

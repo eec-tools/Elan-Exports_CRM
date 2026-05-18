@@ -7,9 +7,9 @@ import {
   uploadDocument,
   editDocument,
   deleteDocument,
-  upload,
+  getVaultUploadSignature,
 } from "../controllers/vault.controller.js";
-import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { authenticate, requireEdit } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -21,10 +21,14 @@ router.get("/", listDocuments);
 router.get("/categories", getCategories);
 router.get("/breadcrumbs/:id", getBreadcrumbs);
 
-// Write – admin only
-router.post("/folder", requireAdmin, createFolder);
-router.post("/upload", requireAdmin, upload.single("file"), uploadDocument);
-router.put("/:id", requireAdmin, editDocument);
-router.delete("/:id", requireAdmin, deleteDocument);
+// Upload signature – admin OR vault edit (used by frontend for direct-to-Cloudinary upload)
+router.get("/upload-signature", requireEdit("vault"), getVaultUploadSignature);
+
+// Write – admin OR members with vault edit permission
+router.post("/folder", requireEdit("vault"), createFolder);
+router.post("/upload", requireEdit("vault"), uploadDocument);   // JSON body, no multipart
+router.put("/:id", requireEdit("vault"), editDocument);
+router.delete("/:id", requireEdit("vault"), deleteDocument);
 
 export default router;
+

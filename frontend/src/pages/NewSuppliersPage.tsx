@@ -253,6 +253,45 @@ const LAB_TEST_TYPES = [
   "Aflatoxin Test",
   "Moisture Analysis",
 ];
+const LAB_TEST_TYPES_TEXTILE = [
+  "Azo Dyes Test",
+  "pH Test",
+  "Colorfastness Test",
+  "Formaldehyde Test",
+  "Heavy Metals (Textiles)",
+];
+const LAB_TEST_TYPES_INDUSTRIAL = [
+  "Industrial Compliance Check",
+  "Safety Data Sheet (SDS) Verification",
+  "RoHS / REACH Compliance Test",
+  "Material Composition Analysis",
+];
+
+function getLabTestTypes(supplierType: string): string[] {
+  const t = (supplierType || "").toLowerCase();
+  if (t.includes("textile") || t.includes("garment") || t.includes("apparel")) return LAB_TEST_TYPES_TEXTILE;
+  if (t.includes("industrial") || t.includes("chemical") || t.includes("engineering")) return LAB_TEST_TYPES_INDUSTRIAL;
+  return LAB_TEST_TYPES;
+}
+
+function makeLabRows(types: string[]): LabTestRow[] {
+  return types.map((t) => ({ testType: t, lastTestDate: "", labName: "", reportAttached: "" }));
+}
+
+const COMPLETENESS_FIELDS: (keyof Supplier)[] = [
+  "company", "country", "productCategory", "product", "email", "phone",
+  "accountManager", "contactPerson", "website", "supplierType",
+  "haccpAvailable", "isoFsscCertNo", "paymentTerms", "incotermsSupported",
+  "currencyPreferred", "moq",
+];
+
+function computeCompleteness(s: Partial<Supplier>): number {
+  const filled = COMPLETENESS_FIELDS.filter((f) => {
+    const v = s[f];
+    return v !== null && v !== undefined && String(v).trim() !== "";
+  }).length;
+  return Math.round((filled / COMPLETENESS_FIELDS.length) * 100);
+}
 
 const DEAL_STAGES = [
   "Communication",
@@ -343,12 +382,7 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
     certNumber: "",
     expiryDate: "",
   })),
-  labTestingRecords: LAB_TEST_TYPES.map((t) => ({
-    testType: t,
-    lastTestDate: "",
-    labName: "",
-    reportAttached: "",
-  })),
+  labTestingRecords: makeLabRows(LAB_TEST_TYPES),
   gmoFreeDeclaration: "",
   irradiationFreeDeclaration: "",
   foodContactCompliance: "",
@@ -412,6 +446,9 @@ export default function NewSuppliersPage() {
   );
   const [showAddStageDialog, setShowAddStageDialog] = useState(false);
   const [newStageName, setNewStageName] = useState("");
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickForm, setQuickForm] = useState({ company: "", email: "", country: "", productCategory: "" });
+  const [showAdvancedLabFields, setShowAdvancedLabFields] = useState(false);
 
   function handleAddStage() {
     const trimmed = newStageName.trim();
@@ -786,6 +823,13 @@ export default function NewSuppliersPage() {
           </Button>
           <PermissionGate permission="new_suppliers" editOnly>
             <Button
+              variant="outline"
+              onClick={() => { setQuickForm({ company: "", email: "", country: "", productCategory: "" }); setQuickAddOpen(true); }}
+              className="gap-2 bg-white hover:bg-slate-50 text-slate-700 shadow-sm border-slate-200 h-9"
+            >
+              <Plus className="h-4 w-4" /> Quick Add
+            </Button>
+            <Button
               onClick={openCreate}
               className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9"
             >
@@ -998,6 +1042,7 @@ export default function NewSuppliersPage() {
                 <th className="px-5 py-3.5 font-semibold sticky left-0 z-30 bg-slate-50 shadow-[inset_-1px_0_0_0_#e2e8f0]">
                   Company Name
                 </th>
+                <th className="px-5 py-3.5 font-semibold">Status</th>
                 <th className="px-5 py-3.5 font-semibold">Product Category</th>
                 <th className="px-5 py-3.5 font-semibold">Product</th>
                 <th className="px-5 py-3.5 font-semibold">Country</th>
@@ -1020,7 +1065,7 @@ export default function NewSuppliersPage() {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading && suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 14 : 13} className="h-32 text-center">
+                  <td colSpan={canEdit ? 15 : 14} className="h-32 text-center">
                     <div className="flex justify-center">
                       <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                     </div>
@@ -1029,7 +1074,7 @@ export default function NewSuppliersPage() {
               ) : suppliers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={canEdit ? 14 : 13}
+                    colSpan={canEdit ? 15 : 14}
                     className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]"
                   >
                     <div className="flex flex-col items-center justify-center gap-3">
@@ -1068,6 +1113,24 @@ export default function NewSuppliersPage() {
                       >
                         {s.company}
                       </Link>
+                    </td>
+                    <td className="px-5 py-3.5 border-r border-slate-100">
+                      {(() => {
+                        const st = s.currentStatus;
+                        if (!st) return <span className="text-xs text-slate-400">—</span>;
+                        const map: Record<string, string> = {
+                          Active: "bg-emerald-100 text-emerald-700",
+                          Inactive: "bg-slate-100 text-slate-500",
+                          Blacklisted: "bg-red-100 text-red-700",
+                          "Under Review": "bg-amber-100 text-amber-700",
+                        };
+                        const cls = map[st] ?? "bg-slate-100 text-slate-600";
+                        return (
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
+                            {st}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td
                       className="px-5 py-3.5 border-r border-slate-100 text-slate-500"
@@ -1403,13 +1466,24 @@ export default function NewSuppliersPage() {
                   <Label>Supplier Type</Label>
                   <MultiSelectDropdown
                     value={form.supplierType ?? ""}
-                    onChange={(v) => setForm({ ...form, supplierType: v })}
+                    onChange={(v) => {
+                      const allBlank = (form.labTestingRecords ?? []).every(
+                        (r) => !r.lastTestDate && !r.labName && !r.reportAttached,
+                      );
+                      setForm({
+                        ...form,
+                        supplierType: v,
+                        ...(allBlank ? { labTestingRecords: makeLabRows(getLabTestTypes(v)) } : {}),
+                      });
+                    }}
                     options={[
                       "Manufacturer",
                       "Trader",
                       "Processor",
                       "Aggregator",
                       "Farmer Producer Organisation (FPO)",
+                      "Textile / Apparel Manufacturer",
+                      "Industrial Manufacturer",
                     ]}
                     placeholder="Select supplier type(s)…"
                   />
@@ -2377,32 +2451,53 @@ export default function NewSuppliersPage() {
 
             {/* ── Section 10: Lab Testing Records ── */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
-                Lab Testing Records
-              </p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Lab Testing Records
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-brand-600 hover:bg-brand-50 gap-1"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      labTestingRecords: [
+                        ...(form.labTestingRecords ?? []),
+                        { testType: "", lastTestDate: "", labName: "", reportAttached: "" },
+                      ],
+                    })
+                  }
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Row
+                </Button>
+              </div>
               <div className="rounded-md border border-slate-200 overflow-hidden mb-4">
                 <table className="w-full text-xs">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-slate-500">
-                        Test / Report
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-slate-500">
-                        Last Test Date
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-slate-500">
-                        Lab Name
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-slate-500">
-                        Report Attached?
-                      </th>
+                      <th className="px-3 py-2 text-left font-medium text-slate-500">Test / Report</th>
+                      <th className="px-3 py-2 text-left font-medium text-slate-500">Last Test Date</th>
+                      <th className="px-3 py-2 text-left font-medium text-slate-500">Lab Name</th>
+                      <th className="px-3 py-2 text-left font-medium text-slate-500">Report?</th>
+                      <th className="px-3 py-2" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {(form.labTestingRecords ?? []).map((row, i) => (
-                      <tr key={row.testType}>
-                        <td className="px-3 py-1.5 text-slate-600 font-medium">
-                          {row.testType}
+                      <tr key={i}>
+                        <td className="px-3 py-1.5">
+                          <Input
+                            className="h-7 text-xs border-slate-200"
+                            value={row.testType}
+                            onChange={(e) => {
+                              const next = [...(form.labTestingRecords ?? [])];
+                              next[i] = { ...next[i], testType: e.target.value };
+                              setForm({ ...form, labTestingRecords: next });
+                            }}
+                            placeholder="Test name"
+                          />
                         </td>
                         <td className="px-3 py-1.5">
                           <Input
@@ -2410,10 +2505,7 @@ export default function NewSuppliersPage() {
                             value={row.lastTestDate}
                             onChange={(e) => {
                               const next = [...(form.labTestingRecords ?? [])];
-                              next[i] = {
-                                ...next[i],
-                                lastTestDate: e.target.value,
-                              };
+                              next[i] = { ...next[i], lastTestDate: e.target.value };
                               setForm({ ...form, labTestingRecords: next });
                             }}
                             placeholder="DD/MM/YYYY"
@@ -2443,6 +2535,18 @@ export default function NewSuppliersPage() {
                             placeholder="Y/N"
                           />
                         </td>
+                        <td className="px-3 py-1.5">
+                          <button
+                            type="button"
+                            className="text-slate-300 hover:text-red-500"
+                            onClick={() => {
+                              const next = (form.labTestingRecords ?? []).filter((_, j) => j !== i);
+                              setForm({ ...form, labTestingRecords: next });
+                            }}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -2453,9 +2557,7 @@ export default function NewSuppliersPage() {
                   <Label>GMO-Free Declaration?</Label>
                   <SelectWithOthers
                     value={form.gmoFreeDeclaration ?? ""}
-                    onChange={(v) =>
-                      setForm({ ...form, gmoFreeDeclaration: v })
-                    }
+                    onChange={(v) => setForm({ ...form, gmoFreeDeclaration: v })}
                     options={["Yes", "No"]}
                     placeholder="Select…"
                   />
@@ -2464,48 +2566,63 @@ export default function NewSuppliersPage() {
                   <Label>Irradiation-Free Declaration?</Label>
                   <SelectWithOthers
                     value={form.irradiationFreeDeclaration ?? ""}
-                    onChange={(v) =>
-                      setForm({ ...form, irradiationFreeDeclaration: v })
-                    }
+                    onChange={(v) => setForm({ ...form, irradiationFreeDeclaration: v })}
                     options={["Yes", "No"]}
                     placeholder="Select…"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>
-                    Food Contact Compliance (EU/FDA) Certificate Available?
-                  </Label>
+                  <Label>Food Contact Compliance (EU/FDA) Certificate Available?</Label>
                   <SelectWithOthers
                     value={form.foodContactCompliance ?? ""}
-                    onChange={(v) =>
-                      setForm({ ...form, foodContactCompliance: v })
-                    }
+                    onChange={(v) => setForm({ ...form, foodContactCompliance: v })}
                     options={["Yes", "No"]}
                     placeholder="Select…"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Compostability Certificate Available?</Label>
-                  <SelectWithOthers
-                    value={form.compostabilityCert ?? ""}
-                    onChange={(v) =>
-                      setForm({ ...form, compostabilityCert: v })
-                    }
-                    options={["Yes", "No"]}
-                    placeholder="Select…"
-                  />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label>Migration Test Report Available?</Label>
-                  <SelectWithOthers
-                    value={form.migrationTestReport ?? ""}
-                    onChange={(v) =>
-                      setForm({ ...form, migrationTestReport: v })
-                    }
-                    options={["Yes", "No"]}
-                    placeholder="Select…"
-                  />
-                </div>
+
+                {/* ── Advanced Fields Toggle (Change 11) ── */}
+                {(showAdvancedLabFields || form.compostabilityCert || form.migrationTestReport) ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Compostability Certificate Available?</Label>
+                      <SelectWithOthers
+                        value={form.compostabilityCert ?? ""}
+                        onChange={(v) => setForm({ ...form, compostabilityCert: v })}
+                        options={["Yes", "No"]}
+                        placeholder="Select…"
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>Migration Test Report Available?</Label>
+                      <SelectWithOthers
+                        value={form.migrationTestReport ?? ""}
+                        onChange={(v) => setForm({ ...form, migrationTestReport: v })}
+                        options={["Yes", "No"]}
+                        placeholder="Select…"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <button
+                        type="button"
+                        className="text-xs text-slate-400 hover:text-slate-600 underline"
+                        onClick={() => setShowAdvancedLabFields(false)}
+                      >
+                        Hide advanced fields
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="sm:col-span-2">
+                    <button
+                      type="button"
+                      className="text-xs text-brand-600 hover:text-brand-800 underline"
+                      onClick={() => setShowAdvancedLabFields(true)}
+                    >
+                      + Show advanced fields (Compostability, Migration Test)
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -3605,6 +3722,84 @@ export default function NewSuppliersPage() {
               Yes, delete supplier
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Quick Add Dialog ── */}
+      <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
+        <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-9 w-9 rounded-full bg-brand-100 flex items-center justify-center shrink-0 border border-brand-200">
+              <Building2 className="h-4 w-4 text-brand-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-base font-bold text-slate-900">Quick Add Supplier</DialogTitle>
+              <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                Create a draft record — fill full details later.
+              </DialogDescription>
+            </div>
+          </div>
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!quickForm.company.trim()) return;
+              createMutation.mutate(
+                { ...quickForm } as any,
+                { onSuccess: () => setQuickAddOpen(false) }
+              );
+            }}
+          >
+            <div className="space-y-1.5">
+              <Label>Company Name *</Label>
+              <Input
+                autoFocus
+                value={quickForm.company}
+                onChange={(e) => setQuickForm({ ...quickForm, company: e.target.value })}
+                placeholder="e.g. Sharma Exports Pvt. Ltd."
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={quickForm.email}
+                onChange={(e) => setQuickForm({ ...quickForm, email: e.target.value })}
+                placeholder="contact@supplier.com"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Country</Label>
+              <Input
+                list="qa-list-country"
+                value={quickForm.country}
+                onChange={(e) => setQuickForm({ ...quickForm, country: e.target.value })}
+                placeholder="e.g. India"
+              />
+              <datalist id="qa-list-country">
+                {filters?.countries?.map((c: string) => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Product Category</Label>
+              <Input
+                value={quickForm.productCategory}
+                onChange={(e) => setQuickForm({ ...quickForm, productCategory: e.target.value })}
+                placeholder="e.g. Spices & Condiments"
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-1">
+              <Button type="button" variant="outline" onClick={() => setQuickAddOpen(false)}>Cancel</Button>
+              <Button
+                type="submit"
+                className="bg-brand-600 hover:bg-brand-700 text-white"
+                disabled={createMutation.isPending || !quickForm.company.trim()}
+              >
+                {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Draft"}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
