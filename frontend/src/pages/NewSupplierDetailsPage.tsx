@@ -236,6 +236,22 @@ interface ProductCatalogEntry {
   url: string;
 }
 
+const COMPLETENESS_FIELDS_DETAIL: string[] = [
+  "company", "country", "productCategory", "product", "email", "phone",
+  "accountManager", "designation", "website", "supplierType",
+  "haccpAvailable", "isoFsscCertNo", "paymentTerms", "incotermsSupported",
+  "currencyPreferred", "moq",
+];
+
+function computeCompleteness(s: Partial<NewSupplier>): number {
+  const rec = s as Record<string, unknown>;
+  const filled = COMPLETENESS_FIELDS_DETAIL.filter((f) => {
+    const v = rec[f];
+    return v !== null && v !== undefined && String(v).trim() !== "";
+  }).length;
+  return Math.round((filled / COMPLETENESS_FIELDS_DETAIL.length) * 100);
+}
+
 type PendingUpload = {
   id: string;
   name: string;
@@ -633,6 +649,24 @@ export default function NewSupplierDetailsPage() {
           </Button>
         </div>
       </div>
+
+      {/* ── Profile Completeness Bar ── */}
+      {(() => {
+        const pct = computeCompleteness(supplier);
+        const barColor = pct >= 80 ? "bg-emerald-500" : pct >= 60 ? "bg-brand-500" : "bg-amber-500";
+        const label = pct >= 80 ? "Complete" : pct >= 60 ? "Mostly complete" : "Incomplete";
+        const labelColor = pct >= 80 ? "text-emerald-700" : pct >= 60 ? "text-brand-700" : "text-amber-700";
+        return (
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+            </div>
+            <span className={`text-xs font-semibold whitespace-nowrap ${labelColor}`}>
+              {pct}% — {label}
+            </span>
+          </div>
+        );
+      })()}
 
       <Separator />
 

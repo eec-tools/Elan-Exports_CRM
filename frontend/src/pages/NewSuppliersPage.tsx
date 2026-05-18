@@ -278,16 +278,17 @@ function makeLabRows(types: string[]): LabTestRow[] {
   return types.map((t) => ({ testType: t, lastTestDate: "", labName: "", reportAttached: "" }));
 }
 
-const COMPLETENESS_FIELDS: (keyof Supplier)[] = [
+const COMPLETENESS_FIELDS: string[] = [
   "company", "country", "productCategory", "product", "email", "phone",
-  "accountManager", "contactPerson", "website", "supplierType",
+  "accountManager", "designation", "website", "supplierType",
   "haccpAvailable", "isoFsscCertNo", "paymentTerms", "incotermsSupported",
   "currencyPreferred", "moq",
 ];
 
 function computeCompleteness(s: Partial<Supplier>): number {
+  const rec = s as Record<string, unknown>;
   const filled = COMPLETENESS_FIELDS.filter((f) => {
-    const v = s[f];
+    const v = rec[f];
     return v !== null && v !== undefined && String(v).trim() !== "";
   }).length;
   return Math.round((filled / COMPLETENESS_FIELDS.length) * 100);
@@ -1107,12 +1108,19 @@ export default function NewSuppliersPage() {
                     className="hover:bg-slate-50/80 transition-colors group"
                   >
                     <td className="px-5 py-3.5 font-medium sticky left-0 z-10 bg-white group-hover:bg-slate-50 shadow-[inset_-1px_0_0_0_#f1f5f9]">
-                      <Link
-                        to={`/suppliers/new/${s.id}`}
-                        className="text-brand-600 hover:text-brand-800 hover:underline"
-                      >
-                        {s.company}
-                      </Link>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Link
+                          to={`/suppliers/new/${s.id}`}
+                          className="text-brand-600 hover:text-brand-800 hover:underline"
+                        >
+                          {s.company}
+                        </Link>
+                        {computeCompleteness(s) < 60 && (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200">
+                            Incomplete
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 border-r border-slate-100">
                       {(() => {
