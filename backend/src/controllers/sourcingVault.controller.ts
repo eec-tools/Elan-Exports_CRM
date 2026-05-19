@@ -287,6 +287,7 @@ export async function sendBulkEmail(
               productCategory: folder.name,
               assignedGmailAccount: assignedGmailAccount ?? null,
               emailTemplateId: emailTemplateId ?? null,
+              formTemplateId: formTemplateId ?? null,
               formToken: randomUUID(),
               status: "pending",
               supplierStage: "Sourcing",
