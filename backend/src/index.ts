@@ -47,6 +47,7 @@ import publicSupplierFormRoutes from "./routes/publicSupplierForm.routes.js";
 import quotationsRoutes from "./routes/quotations.routes.js";
 import publicQuotationFormRoutes from "./routes/publicQuotationForm.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
+import shortLinksRoutes from "./routes/shortLinks.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -176,6 +177,7 @@ app.use("/api/public/supplier-form", publicSupplierFormRoutes);
 app.use("/api/quotations", quotationsRoutes);
 app.use("/api/public/quotation-form", publicQuotationFormRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/f", shortLinksRoutes);
 
 // Health check with detailed status
 app.get("/api/health", async (_req, res) => {

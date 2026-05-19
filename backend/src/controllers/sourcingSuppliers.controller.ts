@@ -4,6 +4,7 @@ import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { createNotification } from "../services/notificationService.js";
 import { startCampaignForSupplier } from "./sourcingEmailCampaign.controller.js";
+import { generateShortCode } from "../utils/shortCode.js";
 
 const SOURCING_FIELDS = [
   "company",
@@ -299,6 +300,7 @@ export async function createSourcingSupplier(
       return;
     }
 
+    const shortCode = await generateShortCode(company);
     const supplier = await (prisma as any).sourcingSupplier.create({
       data: {
         company,
@@ -306,6 +308,7 @@ export async function createSourcingSupplier(
         assignedGmailAccount: assignedGmailAccount ?? null,
         emailTemplateId: emailTemplateId ?? null,
         formTemplateId: formTemplateId ?? null,
+        shortCode,
         productCategory: productCategory ?? null,
         product: product ?? null,
         country: country ?? null,
@@ -686,7 +689,10 @@ export async function addFromVaultFolder(
       return;
     }
 
-    const supplierData = vaultSuppliers.map((s: any) => ({
+    // Generate short codes before transaction (uniqueness checks need to run outside tx)
+    const shortCodes = await Promise.all(vaultSuppliers.map((s: any) => generateShortCode(s.company)));
+
+    const supplierData = vaultSuppliers.map((s: any, i: number) => ({
       company: s.company,
       email: s.email,
       phone: s.phone,
@@ -698,6 +704,7 @@ export async function addFromVaultFolder(
       assignedGmailAccount: assignedGmailAccount ?? null,
       emailTemplateId: emailTemplateId ?? null,
       formTemplateId: formTemplateId ?? null,
+      shortCode: shortCodes[i],
       formToken: randomUUID(),
       status: "pending",
       supplierStage: "Sourcing",

@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { startCampaignForSupplier } from "./sourcingEmailCampaign.controller.js";
+import { generateShortCode } from "../utils/shortCode.js";
 
 /**
  * GET /api/sourcing-vault
@@ -256,6 +257,9 @@ export async function sendBulkEmail(
       return;
     }
 
+    // Generate short codes before transaction (uniqueness checks need to run outside tx)
+    const shortCodes = await Promise.all(validRows.map((s) => generateShortCode(s.company.trim())));
+
     const createdSuppliers: any[] = await (prisma as any).$transaction(async (tx: any) => {
       await tx.sourcingVaultSupplier.createMany({
         data: validRows.map((s) => ({
@@ -273,7 +277,8 @@ export async function sendBulkEmail(
       });
 
       const created: any[] = [];
-      for (const s of validRows) {
+      for (let i = 0; i < validRows.length; i++) {
+        const s = validRows[i];
         try {
           const supplier = await tx.sourcingSupplier.create({
             data: {
@@ -288,6 +293,7 @@ export async function sendBulkEmail(
               assignedGmailAccount: assignedGmailAccount ?? null,
               emailTemplateId: emailTemplateId ?? null,
               formTemplateId: formTemplateId ?? null,
+              shortCode: shortCodes[i],
               formToken: randomUUID(),
               status: "pending",
               supplierStage: "Sourcing",

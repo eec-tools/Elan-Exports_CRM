@@ -13,7 +13,8 @@ function addDays(date: Date, days: number): Date {
     return result;
 }
 
-function buildFormLink(formToken: string, formTemplateId?: string | null): string {
+function buildFormLink(formToken: string, formTemplateId?: string | null, shortCode?: string | null): string {
+    if (shortCode) return `https://api.eectrade.com/api/f/${shortCode}`;
     const baseUrl = "https://crm.eectrade.com";
     const normalizedToken = formToken.replace(/^\/+/, "");
     const base = `${baseUrl}/supplier-form/${normalizedToken}`;
@@ -209,7 +210,7 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
     const nextStep = campaign.currentStep + 1;
     if (nextStep > 4) return; // all done
 
-    const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId);
+    const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId, supplier.shortCode);
     const signature = await fetchDefaultSignatureForAccount(fromEmail);
     const templateData = {
         company: supplier.company,
@@ -335,7 +336,7 @@ export async function startCampaignForSupplier(sourcingId: string, userId?: stri
         const existing = await (prisma as any).sourcingEmailCampaign.findUnique({ where: { sourcingId } });
         if (existing) return false;
 
-        const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId);
+        const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId, supplier.shortCode);
         const signature = await fetchDefaultSignatureForAccount(supplier.assignedGmailAccount);
         const templateData = {
             company: supplier.company,
@@ -497,7 +498,7 @@ export async function startCampaign(req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId);
+        const formLink = buildFormLink(supplier.formToken, supplier.formTemplateId, supplier.shortCode);
         const signature = await fetchDefaultSignatureForAccount(supplier.assignedGmailAccount);
         let customTplForStart: CustomEmailTemplate | null = null;
         if (supplier.emailTemplateId) {

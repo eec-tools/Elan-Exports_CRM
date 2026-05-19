@@ -595,6 +595,7 @@ model SourcingSupplier {
   referralSource             String?                   @map("referral_source")
   emailTemplateId            String?                   @map("email_template_id")
   formTemplateId             String?                   @map("form_template_id")
+  shortCode                  String?                   @unique @map("short_code")
 
   @@map("sourcing_suppliers")
 }
