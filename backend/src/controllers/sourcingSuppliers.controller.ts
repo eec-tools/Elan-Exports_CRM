@@ -655,7 +655,7 @@ export async function addFromVaultFolder(
   res: Response,
 ): Promise<void> {
   try {
-    const { folderId, assignedGmailAccount, emailTemplateId } = req.body as {
+    const { folderId, assignedGmailAccount, formTemplateId, emailTemplateId } = req.body as {
       folderId: string;
       assignedGmailAccount?: string;
       formTemplateId?: string;
@@ -697,6 +697,7 @@ export async function addFromVaultFolder(
       productCategory: folder.name,
       assignedGmailAccount: assignedGmailAccount ?? null,
       emailTemplateId: emailTemplateId ?? null,
+      formTemplateId: formTemplateId ?? null,
       formToken: randomUUID(),
       status: "pending",
       supplierStage: "Sourcing",
