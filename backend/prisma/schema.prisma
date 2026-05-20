@@ -122,6 +122,7 @@ model Buyer {
   productCatalog            String?   @map("product_catalog_shared")
   supplierLinks             Json      @default("[]") @map("supplier_links")
   quotations                Json?     @default("[]") @map("quotations")
+  quotationLinks            Quotation[]
   createdBy                 String?   @map("created_by")
   createdAt                 DateTime  @default(now()) @map("created_at")
   updatedAt                 DateTime  @updatedAt @map("updated_at")
@@ -1063,6 +1064,21 @@ model Quotation {
   // Supplier info (denormalized for display & public form)
   supplierName    String  @map("supplier_name")
   supplierWebsite String? @map("supplier_website")
+
+  // Linked buyer (FK + denormalized name for display)
+  buyerId   String? @map("buyer_id")
+  buyerName String? @map("buyer_name")
+  buyer     Buyer?  @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+
+  // Summary price fields for list view (internal, never sent to supplier)
+  quotedPrice String? @map("quoted_price")
+  currency    String?
+
+  // Expiry date for the quotation
+  validUntil DateTime? @map("valid_until") @db.Date
+
+  // Linked deal (populated when quotation is created from a deal, or on Convert to Deal)
+  linkedDealId String? @map("linked_deal_id")
 
   // Per-field config: { [fieldKey]: { sentToSupplier: boolean, mandatory: boolean } }
   fieldConfig Json @default("{}") @map("field_config")

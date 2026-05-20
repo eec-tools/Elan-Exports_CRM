@@ -33,6 +33,12 @@ const QUOTATION_FIELDS = [
   "fieldSources",
   "linkedSupplierId",
   "linkedSupplierType",
+  "buyerId",
+  "buyerName",
+  "quotedPrice",
+  "currency",
+  "validUntil",
+  "linkedDealId",
   "status",
 ] as const;
 
@@ -83,6 +89,7 @@ export async function listQuotations(
       page = "1",
       limit = "20",
       status,
+      buyerId,
     } = req.query as Record<string, string>;
 
     const pageNum = Math.max(1, parseInt(page));
@@ -97,10 +104,14 @@ export async function listQuotations(
         { product: { contains: search, mode: "insensitive" } },
         { hsCode: { contains: search, mode: "insensitive" } },
         { origin: { contains: search, mode: "insensitive" } },
+        { buyerName: { contains: search, mode: "insensitive" } },
       ];
     }
     if (status && status !== "all") {
       where.status = status;
+    }
+    if (buyerId && buyerId !== "all") {
+      where.buyerId = buyerId;
     }
 
     const [quotations, total] = await Promise.all([
@@ -242,6 +253,12 @@ export async function createQuotation(
       supplierWebsite,
       product,
       fieldConfig,
+      buyerId,
+      buyerName,
+      quotedPrice,
+      currency,
+      validUntil,
+      linkedDealId,
     } = req.body;
 
     if (!supplierName) {
@@ -261,6 +278,12 @@ export async function createQuotation(
         status: "pending",
         formToken: randomUUID(),
         createdBy: req.user!.id,
+        buyerId: buyerId ?? null,
+        buyerName: buyerName ?? null,
+        quotedPrice: quotedPrice ?? null,
+        currency: currency ?? null,
+        validUntil: validUntil ? new Date(validUntil) : null,
+        linkedDealId: linkedDealId ?? null,
       },
     });
 
@@ -660,6 +683,88 @@ export async function exportQuotationPdf(
     doc.end();
   } catch (err) {
     console.error("Export PDF error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * GET /api/quotations/search-buyers?q=
+ * Autocomplete buyer search by company name.
+ */
+export async function searchBuyers(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const q = (req.query.q as string) || "";
+    const where = q
+      ? { company: { contains: q, mode: "insensitive" as const } }
+      : {};
+
+    const buyers = await (prisma as any).buyer.findMany({
+      where,
+      take: 20,
+      orderBy: { company: "asc" },
+      select: { id: true, company: true, name: true, country: true },
+    });
+
+    res.json(buyers);
+  } catch (err) {
+    console.error("Search buyers error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * POST /api/quotations/:id/convert-to-deal
+ * Creates a Deal pre-filled from this quotation. Safe to call multiple times —
+ * updates linkedDealId on the quotation if a deal already exists.
+ */
+export async function convertToDeal(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const { id } = req.params;
+
+    const quotation = await (prisma as any).quotation.findUnique({
+      where: { id },
+    });
+    if (!quotation) {
+      res.status(404).json({ error: "Quotation not found" });
+      return;
+    }
+
+    const allowedStatuses = ["response_received", "negotiating", "finalized"];
+    if (!allowedStatuses.includes(quotation.status)) {
+      res.status(400).json({
+        error:
+          "Quotation must be in Responded, Negotiating, or Finalized status to convert to a deal.",
+      });
+      return;
+    }
+
+    const deal = await (prisma as any).deal.create({
+      data: {
+        title: `${quotation.supplierName} — ${quotation.product ?? "Quotation"}`,
+        buyer: quotation.buyerName ?? null,
+        supplier: quotation.supplierName ?? null,
+        product: quotation.product ?? null,
+        hsCode: quotation.hsCode ?? null,
+        price: quotation.quotedPrice ? parseFloat(quotation.quotedPrice) : null,
+        stage: "Quotation",
+        createdBy: req.user!.id,
+      },
+    });
+
+    await (prisma as any).quotation.update({
+      where: { id },
+      data: { linkedDealId: deal.id },
+    });
+
+    res.status(201).json({ deal, quotationId: id });
+  } catch (err) {
+    console.error("Convert to deal error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 }
