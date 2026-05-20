@@ -761,7 +761,7 @@ export async function updateNewSupplierStage(
                         warehousePhotos: (existing.warehousePhotos as any[]) ?? [],
                         videoLinks: (existing.videoLinks as any[]) ?? [],
                         // Section 1 — Identity
-                        contactPerson: existing.contactPerson,
+                        contactPerson: existing.accountManager,
                         designation: existing.designation,
                         tradeName: existing.tradeName,
                         yearEstablished: existing.yearEstablished,

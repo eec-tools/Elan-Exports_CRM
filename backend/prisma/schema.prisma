@@ -277,6 +277,7 @@ model Supplier {
   factoryVisitDate           String?                @map("factory_visit_date")
   factoryVisitOutcome        String?                @map("factory_visit_outcome")
   referralSource             String?                @map("referral_source")
+  accountManager             String?                @map("account_manager")
 
   @@map("suppliers")
 }

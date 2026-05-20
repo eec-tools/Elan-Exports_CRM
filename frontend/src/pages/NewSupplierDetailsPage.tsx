@@ -386,6 +386,11 @@ export default function NewSupplierDetailsPage() {
     onError: () => toast.error("Failed to update supplier"),
   });
 
+  const { data: filters } = useQuery({
+    queryKey: ["new-supplier-filters"],
+    queryFn: () => api.get("/new-suppliers/filters").then((r) => r.data),
+  });
+
   const { data: buyersListData, isLoading: buyersListLoading } = useQuery<
     { id: string; company: string; name: string }[]
   >({
@@ -2197,11 +2202,17 @@ export default function NewSupplierDetailsPage() {
                 <div className="space-y-2">
                   <Label>Account Manager</Label>
                   <Input
+                    list="detail-list-manager"
                     value={form.accountManager ?? ""}
                     onChange={(e) =>
                       setForm({ ...form, accountManager: e.target.value })
                     }
                   />
+                  <datalist id="detail-list-manager">
+                    {filters?.accountManagers?.map((m: string) => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="space-y-2">
                   <Label>Current Status</Label>
