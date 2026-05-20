@@ -1102,7 +1102,7 @@ export async function getSupplierActivity(
       where: { entityType: "suppliers", entityId: id },
       orderBy: { createdAt: "desc" },
       take: 100,
-      include: { user: { select: { name: true } } },
+      include: { user: { select: { fullName: true } } },
     });
     res.json(logs);
   } catch (err) {

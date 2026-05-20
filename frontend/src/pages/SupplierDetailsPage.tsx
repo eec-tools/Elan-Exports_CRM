@@ -358,67 +358,6 @@ function LinkedDealsPanel({ supplierName }: { supplierName: string }) {
   );
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  create: "Supplier created",
-  update: "Supplier updated",
-  update_stage: "Stage changed",
-  move_to_suppliers: "Converted from New Supplier",
-  move_to_new_suppliers: "Moved back to New Suppliers",
-  move_to_old_suppliers: "Closed / Archived",
-  delete: "Supplier deleted",
-};
-
-function ActivityTimeline({ supplierId }: { supplierId: string }) {
-  const { data: logs, isLoading } = useQuery<{ id: string; action: string; details: Record<string, unknown>; createdAt: string; user?: { name: string } }[]>({
-    queryKey: ["supplier-activity", supplierId],
-    queryFn: () => api.get(`/suppliers/${supplierId}/activity`).then((r) => r.data),
-  });
-
-  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-
-  if (!logs || logs.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-16 text-center">
-          <Clock className="h-8 w-8 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">No activity recorded yet.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4" />Activity Timeline</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="relative">
-          <div className="absolute left-3 top-0 bottom-0 w-px bg-slate-200" />
-          <div className="space-y-4">
-            {logs.map((log) => (
-              <div key={log.id} className="flex gap-4 relative">
-                <div className="h-6 w-6 rounded-full bg-brand-100 border-2 border-brand-300 shrink-0 z-10" />
-                <div className="flex-1 min-w-0 pb-2">
-                  <p className="text-sm font-medium text-slate-800">{ACTION_LABELS[log.action] ?? log.action}</p>
-                  {log.details && Object.keys(log.details).length > 0 && (
-                    <p className="text-xs text-slate-500 truncate mt-0.5">
-                      {Object.entries(log.details).filter(([k]) => k !== "company").map(([k, v]) => `${k}: ${v}`).join(" · ")}
-                    </p>
-                  )}
-                  <p className="text-xs text-slate-400 mt-1">
-                    {new Date(log.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    {log.user?.name && ` · ${log.user.name}`}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 export default function SupplierDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -757,7 +696,6 @@ export default function SupplierDetailsPage() {
           <TabsTrigger value="buyers">Buyer Exposure</TabsTrigger>
           <TabsTrigger value="documents">Document Vault</TabsTrigger>
           <TabsTrigger value="deals">Deals</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
         {/* ── Details Tab ── */}
@@ -1676,11 +1614,6 @@ export default function SupplierDetailsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* ── Activity Timeline Tab ── */}
-        <TabsContent value="activity" className="mt-0">
-          <ActivityTimeline supplierId={supplier.id} />
         </TabsContent>
 
       </Tabs>
