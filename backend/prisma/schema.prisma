@@ -154,6 +154,7 @@ model Supplier {
   exportingCountries         String?                @map("exporting_countries")
   factoryVideosShared        String?                @map("factory_videos_shared")
   lidlFactoryId              String?                @map("lidl_factory_id")
+  buyerFactoryIds            Json                   @default("[]") @map("buyer_factory_ids")
   otherBrands                String?                @map("other_brands")
   productCatalogShared       String?                @map("product_catalog_shared")
   samplePolicy               String?                @map("sample_policy")
@@ -162,6 +163,8 @@ model Supplier {
   workingWithOurBrands       String?                @map("working_with_our_brands")
   documents                  Json                   @default("[]")
   contractDocument           Json?                  @map("contract_document")
+  contractStartDate          DateTime?              @map("contract_start_date")
+  contractEndDate            DateTime?              @map("contract_end_date")
   creator                    User?                  @relation(fields: [createdBy], references: [id])
   supplierStage              String                 @default("Signed") @map("supplier_stage")
   emailCampaign              SupplierEmailCampaign?

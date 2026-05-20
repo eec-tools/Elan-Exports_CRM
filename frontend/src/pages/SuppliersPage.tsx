@@ -716,7 +716,14 @@ export default function SuppliersPage() {
                       </Link>
                     </td>
                     <td className="px-5 py-3.5 border-r border-slate-100">{s.country}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100">{s.contactPerson}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100">
+                      {s.contactPerson ? s.contactPerson : (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-600">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          Missing
+                        </span>
+                      )}
+                    </td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.email}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.products}>{s.products}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[180px] truncate" title={[...new Set((s.supplierProducts || []).flatMap((p: any) => (p.certifications || "").split(",").map((c: string) => c.trim()).filter(Boolean)))].join(", ") || undefined}>{[...new Set((s.supplierProducts || []).flatMap((p: any) => (p.certifications || "").split(",").map((c: string) => c.trim()).filter(Boolean)))].join(", ") || "—"}</td>

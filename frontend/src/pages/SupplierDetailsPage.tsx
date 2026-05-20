@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PermissionGate } from "@/components/PermissionGate";
+import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -66,6 +67,9 @@ import {
   Plus,
   Check,
   AlertCircle,
+  Star,
+  AlertTriangle,
+  TrendingUp,
 } from "lucide-react";
 
 interface OrganicCertRow { market: string; certNumber: string; expiryDate: string; }
@@ -110,6 +114,9 @@ interface Supplier {
   id: string;
   company: string;
   lidlFactoryId?: string;
+  buyerFactoryIds?: { buyerName: string; factoryId: string }[];
+  contractStartDate?: string;
+  contractEndDate?: string;
   commissionPercent?: string;
   contractBuyer?: string;
   buyerIds?: string[];
@@ -292,6 +299,127 @@ function InfoRow({
   );
 }
 
+const STAGE_COLORS: Record<string, string> = {
+  "Communication": "bg-blue-50 text-blue-700 border-blue-200",
+  "Sample": "bg-violet-50 text-violet-700 border-violet-200",
+  "Quotation": "bg-amber-50 text-amber-700 border-amber-200",
+  "Negotiation": "bg-orange-50 text-orange-700 border-orange-200",
+  "Confirmed": "bg-brand-50 text-brand-700 border-brand-200",
+  "Shipped": "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Closed Lost": "bg-red-50 text-red-700 border-red-200",
+};
+
+function LinkedDealsPanel({ supplierName }: { supplierName: string }) {
+  const { data: deals, isLoading } = useQuery<{ id: string; title: string; buyer?: string; stage: string; expectedRevenue?: number; createdAt: string }[]>({
+    queryKey: ["supplier-deals", supplierName],
+    queryFn: () => api.get(`/deals?supplier=${encodeURIComponent(supplierName)}`).then((r) => r.data),
+    enabled: !!supplierName,
+  });
+
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <TrendingUp className="h-4 w-4" />
+          Linked Deals
+          {deals && deals.length > 0 && <Badge variant="outline" className="ml-1 text-xs">{deals.length}</Badge>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {(!deals || deals.length === 0) ? (
+          <p className="text-sm text-slate-500 py-4 text-center">No deals linked to this supplier yet.</p>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {deals.map((deal) => (
+              <div key={deal.id} className="flex items-center justify-between py-3 gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-800 truncate">{deal.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {deal.buyer && <span>{deal.buyer} · </span>}
+                    {new Date(deal.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {deal.expectedRevenue != null && (
+                    <span className="text-xs font-semibold text-slate-600">${deal.expectedRevenue.toLocaleString()}</span>
+                  )}
+                  <Badge variant="outline" className={`text-xs ${STAGE_COLORS[deal.stage] ?? "bg-slate-50 text-slate-600 border-slate-200"}`}>
+                    {deal.stage}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  create: "Supplier created",
+  update: "Supplier updated",
+  update_stage: "Stage changed",
+  move_to_suppliers: "Converted from New Supplier",
+  move_to_new_suppliers: "Moved back to New Suppliers",
+  move_to_old_suppliers: "Closed / Archived",
+  delete: "Supplier deleted",
+};
+
+function ActivityTimeline({ supplierId }: { supplierId: string }) {
+  const { data: logs, isLoading } = useQuery<{ id: string; action: string; details: Record<string, unknown>; createdAt: string; user?: { name: string } }[]>({
+    queryKey: ["supplier-activity", supplierId],
+    queryFn: () => api.get(`/suppliers/${supplierId}/activity`).then((r) => r.data),
+  });
+
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+
+  if (!logs || logs.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-16 text-center">
+          <Clock className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+          <p className="text-sm text-slate-500">No activity recorded yet.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4" />Activity Timeline</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="relative">
+          <div className="absolute left-3 top-0 bottom-0 w-px bg-slate-200" />
+          <div className="space-y-4">
+            {logs.map((log) => (
+              <div key={log.id} className="flex gap-4 relative">
+                <div className="h-6 w-6 rounded-full bg-brand-100 border-2 border-brand-300 shrink-0 z-10" />
+                <div className="flex-1 min-w-0 pb-2">
+                  <p className="text-sm font-medium text-slate-800">{ACTION_LABELS[log.action] ?? log.action}</p>
+                  {log.details && Object.keys(log.details).length > 0 && (
+                    <p className="text-xs text-slate-500 truncate mt-0.5">
+                      {Object.entries(log.details).filter(([k]) => k !== "company").map(([k, v]) => `${k}: ${v}`).join(" · ")}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-400 mt-1">
+                    {new Date(log.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    {log.user?.name && ` · ${log.user.name}`}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SupplierDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -312,8 +440,11 @@ export default function SupplierDetailsPage() {
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [uploadingContract, setUploadingContract] = useState(false);
 
+  const { isAdmin, hasEditPermission } = useAuth();
   const { isUnlocked, unlockButton, passkeyDialog } =
     useSensitiveDataUnlock("supplier-details");
+  // Admins and users with edit permission see sensitive fields without the passkey
+  const effectivelyUnlocked = isUnlocked || isAdmin || hasEditPermission("signed_suppliers");
 
   const { data: supplier, isLoading } = useQuery<Supplier>({
     queryKey: ["supplier", id],
@@ -487,6 +618,10 @@ export default function SupplierDetailsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.company) return;
+    if (!form.contactPerson?.trim()) {
+      toast.error("Contact Person is required before saving.");
+      return;
+    }
 
     const catalogUrl =
       catalogFilePending?.status === "ready" && catalogFilePending.url
@@ -567,7 +702,7 @@ export default function SupplierDetailsPage() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight">
               {supplier.company}
             </h1>
@@ -577,6 +712,18 @@ export default function SupplierDetailsPage() {
             >
               {supplier.currentStatus || "Active"}
             </Badge>
+            {supplier.vettingScore != null && (
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 flex items-center gap-1">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                {supplier.vettingScore}/5
+              </Badge>
+            )}
+            {!supplier.contactPerson && (
+              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                No Contact Person
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             Supplier ID: #{supplier.id.slice(0, 8).toUpperCase()}
@@ -609,6 +756,8 @@ export default function SupplierDetailsPage() {
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="buyers">Buyer Exposure</TabsTrigger>
           <TabsTrigger value="documents">Document Vault</TabsTrigger>
+          <TabsTrigger value="deals">Deals</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
         {/* ── Details Tab ── */}
@@ -666,7 +815,7 @@ export default function SupplierDetailsPage() {
                 <Building2 className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground">Contract Buyers</p>
-                  {!isUnlocked ? (
+                  {!effectivelyUnlocked ? (
                     <div className="mt-1">
                       <span className="font-mono tracking-widest text-muted-foreground opacity-60">
                         ••••••••••••••••
@@ -698,7 +847,7 @@ export default function SupplierDetailsPage() {
               value={
                 <SensitiveValue
                   value={supplier.contractBuyer}
-                  isUnlocked={isUnlocked}
+                  isUnlocked={effectivelyUnlocked}
                 />
               }
             />
@@ -708,7 +857,7 @@ export default function SupplierDetailsPage() {
               value={
                 <SensitiveValue
                   value={supplier.commissionPercent}
-                  isUnlocked={isUnlocked}
+                  isUnlocked={effectivelyUnlocked}
                 />
               }
             />
@@ -718,15 +867,59 @@ export default function SupplierDetailsPage() {
               value={
                 <SensitiveValue
                   value={supplier.approvedConfirmPercent}
-                  isUnlocked={isUnlocked}
+                  isUnlocked={effectivelyUnlocked}
                 />
               }
             />
-            <InfoRow
-              icon={Tag}
-              label="Lidl Factory ID"
-              value={supplier.lidlFactoryId}
-            />
+            {/* Contract dates */}
+            {(supplier.contractStartDate || supplier.contractEndDate) && (() => {
+              const end = supplier.contractEndDate ? new Date(supplier.contractEndDate) : null;
+              const daysLeft = end ? Math.ceil((end.getTime() - Date.now()) / 86400000) : null;
+              return (
+                <div className="py-2 space-y-1">
+                  {supplier.contractStartDate && (
+                    <InfoRow icon={Clock} label="Contract Start" value={new Date(supplier.contractStartDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} />
+                  )}
+                  {end && (
+                    <div className="flex items-start gap-3 py-1">
+                      <Clock className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-muted-foreground">Contract End</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium">{end.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                          {daysLeft !== null && daysLeft <= 60 && daysLeft >= 0 && (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+                              Expiring in {daysLeft}d
+                            </Badge>
+                          )}
+                          {daysLeft !== null && daysLeft < 0 && (
+                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs">
+                              Expired
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Buyer Factory IDs */}
+            {(supplier.buyerFactoryIds ?? []).length > 0 && (
+              <div className="py-2">
+                <p className="text-xs text-muted-foreground mb-1">Buyer Factory IDs</p>
+                <div className="space-y-1">
+                  {(supplier.buyerFactoryIds ?? []).map((row, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <span className="font-medium text-slate-700">{row.buyerName}</span>
+                      <span className="text-slate-400">→</span>
+                      <span className="font-mono text-slate-600">{row.factoryId}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <Separator className="my-3" />
             <div>
@@ -734,7 +927,7 @@ export default function SupplierDetailsPage() {
                 <FileText className="h-3.5 w-3.5" />
                 Contract Documents
               </p>
-              {!isUnlocked ? (
+              {!effectivelyUnlocked ? (
                 <p className="text-sm font-medium text-slate-800">•••••••••••••••••••••</p>
               ) : (
                 <div className="space-y-2">
@@ -982,20 +1175,52 @@ export default function SupplierDetailsPage() {
             {(supplier.warehousePhotos ?? []).length > 0 && (
               <div className="py-2">
                 <p className="text-xs text-muted-foreground mb-1">Warehouse Photos</p>
-                <div className="flex flex-col gap-1">
-                  {(supplier.warehousePhotos ?? []).map((p, i) => (
-                    <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">{p.name}</a>
-                  ))}
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {(supplier.warehousePhotos ?? []).map((p, i) => {
+                    const thumbUrl = p.url?.includes("/upload/")
+                      ? p.url.replace("/upload/", "/upload/c_fill,w_80,h_80/")
+                      : p.url;
+                    return (
+                      <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" className="group relative flex flex-col items-center gap-1" title={p.name}>
+                        <img src={thumbUrl} alt={p.name} className="w-20 h-20 object-cover rounded border border-slate-200 group-hover:opacity-80 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        <span className="text-xs text-slate-500 truncate max-w-[80px]">{p.name}</span>
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             )}
             {(supplier.videoLinks ?? []).length > 0 && (
               <div className="py-2">
-                <p className="text-xs text-muted-foreground mb-1">Video Links</p>
-                <div className="flex flex-col gap-1">
-                  {(supplier.videoLinks ?? []).map((v, i) => (
-                    <a key={i} href={v.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline truncate">{v.label || v.url}</a>
-                  ))}
+                <p className="text-xs text-muted-foreground mb-2">Video Links</p>
+                <div className="flex flex-col gap-2">
+                  {(supplier.videoLinks ?? []).map((v, i) => {
+                    const ytMatch = v.url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+                    const isDrive = v.url?.includes("drive.google.com");
+                    return (
+                      <a key={i} href={v.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 group">
+                        {ytMatch ? (
+                          <img
+                            src={`https://img.youtube.com/vi/${ytMatch[1]}/mqdefault.jpg`}
+                            alt={v.label || "Video"}
+                            className="w-24 h-14 object-cover rounded border border-slate-200 shrink-0 group-hover:opacity-80 transition-opacity"
+                          />
+                        ) : isDrive ? (
+                          <div className="w-10 h-10 rounded border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0">
+                            <svg className="w-5 h-5" viewBox="0 0 87.3 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L27.5 50H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
+                              <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 45.5C.4 46.9 0 48.45 0 50h27.5z" fill="#00AC47"/>
+                              <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" fill="#EA4335"/>
+                              <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.95 0H34.35c-1.55 0-3.1.4-4.45 1.2z" fill="#00832D"/>
+                              <path d="M59.8 50H27.5L13.75 76.8c1.35.8 2.9 1.2 4.45 1.2h50.6c1.55 0 3.1-.4 4.45-1.2z" fill="#2684FC"/>
+                              <path d="M73.4 26.5l-12.65-21.8c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 25H87.3c0-1.55-.4-3.1-1.2-4.5z" fill="#FFBA00"/>
+                            </svg>
+                          </div>
+                        ) : null}
+                        <span className="text-sm text-brand-600 group-hover:underline truncate">{v.label || v.url}</span>
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1387,6 +1612,11 @@ export default function SupplierDetailsPage() {
           </Card>
         </TabsContent>
 
+        {/* ── Linked Deals Tab ── */}
+        <TabsContent value="deals" className="mt-0">
+          <LinkedDealsPanel supplierName={supplier.company} />
+        </TabsContent>
+
         {/* ── Document Vault Tab ── */}
         <TabsContent value="documents" className="mt-0">
           <Card>
@@ -1448,6 +1678,11 @@ export default function SupplierDetailsPage() {
           </Card>
         </TabsContent>
 
+        {/* ── Activity Timeline Tab ── */}
+        <TabsContent value="activity" className="mt-0">
+          <ActivityTimeline supplierId={supplier.id} />
+        </TabsContent>
+
       </Tabs>
 
       {/* ── Edit Dialog ── */}
@@ -1470,7 +1705,21 @@ export default function SupplierDetailsPage() {
               <div className="space-y-2"><Label>Postal Code</Label><Input value={form.postalCode ?? ""} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} /></div>
               <div className="space-y-2"><Label>Supplier Type</Label><MultiSelectDropdown value={form.supplierType ?? ""} onChange={(v) => setForm({ ...form, supplierType: v })} options={["Manufacturer","Trader","Processor","Aggregator","Farmer Producer Organisation (FPO)"]} placeholder="Select supplier type(s)…" /></div>
               <div className="space-y-2"><Label>Website</Label><Input value={form.website ?? ""} onChange={(e) => setForm({ ...form, website: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Lidl Factory ID</Label><Input value={form.lidlFactoryId ?? ""} onChange={(e) => setForm({ ...form, lidlFactoryId: e.target.value })} /></div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Buyer Factory IDs</Label>
+                <div className="space-y-2">
+                  {((form as any).buyerFactoryIds ?? []).map((row: { buyerName: string; factoryId: string }, i: number) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <Input className="flex-1" placeholder="Buyer Name" value={row.buyerName} onChange={(e) => { const arr = [...((form as any).buyerFactoryIds ?? [])]; arr[i] = { ...arr[i], buyerName: e.target.value }; setForm({ ...form, buyerFactoryIds: arr } as any); }} />
+                      <Input className="flex-1" placeholder="Factory ID" value={row.factoryId} onChange={(e) => { const arr = [...((form as any).buyerFactoryIds ?? [])]; arr[i] = { ...arr[i], factoryId: e.target.value }; setForm({ ...form, buyerFactoryIds: arr } as any); }} />
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 shrink-0" onClick={() => { const arr = ((form as any).buyerFactoryIds ?? []).filter((_: any, j: number) => j !== i); setForm({ ...form, buyerFactoryIds: arr } as any); }}><X className="h-4 w-4" /></Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, buyerFactoryIds: [...((form as any).buyerFactoryIds ?? []), { buyerName: "", factoryId: "" }] } as any)}>
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Buyer Factory ID
+                  </Button>
+                </div>
+              </div>
               <div className="space-y-2 sm:col-span-2"><Label>Company Address</Label><Textarea value={form.companyAddress ?? ""} onChange={(e) => setForm({ ...form, companyAddress: e.target.value })} rows={2} /></div>
               <div className="space-y-2 sm:col-span-2"><Label>Manufacturing / Processing Facility Address</Label><Textarea value={form.manufacturingAddress ?? ""} onChange={(e) => setForm({ ...form, manufacturingAddress: e.target.value })} rows={2} /></div>
             </div></div>
@@ -1480,7 +1729,11 @@ export default function SupplierDetailsPage() {
             {/* ── Contact Details ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Contact Details</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Contact Person</Label><Input value={form.contactPerson ?? ""} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} /></div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">Contact Person <span className="text-red-500">*</span></Label>
+                <Input value={form.contactPerson ?? ""} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} className={!form.contactPerson?.trim() ? "border-yellow-400 focus-visible:ring-yellow-300" : ""} placeholder="Required" />
+                {!form.contactPerson?.trim() && <p className="text-xs text-yellow-600">Contact name is required to save.</p>}
+              </div>
               <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
               <div className="space-y-2"><Label>WhatsApp</Label><Input value={form.whatsapp ?? ""} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="With country code" /></div>
               <div className="space-y-2"><Label>Email</Label><Input type="text" value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
@@ -1626,6 +1879,8 @@ export default function SupplierDetailsPage() {
               <div className="space-y-2"><Label>Contract Buyer (legacy)</Label><Input value={form.contractBuyer ?? ""} onChange={(e) => setForm({ ...form, contractBuyer: e.target.value })} /></div>
               <div className="space-y-2"><Label>Commission %</Label><Input value={form.commissionPercent ?? ""} onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })} /></div>
               <div className="space-y-2"><Label>Approved Confirm %</Label><Input value={form.approvedConfirmPercent ?? ""} onChange={(e) => setForm({ ...form, approvedConfirmPercent: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Contract Start Date</Label><Input type="date" value={(form as any).contractStartDate ? new Date((form as any).contractStartDate).toISOString().slice(0, 10) : ""} onChange={(e) => setForm({ ...form, contractStartDate: e.target.value || undefined } as any)} /></div>
+              <div className="space-y-2"><Label>Contract End Date</Label><Input type="date" value={(form as any).contractEndDate ? new Date((form as any).contractEndDate).toISOString().slice(0, 10) : ""} onChange={(e) => setForm({ ...form, contractEndDate: e.target.value || undefined } as any)} /></div>
               <div className="space-y-2"><Label>Currency Preferred</Label><Input value={form.currencyPreferred ?? ""} onChange={(e) => setForm({ ...form, currencyPreferred: e.target.value })} placeholder="e.g. USD, EUR" /></div>
               <div className="space-y-2 sm:col-span-2"><Label>Incoterms Supported</Label><MultiSelectDropdown value={form.incotermsSupported ?? ""} onChange={(v) => setForm({ ...form, incotermsSupported: v })} options={["EXW","FCA","FOB","CIF","CNF","CPT","CIP","DDP"]} placeholder="Select incoterms…" /></div>
               <div className="space-y-2"><Label>Ports of Export</Label><Input value={form.portsOfExport ?? ""} onChange={(e) => setForm({ ...form, portsOfExport: e.target.value })} /></div>

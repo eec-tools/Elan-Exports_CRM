@@ -732,6 +732,7 @@ export async function updateNewSupplierStage(
             certifications: existing.certifications,
             createdBy: req.user!.id,
             supplierStage: stage,
+            currentStatus: "Signed",
         };
 
         const oldBuyerIds: string[] = (existing.buyerIds as string[]) ?? [];

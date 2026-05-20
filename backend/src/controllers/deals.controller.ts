@@ -11,9 +11,11 @@ function flattenDeal(deal: any) {
 }
 
 // GET /api/deals
-export const getAllDeals = async (_req: Request, res: Response) => {
+export const getAllDeals = async (req: Request, res: Response) => {
   try {
+    const { supplier } = req.query as { supplier?: string };
     const deals = await prisma.deal.findMany({
+      where: supplier ? { supplier: { equals: supplier, mode: "insensitive" } } : undefined,
       orderBy: { createdAt: "desc" },
       include: { creator: { select: { fullName: true } } },
     });

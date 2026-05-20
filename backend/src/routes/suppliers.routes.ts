@@ -13,6 +13,7 @@ import {
   getSupplierStats,
   getSupplierFilters,
   updateSupplierStage,
+  getSupplierActivity,
 } from "../controllers/suppliers.controller.js";
 import {
   authenticate,
@@ -30,6 +31,7 @@ router.get("/stats", getSupplierStats);
 router.get("/filters", getSupplierFilters);
 router.get("/export/csv", exportSuppliersCsv);
 router.get("/upload-signature", requireEdit(["suppliers", "signed_suppliers"]), getUploadSignature);
+router.get("/:id/activity", getSupplierActivity);
 router.get("/:id", getSupplier);
 router.post("/upload", requireEdit(["suppliers", "signed_suppliers"]), uploadSupplierFile.single("file"), uploadCatalog);
 router.post("/", requireEdit(["suppliers", "signed_suppliers"]), createSupplier);

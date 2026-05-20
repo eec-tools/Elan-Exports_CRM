@@ -1016,7 +1016,7 @@ export async function getSupplierStats(
 ): Promise<void> {
   try {
     const suppliers = await prisma.supplier.findMany({
-      select: { currentStatus: true },
+      select: { currentStatus: true, supplierStage: true },
     });
 
     const stats = {
@@ -1032,7 +1032,8 @@ export async function getSupplierStats(
       if (status === "active") stats.active++;
       else if (status === "inactive") stats.inactive++;
       else if (status === "under review") stats.underReview++;
-      else if (status === "signed") stats.signed++;
+      // Count all suppliers in the signed-contract stage (supplierStage = "Signed")
+      if (s.supplierStage?.toLowerCase() === "signed") stats.signed++;
     }
 
     res.json(stats);
@@ -1084,6 +1085,28 @@ export async function getSupplierFilters(
     });
   } catch (err) {
     console.error("Get supplier filters error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * GET /api/suppliers/:id/activity
+ */
+export async function getSupplierActivity(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    const logs = await prisma.activityLog.findMany({
+      where: { entityType: "suppliers", entityId: id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: { user: { select: { name: true } } },
+    });
+    res.json(logs);
+  } catch (err) {
+    console.error("Get supplier activity error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 }
