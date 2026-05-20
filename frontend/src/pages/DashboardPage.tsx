@@ -551,13 +551,9 @@ export default function DashboardPage() {
         </div>
 
         <div className="p-5">
-          {s.taskAnalytics &&
-          s.taskAnalytics.filter((ta) => ta.owner.toLowerCase() !== "fahad")
-            .length > 0 ? (
+          {s.taskAnalytics && s.taskAnalytics.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {s.taskAnalytics
-                .filter((ta) => ta.owner.toLowerCase() !== "fahad")
-                .map((ta) => {
+              {s.taskAnalytics.map((ta) => {
                   const totalPct = Math.round((ta.total / maxTaskCount) * 100);
                   const completedPct =
                     ta.total > 0

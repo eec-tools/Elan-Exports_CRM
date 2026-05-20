@@ -128,6 +128,9 @@ export async function getDashboardStats(
       const ownerTrimmed = item.owner.trim();
       const ownerFirstName =
         ownerTrimmed.split(" ")[0]?.toLowerCase() || ownerTrimmed.toLowerCase();
+
+      // Skip owners that don't match any active user — filters out orphaned/test data
+      if (!firstNameToFullName[ownerFirstName]) continue;
       const status = (item.status || "").toLowerCase();
       const count = item._count.id;
 
