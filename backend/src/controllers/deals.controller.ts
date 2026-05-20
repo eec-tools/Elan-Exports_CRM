@@ -5,13 +5,19 @@ import { syncDealStageFromDeal } from "../services/dealStageSync.service.js";
 
 const prisma = new PrismaClient();
 
+function flattenDeal(deal: any) {
+  const { creator, ...rest } = deal;
+  return { ...rest, creatorName: creator?.fullName ?? null };
+}
+
 // GET /api/deals
 export const getAllDeals = async (_req: Request, res: Response) => {
   try {
     const deals = await prisma.deal.findMany({
       orderBy: { createdAt: "desc" },
+      include: { creator: { select: { fullName: true } } },
     });
-    res.json(deals);
+    res.json(deals.map(flattenDeal));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch deals" });
@@ -22,20 +28,8 @@ export const getAllDeals = async (_req: Request, res: Response) => {
 export const createDeal = async (req: Request, res: Response) => {
   try {
     const {
-      title,
-      buyer,
-      supplier,
-      product,
-      hsCode,
-      volume,
-      price,
-      expectedRevenue,
-      margin,
-      stage,
-      probability,
-      category,
-      riskScore,
-      notes,
+      title, buyer, supplier, product, hsCode, volume, price,
+      expectedRevenue, margin, stage, probability, category, riskScore, notes,
     } = req.body;
 
     const user = (req as any).user;
@@ -56,10 +50,12 @@ export const createDeal = async (req: Request, res: Response) => {
         category,
         riskScore: riskScore || "Medium",
         notes,
+        stageEnteredAt: new Date(),
         createdBy: user?.id ?? null,
       },
+      include: { creator: { select: { fullName: true } } },
     });
-    res.status(201).json(deal);
+    res.status(201).json(flattenDeal(deal));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to create deal" });
@@ -71,23 +67,16 @@ export const updateDeal = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const {
-      title,
-      buyer,
-      supplier,
-      product,
-      hsCode,
-      volume,
-      price,
-      expectedRevenue,
-      margin,
-      stage,
-      probability,
-      category,
-      riskScore,
-      notes,
+      title, buyer, supplier, product, hsCode, volume, price,
+      expectedRevenue, margin, stage, probability, category, riskScore, notes,
     } = req.body;
 
-    const existing = await prisma.deal.findUnique({ where: { id }, select: { stage: true, title: true, supplier: true } });
+    const existing = await prisma.deal.findUnique({
+      where: { id },
+      select: { stage: true, title: true, supplier: true },
+    });
+
+    const stageChanging = stage !== undefined && existing?.stage !== stage;
 
     const deal = await prisma.deal.update({
       where: { id },
@@ -99,22 +88,20 @@ export const updateDeal = async (req: Request, res: Response) => {
         ...(hsCode !== undefined && { hsCode }),
         ...(volume !== undefined && { volume }),
         ...(price !== undefined && { price: parseFloat(price) }),
-        ...(expectedRevenue !== undefined && {
-          expectedRevenue: parseFloat(expectedRevenue),
-        }),
+        ...(expectedRevenue !== undefined && { expectedRevenue: parseFloat(expectedRevenue) }),
         ...(margin !== undefined && { margin: parseFloat(margin) }),
         ...(stage !== undefined && { stage }),
-        ...(probability !== undefined && {
-          probability: parseFloat(probability),
-        }),
+        ...(probability !== undefined && { probability: parseFloat(probability) }),
         ...(category !== undefined && { category }),
         ...(riskScore !== undefined && { riskScore }),
         ...(notes !== undefined && { notes }),
+        // Stamp the time when stage changes
+        ...(stageChanging && { stageEnteredAt: new Date() }),
       },
+      include: { creator: { select: { fullName: true } } },
     });
 
-    // If stage changed, sync to suppliers and reports
-    if (stage !== undefined && existing?.stage !== stage) {
+    if (stageChanging) {
       await createNotification({
         type: "deal_stage_change",
         title: "Deal Stage Updated",
@@ -125,14 +112,13 @@ export const updateDeal = async (req: Request, res: Response) => {
         entityLink: `/deals`,
       });
 
-      // Sync the stage change to all related suppliers and reports
       const supplierName = supplier !== undefined ? supplier : existing?.supplier;
       if (supplierName) {
         await syncDealStageFromDeal(deal.id, supplierName, stage);
       }
     }
 
-    res.json(deal);
+    res.json(flattenDeal(deal));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update deal" });

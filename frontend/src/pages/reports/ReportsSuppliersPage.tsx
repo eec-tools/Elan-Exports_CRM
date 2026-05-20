@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
 import { Loader2, Factory, Globe, Star, Percent, CheckCircle, TrendingUp, Archive } from "lucide-react";
+import { STAGE_SHORT } from "@/lib/dealStages";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Legend, RadarChart, Radar,
@@ -43,18 +44,7 @@ interface OldSuppliersData {
 
 const CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#3b82f6", "#8b5cf6", "#14b8a6", "#f97316"];
 
-const STAGE_SHORT: Record<string, string> = {
-  "Communication": "Communication",
-  "Sampling": "Sampling",
-  "Quotation": "Quotation",
-  "Negotiation with EEC": "Neg. EEC",
-  "Price quotation to Buyer after EEC approval": "Price to Buyer",
-  "Negotiation with buyer": "Neg. Buyer",
-  "Price approval by buyer": "Price Approved",
-  "Quotation send to the supplier from buyer end": "Quote to Supplier",
-  "Orders confirmed from buyers end": "Orders Confirmed",
-  "Timeline (Product shipping.. etc) should be established from suppliers end": "Timeline Est.",
-};
+// STAGE_SHORT imported from @/lib/dealStages
 
 function fmtMoney(v: number) {
   if (!v) return "$0";

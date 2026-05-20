@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { getCustomDealStages } from "@/lib/customDealStages";
+import { DEAL_STAGE_CONFIG } from "@/lib/dealStages";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
@@ -35,8 +36,6 @@ interface RecentDeal {
   buyer?: string;
   stage: string;
   expectedRevenue?: number;
-  probability?: number;
-  riskScore?: string;
   createdAt: string;
 }
 
@@ -49,84 +48,8 @@ interface TaskAnalyticsOwner {
   total: number;
 }
 
-const STAGES = [
-  {
-    id: "Communication",
-    label: "Communication",
-    color: "#64748b",
-    bg: "#f1f5f9",
-    text: "#334155",
-  },
-  {
-    id: "Sampling",
-    label: "Sampling",
-    color: "#8b5cf6",
-    bg: "#f5f3ff",
-    text: "#6d28d9",
-  },
-  {
-    id: "Quotation",
-    label: "Quotation",
-    color: "#3b82f6",
-    bg: "#eff6ff",
-    text: "#1d4ed8",
-  },
-  {
-    id: "Negotiation with EEC",
-    label: "Negotiation with EEC",
-    color: "#f59e0b",
-    bg: "#fffbeb",
-    text: "#b45309",
-  },
-  {
-    id: "Price quotation to Buyer after EEC approval",
-    label: "Price quotation to Buyer",
-    color: "#06b6d4",
-    bg: "#ecfeff",
-    text: "#0e7490",
-  },
-  {
-    id: "Negotiation with buyer",
-    label: "Negotiation with buyer",
-    color: "#f97316",
-    bg: "#fff7ed",
-    text: "#c2410c",
-  },
-  {
-    id: "Price approval by buyer",
-    label: "Price approval by buyer",
-    color: "#10b981",
-    bg: "#ecfdf5",
-    text: "#065f46",
-  },
-  {
-    id: "Quotation send to the supplier from buyer end",
-    label: "Quotation to supplier",
-    color: "#14b8a6",
-    bg: "#f0fdfa",
-    text: "#115e59",
-  },
-  {
-    id: "Orders confirmed from buyers end",
-    label: "Orders confirmed",
-    color: "#16a34a",
-    bg: "#f0fdf4",
-    text: "#14532d",
-  },
-  {
-    id: "Timeline (Product shipping.. etc) should be established from suppliers end",
-    label: "Timeline established",
-    color: "#22c55e",
-    bg: "#f0fdf4",
-    text: "#166534",
-  },
-];
+const STAGES = DEAL_STAGE_CONFIG;
 
-function riskColor(risk?: string) {
-  if (risk === "Low") return "#10b981";
-  if (risk === "High") return "#ef4444";
-  return "#f59e0b";
-}
 
 function fmtMoney(v?: number) {
   if (!v) return "—";
@@ -537,7 +460,7 @@ export default function DashboardPage() {
                       {deal.buyer}
                     </p>
                   )}
-                  <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center mt-2">
                     {deal.expectedRevenue ? (
                       <span
                         className="text-sm font-bold"
@@ -546,25 +469,9 @@ export default function DashboardPage() {
                         {fmtMoney(deal.expectedRevenue)}
                       </span>
                     ) : (
-                      <span className="text-xs text-slate-400">No revenue</span>
-                    )}
-                    {deal.probability !== undefined && (
-                      <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                        {deal.probability}%
-                      </span>
+                      <span className="text-xs text-slate-400">No value set</span>
                     )}
                   </div>
-                  {deal.riskScore && (
-                    <div className="flex items-center gap-1 mt-1.5">
-                      <div
-                        className="h-2 w-2 rounded-full"
-                        style={{ background: riskColor(deal.riskScore) }}
-                      />
-                      <span className="text-xs text-slate-400">
-                        {deal.riskScore} risk
-                      </span>
-                    </div>
-                  )}
                 </Link>
               );
 

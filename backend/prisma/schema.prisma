@@ -888,6 +888,7 @@ model Deal {
   category            String?
   riskScore           String?              @default("Medium") @map("risk_score")
   notes               String?
+  stageEnteredAt      DateTime?            @map("stage_entered_at")
   createdBy           String?              @map("created_by")
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @updatedAt @map("updated_at")

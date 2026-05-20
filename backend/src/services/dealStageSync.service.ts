@@ -4,7 +4,9 @@ import { createNotification } from "./notificationService.js";
 const prisma = new PrismaClient();
 
 /**
- * Valid deal stages in order
+ * Valid deal stages in order.
+ * Existing IDs (1-10) are preserved to avoid breaking DB data.
+ * Post-shipment stages (11-18) are appended.
  */
 export const DEAL_STAGES = [
     "Communication",
@@ -17,6 +19,14 @@ export const DEAL_STAGES = [
     "Quotation send to the supplier from buyer end",
     "Orders confirmed from buyers end",
     "Timeline (Product shipping.. etc) should be established from suppliers end",
+    "Shipment Dispatched",
+    "Documents Prepared",
+    "Customs & In Transit",
+    "Goods Delivered",
+    "Commission Confirmation",
+    "Buyer Payment Follow-Up",
+    "Claim Resolution",
+    "Supplier Evaluation & Reorder",
 ] as const;
 
 export type DealStage = typeof DEAL_STAGES[number];
