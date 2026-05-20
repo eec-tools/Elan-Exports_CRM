@@ -43,6 +43,7 @@ model User {
   permissions          UserPermission[]
   roles             UserRole[]
   vaultDocuments    VaultDocument[]
+  vaultDocumentVersions VaultDocumentVersion[]
   notificationReads NotificationRead[]
   assignedCompanies String[]              @default([]) @map("assigned_companies")
   saturdaySchedule  String                @default("off") @map("saturday_schedule")
@@ -841,23 +842,41 @@ model EmailTracker {
 }
 
 model VaultDocument {
-  id         String          @id @default(uuid())
+  id         String                  @id @default(uuid())
   name       String
   category   String
-  region     String          @default("Global")
-  fileUrl    String?         @map("file_url")
-  publicId   String?         @map("public_id")
-  fileType   String?         @map("file_type")
-  isFolder   Boolean         @default(false) @map("is_folder")
-  parentId   String?         @map("parent_id")
-  parent     VaultDocument?  @relation("VaultTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children   VaultDocument[] @relation("VaultTree")
-  uploadedBy String?         @map("uploaded_by")
-  createdAt  DateTime        @default(now()) @map("created_at")
-  updatedAt  DateTime        @updatedAt @map("updated_at")
-  uploader   User?           @relation(fields: [uploadedBy], references: [id])
+  region     String                  @default("Global")
+  fileUrl    String?                 @map("file_url")
+  publicId   String?                 @map("public_id")
+  fileType   String?                 @map("file_type")
+  isFolder   Boolean                 @default(false) @map("is_folder")
+  parentId   String?                 @map("parent_id")
+  parent     VaultDocument?          @relation("VaultTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children   VaultDocument[]         @relation("VaultTree")
+  uploadedBy String?                 @map("uploaded_by")
+  expiryDate DateTime?               @map("expiry_date")
+  createdAt  DateTime                @default(now()) @map("created_at")
+  updatedAt  DateTime                @updatedAt @map("updated_at")
+  uploader   User?                   @relation(fields: [uploadedBy], references: [id])
+  versions   VaultDocumentVersion[]
 
   @@map("vault_documents")
+}
+
+model VaultDocumentVersion {
+  id         String        @id @default(uuid())
+  documentId String        @map("document_id")
+  document   VaultDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionNum Int           @map("version_num")
+  name       String
+  fileUrl    String        @map("file_url")
+  publicId   String?       @map("public_id")
+  fileType   String?       @map("file_type")
+  uploadedBy String?       @map("uploaded_by")
+  uploader   User?         @relation(fields: [uploadedBy], references: [id])
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  @@map("vault_document_versions")
 }
 
 model DailyTask {

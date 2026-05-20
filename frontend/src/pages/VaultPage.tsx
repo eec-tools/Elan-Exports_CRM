@@ -29,12 +29,19 @@ import {
   Loader2,
   Check,
   AlertCircle,
+  Eye,
+  History,
+  RefreshCw,
+  Lock,
+  CalendarClock,
+  Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +59,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 // ─── Types ───────────────────────────────────────────
 
@@ -66,10 +79,29 @@ interface VaultDocument {
   isFolder: boolean;
   parentId: string | null;
   uploadedBy: string | null;
+  expiryDate: string | null;
+  canEdit?: boolean;
   createdAt: string;
   updatedAt: string;
   uploader?: { fullName: string; email: string } | null;
   _count?: { children: number };
+}
+
+interface VaultDocumentVersion {
+  id: string;
+  documentId: string;
+  versionNum: number;
+  name: string;
+  fileUrl: string;
+  publicId: string | null;
+  fileType: string | null;
+  createdAt: string;
+  uploader?: { fullName: string; email: string } | null;
+}
+
+interface FolderPolicy {
+  canRead: boolean;
+  canEdit: boolean;
 }
 
 interface Breadcrumb {
@@ -196,10 +228,24 @@ export default function VaultPage() {
     name: "",
     category: "",
     region: "Global",
+    expiryDate: "",
   });
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<{ file: File; status: "pending" | "uploading" | "done" | "error" }[]>([]);
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Preview dialog
+  const [previewDoc, setPreviewDoc] = useState<VaultDocument | null>(null);
+
+  // Replace dialog
+  const [replaceDoc, setReplaceDoc] = useState<VaultDocument | null>(null);
+  const [replaceFile, setReplaceFile] = useState<File | null>(null);
+  const [replaceStatus, setReplaceStatus] = useState<"idle" | "uploading" | "saving" | "done" | "error">("idle");
+  const replaceFileRef = useRef<HTMLInputElement>(null);
+
+  // Version history sheet
+  const [historyDoc, setHistoryDoc] = useState<VaultDocument | null>(null);
 
   // New Folder dialog
   const [folderOpen, setFolderOpen] = useState(false);
@@ -211,6 +257,7 @@ export default function VaultPage() {
     name: "",
     category: "",
     region: "",
+    expiryDate: "",
   });
 
   // Delete dialog
@@ -248,6 +295,38 @@ export default function VaultPage() {
   const folders = documents.filter((d) => d.isFolder);
   const files = documents.filter((d) => !d.isFolder);
 
+  // Expiry alerts — certifications expiring within 60 days
+  const { data: expiryAlerts = [] } = useQuery<VaultDocument[]>({
+    queryKey: ["vault-expiry-alerts"],
+    queryFn: async () => {
+      const res = await api.get("/vault/expiry-alerts");
+      return res.data;
+    },
+  });
+  const [expiryBannerDismissed, setExpiryBannerDismissed] = useState(false);
+
+  // Folder-level policy for current folder
+  const { data: folderPolicy } = useQuery<FolderPolicy>({
+    queryKey: ["vault-folder-policy", currentFolderId],
+    queryFn: async () => {
+      const res = await api.get("/vault/folder-policy", {
+        params: { folderId: currentFolderId ?? "" },
+      });
+      return res.data;
+    },
+  });
+  const canEditHere = folderPolicy ? folderPolicy.canEdit : canEdit;
+
+  // Version history for selected doc
+  const { data: versions = [], isLoading: versionsLoading } = useQuery<VaultDocumentVersion[]>({
+    queryKey: ["vault-versions", historyDoc?.id],
+    queryFn: async () => {
+      const res = await api.get(`/vault/${historyDoc!.id}/versions`);
+      return res.data;
+    },
+    enabled: !!historyDoc,
+  });
+
   // Upload status: idle | uploading | saving | done | error
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "saving" | "done" | "error">("idle");
 
@@ -261,60 +340,138 @@ export default function VaultPage() {
     return "file";
   }
 
+  async function uploadSingleFileToCloudinary(
+    file: File,
+    sig: { signature: string; timestamp: number; cloudName: string; apiKey: string; folder: string },
+  ): Promise<{ secure_url: string; public_id: string }> {
+    const isRaw =
+      /\.(pdf|doc|docx|xls|xlsx|csv|zip)$/i.test(file.name) ||
+      file.type === "application/pdf";
+    const resourceType = isRaw ? "raw" : "auto";
+
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("signature", sig.signature);
+    fd.append("timestamp", String(sig.timestamp));
+    fd.append("api_key", sig.apiKey);
+    fd.append("folder", sig.folder);
+
+    const cloudRes = await fetch(
+      `https://api.cloudinary.com/v1_1/${sig.cloudName}/${resourceType}/upload`,
+      { method: "POST", body: fd },
+    );
+    const cloudData = await cloudRes.json();
+    if (!cloudData.secure_url) throw new Error("Cloudinary upload failed");
+    return { secure_url: cloudData.secure_url, public_id: cloudData.public_id };
+  }
+
   async function uploadToCloudinaryAndSave() {
-    if (!uploadFile) { toast.error("Please select a file"); return; }
-    if (!uploadForm.name || !uploadForm.category) { toast.error("Name and category are required"); return; }
+    if (uploadFiles.length === 0) { toast.error("Please select at least one file"); return; }
+    if (!uploadForm.category) { toast.error("Category is required"); return; }
+    if (uploadFiles.length === 1 && !uploadForm.name) { toast.error("Document name is required"); return; }
+
+    const isSingle = uploadFiles.length === 1;
+    setUploadStatus("uploading");
+
+    // Initialise per-file progress
+    setUploadProgress(uploadFiles.map((f) => ({ file: f, status: "pending" })));
 
     try {
-      // Step 1 — get signed params from backend
-      setUploadStatus("uploading");
       const { data: sig } = await api.get("/vault/upload-signature");
 
-      const isRaw =
-        /\.(pdf|doc|docx|xls|xlsx|csv|zip)$/i.test(uploadFile.name) ||
-        uploadFile.type === "application/pdf";
-      const resourceType = isRaw ? "raw" : "auto";
+      for (let i = 0; i < uploadFiles.length; i++) {
+        const file = uploadFiles[i];
+        setUploadProgress((prev) =>
+          prev.map((p, idx) => (idx === i ? { ...p, status: "uploading" } : p)),
+        );
 
-      // Step 2 — upload directly to Cloudinary (no backend proxy)
-      const fd = new FormData();
-      fd.append("file", uploadFile);
-      fd.append("signature", sig.signature);
-      fd.append("timestamp", String(sig.timestamp));
-      fd.append("api_key", sig.apiKey);
-      fd.append("folder", sig.folder);
+        const { secure_url, public_id } = await uploadSingleFileToCloudinary(file, sig);
 
-      const cloudRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${sig.cloudName}/${resourceType}/upload`,
-        { method: "POST", body: fd },
-      );
-      const cloudData = await cloudRes.json();
-      if (!cloudData.secure_url) throw new Error("Cloudinary upload failed");
+        const docName = isSingle
+          ? uploadForm.name
+          : file.name.replace(/\.[^/.]+$/, "") || file.name;
 
-      // Step 3 — save metadata to backend (plain JSON, no CORS / size issues)
-      setUploadStatus("saving");
-      await api.post("/vault/upload", {
-        name: uploadForm.name,
-        category: uploadForm.category,
-        region: uploadForm.region,
-        parentId: currentFolderId || undefined,
-        fileUrl: cloudData.secure_url as string,
-        publicId: cloudData.public_id as string,
-        fileType: deriveFileType(uploadFile.type),
-      });
+        const payload: Record<string, any> = {
+          name: docName,
+          category: uploadForm.category,
+          region: uploadForm.region,
+          parentId: currentFolderId || undefined,
+          fileUrl: secure_url,
+          publicId: public_id,
+          fileType: deriveFileType(file.type),
+        };
+        if (uploadForm.category === "Certifications" && uploadForm.expiryDate) {
+          payload.expiryDate = uploadForm.expiryDate;
+        }
+
+        await api.post("/vault/upload", payload);
+
+        setUploadProgress((prev) =>
+          prev.map((p, idx) => (idx === i ? { ...p, status: "done" } : p)),
+        );
+      }
 
       setUploadStatus("done");
-      toast.success("Document uploaded successfully");
+      toast.success(
+        isSingle ? "Document uploaded successfully" : `${uploadFiles.length} files uploaded`,
+      );
       queryClient.invalidateQueries({ queryKey: ["vault-documents"] });
       queryClient.invalidateQueries({ queryKey: ["vault-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["vault-expiry-alerts"] });
       setTimeout(() => {
         setUploadOpen(false);
-        setUploadForm({ name: "", category: "", region: "Global" });
-        setUploadFile(null);
+        setUploadForm({ name: "", category: "", region: "Global", expiryDate: "" });
+        setUploadFiles([]);
+        setUploadProgress([]);
         setUploadStatus("idle");
       }, 800);
     } catch (err: any) {
       setUploadStatus("error");
       toast.error(err?.message ?? "Upload failed");
+    }
+  }
+
+  async function handleReplace() {
+    if (!replaceDoc || !replaceFile) return;
+    try {
+      setReplaceStatus("uploading");
+      const { data: sig } = await api.get("/vault/upload-signature");
+      const { secure_url, public_id } = await uploadSingleFileToCloudinary(replaceFile, sig);
+      setReplaceStatus("saving");
+      const newName = replaceFile.name.replace(/\.[^/.]+$/, "") || replaceFile.name;
+      await api.post(`/vault/${replaceDoc.id}/replace`, {
+        fileUrl: secure_url,
+        publicId: public_id,
+        fileType: deriveFileType(replaceFile.type),
+        name: newName,
+      });
+      setReplaceStatus("done");
+      toast.success("File replaced — previous version archived");
+      queryClient.invalidateQueries({ queryKey: ["vault-documents"] });
+      setTimeout(() => {
+        setReplaceDoc(null);
+        setReplaceFile(null);
+        setReplaceStatus("idle");
+      }, 800);
+    } catch (err: any) {
+      setReplaceStatus("error");
+      toast.error(err?.message ?? "Replace failed");
+    }
+  }
+
+  async function handleRestoreVersion(version: VaultDocumentVersion) {
+    if (!historyDoc) return;
+    try {
+      await api.post(`/vault/${historyDoc.id}/replace`, {
+        fileUrl: version.fileUrl,
+        publicId: version.publicId,
+        fileType: version.fileType,
+      });
+      toast.success(`Restored to version ${version.versionNum}`);
+      queryClient.invalidateQueries({ queryKey: ["vault-documents"] });
+      queryClient.invalidateQueries({ queryKey: ["vault-versions", historyDoc.id] });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Restore failed");
     }
   }
 
@@ -345,7 +502,7 @@ export default function VaultPage() {
       data,
     }: {
       id: string;
-      data: { name: string; category: string; region: string };
+      data: { name: string; category: string; region: string; expiryDate?: string };
     }) => {
       const res = await api.put(`/vault/${id}`, data);
       return res.data;
@@ -354,6 +511,7 @@ export default function VaultPage() {
       toast.success("Document updated");
       queryClient.invalidateQueries({ queryKey: ["vault-documents"] });
       queryClient.invalidateQueries({ queryKey: ["vault-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["vault-expiry-alerts"] });
       setEditDoc(null);
     },
     onError: (err: any) => {
@@ -385,20 +543,17 @@ export default function VaultPage() {
     setCurrentFolderId(folderId);
   }
 
-  function handleFileSelect(file: File | null) {
-    if (file) {
-      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "") || file.name;
-      setUploadForm((prev) => {
-        const prevExtracted = uploadFile
-          ? uploadFile.name.replace(/\.[^/.]+$/, "") || uploadFile.name
-          : "";
-        if (!prev.name || prev.name === prevExtracted) {
-          return { ...prev, name: nameWithoutExt };
-        }
-        return prev;
-      });
+  function handleFilesSelect(newFiles: FileList | null) {
+    if (!newFiles || newFiles.length === 0) return;
+    const arr = Array.from(newFiles);
+    setUploadFiles(arr);
+    // Auto-fill name only for single file
+    if (arr.length === 1) {
+      const nameWithoutExt = arr[0].name.replace(/\.[^/.]+$/, "") || arr[0].name;
+      setUploadForm((prev) => ({ ...prev, name: prev.name || nameWithoutExt }));
+    } else {
+      setUploadForm((prev) => ({ ...prev, name: "" }));
     }
-    setUploadFile(file);
   }
 
   function handleUploadSubmit() {
@@ -408,18 +563,26 @@ export default function VaultPage() {
   function handleFileDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileSelect(file);
+    if (e.dataTransfer.files.length > 0) handleFilesSelect(e.dataTransfer.files);
   }
 
   function openEdit(doc: VaultDocument) {
     setEditDoc(doc);
-    setEditForm({ name: doc.name, category: doc.category, region: doc.region });
+    const expiryRaw = doc.expiryDate ? new Date(doc.expiryDate).toISOString().split("T")[0] : "";
+    setEditForm({ name: doc.name, category: doc.category, region: doc.region, expiryDate: expiryRaw });
   }
 
   function handleEditSubmit() {
     if (!editDoc) return;
-    editMutation.mutate({ id: editDoc.id, data: editForm });
+    const data: { name: string; category: string; region: string; expiryDate?: string } = {
+      name: editForm.name,
+      category: editForm.category,
+      region: editForm.region,
+    };
+    if (editForm.category === "Certifications") {
+      data.expiryDate = editForm.expiryDate || undefined;
+    }
+    editMutation.mutate({ id: editDoc.id, data });
   }
 
   function formatDate(iso: string) {
@@ -430,6 +593,14 @@ export default function VaultPage() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  }
+
+  function getExpiryBadge(expiryDate: string | null) {
+    if (!expiryDate) return null;
+    const daysLeft = Math.ceil((new Date(expiryDate).getTime() - Date.now()) / 86400000);
+    if (daysLeft <= 0) return <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Expired</Badge>;
+    if (daysLeft <= 60) return <Badge className="bg-amber-500 hover:bg-amber-500 text-white text-[10px] px-1.5 py-0">Expiring Soon</Badge>;
+    return null;
   }
 
   const isAtRoot = currentFolderId === null && !search;
@@ -459,13 +630,31 @@ export default function VaultPage() {
               <FolderPlus className="h-4 w-4" />
               New Folder
             </Button>
-            <Button onClick={() => setUploadOpen(true)} className="gap-2">
-              <Upload className="h-4 w-4" />
-              Upload
-            </Button>
+            {canEditHere && (
+              <Button onClick={() => setUploadOpen(true)} className="gap-2">
+                <Upload className="h-4 w-4" />
+                Upload
+              </Button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Expiry alert banner */}
+      {expiryAlerts.length > 0 && !expiryBannerDismissed && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <CalendarClock className="h-4 w-4 shrink-0 text-amber-600" />
+          <span className="flex-1">
+            <strong>{expiryAlerts.length}</strong> certification file{expiryAlerts.length !== 1 ? "s are" : " is"} expiring within 60 days.
+          </span>
+          <button
+            onClick={() => setExpiryBannerDismissed(true)}
+            className="text-amber-600 hover:text-amber-800"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Breadcrumbs */}
       <div className="flex items-center gap-1 text-sm">
@@ -624,10 +813,13 @@ export default function VaultPage() {
                           <Icon className="h-6 w-6 text-white" />
                         </div>
                         <div className="min-w-0 w-full">
-                          <p className="text-sm font-semibold truncate leading-tight">
+                          <p className="text-sm font-semibold truncate leading-tight" title={folder.name}>
                             {folder.name}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
+                          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 justify-center">
+                            {folder.canEdit === false && (
+                              <Lock className="h-2.5 w-2.5 text-muted-foreground/60" />
+                            )}
                             {childCount} item{childCount !== 1 ? "s" : ""}
                           </p>
                         </div>
@@ -678,99 +870,127 @@ export default function VaultPage() {
               )}
               <div className="rounded-xl border border-border bg-card overflow-hidden">
                 {/* Table header */}
-                <div className="grid grid-cols-[minmax(0,1fr)_140px_140px_180px_80px] items-stretch border-b bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <span className="px-4 py-2.5 border-r border-border">
-                    File
-                  </span>
-                  <span className="px-4 py-2.5 border-r border-border">
-                    Category
-                  </span>
-                  <span className="px-4 py-2.5 border-r border-border">
-                    Region
-                  </span>
-                  <span className="px-4 py-2.5 border-r border-border">
-                    Modified
-                  </span>
+                <div className="grid grid-cols-[minmax(0,1fr)_140px_120px_170px_170px_180px] items-stretch border-b bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="px-4 py-2.5 border-r border-border">File</span>
+                  <span className="px-4 py-2.5 border-r border-border">Category</span>
+                  <span className="px-4 py-2.5 border-r border-border">Region</span>
+                  <span className="px-4 py-2.5 border-r border-border">Uploaded</span>
+                  <span className="px-4 py-2.5 border-r border-border">Modified</span>
                   <span className="px-4 py-2.5 text-right">Actions</span>
                 </div>
 
                 <div className="divide-y divide-border">
                   {files.map((doc) => {
-                    const {
-                      color,
-                      bg,
-                      Icon: CatIcon,
-                    } = getCategoryMeta(doc.category);
+                    const { color, bg, Icon: CatIcon } = getCategoryMeta(doc.category);
+                    const fileCanEdit = doc.canEdit !== undefined ? doc.canEdit : canEdit;
                     return (
                       <div
                         key={doc.id}
-                        className="grid grid-cols-[minmax(0,1fr)_140px_140px_180px_80px] items-stretch hover:bg-muted/30 transition-colors group last:border-0"
+                        className="grid grid-cols-[minmax(0,1fr)_140px_120px_170px_170px_180px] items-stretch hover:bg-muted/30 transition-colors group last:border-0"
                       >
-                        {/* Name + type icon */}
+                        {/* Name + type icon + expiry badge */}
                         <div className="flex items-center gap-3 min-w-0 px-4 py-3 border-r border-border">
                           <div className={`shrink-0 rounded-lg p-2 ${bg}`}>
-                            <FileTypeIcon
-                              fileType={doc.fileType}
-                              className={`h-4 w-4 ${color}`}
-                            />
+                            <FileTypeIcon fileType={doc.fileType} className={`h-4 w-4 ${color}`} />
                           </div>
-                          <div className="min-w-0">
-                            {doc.fileUrl ? (
-                              <a
-                                href={doc.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-medium text-sm truncate hover:underline flex items-center gap-1 group/link"
-                                title={doc.name}
-                              >
-                                <span className="truncate">{doc.name}</span>
-                                <ExternalLink className="h-3 w-3 shrink-0 opacity-0 group-hover/link:opacity-100 transition-opacity" />
-                              </a>
-                            ) : (
-                              <span className="font-medium text-sm truncate">
-                                {doc.name}
-                              </span>
-                            )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {doc.fileUrl ? (
+                                <button
+                                  onClick={() => setPreviewDoc(doc)}
+                                  className="font-medium text-sm truncate hover:underline text-left"
+                                  title={doc.name}
+                                >
+                                  {doc.name}
+                                </button>
+                              ) : (
+                                <span className="font-medium text-sm truncate">{doc.name}</span>
+                              )}
+                              {doc.fileUrl && (
+                                <a
+                                  href={doc.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Open in new tab"
+                                  className="shrink-0 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                              {getExpiryBadge(doc.expiryDate)}
+                            </div>
                             {doc.uploader && (
-                              <p className="text-xs text-muted-foreground truncate">
-                                {doc.uploader.fullName}
-                              </p>
+                              <p className="text-xs text-muted-foreground truncate">{doc.uploader.fullName}</p>
                             )}
                           </div>
                         </div>
 
                         {/* Category */}
                         <div className="flex items-center gap-1.5 px-4 py-3 border-r border-border">
-                          <CatIcon
-                            className={`h-3.5 w-3.5 shrink-0 ${color}`}
-                          />
-                          <span className={`text-xs font-medium ${color}`}>
-                            {doc.category}
-                          </span>
+                          <CatIcon className={`h-3.5 w-3.5 shrink-0 ${color}`} />
+                          <span className={`text-xs font-medium ${color} truncate`}>{doc.category}</span>
                         </div>
 
                         {/* Region */}
-                        <span className="flex items-center px-4 py-3 text-sm text-muted-foreground border-r border-border">
+                        <span className="flex items-center px-4 py-3 text-sm text-muted-foreground border-r border-border truncate">
                           {doc.region}
                         </span>
 
-                        {/* Date */}
+                        {/* Uploaded */}
+                        <span className="flex items-center px-4 py-3 text-xs text-muted-foreground border-r border-border">
+                          {formatDate(doc.createdAt)}
+                        </span>
+
+                        {/* Modified */}
                         <span className="flex items-center px-4 py-3 text-xs text-muted-foreground border-r border-border">
                           {formatDate(doc.updatedAt)}
                         </span>
 
                         {/* Actions */}
-                        <div className="flex items-center justify-end gap-1 px-4 py-3">
-                          {canEdit && (
+                        <div className="flex items-center justify-end gap-0.5 px-2 py-3">
+                          {/* Preview */}
+                          {doc.fileUrl && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Preview"
+                              onClick={() => setPreviewDoc(doc)}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {fileCanEdit && (
                             <>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="Edit"
+                                title="Edit metadata"
                                 onClick={() => openEdit(doc)}
                               >
                                 <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              {doc.fileUrl && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Replace file"
+                                  onClick={() => { setReplaceDoc(doc); setReplaceFile(null); setReplaceStatus("idle"); }}
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Version history"
+                                onClick={() => setHistoryDoc(doc)}
+                              >
+                                <History className="h-3.5 w-3.5" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -812,69 +1032,64 @@ export default function VaultPage() {
           <div className="space-y-4 py-2">
             {/* Drop zone */}
             <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={handleFileDrop}
               onClick={() => fileInputRef.current?.click()}
               className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition-colors ${
-                dragging
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/40 hover:bg-muted/30"
+                dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-muted/30"
               }`}
             >
               <input
                 ref={fileInputRef}
                 type="file"
+                multiple
                 className="hidden"
-                onChange={(e) =>
-                  handleFileSelect(e.target.files?.[0] ?? null)
-                }
+                onChange={(e) => handleFilesSelect(e.target.files)}
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.jfif,.gif,.webp,.zip"
               />
-              {uploadFile ? (
-                <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  <span className="text-sm font-medium truncate max-w-[250px]">
-                    {uploadFile.name}
-                  </span>
+              {uploadFiles.length > 0 ? (
+                <div className="w-full space-y-1.5">
+                  {uploadFiles.map((f, i) => {
+                    const prog = uploadProgress[i];
+                    return (
+                      <div key={i} className="flex items-center gap-2 text-left">
+                        <FileText className="h-4 w-4 text-primary shrink-0" />
+                        <span className="text-sm truncate flex-1">{f.name}</span>
+                        {prog?.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />}
+                        {prog?.status === "done" && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+                        {prog?.status === "error" && <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />}
+                      </div>
+                    );
+                  })}
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleFileSelect(null);
-                    }}
-                    className="ml-1 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => { e.stopPropagation(); setUploadFiles([]); setUploadProgress([]); }}
+                    className="text-xs text-muted-foreground hover:text-foreground mt-1"
                   >
-                    <X className="h-4 w-4" />
+                    Clear selection
                   </button>
                 </div>
               ) : (
                 <>
                   <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                  <p className="text-sm font-medium">
-                    Click or drag & drop a file
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    PDF, DOC, Excel, Images — up to 50 MB
-                  </p>
+                  <p className="text-sm font-medium">Click or drag & drop files</p>
+                  <p className="text-xs text-muted-foreground mt-1">PDF, DOC, Excel, Images — up to 50 MB each · Multiple files supported</p>
                 </>
               )}
             </div>
 
-            {/* Name */}
-            <div className="space-y-1.5">
-              <Label>Document Name *</Label>
-              <Input
-                placeholder="e.g. ISO_9001_Certificate"
-                value={uploadForm.name}
-                onChange={(e) =>
-                  setUploadForm((f) => ({ ...f, name: e.target.value }))
-                }
-              />
-            </div>
+            {/* Name — only shown for single file */}
+            {uploadFiles.length <= 1 && (
+              <div className="space-y-1.5">
+                <Label>Document Name *</Label>
+                <Input
+                  placeholder="e.g. ISO_9001_Certificate"
+                  value={uploadForm.name}
+                  onChange={(e) => setUploadForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+            )}
 
             {/* Category */}
             <div className="space-y-1.5">
@@ -884,9 +1099,7 @@ export default function VaultPage() {
                   <button
                     key={cat}
                     type="button"
-                    onClick={() =>
-                      setUploadForm((f) => ({ ...f, category: cat }))
-                    }
+                    onClick={() => setUploadForm((f) => ({ ...f, category: cat }))}
                     className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                       uploadForm.category === cat
                         ? "bg-primary text-primary-foreground border-primary"
@@ -900,11 +1113,24 @@ export default function VaultPage() {
               <Input
                 placeholder="Or type a custom category"
                 value={uploadForm.category}
-                onChange={(e) =>
-                  setUploadForm((f) => ({ ...f, category: e.target.value }))
-                }
+                onChange={(e) => setUploadForm((f) => ({ ...f, category: e.target.value }))}
               />
             </div>
+
+            {/* Expiry Date — Certifications only */}
+            {uploadForm.category === "Certifications" && (
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1">
+                  <CalendarClock className="h-3.5 w-3.5 text-amber-500" />
+                  Expiry Date *
+                </Label>
+                <Input
+                  type="date"
+                  value={uploadForm.expiryDate}
+                  onChange={(e) => setUploadForm((f) => ({ ...f, expiryDate: e.target.value }))}
+                />
+              </div>
+            )}
 
             {/* Region */}
             <div className="space-y-1.5">
@@ -912,9 +1138,7 @@ export default function VaultPage() {
               <Input
                 placeholder="Global, EU, North America…"
                 value={uploadForm.region}
-                onChange={(e) =>
-                  setUploadForm((f) => ({ ...f, region: e.target.value }))
-                }
+                onChange={(e) => setUploadForm((f) => ({ ...f, region: e.target.value }))}
               />
             </div>
           </div>
@@ -922,10 +1146,7 @@ export default function VaultPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => {
-                setUploadOpen(false);
-                setUploadStatus("idle");
-              }}
+              onClick={() => { setUploadOpen(false); setUploadStatus("idle"); setUploadFiles([]); setUploadProgress([]); }}
               disabled={uploadStatus === "uploading" || uploadStatus === "saving"}
             >
               Cancel
@@ -935,36 +1156,10 @@ export default function VaultPage() {
               disabled={uploadStatus === "uploading" || uploadStatus === "saving" || uploadStatus === "done"}
               className="gap-2"
             >
-              {uploadStatus === "uploading" && (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Uploading…
-                </>
-              )}
-              {uploadStatus === "saving" && (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving…
-                </>
-              )}
-              {uploadStatus === "done" && (
-                <>
-                  <Check className="h-4 w-4" />
-                  Done
-                </>
-              )}
-              {uploadStatus === "error" && (
-                <>
-                  <AlertCircle className="h-4 w-4" />
-                  Retry
-                </>
-              )}
-              {uploadStatus === "idle" && (
-                <>
-                  <Upload className="h-4 w-4" />
-                  Upload
-                </>
-              )}
+              {(uploadStatus === "uploading" || uploadStatus === "saving") && <><Loader2 className="h-4 w-4 animate-spin" />{uploadStatus === "uploading" ? `Uploading${uploadFiles.length > 1 ? "…" : "…"}` : "Saving…"}</>}
+              {uploadStatus === "done" && <><Check className="h-4 w-4" />Done</>}
+              {uploadStatus === "error" && <><AlertCircle className="h-4 w-4" />Retry</>}
+              {uploadStatus === "idle" && <><Upload className="h-4 w-4" />Upload {uploadFiles.length > 1 ? `(${uploadFiles.length} files)` : ""}</>}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1083,11 +1278,23 @@ export default function VaultPage() {
                   <Label>Region</Label>
                   <Input
                     value={editForm.region}
-                    onChange={(e) =>
-                      setEditForm((f) => ({ ...f, region: e.target.value }))
-                    }
+                    onChange={(e) => setEditForm((f) => ({ ...f, region: e.target.value }))}
                   />
                 </div>
+
+                {editForm.category === "Certifications" && (
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1">
+                      <CalendarClock className="h-3.5 w-3.5 text-amber-500" />
+                      Expiry Date
+                    </Label>
+                    <Input
+                      type="date"
+                      value={editForm.expiryDate}
+                      onChange={(e) => setEditForm((f) => ({ ...f, expiryDate: e.target.value }))}
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -1149,6 +1356,161 @@ export default function VaultPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ─── Preview Dialog ────────────────────────────── */}
+      <Dialog open={!!previewDoc} onOpenChange={(o) => !o && setPreviewDoc(null)}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 min-w-0 pr-8">
+              {previewDoc && <FileTypeIcon fileType={previewDoc.fileType} className="h-4 w-4 shrink-0 text-primary" />}
+              <span className="truncate">{previewDoc?.name}</span>
+            </DialogTitle>
+            {previewDoc?.fileUrl && (
+              <div className="flex items-center gap-2 pt-1">
+                <a
+                  href={previewDoc.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  title="Open in new tab"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open in new tab
+                </a>
+              </div>
+            )}
+          </DialogHeader>
+          <div className="flex-1 overflow-auto rounded-lg bg-muted/30 min-h-[400px] flex items-center justify-center">
+            {previewDoc?.fileType === "image" && previewDoc.fileUrl && (
+              <img
+                src={previewDoc.fileUrl}
+                alt={previewDoc.name}
+                className="max-w-full max-h-[65vh] object-contain rounded"
+              />
+            )}
+            {(previewDoc?.fileType === "pdf") && previewDoc?.fileUrl && (
+              <iframe
+                src={previewDoc.fileUrl}
+                title={previewDoc.name}
+                className="w-full h-[65vh] rounded border-0"
+              />
+            )}
+            {(previewDoc?.fileType === "doc" || previewDoc?.fileType === "sheet" || previewDoc?.fileType === "file") && previewDoc?.fileUrl && (
+              <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
+                <FileTypeIcon fileType={previewDoc.fileType} className="h-16 w-16 opacity-30" />
+                <p className="text-sm">Preview not available for this file type.</p>
+                <a href={previewDoc.fileUrl} target="_blank" rel="noopener noreferrer">
+                  <Button variant="outline" className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Download to view
+                  </Button>
+                </a>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Replace File Dialog ───────────────────────── */}
+      <Dialog open={!!replaceDoc} onOpenChange={(o) => !o && setReplaceDoc(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Replace File
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Current version of <strong>{replaceDoc?.name}</strong> will be archived and a new version created.
+            </p>
+            <div
+              onClick={() => replaceFileRef.current?.click()}
+              className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center cursor-pointer hover:border-primary/40 hover:bg-muted/30 transition-colors"
+            >
+              <input
+                ref={replaceFileRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => setReplaceFile(e.target.files?.[0] ?? null)}
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.jfif,.gif,.webp,.zip"
+              />
+              {replaceFile ? (
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium truncate max-w-[280px]">{replaceFile.name}</span>
+                </div>
+              ) : (
+                <>
+                  <Upload className="h-6 w-6 text-muted-foreground mb-1" />
+                  <p className="text-sm">Click to select replacement file</p>
+                </>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReplaceDoc(null)} disabled={replaceStatus === "uploading" || replaceStatus === "saving"}>
+              Cancel
+            </Button>
+            <Button onClick={handleReplace} disabled={!replaceFile || replaceStatus === "uploading" || replaceStatus === "saving" || replaceStatus === "done"} className="gap-2">
+              {(replaceStatus === "uploading" || replaceStatus === "saving") && <><Loader2 className="h-4 w-4 animate-spin" />{replaceStatus === "uploading" ? "Uploading…" : "Saving…"}</>}
+              {replaceStatus === "done" && <><Check className="h-4 w-4" />Done</>}
+              {replaceStatus === "error" && <><AlertCircle className="h-4 w-4" />Retry</>}
+              {replaceStatus === "idle" && <><RefreshCw className="h-4 w-4" />Replace</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Version History Sheet ─────────────────────── */}
+      <Sheet open={!!historyDoc} onOpenChange={(o) => !o && setHistoryDoc(null)}>
+        <SheetContent className="w-[400px] sm:w-[480px]">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Version History
+            </SheetTitle>
+            <p className="text-xs text-muted-foreground truncate">{historyDoc?.name}</p>
+          </SheetHeader>
+          <div className="mt-4 space-y-2">
+            {versionsLoading && (
+              <div className="flex items-center gap-2 text-muted-foreground py-6 justify-center">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading history…
+              </div>
+            )}
+            {!versionsLoading && versions.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">No previous versions — this is the original upload.</p>
+            )}
+            {versions.map((v) => (
+              <div key={v.id} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" title={v.name}>{v.name}</p>
+                  <p className="text-xs text-muted-foreground">v{v.versionNum} · {formatDate(v.createdAt)}{v.uploader ? ` · ${v.uploader.fullName}` : ""}</p>
+                </div>
+                <div className="flex gap-1">
+                  <a href={v.fileUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Open in new tab">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                  </a>
+                  {canEdit && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      title="Restore this version"
+                      onClick={() => handleRestoreVersion(v)}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { PrismaClient } from "@prisma/client";
 import { AuthRequest } from "../types/index.js";
+import { resolveFolderPolicy } from "../config/vaultPermissions.js";
 
 const prisma = new PrismaClient();
 
@@ -98,10 +99,14 @@ export async function listDocuments(
       search?: string;
       parentId?: string;
     };
+    const user = (req as any).user;
+    const isAdmin = user?.roles?.includes("admin") ?? false;
+    const hasVaultEdit = user?.permissions?.some(
+      (p: any) => p.permission === "vault" && p.accessLevel === "edit",
+    ) ?? false;
 
     const where: any = {};
 
-    // If searching, search across everything (not scoped to parent)
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
@@ -109,29 +114,33 @@ export async function listDocuments(
         { region: { contains: search, mode: "insensitive" } },
       ];
     } else {
-      // Scope to parent folder (null = root)
-      if (parentId) {
-        where.parentId = parentId;
-      } else {
-        where.parentId = null;
-      }
+      where.parentId = parentId || null;
     }
 
     if (category && category !== "all") where.category = category;
 
     const documents = await prisma.vaultDocument.findMany({
       where,
-      orderBy: [
-        { isFolder: "desc" }, // folders first
-        { name: "asc" },
-      ],
+      orderBy: [{ isFolder: "desc" }, { name: "asc" }],
       include: {
         uploader: { select: { fullName: true, email: true } },
         _count: { select: { children: true } },
       },
     });
 
-    res.json(documents);
+    // Annotate each item with canEdit based on folder policy
+    const annotated = await Promise.all(
+      documents.map(async (doc) => {
+        const policy = await resolveFolderPolicy(doc.isFolder ? doc.parentId : (doc.parentId ?? doc.id));
+        const canEdit =
+          isAdmin ||
+          (policy.edit === "all" && (isAdmin || hasVaultEdit));
+        const canRead = isAdmin || policy.read === "all";
+        return { ...doc, canEdit, canRead };
+      }),
+    );
+
+    res.json(annotated);
   } catch (err) {
     next(err);
   }
@@ -236,7 +245,7 @@ export async function createFolder(
 /**
  * POST /api/vault/upload
  * Accepts a JSON body with the Cloudinary result already uploaded from the frontend.
- * { name, category, region, parentId, fileUrl, publicId, fileType }
+ * { name, category, region, parentId, fileUrl, publicId, fileType, expiryDate? }
  */
 export async function uploadDocument(
   req: Request,
@@ -244,7 +253,7 @@ export async function uploadDocument(
   next: NextFunction,
 ) {
   try {
-    const { name, category, region, parentId, fileUrl, publicId, fileType } = req.body;
+    const { name, category, region, parentId, fileUrl, publicId, fileType, expiryDate } = req.body;
 
     if (!name || !category) {
       res.status(400).json({ error: "Name and category are required" });
@@ -255,7 +264,16 @@ export async function uploadDocument(
       return;
     }
 
-    const userId = (req as any).user?.id;
+    const user = (req as any).user;
+    const userId = user?.id;
+    const isAdmin = user?.roles?.includes("admin") ?? false;
+    const hasVaultEdit = user?.permissions?.some((p: any) => p.permission === "vault" && p.accessLevel === "edit") ?? false;
+
+    const policy = await resolveFolderPolicy(parentId || null);
+    if (!(isAdmin || (policy.edit === "all" && hasVaultEdit))) {
+      res.status(403).json({ error: "You do not have permission to upload to this folder" });
+      return;
+    }
 
     const doc = await prisma.vaultDocument.create({
       data: {
@@ -268,6 +286,7 @@ export async function uploadDocument(
         isFolder: false,
         parentId: parentId || null,
         uploadedBy: userId ?? null,
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
       },
       include: {
         uploader: { select: { fullName: true, email: true } },
@@ -281,7 +300,7 @@ export async function uploadDocument(
   }
 }
 
-/** PUT /api/vault/:id - edit document metadata (name, category, region) */
+/** PUT /api/vault/:id - edit document metadata (name, category, region, expiryDate) */
 export async function editDocument(
   req: Request,
   res: Response,
@@ -289,11 +308,20 @@ export async function editDocument(
 ) {
   try {
     const { id } = req.params;
-    const { name, category, region } = req.body;
+    const { name, category, region, expiryDate } = req.body;
 
     const existing = await prisma.vaultDocument.findUnique({ where: { id: id as string } });
     if (!existing) {
       res.status(404).json({ error: "Document not found" });
+      return;
+    }
+
+    const user = (req as any).user;
+    const isAdmin = user?.roles?.includes("admin") ?? false;
+    const hasVaultEdit = user?.permissions?.some((p: any) => p.permission === "vault" && p.accessLevel === "edit") ?? false;
+    const policy = await resolveFolderPolicy(existing.parentId);
+    if (!(isAdmin || (policy.edit === "all" && hasVaultEdit))) {
+      res.status(403).json({ error: "You do not have permission to edit files in this folder" });
       return;
     }
 
@@ -303,6 +331,7 @@ export async function editDocument(
         ...(name && { name }),
         ...(category && { category }),
         ...(region !== undefined && { region }),
+        ...(expiryDate !== undefined && { expiryDate: expiryDate ? new Date(expiryDate) : null }),
       },
       include: {
         uploader: { select: { fullName: true, email: true } },
@@ -311,6 +340,147 @@ export async function editDocument(
     });
 
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /api/vault/:id/replace - archive current file as a version, upload new one */
+export async function replaceDocument(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { id } = req.params;
+    const { fileUrl, publicId, fileType, name } = req.body;
+
+    if (!fileUrl) {
+      res.status(400).json({ error: "fileUrl is required" });
+      return;
+    }
+
+    const existing = await prisma.vaultDocument.findUnique({ where: { id: id as string } });
+    if (!existing) {
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
+
+    const userId = (req as any).user?.id;
+
+    // Get current max version number
+    const latestVersion = await prisma.vaultDocumentVersion.findFirst({
+      where: { documentId: id as string },
+      orderBy: { versionNum: "desc" },
+      select: { versionNum: true },
+    });
+    const nextVersionNum = (latestVersion?.versionNum ?? 0) + 1;
+
+    // Archive current file as a version
+    if (existing.fileUrl) {
+      await prisma.vaultDocumentVersion.create({
+        data: {
+          documentId: id as string,
+          versionNum: nextVersionNum,
+          name: existing.name,
+          fileUrl: existing.fileUrl,
+          publicId: existing.publicId ?? null,
+          fileType: existing.fileType ?? null,
+          uploadedBy: existing.uploadedBy ?? null,
+        },
+      });
+    }
+
+    // Update document with new file (do NOT delete old Cloudinary asset — it's versioned)
+    const updated = await prisma.vaultDocument.update({
+      where: { id: id as string },
+      data: {
+        fileUrl,
+        publicId: publicId || null,
+        fileType: fileType || existing.fileType || "file",
+        uploadedBy: userId ?? existing.uploadedBy,
+        ...(name && { name }),
+      },
+      include: {
+        uploader: { select: { fullName: true, email: true } },
+        _count: { select: { children: true } },
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /api/vault/:id/versions - list archived versions for a document */
+export async function getDocumentVersions(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { id } = req.params;
+
+    const versions = await prisma.vaultDocumentVersion.findMany({
+      where: { documentId: id as string },
+      orderBy: { versionNum: "desc" },
+      include: {
+        uploader: { select: { fullName: true, email: true } },
+      },
+    });
+
+    res.json(versions);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /api/vault/expiry-alerts - certifications expiring within 60 days */
+export async function getExpiryAlerts(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const sixtyDaysFromNow = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+
+    const expiring = await prisma.vaultDocument.findMany({
+      where: {
+        isFolder: false,
+        category: "Certifications",
+        expiryDate: { not: null, lte: sixtyDaysFromNow },
+      },
+      include: {
+        uploader: { select: { fullName: true, email: true } },
+        _count: { select: { children: true } },
+      },
+      orderBy: { expiryDate: "asc" },
+    });
+
+    res.json(expiring);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /api/vault/folder-policy - returns canRead/canEdit for a given folder context */
+export async function getFolderPolicy(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { folderId } = req.query as { folderId?: string };
+    const user = (req as any).user;
+
+    const policy = await resolveFolderPolicy(folderId || null);
+    const isAdmin = user?.roles?.includes("admin") ?? false;
+
+    const canRead = policy.read === "all" || isAdmin;
+    const canEdit = (policy.edit === "all" && (isAdmin || user?.permissions?.some((p: any) => p.permission === "vault" && p.accessLevel === "edit"))) || isAdmin;
+
+    res.json({ canRead, canEdit });
   } catch (err) {
     next(err);
   }
@@ -328,6 +498,15 @@ export async function deleteDocument(
     const existing = await prisma.vaultDocument.findUnique({ where: { id: id as string } });
     if (!existing) {
       res.status(404).json({ error: "Document not found" });
+      return;
+    }
+
+    const user = (req as any).user;
+    const isAdmin = user?.roles?.includes("admin") ?? false;
+    const hasVaultEdit = user?.permissions?.some((p: any) => p.permission === "vault" && p.accessLevel === "edit") ?? false;
+    const policy = await resolveFolderPolicy(existing.parentId);
+    if (!(isAdmin || (policy.edit === "all" && hasVaultEdit))) {
+      res.status(403).json({ error: "You do not have permission to delete files in this folder" });
       return;
     }
 
