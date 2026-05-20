@@ -4,7 +4,7 @@ import { getCustomDealStages } from "@/lib/customDealStages";
 import {
   Plus, LayoutGrid, List, X, Pencil, Trash2, ChevronRight, TrendingUp,
   BarChart2, AlertTriangle, CheckCircle2, Circle, Save, ChevronDown, ChevronUp,
-  Filter, Clock, DollarSign, ArrowUpDown,
+  Filter, Clock, DollarSign, ArrowUpDown, Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,6 +110,9 @@ export default function DealsPage() {
 
   const [dragOver, setDragOver] = useState<string | null>(null);
 
+  // Search
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Filters
   const [showFilters, setShowFilters] = useState(false);
   const [filterBuyer, setFilterBuyer] = useState("");
@@ -196,6 +199,17 @@ export default function DealsPage() {
   const filteredDeals = useMemo(() => {
     let result = [...deals];
 
+    // Search across key fields
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((d) =>
+        d.title.toLowerCase().includes(q) ||
+        (d.buyer ?? "").toLowerCase().includes(q) ||
+        (d.supplier ?? "").toLowerCase().includes(q) ||
+        (d.product ?? "").toLowerCase().includes(q)
+      );
+    }
+
     if (filterBuyer) result = result.filter((d) => d.buyer === filterBuyer);
     if (filterManager) result = result.filter((d) => d.creatorName === filterManager);
     if (filterStage) result = result.filter((d) => d.stage === filterStage);
@@ -223,7 +237,7 @@ export default function DealsPage() {
     });
 
     return result;
-  }, [deals, filterBuyer, filterManager, filterStage, filterCategory, filterDateFrom, filterDateTo, sortKey, sortDir]);
+  }, [deals, searchQuery, filterBuyer, filterManager, filterStage, filterCategory, filterDateFrom, filterDateTo, sortKey, sortDir]);
 
   const activeFilterCount = [filterBuyer, filterManager, filterStage, filterCategory, filterDateFrom, filterDateTo].filter(Boolean).length;
 
@@ -399,6 +413,26 @@ export default function DealsPage() {
         />
       </div>
 
+      {/* ── Search Bar ── */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search deals by title, buyer, supplier or product…"
+          className="w-full pl-9 pr-9 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-400 shadow-sm placeholder:text-slate-400"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       {/* ── View Toggle + Sort + Filter Controls ── */}
       <div className="flex items-center gap-2 pb-3 flex-wrap">
         <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
@@ -483,7 +517,7 @@ export default function DealsPage() {
 
       {/* ── Content Area ── */}
       <div className="flex gap-5 flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin h-8 w-8 rounded-full border-4 border-brand-500 border-t-transparent" />
@@ -839,8 +873,8 @@ function TableView({ deals, stages, onRowClick, onDelete, onEdit, sortKey, sortD
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
-      <div className="overflow-x-auto">
+    <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm flex flex-col flex-1 min-h-0">
+      <div className="overflow-auto flex-1 min-h-0">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">

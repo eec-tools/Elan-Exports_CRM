@@ -25,6 +25,7 @@ import {
   ExternalLink,
   ClipboardList,
   FileText,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -39,6 +40,12 @@ interface Quotation {
   status: string;
   formToken?: string;
   fieldConfig: Record<string, { sentToSupplier: boolean; mandatory: boolean }>;
+  buyerId?: string;
+  buyerName?: string;
+  quotedPrice?: string;
+  currency?: string;
+  validUntil?: string;
+  linkedDealId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +64,13 @@ interface SupplierSuggestion {
   company: string;
   email?: string;
   supplierType: "new" | "signed";
+}
+
+interface BuyerSuggestion {
+  id: string;
+  company: string;
+  name: string;
+  country: string;
 }
 
 // ─── All quotation fields with defaults ─────────────
@@ -99,6 +113,20 @@ function buildDefaultFieldConfig() {
   return config;
 }
 
+function isExpired(validUntil?: string): boolean {
+  if (!validUntil) return false;
+  return new Date(validUntil) < new Date();
+}
+
+function isExpiringSoon(validUntil?: string): boolean {
+  if (!validUntil) return false;
+  const d = new Date(validUntil);
+  const now = new Date();
+  const sevenDays = new Date();
+  sevenDays.setDate(now.getDate() + 7);
+  return d >= now && d <= sevenDays;
+}
+
 // ─── Status config ──────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
   pending:           { label: "Pending",           class: "bg-slate-100 text-slate-700" },
@@ -107,6 +135,8 @@ const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
   negotiating:       { label: "Negotiating",       class: "bg-amber-100 text-amber-700" },
   finalized:         { label: "Finalized",         class: "bg-purple-100 text-purple-700" },
 };
+
+const CURRENCIES = ["USD", "EUR", "GBP", "AED", "INR", "CNY", "JPY", "SGD", "AUD", "CAD"];
 
 export default function QuotationsPage() {
   const { hasEditPermission } = useAuth();
@@ -117,6 +147,7 @@ export default function QuotationsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [buyerFilter, setBuyerFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Quotation | null>(null);
   const [formLinkDialog, setFormLinkDialog] = useState<{ open: boolean; link: string; company: string }>({
@@ -126,14 +157,24 @@ export default function QuotationsPage() {
   // ─── Create form state ───────────────────────────
   const [supplierQuery, setSupplierQuery] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierSuggestion | null>(null);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [buyerQuery, setBuyerQuery] = useState("");
+  const [selectedBuyer, setSelectedBuyer] = useState<BuyerSuggestion | null>(null);
+  const [showBuyerDropdown, setShowBuyerDropdown] = useState(false);
+  const [newQuotedPrice, setNewQuotedPrice] = useState("");
+  const [newCurrency, setNewCurrency] = useState("USD");
+  const [newValidUntil, setNewValidUntil] = useState("");
   const [fieldConfig, setFieldConfig] = useState(buildDefaultFieldConfig());
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const supplierDropdownRef = useRef<HTMLDivElement>(null);
+  const buyerDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
+      if (supplierDropdownRef.current && !supplierDropdownRef.current.contains(e.target as Node)) {
+        setShowSupplierDropdown(false);
+      }
+      if (buyerDropdownRef.current && !buyerDropdownRef.current.contains(e.target as Node)) {
+        setShowBuyerDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -142,11 +183,12 @@ export default function QuotationsPage() {
 
   // ─── Queries ─────────────────────────────────────
   const { data, isLoading } = useQuery({
-    queryKey: ["quotations", search, page, statusFilter],
+    queryKey: ["quotations", search, page, statusFilter, buyerFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
         search, page: String(page), limit: "20",
         ...(statusFilter !== "all" && { status: statusFilter }),
+        ...(buyerFilter !== "all" && { buyerId: buyerFilter }),
       });
       const res = await api.get(`/quotations?${params}`);
       return res.data as { data: Quotation[]; pagination: { total: number; pages: number } };
@@ -171,6 +213,25 @@ export default function QuotationsPage() {
     enabled: supplierQuery.length > 0,
   });
 
+  const { data: buyerSuggestions = [] } = useQuery({
+    queryKey: ["quotation-buyer-search", buyerQuery],
+    queryFn: async () => {
+      if (!buyerQuery.trim()) return [];
+      const res = await api.get(`/quotations/search-buyers?q=${encodeURIComponent(buyerQuery)}`);
+      return res.data as BuyerSuggestion[];
+    },
+    enabled: buyerQuery.length > 0,
+  });
+
+  // All buyers for the filter dropdown (fetch once with empty query)
+  const { data: allBuyers = [] } = useQuery({
+    queryKey: ["quotation-buyer-list"],
+    queryFn: async () => {
+      const res = await api.get("/quotations/search-buyers?q=");
+      return res.data as BuyerSuggestion[];
+    },
+  });
+
   // ─── Mutations ────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: () =>
@@ -178,6 +239,11 @@ export default function QuotationsPage() {
         supplierName: selectedSupplier?.company ?? supplierQuery,
         linkedSupplierId: selectedSupplier?.id ?? null,
         linkedSupplierType: selectedSupplier?.supplierType ?? null,
+        buyerId: selectedBuyer?.id ?? null,
+        buyerName: selectedBuyer?.company ?? null,
+        quotedPrice: newQuotedPrice || null,
+        currency: newQuotedPrice ? newCurrency : null,
+        validUntil: newValidUntil || null,
         fieldConfig,
       }),
     onSuccess: (res) => {
@@ -208,40 +274,34 @@ export default function QuotationsPage() {
   });
 
   const handleCopyLink = async (link: string | null) => {
-    if (!link) {
-      toast.error("Link not available");
-      return;
-    }
+    if (!link) { toast.error("Link not available"); return; }
     const success = await copyToClipboard(link);
-    if (success) {
-      toast.success("Link copied to clipboard");
-    } else {
-      toast.error("Failed to copy link. Please copy it manually.");
-    }
+    if (success) toast.success("Link copied to clipboard");
+    else toast.error("Failed to copy link. Please copy it manually.");
   };
 
   function resetCreateForm() {
     setSupplierQuery("");
     setSelectedSupplier(null);
-    setShowDropdown(false);
+    setShowSupplierDropdown(false);
+    setBuyerQuery("");
+    setSelectedBuyer(null);
+    setShowBuyerDropdown(false);
+    setNewQuotedPrice("");
+    setNewCurrency("USD");
+    setNewValidUntil("");
     setFieldConfig(buildDefaultFieldConfig());
   }
 
   function toggleSent(key: string, value: boolean) {
     setFieldConfig((prev) => ({
       ...prev,
-      [key]: {
-        sentToSupplier: value,
-        mandatory: value ? prev[key].mandatory : false,
-      },
+      [key]: { sentToSupplier: value, mandatory: value ? prev[key].mandatory : false },
     }));
   }
 
   function toggleMandatory(key: string, value: boolean) {
-    setFieldConfig((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], mandatory: value },
-    }));
+    setFieldConfig((prev) => ({ ...prev, [key]: { ...prev[key], mandatory: value } }));
   }
 
   const quotations = data?.data ?? [];
@@ -268,12 +328,12 @@ export default function QuotationsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: "Total",     value: stats?.total,             color: "text-slate-700" },
-          { label: "Pending",   value: stats?.pending,           color: "text-slate-500" },
-          { label: "Form Sent", value: stats?.formSent,          color: "text-blue-600" },
-          { label: "Responded", value: stats?.responseReceived,  color: "text-green-600" },
+          { label: "Total",      value: stats?.total,            color: "text-slate-700" },
+          { label: "Pending",    value: stats?.pending,          color: "text-slate-500" },
+          { label: "Form Sent",  value: stats?.formSent,         color: "text-blue-600" },
+          { label: "Responded",  value: stats?.responseReceived, color: "text-green-600" },
           { label: "Negotiating",value: stats?.negotiating,      color: "text-amber-600" },
-          { label: "Finalized", value: stats?.finalized,         color: "text-purple-600" },
+          { label: "Finalized",  value: stats?.finalized,        color: "text-purple-600" },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
             <p className="text-xs text-slate-500 font-medium">{label}</p>
@@ -288,11 +348,21 @@ export default function QuotationsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             className="pl-9"
-            placeholder="Search supplier, product, HS code…"
+            placeholder="Search supplier, buyer, product, HS code…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
         </div>
+        <select
+          className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          value={buyerFilter}
+          onChange={(e) => { setBuyerFilter(e.target.value); setPage(1); }}
+        >
+          <option value="all">All Buyers</option>
+          {allBuyers.map((b) => (
+            <option key={b.id} value={b.id}>{b.company}</option>
+          ))}
+        </select>
         <select
           className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={statusFilter}
@@ -319,7 +389,7 @@ export default function QuotationsPage() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {["Supplier", "Product", "Status", "Created", "Actions"].map((h) => (
+                {["Supplier", "Buyer", "Product", "Quoted Price", "Status", "Valid Until", "Actions"].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -328,6 +398,8 @@ export default function QuotationsPage() {
               {quotations.map((q) => {
                 const statusCfg = STATUS_CONFIG[q.status] ?? { label: q.status, class: "bg-slate-100 text-slate-700" };
                 const formLink = q.formToken ? `${window.location.origin}/quotation-form/${q.formToken}` : null;
+                const expired = isExpired(q.validUntil);
+                const expiringSoon = !expired && isExpiringSoon(q.validUntil);
                 return (
                   <tr key={q.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3">
@@ -338,29 +410,46 @@ export default function QuotationsPage() {
                         {q.supplierName}
                       </button>
                     </td>
+                    <td className="px-4 py-3 text-slate-600 text-sm">{q.buyerName ?? <span className="text-slate-400">—</span>}</td>
                     <td className="px-4 py-3 text-slate-600">{q.product ?? "—"}</td>
+                    <td className="px-4 py-3 text-slate-700 font-medium">
+                      {q.quotedPrice
+                        ? <span>{q.currency ? `${q.currency} ` : ""}{q.quotedPrice}</span>
+                        : <span className="text-slate-400">—</span>}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusCfg.class}`}>
                         {statusCfg.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">
-                      {new Date(q.createdAt).toLocaleDateString()}
+                    <td className="px-4 py-3 text-xs">
+                      {q.validUntil ? (
+                        <span className="flex items-center gap-1">
+                          {expired ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
+                              <AlertCircle className="h-3 w-3" /> Expired
+                            </span>
+                          ) : expiringSoon ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                              <AlertCircle className="h-3 w-3" /> {new Date(q.validUntil).toLocaleDateString()}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">{new Date(q.validUntil).toLocaleDateString()}</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {formLink && (
-                          <Button
-                            size="sm" variant="ghost"
-                            title="Copy form link"
-                            onClick={() => handleCopyLink(formLink)}
-                          >
+                          <Button size="sm" variant="ghost" title="Copy form link" onClick={() => handleCopyLink(formLink)}>
                             <Copy className="h-4 w-4" />
                           </Button>
                         )}
                         {formLink && (
-                          <Button size="sm" variant="ghost" title="Open supplier form in new tab"
-                            onClick={() => window.open(formLink, "_blank")}>
+                          <Button size="sm" variant="ghost" title="Open supplier form in new tab" onClick={() => window.open(formLink, "_blank")}>
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                         )}
@@ -401,12 +490,12 @@ export default function QuotationsPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogTitle>New Quotation</DialogTitle>
           <DialogDescription>
-            Select a supplier and configure which fields will appear in the supplier's web form.
+            Select a supplier and buyer, set pricing details, then configure which fields appear in the supplier's web form.
           </DialogDescription>
 
           <div className="space-y-5 pt-2">
             {/* Supplier autocomplete */}
-            <div className="relative" ref={dropdownRef}>
+            <div className="relative" ref={supplierDropdownRef}>
               <Label className="mb-1.5 block">Supplier <span className="text-red-500">*</span></Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -417,40 +506,101 @@ export default function QuotationsPage() {
                   onChange={(e) => {
                     setSelectedSupplier(null);
                     setSupplierQuery(e.target.value);
-                    setShowDropdown(true);
+                    setShowSupplierDropdown(true);
                   }}
-                  onFocus={() => { if (supplierQuery) setShowDropdown(true); }}
+                  onFocus={() => { if (supplierQuery) setShowSupplierDropdown(true); }}
                 />
               </div>
-              {showDropdown && supplierSuggestions.length > 0 && (
+              {showSupplierDropdown && supplierSuggestions.length > 0 && (
                 <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
                   {supplierSuggestions.map((s) => (
                     <button
                       key={`${s.supplierType}-${s.id}`}
                       className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors flex items-center justify-between"
-                      onClick={() => {
-                        setSelectedSupplier(s);
-                        setSupplierQuery(s.company);
-                        setShowDropdown(false);
-                      }}
+                      onClick={() => { setSelectedSupplier(s); setSupplierQuery(s.company); setShowSupplierDropdown(false); }}
                     >
                       <span className="font-medium text-slate-800">{s.company}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        s.supplierType === "signed"
-                          ? "bg-purple-100 text-purple-700"
-                          : "bg-blue-100 text-blue-700"
-                      }`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${s.supplierType === "signed" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
                         {s.supplierType === "signed" ? "Signed" : "New"}
                       </span>
                     </button>
                   ))}
                 </div>
               )}
-              {showDropdown && supplierQuery.length > 0 && supplierSuggestions.length === 0 && (
+              {showSupplierDropdown && supplierQuery.length > 0 && supplierSuggestions.length === 0 && (
                 <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm text-slate-400">
                   No suppliers found. The name will be used as entered.
                 </div>
               )}
+            </div>
+
+            {/* Buyer autocomplete */}
+            <div className="relative" ref={buyerDropdownRef}>
+              <Label className="mb-1.5 block">Buyer <span className="text-red-500">*</span></Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search buyers…"
+                  value={selectedBuyer ? selectedBuyer.company : buyerQuery}
+                  onChange={(e) => {
+                    setSelectedBuyer(null);
+                    setBuyerQuery(e.target.value);
+                    setShowBuyerDropdown(true);
+                  }}
+                  onFocus={() => { if (buyerQuery) setShowBuyerDropdown(true); }}
+                />
+              </div>
+              {showBuyerDropdown && buyerSuggestions.length > 0 && (
+                <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                  {buyerSuggestions.map((b) => (
+                    <button
+                      key={b.id}
+                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors flex items-center justify-between"
+                      onClick={() => { setSelectedBuyer(b); setBuyerQuery(b.company); setShowBuyerDropdown(false); }}
+                    >
+                      <span className="font-medium text-slate-800">{b.company}</span>
+                      <span className="text-xs text-slate-500">{b.country}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {showBuyerDropdown && buyerQuery.length > 0 && buyerSuggestions.length === 0 && (
+                <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm text-slate-400">
+                  No buyers found.
+                </div>
+              )}
+            </div>
+
+            {/* Quoted Price + Currency + Valid Until */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-1">
+                <Label className="mb-1.5 block">Currency <span className="text-red-500">*</span></Label>
+                <select
+                  className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  value={newCurrency}
+                  onChange={(e) => setNewCurrency(e.target.value)}
+                >
+                  {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="sm:col-span-1">
+                <Label className="mb-1.5 block">Quoted Price <span className="text-red-500">*</span></Label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 4.50"
+                  value={newQuotedPrice}
+                  onChange={(e) => setNewQuotedPrice(e.target.value)}
+                />
+              </div>
+              <div className="sm:col-span-1">
+                <Label className="mb-1.5 block">Valid Until <span className="text-red-500">*</span></Label>
+                <Input
+                  type="date"
+                  value={newValidUntil}
+                  onChange={(e) => setNewValidUntil(e.target.value)}
+                />
+              </div>
             </div>
 
             {/* Field configuration */}
@@ -458,7 +608,6 @@ export default function QuotationsPage() {
               <Label className="mb-2 block text-sm font-semibold">Form Field Configuration</Label>
               <p className="text-xs text-slate-500 mb-3">
                 Choose which fields appear in the supplier's web form and which are mandatory.
-                Fields not sent to the supplier can still be filled internally.
               </p>
               <div className="border border-slate-200 rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
@@ -476,17 +625,10 @@ export default function QuotationsPage() {
                         <tr key={f.key} className="hover:bg-slate-50">
                           <td className="px-3 py-2.5 text-slate-700 font-medium">{f.label}</td>
                           <td className="px-3 py-2.5 text-center">
-                            <Switch
-                              checked={cfg.sentToSupplier}
-                              onCheckedChange={(v: boolean) => toggleSent(f.key, v)}
-                            />
+                            <Switch checked={cfg.sentToSupplier} onCheckedChange={(v: boolean) => toggleSent(f.key, v)} />
                           </td>
                           <td className="px-3 py-2.5 text-center">
-                            <Switch
-                              checked={cfg.mandatory}
-                              disabled={!cfg.sentToSupplier}
-                              onCheckedChange={(v: boolean) => toggleMandatory(f.key, v)}
-                            />
+                            <Switch checked={cfg.mandatory} disabled={!cfg.sentToSupplier} onCheckedChange={(v: boolean) => toggleMandatory(f.key, v)} />
                           </td>
                         </tr>
                       );
@@ -497,11 +639,9 @@ export default function QuotationsPage() {
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => { setCreateOpen(false); resetCreateForm(); }}>
-                Cancel
-              </Button>
+              <Button variant="outline" onClick={() => { setCreateOpen(false); resetCreateForm(); }}>Cancel</Button>
               <Button
-                disabled={(!selectedSupplier && !supplierQuery.trim()) || createMutation.isPending}
+                disabled={(!selectedSupplier && !supplierQuery.trim()) || !selectedBuyer || !newQuotedPrice || !newValidUntil || createMutation.isPending}
                 onClick={() => createMutation.mutate()}
               >
                 {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -525,17 +665,10 @@ export default function QuotationsPage() {
               <p className="text-sm text-slate-800 break-all font-mono">{formLinkDialog.link}</p>
             </div>
             <div className="flex gap-3">
-              <Button
-                className="flex-1 gap-2"
-                onClick={() => handleCopyLink(formLinkDialog.link)}
-              >
+              <Button className="flex-1 gap-2" onClick={() => handleCopyLink(formLinkDialog.link)}>
                 <Copy className="h-4 w-4" /> Copy Link
               </Button>
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={() => window.open(formLinkDialog.link, "_blank")}
-              >
+              <Button variant="outline" className="gap-2" onClick={() => window.open(formLinkDialog.link, "_blank")}>
                 <ExternalLink className="h-4 w-4" /> Preview
               </Button>
             </div>
