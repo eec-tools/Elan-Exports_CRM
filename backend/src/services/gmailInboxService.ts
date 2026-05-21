@@ -38,6 +38,25 @@ export interface SyncResult {
   syncedAt: Date;
 }
 
+function isRateLimitError(err: any): boolean {
+  const status = err?.status ?? err?.code ?? err?.response?.status;
+  if (status === 429 || status === 403) return true;
+  const msg: string = err?.message ?? "";
+  return /rate limit|quota|userRateLimit/i.test(msg);
+}
+
+function extractRetryAfter(err: any): Date | null {
+  // Try parsing "Retry after <ISO>" from the error message
+  const msg: string = err?.message ?? "";
+  const match = msg.match(/retry after\s+(\S+)/i);
+  if (match) {
+    const d = new Date(match[1]);
+    if (!isNaN(d.getTime())) return d;
+  }
+  // Fall back to 10 minutes from now
+  return new Date(Date.now() + 10 * 60 * 1000);
+}
+
 export async function syncGmailInbox(accountEmail: string): Promise<SyncResult> {
   const result: SyncResult = { created: 0, updated: 0, errors: 0, syncedAt: new Date() };
 
@@ -47,6 +66,17 @@ export async function syncGmailInbox(accountEmail: string): Promise<SyncResult> 
   } catch {
     // Account not connected — skip silently
     return result;
+  }
+
+  // Check if this account is in a rate-limit cooldown
+  const cooldownKey = `gmail_inbox_rate_limit_until_${accountEmail}`;
+  const cooldownSetting = await prisma.appSetting.findUnique({ where: { key: cooldownKey } });
+  if (cooldownSetting?.value) {
+    const until = new Date(cooldownSetting.value);
+    if (until > new Date()) {
+      console.log(`[GmailInbox] ${accountEmail}: rate-limit cooldown active until ${until.toISOString()} — skipping`);
+      return result;
+    }
   }
 
   const gmail = google.gmail({ version: "v1", auth });
@@ -146,6 +176,17 @@ export async function syncGmailInbox(accountEmail: string): Promise<SyncResult> 
   } catch (err: any) {
     console.error(`[GmailInbox] Failed to list messages for ${accountEmail}:`, err?.message);
     result.errors++;
+    if (isRateLimitError(err)) {
+      const until = extractRetryAfter(err);
+      if (until) {
+        await prisma.appSetting.upsert({
+          where: { key: cooldownKey },
+          update: { value: until.toISOString() },
+          create: { key: cooldownKey, value: until.toISOString() },
+        });
+        console.log(`[GmailInbox] ${accountEmail}: rate-limited — cooldown set until ${until.toISOString()}`);
+      }
+    }
   }
 
   return result;
