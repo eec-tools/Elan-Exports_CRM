@@ -1086,7 +1086,8 @@ export default function BuyerDetailsPage() {
                     onChange={(e) =>
                       setForm({ ...form, tradeName: e.target.value })
                     }
-                    placeholder="If different from legal name"
+                    placeholder="If different from the legal name e.g. Nike, ZARA"
+                    maxLength={80}
                   />
                 </div>
                 <div className="space-y-2">

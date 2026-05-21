@@ -581,7 +581,7 @@ export default function BuyersPage() {
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Company Profile</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2"><Label>Company Legal Name *</Label><Input value={form.company ?? ""} onChange={(e) => setForm({ ...form, company: e.target.value })} required /></div>
-              <div className="space-y-2"><Label>Trade / Brand Name</Label><Input value={form.tradeName ?? ""} onChange={(e) => setForm({ ...form, tradeName: e.target.value })} placeholder="If different from legal name" /></div>
+              <div className="space-y-2"><Label>Trade / Brand Name</Label><Input value={form.tradeName ?? ""} onChange={(e) => setForm({ ...form, tradeName: e.target.value })} placeholder="If different from the legal name e.g. Nike, ZARA" maxLength={80} /></div>
               <div className="space-y-2"><Label>Buyer Type</Label><SelectWithOthers value={form.buyerType ?? ""} onChange={(v) => setForm({ ...form, buyerType: v })} options={["Wholesaler","Retailer","Importer / Distributor","E-Commerce","Supermarket Chain","Private Label Brand","Trader","Food Service / HoReCa"]} placeholder="Select buyer type…" /></div>
               <div className="space-y-2"><Label>Country of Registration *</Label><Input value={form.country ?? ""} onChange={(e) => setForm({ ...form, country: e.target.value })} required /></div>
               <div className="space-y-2"><Label>City</Label><Input value={form.city ?? ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
