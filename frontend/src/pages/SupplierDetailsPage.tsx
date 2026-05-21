@@ -70,6 +70,7 @@ import {
   Star,
   AlertTriangle,
   TrendingUp,
+  Briefcase,
 } from "lucide-react";
 
 interface OrganicCertRow { market: string; certNumber: string; expiryDate: string; }
@@ -124,6 +125,7 @@ interface Supplier {
   products?: string;
   country?: string;
   contactPerson?: string;
+  designation?: string;
   phone?: string;
   companyAddress?: string;
   email?: string;
@@ -716,6 +718,11 @@ export default function SupplierDetailsPage() {
               icon={User}
               label="Contact Person"
               value={supplier.contactPerson}
+            />
+            <InfoRow
+              icon={Briefcase}
+              label="Role/Designation"
+              value={supplier.designation}
             />
             <InfoRow icon={Mail} label="Email Address" value={supplier.email} />
             <InfoRow icon={Phone} label="Phone" value={supplier.phone} />
@@ -1667,6 +1674,7 @@ export default function SupplierDetailsPage() {
                 <Input value={form.contactPerson ?? ""} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} className={!form.contactPerson?.trim() ? "border-yellow-400 focus-visible:ring-yellow-300" : ""} placeholder="Required" />
                 {!form.contactPerson?.trim() && <p className="text-xs text-yellow-600">Contact name is required to save.</p>}
               </div>
+              <div className="space-y-2"><Label>Role/Designation</Label><Input value={form.designation ?? ""} onChange={(e) => setForm({ ...form, designation: e.target.value })} placeholder="e.g., Sales Manager, Owner" /></div>
               <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
               <div className="space-y-2"><Label>WhatsApp</Label><Input value={form.whatsapp ?? ""} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="With country code" /></div>
               <div className="space-y-2"><Label>Email</Label><Input type="text" value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>

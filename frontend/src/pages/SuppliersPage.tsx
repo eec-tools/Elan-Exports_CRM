@@ -103,6 +103,7 @@ interface Supplier {
   products?: string;
   country?: string;
   contactPerson?: string;
+  designation?: string;
   phone?: string;
   companyAddress?: string;
   dealStage?: string;
@@ -237,6 +238,7 @@ const DEAL_STAGES = [
 const EMPTY_SUPPLIER: Partial<Supplier> = {
   company: "",
   contactPerson: "",
+  designation: "",
   email: "",
   currentStatus: "Under Review",
   supplierProducts: [],
@@ -898,6 +900,7 @@ export default function SuppliersPage() {
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Contact Details</p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2"><Label>Contact Person</Label><Input value={form.contactPerson ?? ""} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Role/Designation</Label><Input value={form.designation ?? ""} onChange={(e) => setForm({ ...form, designation: e.target.value })} placeholder="e.g., Sales Manager, Owner" /></div>
                 <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                 <div className="space-y-2"><Label>WhatsApp</Label><Input value={form.whatsapp ?? ""} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="With country code" /></div>
                 <div className="space-y-2"><Label>Email</Label><Input type="text" value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
