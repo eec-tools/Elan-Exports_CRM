@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PermissionGate } from "@/components/PermissionGate";
+import { useAuth } from "@/contexts/AuthContext";
 import { MultiSelectDropdown } from "@/components/MultiSelectDropdown";
 import { SelectWithOthers } from "@/components/SelectWithOthers";
 import { EntityLinkSelect } from "@/components/EntityLinkSelect";
@@ -137,17 +138,31 @@ function InfoRow({
   icon: Icon,
   label,
   value,
+  onAdd,
 }: {
   icon: React.ElementType;
   label: string;
   value?: React.ReactNode;
+  onAdd?: () => void;
 }) {
+  const isEmpty = value === undefined || value === null || value === "";
   return (
     <div className="flex items-start gap-3 py-2">
       <Icon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-medium break-words">{value || "—"}</p>
+        {isEmpty && onAdd ? (
+          <button
+            type="button"
+            onClick={onAdd}
+            className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground/40 hover:text-brand-600 transition-colors"
+          >
+            <Plus className="h-3 w-3" />
+            <span>Add</span>
+          </button>
+        ) : (
+          <p className="text-sm font-medium break-words">{value || "—"}</p>
+        )}
       </div>
     </div>
   );
@@ -231,6 +246,7 @@ export default function BuyerDetailsPage() {
   const location = useLocation();
   const backFrom = (location.state as { from?: { path: string; label: string } } | null)?.from;
   const queryClient = useQueryClient();
+  const { hasEditPermission } = useAuth();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<Partial<Buyer>>({});
@@ -420,6 +436,11 @@ export default function BuyerDetailsPage() {
   const sourcingRequirements: SourcingRequirement[] =
     buyer.sourcingRequirements || [];
 
+  const canEdit = hasEditPermission("buyers");
+  const InfoField = (props: Parameters<typeof InfoRow>[0]) => (
+    <InfoRow {...props} onAdd={canEdit ? openEdit : undefined} />
+  );
+
   return (
     <div className="space-y-6">
       {/* ── Breadcrumb ── */}
@@ -484,22 +505,22 @@ export default function BuyerDetailsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <InfoRow
+            <InfoField
               icon={Building2}
               label="Legal Company Name"
               value={buyer.company}
             />
-            <InfoRow
+            <InfoField
               icon={Building2}
               label="Trade / Brand Name"
               value={buyer.tradeName}
             />
-            <InfoRow icon={User} label="Buyer Type" value={buyer.buyerType} />
-            <InfoRow icon={MapPin} label="Country" value={buyer.country} />
-            <InfoRow icon={MapPin} label="City" value={buyer.city} />
-            <InfoRow icon={MapPin} label="Region" value={buyer.region} />
-            <InfoRow icon={MapPin} label="Address" value={buyer.address} />
-            <InfoRow
+            <InfoField icon={User} label="Buyer Type" value={buyer.buyerType} />
+            <InfoField icon={MapPin} label="Country" value={buyer.country} />
+            <InfoField icon={MapPin} label="City" value={buyer.city} />
+            <InfoField icon={MapPin} label="Region" value={buyer.region} />
+            <InfoField icon={MapPin} label="Address" value={buyer.address} />
+            <InfoField
               icon={Globe}
               label="Website"
               value={
@@ -525,13 +546,13 @@ export default function BuyerDetailsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <InfoRow icon={User} label="Contact Name" value={buyer.name} />
-            <InfoRow
+            <InfoField icon={User} label="Contact Name" value={buyer.name} />
+            <InfoField
               icon={User}
               label="Role / Designation"
               value={buyer.contactRole}
             />
-            <InfoRow
+            <InfoField
               icon={Mail}
               label="Email"
               value={
@@ -545,8 +566,8 @@ export default function BuyerDetailsPage() {
                 ) : undefined
               }
             />
-            <InfoRow icon={Phone} label="Phone" value={buyer.phone} />
-            <InfoRow
+            <InfoField icon={Phone} label="Phone" value={buyer.phone} />
+            <InfoField
               icon={MessageCircle}
               label="WhatsApp"
               value={buyer.whatsapp}
@@ -642,32 +663,32 @@ export default function BuyerDetailsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <InfoRow
+            <InfoField
               icon={Package}
               label="Product Categories"
               value={buyer.productCategories}
             />
-            <InfoRow
+            <InfoField
               icon={MapPin}
               label="Markets Served"
               value={buyer.marketsServed}
             />
-            <InfoRow
+            <InfoField
               icon={Package}
               label="Annual Import Volume"
               value={buyer.annualImportVolume}
             />
-            <InfoRow
+            <InfoField
               icon={CreditCard}
               label="Annual Purchase Value"
               value={buyer.annualPurchaseValue}
             />
-            <InfoRow
+            <InfoField
               icon={Package}
               label="Current Suppliers / Origins"
               value={buyer.currentSuppliersOrigins}
             />
-            <InfoRow
+            <InfoField
               icon={Package}
               label="Product Category Interest"
               value={buyer.productCategoryInterest}
@@ -682,27 +703,27 @@ export default function BuyerDetailsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <InfoRow
+            <InfoField
               icon={CreditCard}
               label="Preferred Currency"
               value={buyer.preferredCurrency}
             />
-            <InfoRow
+            <InfoField
               icon={CreditCard}
               label="Pricing Range"
               value={buyer.pricingRange}
             />
-            <InfoRow
+            <InfoField
               icon={CreditCard}
               label="MOQ Requirements"
               value={buyer.moqRequirements}
             />
-            <InfoRow
+            <InfoField
               icon={CreditCard}
               label="Payment Terms"
               value={buyer.paymentTerms}
             />
-            <InfoRow icon={Ship} label="Incoterms" value={buyer.incoterms} />
+            <InfoField icon={Ship} label="Incoterms" value={buyer.incoterms} />
           </CardContent>
         </Card>
       </div>
@@ -730,79 +751,79 @@ export default function BuyerDetailsPage() {
                   {req.product ? ` — ${req.product}` : ""}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
-                  <InfoRow
+                  <InfoField
                     icon={Package}
                     label="Product / Commodity"
                     value={req.product}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={Package}
                     label="Product Variant / Spec"
                     value={req.productVariant}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={MapPin}
                     label="Country of Origin Preferred"
                     value={req.countryOfOriginPreferred}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={Package}
                     label="Organic / Conventional"
                     value={req.organicConventional}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={Package}
                     label="Quantity Required"
                     value={req.quantityRequired}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={Clock}
                     label="Frequency"
                     value={req.frequency}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={CreditCard}
                     label="Target Price (per unit)"
                     value={req.targetPrice}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={CreditCard}
                     label="Currency"
                     value={req.currency}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={Ship}
                     label="Delivery Port & Country"
                     value={req.deliveryPort}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={Ship}
                     label="Incoterm Preferred"
                     value={req.incotermPreferred}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={Package}
                     label="Sample Required?"
                     value={req.sampleRequired}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={Package}
                     label="Sample Quantity"
                     value={req.sampleQuantity}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={Clock}
                     label="Deadline to Receive Samples"
                     value={req.deadlineToReceiveSamples}
                   />
-                  <InfoRow
+                  <InfoField
                     icon={Clock}
                     label="Expected First Delivery Date"
                     value={req.expectedFirstDeliveryDate}
                   />
                   {req.packagingRequirements && (
                     <div className="sm:col-span-2">
-                      <InfoRow
+                      <InfoField
                         icon={Package}
                         label="Packaging Requirements"
                         value={req.packagingRequirements}
@@ -811,7 +832,7 @@ export default function BuyerDetailsPage() {
                   )}
                   {req.labellingRequirements && (
                     <div className="sm:col-span-2">
-                      <InfoRow
+                      <InfoField
                         icon={ClipboardList}
                         label="Labelling Requirements"
                         value={req.labellingRequirements}
@@ -820,7 +841,7 @@ export default function BuyerDetailsPage() {
                   )}
                   {req.qualityParameters && (
                     <div className="sm:col-span-2">
-                      <InfoRow
+                      <InfoField
                         icon={ClipboardList}
                         label="Quality Parameters"
                         value={req.qualityParameters}
@@ -829,7 +850,7 @@ export default function BuyerDetailsPage() {
                   )}
                   {req.requiredCertifications && (
                     <div className="sm:col-span-2">
-                      <InfoRow
+                      <InfoField
                         icon={ClipboardList}
                         label="Required Certifications"
                         value={req.requiredCertifications}
@@ -852,37 +873,37 @@ export default function BuyerDetailsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
-            <InfoRow
+            <InfoField
               icon={Ship}
               label="Preferred Shipping Mode"
               value={buyer.shippingMode}
             />
-            <InfoRow
+            <InfoField
               icon={MapPin}
               label="Preferred Ports of Discharge"
               value={buyer.portsOfDischarge}
             />
-            <InfoRow
+            <InfoField
               icon={MapPin}
               label="Country of Final Delivery"
               value={buyer.countryOfFinalDelivery}
             />
-            <InfoRow
+            <InfoField
               icon={Building2}
               label="Freight Forwarder / Logistics"
               value={buyer.freightForwarder}
             />
-            <InfoRow
+            <InfoField
               icon={Package}
               label="Packing / Marking Requirements"
               value={buyer.packingRequirements}
             />
-            <InfoRow
+            <InfoField
               icon={ClipboardList}
               label="Certification Requirements"
               value={buyer.certificationRequirements}
             />
-            <InfoRow
+            <InfoField
               icon={ClipboardList}
               label="Social / Ethical Compliance"
               value={buyer.socialEthicalCompliance}
@@ -898,12 +919,12 @@ export default function BuyerDetailsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <InfoRow
+              <InfoField
                 icon={MessageCircle}
                 label="Source"
                 value={buyer.howHeardAboutUs}
               />
-              <InfoRow
+              <InfoField
                 icon={Building2}
                 label="Trade Fair Name"
                 value={buyer.tradeFairName}
@@ -918,22 +939,22 @@ export default function BuyerDetailsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <InfoRow
+              <InfoField
                 icon={ClipboardList}
                 label="Risk Rating"
                 value={buyer.riskRating}
               />
-              <InfoRow
+              <InfoField
                 icon={ClipboardList}
                 label="Strategic Value"
                 value={buyer.strategicValue}
               />
-              <InfoRow
+              <InfoField
                 icon={ClipboardList}
                 label="Lead Source"
                 value={buyer.leadSource}
               />
-              <InfoRow
+              <InfoField
                 icon={Clock}
                 label="Last Contact Date"
                 value={
@@ -945,12 +966,12 @@ export default function BuyerDetailsPage() {
                     : undefined
                 }
               />
-              <InfoRow
+              <InfoField
                 icon={ClipboardList}
                 label="Deal History"
                 value={buyer.dealHistory}
               />
-              <InfoRow icon={ClipboardList} label="Notes" value={buyer.notes} />
+              <InfoField icon={ClipboardList} label="Notes" value={buyer.notes} />
             </CardContent>
           </Card>
         </div>
