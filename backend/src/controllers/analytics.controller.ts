@@ -291,8 +291,15 @@ export async function getSuppliersReport(
   res: Response,
 ): Promise<void> {
   try {
-    const { tab = "new", from, to } = req.query as Record<string, string>;
+    const {
+      tab = "new", from, to,
+      tablePage = "1", tableLimit = "25", tableSearch = "",
+    } = req.query as Record<string, string>;
     const dateFilter = buildDateFilter(from, to);
+    const tPage = Math.max(1, parseInt(tablePage));
+    const tLimit = Math.min(100, Math.max(1, parseInt(tableLimit)));
+    const tSkip = (tPage - 1) * tLimit;
+    const tSearch = tableSearch.trim().toLowerCase();
 
     if (tab === "new") {
       const where: any = {};
@@ -427,8 +434,8 @@ export async function getSuppliersReport(
         recentNew.map((s: any) => new Date(s.createdAt)),
       );
 
-      // Table
-      const table = newSuppliers.map((s: any) => {
+      // Table — filter, then paginate
+      const allRows = newSuppliers.map((s: any) => {
         const campaign = s.emailCampaign;
         let emailStage = "Not Started";
         if (campaign?.responseReceivedAt) emailStage = "Responded";
@@ -452,6 +459,15 @@ export async function getSuppliersReport(
           createdAt: s.createdAt,
         };
       });
+      const filteredRows = tSearch
+        ? allRows.filter((r: any) =>
+            r.company.toLowerCase().includes(tSearch) ||
+            r.country.toLowerCase().includes(tSearch) ||
+            r.product.toLowerCase().includes(tSearch),
+          )
+        : allRows;
+      const tableTotal = filteredRows.length;
+      const table = filteredRows.slice(tSkip, tSkip + tLimit);
 
       res.json({
         kpis: {
@@ -468,6 +484,7 @@ export async function getSuppliersReport(
         timeInPipeline,
         monthlyTrend,
         table,
+        tableTotal,
       });
     } else if (tab === "signed") {
       const where: any = {};
@@ -632,8 +649,8 @@ export async function getSuppliersReport(
         percentage: total > 0 ? Math.round((c.count / total) * 100) : 0,
       }));
 
-      // Table
-      const table = enriched.map((s: any) => ({
+      // Table — filter, then paginate
+      const allSignedRows = enriched.map((s: any) => ({
         id: s.id,
         company: s.company,
         country: s.country ?? "—",
@@ -655,6 +672,15 @@ export async function getSuppliersReport(
         hasOrganic: s.hasOrganic,
         createdAt: s.createdAt,
       }));
+      const filteredSignedRows = tSearch
+        ? allSignedRows.filter((r: any) =>
+            r.company.toLowerCase().includes(tSearch) ||
+            r.country.toLowerCase().includes(tSearch) ||
+            (r.products ?? "").toLowerCase().includes(tSearch),
+          )
+        : allSignedRows;
+      const tableTotal = filteredSignedRows.length;
+      const table = filteredSignedRows.slice(tSkip, tSkip + tLimit);
 
       res.json({
         kpis: {
@@ -672,6 +698,7 @@ export async function getSuppliersReport(
         paymentTermsBreakdown,
         certificationCoverage,
         table,
+        tableTotal,
         marginValues: marginValues.slice(0, 50).map((v) => ({ value: Math.round(v * 10) / 10 })),
       });
     } else {
@@ -728,7 +755,7 @@ export async function getSuppliersReport(
         ([potential, count]) => ({ potential, count }),
       );
 
-      const table = oldSuppliers.map((s: any) => ({
+      const allOldRows = oldSuppliers.map((s: any) => ({
         id: s.id,
         company: s.company,
         country: s.country ?? "—",
@@ -740,6 +767,15 @@ export async function getSuppliersReport(
         dateMarkedInactive: s.dateMarkedInactive ?? "—",
         createdAt: s.createdAt,
       }));
+      const filteredOldRows = tSearch
+        ? allOldRows.filter((r: any) =>
+            r.company.toLowerCase().includes(tSearch) ||
+            r.country.toLowerCase().includes(tSearch) ||
+            r.product.toLowerCase().includes(tSearch),
+          )
+        : allOldRows;
+      const tableTotal = filteredOldRows.length;
+      const table = filteredOldRows.slice(tSkip, tSkip + tLimit);
 
       res.json({
         kpis: {
@@ -754,6 +790,7 @@ export async function getSuppliersReport(
         productCategories,
         reactivationBreakdown,
         table,
+        tableTotal,
       });
     }
   } catch (err) {

@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
+import { jsPDF } from "jspdf";
+import { autoTable } from "jspdf-autotable";
 import {
   Loader2, Users, TrendingUp, Target, Award, UserCheck,
-  Mail, CheckCircle, Globe,
+  Mail, CheckCircle, Globe, FileDown, FileSpreadsheet,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Legend,
@@ -100,6 +103,49 @@ const STATUS_LABEL: Record<string, string> = {
 
 function initials(name: string) {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+}
+
+function csvValue(v: unknown) {
+  return `"${String(v ?? "").replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename: string, rows: unknown[][]) {
+  const csvContent = rows.map((row) => row.map(csvValue).join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildPdfHeader(doc: jsPDF, title: string, subtitle: string, dateRange: string, recordLabel: string, recordCount: number) {
+  const pageW = doc.internal.pageSize.getWidth();
+
+  doc.setFillColor(30, 41, 59);
+  doc.rect(0, 0, pageW, 22, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text("Élan Exports Consultancy", 12, 10);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text(subtitle, 12, 16);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text(title, pageW / 2, 10, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text(`Period: ${dateRange}`, pageW / 2, 16, { align: "center" });
+  doc.text(`${recordCount} ${recordLabel}`, pageW - 12, 10, { align: "right" });
 }
 
 function KpiCard({ label, value, sub, icon: Icon, color = "blue" }: {
@@ -231,6 +277,40 @@ function EmployeeCard({ emp, onClick, isSelected }: {
   );
 }
 
+const ATTR_PAGE_SIZE = 50;
+
+function Pagination({ page, total, limit, onChange }: {
+  page: number; total: number; limit: number; onChange: (p: number) => void;
+}) {
+  const pages = Math.max(1, Math.ceil(total / limit));
+  if (pages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50">
+      <span className="text-xs text-slate-500">
+        {Math.min((page - 1) * limit + 1, total)}–{Math.min(page * limit, total)} of {total}
+      </span>
+      <div className="flex items-center gap-1">
+        <button onClick={() => onChange(1)} disabled={page === 1}
+          className="px-2 py-1 text-xs rounded border border-slate-200 disabled:opacity-40 hover:bg-white">«</button>
+        <button onClick={() => onChange(page - 1)} disabled={page === 1}
+          className="px-2 py-1 text-xs rounded border border-slate-200 disabled:opacity-40 hover:bg-white">‹</button>
+        {Array.from({ length: Math.min(5, pages) }, (_, i) => {
+          const start = Math.max(1, Math.min(page - 2, pages - 4));
+          const p = start + i;
+          return p <= pages ? (
+            <button key={p} onClick={() => onChange(p)}
+              className={`px-2.5 py-1 text-xs rounded border ${p === page ? "bg-brand-600 text-white border-brand-600" : "border-slate-200 hover:bg-white"}`}>{p}</button>
+          ) : null;
+        })}
+        <button onClick={() => onChange(page + 1)} disabled={page === pages}
+          className="px-2 py-1 text-xs rounded border border-slate-200 disabled:opacity-40 hover:bg-white">›</button>
+        <button onClick={() => onChange(pages)} disabled={page === pages}
+          className="px-2 py-1 text-xs rounded border border-slate-200 disabled:opacity-40 hover:bg-white">»</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ReportsEmployeesPage() {
@@ -238,6 +318,7 @@ export default function ReportsEmployeesPage() {
   const [to, setTo] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [attrPage, setAttrPage] = useState(1);
 
   const params: Record<string, string> = {};
   if (from) params.from = from;
@@ -284,6 +365,211 @@ export default function ReportsEmployeesPage() {
   const selectedEmpStats = selectedEmployee
     ? perEmployee.find((e) => e.userId === selectedEmployee)
     : null;
+  const reportScopeLabel = selectedEmpStats?.fullName ?? (selectedEmployee ? "Selected employee" : "All employees");
+
+  function exportCsv() {
+    try {
+      const rows: unknown[][] = [];
+      const dateRange = from || to ? `${from || "—"} to ${to || "—"}` : "All time";
+
+      rows.push(["Employees Report"]);
+      rows.push(["Period", dateRange]);
+      rows.push(["Scope", reportScopeLabel]);
+      rows.push([]);
+      rows.push(["KPI", "Value", "Note"]);
+      rows.push(["Active Employees", kpis.activeEmployees, "In the system"]);
+      rows.push(["Total Sourced", kpis.totalSourcing, "All sourcing suppliers"]);
+      rows.push(["Converted to New", kpis.totalConverted, "Sourcing to new pipeline"]);
+      rows.push(["Conversion Rate", `${kpis.endToEndRate}%`, "End-to-end"]);
+      rows.push(["Top Sourcer", kpis.topSourcerName, `${kpis.topSourcerCount} suppliers total`]);
+      rows.push(["This Month", perEmployee.reduce((s, e) => s + e.thisMonth, 0), "New sourcing leads"]);
+      rows.push([]);
+      rows.push(["Leaderboard"]);
+      rows.push(["Rank", "Employee", "Designation", "Total Sourced", "This Month", "Converted", "Conv. Rate", "Resp. Rate", "Countries"]);
+      leaderboard.forEach((row) => {
+        rows.push([
+          row.rank,
+          row.fullName,
+          row.designation || "—",
+          row.totalSourced,
+          row.thisMonth,
+          row.convertedToNew,
+          `${row.conversionRate}%`,
+          `${row.responseRate}%`,
+          row.countriesCount,
+        ]);
+      });
+      rows.push([]);
+      rows.push(["Supplier Attribution"]);
+      rows.push(["Supplier", "Country", "Product", "Sourced By", "Status", "Email Stage", "Converted", "Days in Pipeline"]);
+      filteredAttribution.forEach((row) => {
+        rows.push([
+          row.company,
+          row.country,
+          row.product,
+          row.employeeName,
+          row.status,
+          row.emailStage,
+          row.convertedToNew ? "Yes" : "No",
+          `${row.daysInPipeline}d`,
+        ]);
+      });
+
+      downloadCsv(`employees-report-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+      toast.success("CSV exported");
+    } catch {
+      toast.error("Failed to export CSV");
+    }
+  }
+
+  function exportPdf() {
+    try {
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+      const dateRange = from || to ? `${from || "—"} to ${to || "—"}` : "All time";
+
+      buildPdfHeader(doc, "Employees Report", "sales@elanexports.com  ·  Employee sourcing report", dateRange, "rows", filteredAttribution.length);
+
+      const kpiY = 26;
+      const kpiItems = [
+        { label: "Active Employees", value: String(kpis.activeEmployees) },
+        { label: "Total Sourced", value: String(kpis.totalSourcing) },
+        { label: "Converted", value: String(kpis.totalConverted) },
+        { label: "End-to-End %", value: `${kpis.endToEndRate}%` },
+        { label: "Top Sourcer", value: kpis.topSourcerName.split(" ")[0] },
+        { label: "This Month", value: String(perEmployee.reduce((s, e) => s + e.thisMonth, 0)) },
+      ];
+      const kpiW = (pageW - 24) / kpiItems.length;
+      kpiItems.forEach((k, i) => {
+        const x = 12 + i * kpiW;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(x, kpiY, kpiW - 2, 14, 2, 2, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(30, 41, 59);
+        doc.text(k.value, x + (kpiW - 2) / 2, kpiY + 6, { align: "center" });
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(k.label, x + (kpiW - 2) / 2, kpiY + 11, { align: "center" });
+      });
+
+      autoTable(doc, {
+        startY: kpiY + 18,
+        head: [["Rank", "Employee", "Designation", "Total", "Month", "Converted", "Conv %", "Resp %", "Countries"]],
+        body: leaderboard.map((row) => [
+          row.rank,
+          row.fullName,
+          row.designation || "—",
+          row.totalSourced,
+          row.thisMonth,
+          row.convertedToNew,
+          `${row.conversionRate}%`,
+          `${row.responseRate}%`,
+          row.countriesCount,
+        ]),
+        theme: "grid",
+        styles: {
+          font: "helvetica",
+          fontSize: 7,
+          cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+          textColor: [30, 41, 59],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.3,
+        },
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 7,
+          halign: "left",
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+          0: { cellWidth: 12, halign: "center" },
+          1: { cellWidth: 34, fontStyle: "bold" },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 18, halign: "right" },
+          4: { cellWidth: 16, halign: "right" },
+          5: { cellWidth: 18, halign: "right" },
+          6: { cellWidth: 18, halign: "right" },
+          7: { cellWidth: 18, halign: "right" },
+          8: { cellWidth: 18, halign: "right" },
+        },
+        didDrawPage: (hookData) => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(6.5);
+          doc.setTextColor(148, 163, 184);
+          doc.text(`Élan Exports Consultancy  ·  Employees Report  ·  Page ${hookData.pageNumber}  ·  Generated ${today}`, pageW / 2, pageH - 5, { align: "center" });
+        },
+      });
+
+      doc.addPage();
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(30, 41, 59);
+      doc.text(`Supplier Attribution — ${reportScopeLabel}`, 12, 14);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Filtered rows: ${filteredAttribution.length}`, 12, 19);
+
+      autoTable(doc, {
+        startY: 23,
+        head: [["Supplier", "Country", "Product", "Sourced By", "Status", "Email Stage", "Converted", "Days"]],
+        body: filteredAttribution.map((row) => [
+          row.company,
+          row.country,
+          row.product,
+          row.employeeName,
+          row.status,
+          row.emailStage,
+          row.convertedToNew ? "Yes" : "No",
+          `${row.daysInPipeline}d`,
+        ]),
+        theme: "grid",
+        styles: {
+          font: "helvetica",
+          fontSize: 7,
+          cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+          textColor: [30, 41, 59],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.3,
+        },
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 7,
+          halign: "left",
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 40 },
+          1: { cellWidth: 18 },
+          2: { cellWidth: 28 },
+          3: { cellWidth: 34 },
+          4: { cellWidth: 22 },
+          5: { cellWidth: 22 },
+          6: { cellWidth: 16, halign: "center" },
+          7: { cellWidth: 16, halign: "right" },
+        },
+        didDrawPage: (hookData) => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(6.5);
+          doc.setTextColor(148, 163, 184);
+          doc.text(`Élan Exports Consultancy  ·  Employees Report  ·  Page ${hookData.pageNumber}  ·  Generated ${today}`, pageW / 2, pageH - 5, { align: "center" });
+        },
+      });
+
+      doc.save(`employees-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+      toast.success("PDF exported");
+    } catch {
+      toast.error("Failed to export PDF");
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -294,6 +580,14 @@ export default function ReportsEmployeesPage() {
           <p className="text-sm text-slate-500 mt-0.5">Sourcing performance and supplier attribution per team member</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={exportCsv} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-brand-200 bg-white text-brand-700 text-sm font-medium shadow-sm hover:bg-brand-50 hover:border-brand-300 transition-colors">
+            <FileSpreadsheet className="h-4 w-4" />
+            Export CSV
+          </button>
+          <button onClick={exportPdf} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium shadow-sm hover:bg-slate-50 transition-colors">
+            <FileDown className="h-4 w-4" />
+            Export PDF
+          </button>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
             className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
           <span className="text-slate-400 text-sm">to</span>
@@ -369,7 +663,7 @@ export default function ReportsEmployeesPage() {
         <h2 className="text-sm font-semibold text-slate-700 mb-3">
           Team Performance
           {selectedEmployee && (
-            <button onClick={() => setSelectedEmployee(null)} className="ml-3 text-xs text-brand-600 hover:underline">
+            <button onClick={() => { setSelectedEmployee(null); setAttrPage(1); }} className="ml-3 text-xs text-brand-600 hover:underline">
               Clear filter
             </button>
           )}
@@ -380,7 +674,7 @@ export default function ReportsEmployeesPage() {
               key={emp.userId}
               emp={emp}
               isSelected={selectedEmployee === emp.userId}
-              onClick={() => setSelectedEmployee(selectedEmployee === emp.userId ? null : emp.userId)}
+              onClick={() => { setSelectedEmployee(selectedEmployee === emp.userId ? null : emp.userId); setAttrPage(1); }}
             />
           ))}
           {perEmployee.length === 0 && (
@@ -415,7 +709,7 @@ export default function ReportsEmployeesPage() {
                 <tr
                   key={row.userId}
                   className={`hover:bg-slate-50 transition-colors cursor-pointer ${selectedEmployee === row.userId ? "bg-brand-50" : ""}`}
-                  onClick={() => setSelectedEmployee(selectedEmployee === row.userId ? null : row.userId)}
+                  onClick={() => { setSelectedEmployee(selectedEmployee === row.userId ? null : row.userId); setAttrPage(1); }}
                 >
                   <td className="px-4 py-3 text-center">
                     <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
@@ -462,14 +756,14 @@ export default function ReportsEmployeesPage() {
           </div>
           <div className="flex items-center gap-2">
             {selectedEmployee && (
-              <button onClick={() => setSelectedEmployee(null)} className="text-xs text-slate-500 hover:text-brand-600 px-2 py-1 border border-slate-200 rounded-lg">
+              <button onClick={() => { setSelectedEmployee(null); setAttrPage(1); }} className="text-xs text-slate-500 hover:text-brand-600 px-2 py-1 border border-slate-200 rounded-lg">
                 Show All
               </button>
             )}
             <input
               placeholder="Search supplier, country, employee…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setAttrPage(1); }}
               className="h-8 w-56 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-500"
             />
           </div>
@@ -489,11 +783,11 @@ export default function ReportsEmployeesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredAttribution.slice(0, 100).map((row) => (
+              {filteredAttribution.slice((attrPage - 1) * ATTR_PAGE_SIZE, attrPage * ATTR_PAGE_SIZE).map((row) => (
                 <tr key={row.sourcingId} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-slate-800">{row.company}</td>
                   <td className="px-4 py-3 text-slate-600">{row.country}</td>
-                  <td className="px-4 py-3 text-slate-500 max-w-[120px] truncate">{row.product}</td>
+                  <td className="px-4 py-3 text-slate-500 max-w-30 truncate">{row.product}</td>
                   <td className="px-4 py-3">
                     <div>
                       <p className="text-slate-800 font-medium text-xs">{row.employeeName}</p>
@@ -526,11 +820,7 @@ export default function ReportsEmployeesPage() {
             </tbody>
           </table>
         </div>
-        {filteredAttribution.length > 100 && (
-          <p className="px-5 py-3 text-xs text-slate-400 border-t border-slate-100">
-            Showing 100 of {filteredAttribution.length} rows.
-          </p>
-        )}
+        <Pagination page={attrPage} total={filteredAttribution.length} limit={ATTR_PAGE_SIZE} onChange={setAttrPage} />
       </div>
 
       {/* Status Legend */}

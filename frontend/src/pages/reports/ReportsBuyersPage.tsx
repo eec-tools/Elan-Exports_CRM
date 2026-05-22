@@ -133,11 +133,46 @@ const STAGE_SHORT: Record<string, string> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+const TABLE_PAGE_SIZE = 25;
+
+function Pagination({ page, total, limit, onChange }: {
+  page: number; total: number; limit: number; onChange: (p: number) => void;
+}) {
+  const pages = Math.max(1, Math.ceil(total / limit));
+  if (pages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50">
+      <span className="text-xs text-slate-500">
+        {Math.min((page - 1) * limit + 1, total)}–{Math.min(page * limit, total)} of {total}
+      </span>
+      <div className="flex items-center gap-1">
+        <button onClick={() => onChange(1)} disabled={page === 1}
+          className="px-2 py-1 text-xs rounded border border-slate-200 disabled:opacity-40 hover:bg-white">«</button>
+        <button onClick={() => onChange(page - 1)} disabled={page === 1}
+          className="px-2 py-1 text-xs rounded border border-slate-200 disabled:opacity-40 hover:bg-white">‹</button>
+        {Array.from({ length: Math.min(5, pages) }, (_, i) => {
+          const start = Math.max(1, Math.min(page - 2, pages - 4));
+          const p = start + i;
+          return p <= pages ? (
+            <button key={p} onClick={() => onChange(p)}
+              className={`px-2.5 py-1 text-xs rounded border ${p === page ? "bg-brand-600 text-white border-brand-600" : "border-slate-200 hover:bg-white"}`}>{p}</button>
+          ) : null;
+        })}
+        <button onClick={() => onChange(page + 1)} disabled={page === pages}
+          className="px-2 py-1 text-xs rounded border border-slate-200 disabled:opacity-40 hover:bg-white">›</button>
+        <button onClick={() => onChange(pages)} disabled={page === pages}
+          className="px-2 py-1 text-xs rounded border border-slate-200 disabled:opacity-40 hover:bg-white">»</button>
+      </div>
+    </div>
+  );
+}
+
 export default function ReportsBuyersPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "noDeal" | "noSupplier">("all");
+  const [tablePage, setTablePage] = useState(1);
 
   const params: Record<string, string> = {};
   if (from) params.from = from;
@@ -374,17 +409,17 @@ export default function ReportsBuyersPage() {
         </div>
         <div className="flex items-center gap-2">
           <input
-            type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+            type="date" value={from} onChange={(e) => { setFrom(e.target.value); setTablePage(1); }}
             className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
           />
           <span className="text-slate-400 text-sm">to</span>
           <input
-            type="date" value={to} onChange={(e) => setTo(e.target.value)}
+            type="date" value={to} onChange={(e) => { setTo(e.target.value); setTablePage(1); }}
             className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
           />
           {(from || to) && (
             <button
-              onClick={() => { setFrom(""); setTo(""); }}
+              onClick={() => { setFrom(""); setTo(""); setTablePage(1); }}
               className="text-xs text-slate-500 hover:text-rose-600 px-2 py-1 rounded"
             >
               Clear
@@ -514,7 +549,7 @@ export default function ReportsBuyersPage() {
                 ))}
               </Pie>
               <Tooltip formatter={(v: number | undefined) => [v, "Buyers"]} />
-              <Legend />
+              <Legend formatter={(_value, entry: any) => entry?.payload?.rating ?? _value} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -544,7 +579,7 @@ export default function ReportsBuyersPage() {
               {(["all", "noDeal", "noSupplier"] as const).map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => { setActiveTab(tab); setTablePage(1); }}
                   className={`px-3 py-1.5 transition-colors ${
                     activeTab === tab ? "bg-brand-600 text-white" : "text-slate-500 hover:bg-slate-50"
                   }`}
@@ -558,7 +593,7 @@ export default function ReportsBuyersPage() {
             <input
               placeholder="Search buyers…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setTablePage(1); }}
               className="h-8 w-48 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-500"
             />
           </div>
@@ -580,7 +615,7 @@ export default function ReportsBuyersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredTable.slice(0, 50).map((b) => (
+              {filteredTable.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE).map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-800">{b.company}</p>
@@ -624,11 +659,7 @@ export default function ReportsBuyersPage() {
             </tbody>
           </table>
         </div>
-        {filteredTable.length > 50 && (
-          <p className="px-5 py-3 text-xs text-slate-400 border-t border-slate-100">
-            Showing 50 of {filteredTable.length} buyers.
-          </p>
-        )}
+        <Pagination page={tablePage} total={filteredTable.length} limit={TABLE_PAGE_SIZE} onChange={setTablePage} />
       </div>
     </div>
   );
