@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { NavLink, Link, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
@@ -29,6 +29,7 @@ import {
   BarChart3,
   UserCheck,
   PieChart,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -721,6 +722,13 @@ export function AppLayout() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <Link
+              to="/settings/gmail"
+              className="flex items-center justify-center h-9 w-9 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              title="Settings"
+            >
+              <Settings className="h-5 w-5" />
+            </Link>
             <NotificationBell />
           </div>
         </header>

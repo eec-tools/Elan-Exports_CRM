@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
-import { Loader2, Users, Globe, TrendingUp, AlertTriangle, DollarSign, UserX } from "lucide-react";
+import { jsPDF } from "jspdf";
+import { autoTable } from "jspdf-autotable";
+import { Loader2, Users, Globe, TrendingUp, AlertTriangle, DollarSign, UserX, FileSpreadsheet, FileDown } from "lucide-react";
+import { toast } from "sonner";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Legend,
@@ -189,6 +192,178 @@ export default function ReportsBuyersPage() {
     count: d.count,
   }));
 
+  const tabLabel = activeTab === "all" ? "All Buyers" : activeTab === "noDeal" ? "No Deals" : "No Supplier Link";
+
+  function exportCSV() {
+    const headers = ["Company", "Contact Name", "Country", "Region", "Status", "Risk Rating",
+      "Product Interest", "Deals", "Pipeline Value ($)", "Last Deal Stage", "Linked Suppliers"];
+    const rows = filteredTable.map((b) => [
+      b.company ?? "",
+      (b as any).name ?? "",
+      (b as any).country ?? "",
+      (b as any).region ?? "",
+      (b as any).status ?? "",
+      (b as any).riskRating ?? "",
+      (b as any).productCategoryInterest ?? "",
+      b.dealCount,
+      b.pipelineValue ?? 0,
+      (b as any).lastDealStage ?? "",
+      (b as any).linkedSupplierCount ?? "",
+    ]);
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `buyers-report-${tabLabel.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exported");
+  }
+
+  function exportPDF() {
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    const dateRange = from || to ? `${from || "—"} to ${to || "—"}` : "All time";
+
+    // ── Header band ──
+    doc.setFillColor(30, 41, 59); // slate-800
+    doc.rect(0, 0, pageW, 22, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(255, 255, 255);
+    doc.text("Élan Exports Consultancy", 12, 10);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text("sales@elanexports.com  ·  Buyers Intelligence Report", 12, 16);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`Buyers Report — ${tabLabel}`, pageW / 2, 10, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Period: ${dateRange}`, pageW / 2, 16, { align: "center" });
+    doc.text(`Generated: ${today}`, pageW - 12, 10, { align: "right" });
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${filteredTable.length} record${filteredTable.length !== 1 ? "s" : ""}`, pageW - 12, 16, { align: "right" });
+
+    // ── KPI band ──
+    const kpiY = 26;
+    const kpiItems = [
+      { label: "Total Buyers", value: String(kpis.totalBuyers) },
+      { label: "Active", value: String(kpis.activeBuyers) },
+      { label: "Pipeline Value", value: fmtMoney(kpis.totalPipelineValue) },
+      { label: "Avg Deal Value", value: fmtMoney(kpis.avgDealValue) },
+      { label: "Countries", value: String(kpis.countriesCount) },
+      { label: "High Risk", value: String(kpis.highRiskCount) },
+      { label: "No Deals", value: String(kpis.noDealCount) },
+    ];
+    const kpiW = (pageW - 24) / kpiItems.length;
+    kpiItems.forEach((k, i) => {
+      const x = 12 + i * kpiW;
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.roundedRect(x, kpiY, kpiW - 2, 14, 2, 2, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(30, 41, 59);
+      doc.text(k.value, x + (kpiW - 2) / 2, kpiY + 6, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(k.label, x + (kpiW - 2) / 2, kpiY + 11, { align: "center" });
+    });
+
+    // ── Table ──
+    const tableRows = filteredTable.map((b) => [
+      b.company ?? "—",
+      (b as any).name && (b as any).name !== "—" ? (b as any).name : "",
+      (b as any).country ?? "—",
+      (b as any).status ?? "—",
+      (b as any).riskRating ?? "—",
+      (b as any).productCategoryInterest && (b as any).productCategoryInterest !== "—"
+        ? String((b as any).productCategoryInterest).slice(0, 30)
+        : "—",
+      String(b.dealCount),
+      b.pipelineValue > 0 ? fmtMoney(b.pipelineValue) : "—",
+      (b as any).lastDealStage && (b as any).lastDealStage !== "—"
+        ? (STAGE_SHORT[(b as any).lastDealStage] ?? String((b as any).lastDealStage).slice(0, 22))
+        : "—",
+      String((b as any).linkedSupplierCount ?? "—"),
+    ]);
+
+    autoTable(doc, {
+      startY: kpiY + 18,
+      head: [["Company", "Contact", "Country", "Status", "Risk", "Product Interest", "Deals", "Pipeline", "Last Stage", "Suppliers"]],
+      body: tableRows,
+      theme: "grid",
+      styles: {
+        font: "helvetica",
+        fontSize: 7.5,
+        cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+        textColor: [30, 41, 59],
+        lineColor: [226, 232, 240],
+        lineWidth: 0.3,
+      },
+      headStyles: {
+        fillColor: [30, 41, 59],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 7,
+        halign: "left",
+      },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 34 },
+        1: { cellWidth: 24, textColor: [100, 116, 139] },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 18, halign: "center" },
+        4: { cellWidth: 16, halign: "center" },
+        5: { cellWidth: 36 },
+        6: { cellWidth: 14, halign: "center" },
+        7: { cellWidth: 22, halign: "right", fontStyle: "bold", textColor: [5, 150, 105] },
+        8: { cellWidth: 28 },
+        9: { cellWidth: 14, halign: "center" },
+      },
+      didParseCell: (hookData) => {
+        if (hookData.section === "body" && hookData.column.index === 3) {
+          const v = hookData.cell.raw as string;
+          if (v === "Active") hookData.cell.styles.textColor = [5, 150, 105];
+          else if (v === "Suspended") hookData.cell.styles.textColor = [220, 38, 38];
+          else hookData.cell.styles.textColor = [180, 120, 0];
+        }
+        if (hookData.section === "body" && hookData.column.index === 4) {
+          const v = hookData.cell.raw as string;
+          if (v === "High") hookData.cell.styles.textColor = [220, 38, 38];
+          else if (v === "Low") hookData.cell.styles.textColor = [5, 150, 105];
+          else if (v === "Medium") hookData.cell.styles.textColor = [180, 120, 0];
+        }
+      },
+      // Footer on each page
+      didDrawPage: (hookData) => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text(
+          `Élan Exports Consultancy  ·  Buyers Report  ·  Page ${hookData.pageNumber}`,
+          pageW / 2, pageH - 5, { align: "center" },
+        );
+      },
+    });
+
+    doc.save(`buyers-report-${tabLabel.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success("PDF exported");
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -215,6 +390,21 @@ export default function ReportsBuyersPage() {
               Clear
             </button>
           )}
+          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <button
+            onClick={exportCSV}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-brand-200 bg-white text-brand-700 text-sm font-medium shadow-sm hover:bg-brand-50 hover:border-brand-300 transition-colors"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Export CSV
+          </button>
+          <button
+            onClick={exportPDF}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium shadow-sm hover:bg-slate-50 transition-colors"
+          >
+            <FileDown className="h-4 w-4" />
+            Export PDF
+          </button>
         </div>
       </div>
 

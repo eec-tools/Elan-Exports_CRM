@@ -38,6 +38,7 @@ import {
   ExternalLink,
   LayoutTemplate,
   Users,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -125,11 +126,26 @@ const STATUS_FILTER_OPTIONS = [
 ];
 
 export default function SourcingSupplierPage() {
-  const { hasEditPermission } = useAuth();
+  const { hasEditPermission, isAdmin } = useAuth();
   const canEdit =
     hasEditPermission("suppliers") || hasEditPermission("sourcing_suppliers");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  const [runningScheduler, setRunningScheduler] = useState(false);
+
+  async function runSchedulerNow() {
+    setRunningScheduler(true);
+    try {
+      await api.post("/sourcing-campaigns/admin/run-scheduler");
+      toast.success("Scheduler triggered — all overdue follow-ups are being sent now.");
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] }), 3000);
+    } catch {
+      toast.error("Failed to trigger scheduler.");
+    } finally {
+      setRunningScheduler(false);
+    }
+  }
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -451,6 +467,20 @@ export default function SourcingSupplierPage() {
             <LayoutTemplate className="h-4 w-4 mr-1.5" />
             Form Templates
           </Button>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={runSchedulerNow}
+              disabled={runningScheduler}
+              className="gap-1.5 border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300"
+            >
+              {runningScheduler
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Zap className="h-4 w-4" />}
+              {runningScheduler ? "Sending…" : "Send Overdue Now"}
+            </Button>
+          )}
           <PermissionGate permission="sourcing_suppliers" editOnly>
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" />
