@@ -88,7 +88,10 @@ async function sendDailyFollowupReminders() {
 }
 
 async function autoSendDueFollowups() {
-  if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET) return;
+  if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET) {
+    console.warn("[EmailCampaignScheduler] GMAIL_CLIENT_ID or GMAIL_CLIENT_SECRET not set — skipping auto-send.");
+    return;
+  }
 
   try {
     const today = endOfDay(new Date());
@@ -125,10 +128,18 @@ async function autoSendDueFollowups() {
   }
 }
 
+export { autoSendDueFollowups };
+
 export function startEmailCampaignScheduler() {
-  // Signed supplier follow-up reminders — 9:00 AM daily
-  cron.schedule("0 9 * * *", sendDailyFollowupReminders);
-  // Auto-send due sourcing supplier follow-ups — 9:00 AM daily
-  cron.schedule("0 9 * * *", autoSendDueFollowups);
-  console.log("[EmailCampaignScheduler] Daily follow-up jobs scheduled at 9:00 AM.");
+  // Signed supplier follow-up reminders — 9:00 AM IST daily
+  cron.schedule("0 9 * * *", sendDailyFollowupReminders, { timezone: "Asia/Kolkata" });
+  // Auto-send due sourcing supplier follow-ups — 9:00 AM IST daily
+  cron.schedule("0 9 * * *", autoSendDueFollowups, { timezone: "Asia/Kolkata" });
+  console.log("[EmailCampaignScheduler] Daily follow-up jobs scheduled at 9:00 AM IST.");
+
+  // Run immediately on startup to catch any overdue campaigns missed while server was down
+  setTimeout(() => {
+    console.log("[EmailCampaignScheduler] Running startup check for overdue follow-ups...");
+    autoSendDueFollowups();
+  }, 5000);
 }

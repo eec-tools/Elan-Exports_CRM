@@ -628,6 +628,82 @@ export async function deleteBuyer(
 }
 
 /**
+ * POST /api/buyers/:id/documents
+ * Upload a document (NDA, contract, compliance doc, etc.) to a buyer record
+ */
+export async function uploadBuyerDocument(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const buyer = await prisma.buyer.findUnique({ where: { id: req.params.id } });
+    if (!buyer) {
+      res.status(404).json({ error: "Buyer not found" });
+      return;
+    }
+
+    const file = req.file as any;
+    if (!file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+
+    const { documentType = "Other" } = req.body;
+    const fileUrl: string = file.path || file.secure_url || file.url;
+
+    const newDoc = {
+      id: crypto.randomUUID(),
+      name: file.originalname || file.filename || "document",
+      url: fileUrl,
+      documentType,
+      uploadedAt: new Date().toISOString(),
+      uploadedBy: req.user!.fullName || req.user!.email,
+    };
+
+    const existing = Array.isArray(buyer.documents) ? (buyer.documents as any[]) : [];
+    const updated = await prisma.buyer.update({
+      where: { id: req.params.id },
+      data: { documents: [...existing, newDoc] },
+    });
+
+    res.json({ document: newDoc, documents: updated.documents });
+  } catch (err) {
+    console.error("Upload buyer document error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * DELETE /api/buyers/:id/documents/:docId
+ * Remove a document from a buyer record
+ */
+export async function deleteBuyerDocument(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const buyer = await prisma.buyer.findUnique({ where: { id: req.params.id } });
+    if (!buyer) {
+      res.status(404).json({ error: "Buyer not found" });
+      return;
+    }
+
+    const existing = Array.isArray(buyer.documents) ? (buyer.documents as any[]) : [];
+    const filtered = existing.filter((d: any) => d.id !== (req.params as any).docId);
+
+    const updated = await prisma.buyer.update({
+      where: { id: req.params.id },
+      data: { documents: filtered },
+    });
+
+    res.json({ documents: updated.documents });
+  } catch (err) {
+    console.error("Delete buyer document error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
  * GET /api/buyers/list
  * Lightweight list for dropdown population
  */

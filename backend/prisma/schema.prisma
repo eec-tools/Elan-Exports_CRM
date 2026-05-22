@@ -121,8 +121,15 @@ model Buyer {
   howHeardAboutUs           String?   @map("how_heard_about_us")
   tradeFairName             String?   @map("trade_fair_name")
   productCatalog            String?   @map("product_catalog_shared")
+  relationshipTier          String?   @map("relationship_tier")
+  // Commercial Intelligence Fields
+  initialOrderValue         String?   @map("initial_order_value")
+  potentialAnnualValue      String?   @map("potential_annual_value")
+  reorderLikelihood         String?   @map("reorder_likelihood")
+  buyerStatedIntent         String?   @map("buyer_stated_intent")
   supplierLinks             Json      @default("[]") @map("supplier_links")
   quotations                Json?     @default("[]") @map("quotations")
+  documents                 Json      @default("[]") @map("documents")
   quotationLinks            Quotation[]
   createdBy                 String?   @map("created_by")
   createdAt                 DateTime  @default(now()) @map("created_at")

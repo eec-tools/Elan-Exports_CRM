@@ -11,6 +11,8 @@ import {
   exportBuyersCsv,
   uploadBuyerCatalog,
   uploadBuyerFile,
+  uploadBuyerDocument,
+  deleteBuyerDocument,
 } from "../controllers/buyers.controller.js";
 import {
   authenticate,
@@ -33,7 +35,9 @@ router.get("/:id", getBuyer);
 // Write operations require edit access
 router.post("/upload", requireEdit("buyers"), uploadBuyerFile.single("file"), uploadBuyerCatalog);
 router.post("/", requireEdit("buyers"), createBuyer);
+router.post("/:id/documents", requireEdit("buyers"), uploadBuyerFile.single("file"), uploadBuyerDocument);
 router.put("/:id", requireEdit("buyers"), updateBuyer);
+router.delete("/:id/documents/:docId", requireEdit("buyers"), deleteBuyerDocument);
 router.delete("/:id", requireEdit("buyers"), deleteBuyer);
 
 export default router;
