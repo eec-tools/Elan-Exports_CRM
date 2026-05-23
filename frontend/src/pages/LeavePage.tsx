@@ -208,7 +208,7 @@ export default function LeavePage() {
 
   if (isAdmin) {
     return (
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6 p-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Leave Management</h1>
           <p className="text-sm text-slate-500 mt-1">Team paid leave overview for {currentYear}</p>

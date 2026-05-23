@@ -192,7 +192,7 @@ export default function AdminEmployeesPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800">Employees</h1>
         <Button onClick={openCreate} className="gap-2">

@@ -30,6 +30,9 @@ import {
   ClipboardList,
   Settings,
   PieChart,
+  History,
+  FileEdit,
+  MailOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -67,6 +70,9 @@ const NAV_SECTIONS: NavSection[] = [
       { to: "/suppliers/sourcing-vault", label: "Vault", icon: Database, perms: ["suppliers", "sourcing_suppliers"] },
       { to: "/suppliers/new", label: "New Suppliers", icon: Factory, perms: ["suppliers", "new_suppliers"] },
       { to: "/suppliers/signed-contract", label: "Signed Contracts", icon: FileText, perms: ["suppliers", "signed_suppliers"] },
+      { to: "/suppliers/old", label: "Old Suppliers", icon: History, perms: ["suppliers", "old_suppliers"] },
+      // { to: "/suppliers/form-templates", label: "Form Templates", icon: FileEdit, perms: ["suppliers", "new_suppliers"] },
+      // { to: "/suppliers/email-templates", label: "Email Templates", icon: MailOpen, perms: ["suppliers", "sourcing_suppliers"] },
     ],
   },
   {

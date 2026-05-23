@@ -359,7 +359,7 @@ export default function DealsPage() {
 
   // ─── Render ───────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full min-h-0 gap-0">
+    <div className="flex flex-col h-full min-h-0 gap-0 p-6">
       {/* ── Header ── */}
       <div className="flex items-center justify-between pb-5 border-b border-slate-100">
         <div>

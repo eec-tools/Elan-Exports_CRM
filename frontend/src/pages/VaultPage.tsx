@@ -608,7 +608,7 @@ export default function VaultPage() {
   // ─── Render ──────────────────────────────────────────
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 p-6">
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>

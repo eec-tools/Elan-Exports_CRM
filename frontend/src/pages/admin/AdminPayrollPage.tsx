@@ -132,7 +132,7 @@ export default function AdminPayrollPage() {
   const totalNet = rows.reduce((s, r) => s + r.netSalary, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-slate-800">Payroll</h1>
         <div className="flex items-center gap-3 flex-wrap">

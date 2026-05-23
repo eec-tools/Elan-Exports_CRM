@@ -104,7 +104,7 @@ export default function AccessRequestsPage() {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-0">
+    <div className="flex flex-col h-full min-h-0 gap-0 p-6">
       {/* ── Dashboard Header ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-slate-100 mb-5">
         <div>
