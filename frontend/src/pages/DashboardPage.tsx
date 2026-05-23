@@ -34,7 +34,9 @@ import {
   Layout,
   Link as LinkIcon,
   Zap,
+  Settings,
 } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 
 // ─── Types ──────────────────────────────────────────────────────────
 interface RecentDeal {
@@ -376,54 +378,46 @@ export default function DashboardPage() {
   return (
     <div className="min-h-full bg-slate-50">
       {/* ── Page Header ─────────────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
+      <div className="bg-brand-600 px-6 py-5">
         <div className="flex items-center gap-4 max-w-400 mx-auto">
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-slate-900 leading-tight">
+            <h1 className="text-2xl font-extrabold text-white leading-tight tracking-tight">
               Executive Dashboard
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-sm text-blue-200/80 mt-0.5 font-medium">
               Centralised view of sourcing operations and deal flow.
             </p>
           </div>
 
           <form onSubmit={handleSearch} className="flex-1 max-w-md mx-4 hidden md:block">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-200/60 pointer-events-none" />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search buyers, suppliers, RFQs..."
-                className="w-full h-9 pl-9 pr-4 text-sm rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-slate-400 focus:outline-none transition-colors"
+                className="w-full h-9 pl-9 pr-4 text-sm rounded-lg border border-white/20 bg-white/10 text-white placeholder:text-blue-200/60 focus:bg-white/20 focus:border-white/40 focus:outline-none transition-colors"
               />
             </div>
           </form>
 
-          <div className="ml-auto flex items-center gap-2 shrink-0">
-            {hasPermission("deals") && (
-              <Link
-                to="/deals"
-                className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" /> New Deal
-              </Link>
-            )}
-            {hasPermission("buyers") && (
-              <Link
-                to="/buyers"
-                className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Buyer
-              </Link>
-            )}
+          <div className="ml-auto flex items-center gap-1 shrink-0">
             {hasPermission("quotations") && (
               <Link
                 to="/quotations"
-                className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors"
+                className="inline-flex items-center gap-1.5 h-8 px-4 text-xs font-bold text-brand-700 bg-white rounded-lg hover:bg-blue-50 transition-colors shadow-sm mr-2"
               >
                 <Plus className="h-3.5 w-3.5" /> New RFQ
               </Link>
             )}
+            <a
+              href="/settings/gmail"
+              className="flex items-center justify-center h-9 w-9 rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+              title="Settings"
+            >
+              <Settings className="h-5 w-5" />
+            </a>
+            <NotificationBell triggerClassName="relative h-9 w-9 text-white/70 hover:text-white hover:bg-white/15 rounded-lg" />
           </div>
         </div>
       </div>
@@ -473,10 +467,10 @@ export default function DashboardPage() {
         {/* ── Greeting ─────────────────────────────────────────── */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
               {getGreeting()}, {firstName} 👋
             </h2>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-slate-500 mt-1 font-medium">
               {formatDateLong(new Date())} — here's your trade intelligence for today
             </p>
           </div>
@@ -507,23 +501,23 @@ export default function DashboardPage() {
         {/* ── Quick action cards ───────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: "View All Buyers", sub: "Active buyer accounts", to: "/buyers", icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-            { label: "Supplier Database", sub: "Signed & sourcing suppliers", to: "/suppliers/signed-contract", icon: Building2, color: "text-violet-600", bg: "bg-violet-50" },
-            { label: "Open RFQs", sub: "Quotation requests", to: "/quotations", icon: ClipboardListIcon, color: "text-emerald-600", bg: "bg-emerald-50" },
+            { label: "View All Buyers", sub: "Active buyer accounts", to: "/buyers", icon: Users, color: "text-blue-600", bg: "bg-blue-100", border: "hover:border-blue-300", accent: "group-hover:bg-blue-600" },
+            { label: "Supplier Database", sub: "Signed & sourcing suppliers", to: "/suppliers/signed-contract", icon: Building2, color: "text-violet-600", bg: "bg-violet-100", border: "hover:border-violet-300", accent: "group-hover:bg-violet-600" },
+            { label: "Open RFQs", sub: "Quotation requests", to: "/quotations", icon: ClipboardListIcon, color: "text-emerald-600", bg: "bg-emerald-100", border: "hover:border-emerald-300", accent: "group-hover:bg-emerald-600" },
           ].map((card) => (
             <Link
               key={card.label}
               to={card.to}
-              className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 hover:border-slate-300 hover:shadow-sm transition-all"
+              className={`group flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 hover:shadow-md transition-all ${card.border}`}
             >
-              <div className={`rounded-lg p-2.5 ${card.bg} shrink-0`}>
-                <card.icon className={`h-5 w-5 ${card.color}`} />
+              <div className={`rounded-lg p-2.5 ${card.bg} shrink-0 transition-colors ${card.accent}`}>
+                <card.icon className={`h-5 w-5 ${card.color} group-hover:text-white transition-colors`} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-800 truncate">{card.label}</p>
-                <p className="text-xs text-slate-500 truncate">{card.sub}</p>
+                <p className="text-sm font-bold text-slate-800 truncate">{card.label}</p>
+                <p className="text-xs text-slate-500 truncate font-medium">{card.sub}</p>
               </div>
-              <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-slate-500 ml-auto shrink-0 transition-colors" />
+              <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-slate-600 ml-auto shrink-0 transition-colors" />
             </Link>
           ))}
         </div>
@@ -536,8 +530,9 @@ export default function DashboardPage() {
               value: s.totalBuyers.toLocaleString(),
               sub: `${s.activeUsers} active users`,
               icon: Users,
-              iconBg: "bg-blue-50",
+              iconBg: "bg-blue-100",
               iconColor: "text-blue-600",
+              accent: "border-t-4 border-t-blue-500",
               trend: null,
             },
             {
@@ -545,8 +540,9 @@ export default function DashboardPage() {
               value: s.totalSuppliers.toLocaleString(),
               sub: `${supplierHealth.underReview} under review`,
               icon: Building2,
-              iconBg: "bg-violet-50",
+              iconBg: "bg-violet-100",
               iconColor: "text-violet-600",
+              accent: "border-t-4 border-t-violet-500",
               trend: null,
             },
             {
@@ -554,8 +550,9 @@ export default function DashboardPage() {
               value: s.totalDeals.toLocaleString(),
               sub: `${topStages.length} active stages`,
               icon: TrendingUp,
-              iconBg: "bg-emerald-50",
+              iconBg: "bg-emerald-100",
               iconColor: "text-emerald-600",
+              accent: "border-t-4 border-t-emerald-500",
               trend: null,
             },
             {
@@ -563,25 +560,26 @@ export default function DashboardPage() {
               value: fmtMoney(pipelineValue) === "—" ? (s.totalDeals > 0 ? "Fill values" : "—") : fmtMoney(pipelineValue),
               sub: pipelineValue === 0 && s.totalDeals > 0 ? "Add revenue to deals" : `Across ${s.totalDeals} deals`,
               icon: DollarSign,
-              iconBg: "bg-amber-50",
+              iconBg: "bg-amber-100",
               iconColor: "text-amber-600",
+              accent: "border-t-4 border-t-amber-500",
               trend: pipelineValue === 0 && s.totalDeals > 0 ? "warning" : null,
             },
           ].map((stat) => (
             <div
               key={stat.label}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-4"
+              className={`rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:shadow-md transition-shadow ${stat.accent}`}
             >
               <div className="flex items-start justify-between gap-2 mb-3">
-                <p className="text-xs font-medium text-slate-500">{stat.label}</p>
-                <div className={`rounded-lg p-1.5 ${stat.iconBg} shrink-0`}>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{stat.label}</p>
+                <div className={`rounded-lg p-2 ${stat.iconBg} shrink-0`}>
                   <stat.icon className={`h-4 w-4 ${stat.iconColor}`} />
                 </div>
               </div>
-              <p className={`text-2xl font-bold leading-tight ${stat.trend === "warning" ? "text-amber-500 text-base" : "text-slate-900"}`}>
+              <p className={`text-3xl font-extrabold leading-tight ${stat.trend === "warning" ? "text-amber-500 text-lg" : "text-slate-900"}`}>
                 {stat.value}
               </p>
-              <p className="text-xs text-slate-400 mt-1">{stat.sub}</p>
+              <p className="text-xs text-slate-400 mt-1 font-medium">{stat.sub}</p>
             </div>
           ))}
         </div>
@@ -589,22 +587,22 @@ export default function DashboardPage() {
         {/* ── Secondary stats row ──────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { label: "Total Vault Docs", value: s.totalVaultDocs.toString(), sub: "Documents stored" },
-            { label: "Total Reports", value: s.totalReports.toString(), sub: "Report records" },
+            { label: "Vault Docs", value: s.totalVaultDocs.toString(), sub: "Documents stored", alert: false },
+            { label: "Reports", value: s.totalReports.toString(), sub: "Report records", alert: false },
             { label: "Pending Tasks", value: s.pendingTasks.toString(), sub: "Awaiting action", alert: s.pendingTasks > 0 },
             { label: "Follow-ups Due", value: (dueCampaignsRaw?.length ?? 0).toString(), sub: "Email campaigns", alert: (dueCampaignsRaw?.length ?? 0) > 0 },
-            { label: "Supplier Health", value: supplierHealth.active.toString(), sub: "Active suppliers" },
-            { label: "Team Members", value: s.activeUsers.toString(), sub: "Active users" },
+            { label: "Active Suppliers", value: supplierHealth.active.toString(), sub: "Supplier health", alert: false },
+            { label: "Team Members", value: s.activeUsers.toString(), sub: "Active users", alert: false },
           ].map((stat) => (
             <div
               key={stat.label}
-              className={`rounded-xl border bg-white px-4 py-3 ${stat.alert ? "border-amber-200" : "border-slate-200"}`}
+              className={`rounded-xl border bg-white px-4 py-3 shadow-sm ${stat.alert ? "border-amber-300 bg-amber-50/50" : "border-slate-200"}`}
             >
-              <p className="text-[11px] font-medium text-slate-500 truncate">{stat.label}</p>
-              <p className={`text-xl font-bold mt-0.5 ${stat.alert ? "text-amber-600" : "text-slate-800"}`}>
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide truncate">{stat.label}</p>
+              <p className={`text-2xl font-extrabold mt-1 ${stat.alert ? "text-amber-600" : "text-slate-800"}`}>
                 {stat.value}
               </p>
-              <p className="text-[11px] text-slate-400 truncate">{stat.sub}</p>
+              <p className="text-[11px] text-slate-400 truncate font-medium">{stat.sub}</p>
             </div>
           ))}
         </div>
@@ -615,15 +613,15 @@ export default function DashboardPage() {
           <div className="xl:col-span-3 space-y-5">
             {/* Live Buyer Requirements */}
             {hasPermission("deals") && (
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/50">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Live Buyer Requirements</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Active sourcing and negotiation activities.</p>
+                    <h3 className="text-sm font-bold text-slate-800 tracking-tight">Live Buyer Requirements</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 font-medium">Active sourcing and negotiation activities.</p>
                   </div>
                   <Link
                     to="/deals"
-                    className="text-xs font-medium text-slate-600 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors"
+                    className="text-xs font-semibold text-brand-600 border border-brand-200 rounded-lg px-3 py-1.5 hover:bg-brand-50 transition-colors"
                   >
                     Export Report
                   </Link>
@@ -690,10 +688,10 @@ export default function DashboardPage() {
 
             {/* Deal pipeline by stage */}
             {hasPermission("deals") && Object.keys(stageCounts).length > 0 && (
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                  <h3 className="text-sm font-semibold text-slate-800">Deal pipeline by stage</h3>
-                  <Link to="/deals" className="text-xs font-medium text-slate-500 hover:text-slate-800 flex items-center gap-1">
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+                  <h3 className="text-sm font-bold text-slate-800 tracking-tight">Deal Pipeline by Stage</h3>
+                  <Link to="/deals" className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1">
                     View all <ChevronRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>
@@ -737,11 +735,11 @@ export default function DashboardPage() {
 
             {/* Email Follow-ups */}
             {hasPermission("analytics") && (
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/50">
                   <div className="flex items-center gap-2">
                     <Bell className="h-4 w-4 text-amber-500" />
-                    <h3 className="text-sm font-semibold text-slate-800">Email Follow-ups Due</h3>
+                    <h3 className="text-sm font-bold text-slate-800 tracking-tight">Email Follow-ups Due</h3>
                     {dueCampaignsRaw && dueCampaignsRaw.length > 0 && (
                       <span className="inline-flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold h-4.5 min-w-4.5 px-1">
                         {dueCampaignsRaw.length}
@@ -803,9 +801,9 @@ export default function DashboardPage() {
           <div className="xl:col-span-2 space-y-5">
             {/* Pipeline stages */}
             {hasPermission("deals") && topStages.length > 0 && (
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100">
-                  <h3 className="text-sm font-semibold text-slate-800">Pipeline Stages</h3>
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+                  <h3 className="text-sm font-bold text-slate-800 tracking-tight">Pipeline Stages</h3>
                 </div>
                 <div className="px-5 py-4 space-y-3">
                   {topStages.map((st) => {
@@ -842,15 +840,15 @@ export default function DashboardPage() {
 
             {/* Supplier Database */}
             {(hasPermission("signed_suppliers") || hasPermission("suppliers")) && (
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/50">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Supplier Database</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Compliance and sourcing overview.</p>
+                    <h3 className="text-sm font-bold text-slate-800 tracking-tight">Supplier Database</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 font-medium">Compliance and sourcing overview.</p>
                   </div>
                   <Link
                     to="/suppliers/signed-contract"
-                    className="text-xs font-medium text-slate-600 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors"
+                    className="text-xs font-semibold text-brand-600 border border-brand-200 rounded-lg px-3 py-1.5 hover:bg-brand-50 transition-colors"
                   >
                     Add Supplier
                   </Link>
@@ -914,10 +912,10 @@ export default function DashboardPage() {
 
             {/* Supplier health */}
             {suppliers.length > 0 && (
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                  <h3 className="text-sm font-semibold text-slate-800">Supplier health</h3>
-                  <Link to="/suppliers/signed-contract" className="text-xs font-medium text-slate-500 hover:text-slate-800 flex items-center gap-1">
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+                  <h3 className="text-sm font-bold text-slate-800 tracking-tight">Supplier Health</h3>
+                  <Link to="/suppliers/signed-contract" className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1">
                     Full report <ChevronRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>
@@ -946,17 +944,17 @@ export default function DashboardPage() {
 
             {/* Pending follow-ups card */}
             {(dueCampaignsRaw?.length ?? 0) > 0 && (
-              <div className="rounded-xl bg-slate-900 px-5 py-5 text-white">
-                <p className="text-xs text-slate-400 font-medium uppercase tracking-widest">TODAY</p>
-                <p className="text-2xl font-bold mt-1">
+              <div className="rounded-xl bg-brand-600 px-5 py-5 text-white shadow-md">
+                <p className="text-xs text-blue-200/70 font-bold uppercase tracking-widest">TODAY</p>
+                <p className="text-2xl font-extrabold mt-1 tracking-tight">
                   {dueCampaignsRaw!.length} Follow Up{dueCampaignsRaw!.length > 1 ? "s" : ""} Pending
                 </p>
-                <p className="text-slate-400 text-sm mt-1.5">
+                <p className="text-blue-100/80 text-sm mt-1.5 font-medium">
                   Buyers waiting for quotations and supplier confirmations.
                 </p>
                 <Link
                   to="/suppliers/sourcing"
-                  className="inline-flex items-center gap-1.5 mt-4 text-xs font-semibold text-white/80 hover:text-white transition-colors"
+                  className="inline-flex items-center gap-1.5 mt-4 text-xs font-bold text-white bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg transition-colors"
                 >
                   View sourcing <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
@@ -966,13 +964,13 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Task Analytics ──────────────────────────────────── */}
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/50">
             <div className="flex items-center gap-2">
               <CheckSquare className="h-4 w-4 text-amber-500" />
-              <h3 className="text-sm font-semibold text-slate-800">Task Analytics</h3>
+              <h3 className="text-sm font-bold text-slate-800 tracking-tight">Task Analytics</h3>
             </div>
-            <Link to="/daily-tasks" className="text-xs font-medium text-slate-500 hover:text-slate-800 flex items-center gap-1">
+            <Link to="/daily-tasks" className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1">
               View all <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>

@@ -44,7 +44,7 @@ function notificationIcon(type: string) {
   return <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />;
 }
 
-export function NotificationBell() {
+export function NotificationBell({ triggerClassName }: { triggerClassName?: string } = {}) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -142,7 +142,7 @@ export function NotificationBell() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-10 w-10 text-slate-800 hover:bg-slate-100 hover:text-slate-900 rounded-lg"
+          className={triggerClassName ?? "relative h-10 w-10 text-slate-800 hover:bg-slate-100 hover:text-slate-900 rounded-lg"}
           title="Notifications"
         >
           <Bell className="h-6 w-6" strokeWidth={2.5} />

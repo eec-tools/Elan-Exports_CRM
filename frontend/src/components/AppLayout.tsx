@@ -28,16 +28,13 @@ import {
   UserCheck,
   Lock,
   ClipboardList,
-  Settings,
   PieChart,
   History,
   FileEdit,
   MailOpen,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState } from "react";
-import { NotificationBell } from "@/components/NotificationBell";
 
 type NavSection = {
   label: string;
@@ -156,27 +153,27 @@ export function AppLayout() {
 
       {/* ── Sidebar ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-[#0f1520] transition-all duration-300 md:relative ${
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-brand-600 transition-all duration-300 md:relative ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         } ${sidebarCollapsed ? "w-17" : "w-64"}`}
       >
         {/* Logo */}
         <div
-          className={`relative flex h-16 items-center border-b border-white/5 shrink-0 ${
+          className={`relative flex h-16 items-center border-b border-white/10 shrink-0 ${
             sidebarCollapsed ? "justify-center px-2" : "px-4 gap-3"
           }`}
         >
           <img
             src="/elan-exports-logo.png"
             alt="EEC"
-            className="h-9 w-9 rounded-full object-cover shrink-0 border border-white/10"
+            className="h-9 w-9 rounded-full object-cover shrink-0 border-2 border-white/20 shadow-sm"
           />
           {!sidebarCollapsed && (
             <div className="min-w-0">
-              <p className="text-white font-bold text-sm leading-tight truncate">
+              <p className="text-white font-bold text-sm leading-tight truncate tracking-wide">
                 EEC CRM
               </p>
-              <p className="text-slate-500 text-[10px] leading-tight truncate">
+              <p className="text-blue-200/60 text-[10px] leading-tight truncate">
                 Global Sourcing &amp; Buyer Management
               </p>
             </div>
@@ -184,7 +181,7 @@ export function AppLayout() {
 
           {/* Mobile close */}
           <button
-            className="ml-auto text-slate-500 hover:text-white md:hidden"
+            className="ml-auto text-blue-200/60 hover:text-white md:hidden"
             onClick={() => setSidebarOpen(false)}
           >
             <X className="h-5 w-5" />
@@ -192,7 +189,7 @@ export function AppLayout() {
 
           {/* Desktop collapse toggle */}
           <button
-            className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 z-50 h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-[#0f1520] text-slate-500 hover:text-white hover:border-white/20 transition-all shadow-lg"
+            className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 z-50 h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-brand-600 text-blue-200/70 hover:text-white hover:border-white/40 transition-all shadow-lg"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             title={sidebarCollapsed ? "Expand" : "Collapse"}
           >
@@ -216,12 +213,12 @@ export function AppLayout() {
             return (
               <div key={section.label} className="mb-1">
                 {!sidebarCollapsed && (
-                  <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600 select-none">
+                  <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-blue-200/45 select-none">
                     {section.label}
                   </p>
                 )}
                 {sidebarCollapsed && (
-                  <div className="h-px bg-white/5 my-2 mx-1" />
+                  <div className="h-px bg-white/10 my-2 mx-1" />
                 )}
                 {visibleItems.map((item) => {
                   const hasAccess = checkAccess(item.perms);
@@ -237,8 +234,8 @@ export function AppLayout() {
                           sidebarCollapsed ? "justify-center" : ""
                         } ${
                           isActive
-                            ? "bg-white/10 text-white"
-                            : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                            ? "bg-white/15 text-white shadow-sm"
+                            : "text-blue-100/75 hover:bg-white/10 hover:text-white"
                         }`
                       }
                     >
@@ -248,7 +245,7 @@ export function AppLayout() {
                             className={`h-4.5 w-4.5 shrink-0 transition-colors ${
                               isActive
                                 ? "text-white"
-                                : "text-slate-500 group-hover:text-slate-300"
+                                : "text-blue-200/60 group-hover:text-white"
                             }`}
                           />
                           {!sidebarCollapsed && (
@@ -256,13 +253,13 @@ export function AppLayout() {
                           )}
                           {!hasAccess && !sidebarCollapsed && (
                             <Lock
-                              className="h-3.5 w-3.5 shrink-0 text-slate-600"
+                              className="h-3.5 w-3.5 shrink-0 text-blue-200/30"
                               strokeWidth={2.5}
                             />
                           )}
                           {!hasAccess && sidebarCollapsed && (
                             <Lock
-                              className="absolute -bottom-0.5 -right-0.5 h-3 w-3 text-slate-600 bg-[#0f1520] rounded-full p-px"
+                              className="absolute -bottom-0.5 -right-0.5 h-3 w-3 text-blue-200/30 bg-brand-600 rounded-full p-px"
                               strokeWidth={2.5}
                             />
                           )}
@@ -277,11 +274,11 @@ export function AppLayout() {
         </nav>
 
         {/* User section */}
-        <div className="shrink-0 border-t border-white/5 p-2">
+        <div className="shrink-0 border-t border-white/10 p-2">
           {!sidebarCollapsed ? (
-            <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-white/5 transition-colors group">
-              <Avatar className="h-8 w-8 shrink-0 border border-white/10">
-                <AvatarFallback className="bg-white/10 text-white text-xs font-bold">
+            <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-white/10 transition-colors group">
+              <Avatar className="h-8 w-8 shrink-0 border-2 border-white/20">
+                <AvatarFallback className="bg-white/20 text-white text-xs font-bold">
                   {initials}
                 </AvatarFallback>
               </Avatar>
@@ -289,29 +286,29 @@ export function AppLayout() {
                 <p className="text-white text-[13px] font-semibold truncate leading-tight">
                   {user?.fullName}
                 </p>
-                <p className="text-slate-500 text-[11px] truncate leading-tight">
+                <p className="text-blue-200/60 text-[11px] truncate leading-tight">
                   {isAdmin ? "Administrator" : "Team Member"}
                 </p>
               </div>
               <button
                 onClick={handleLogout}
                 title="Logout"
-                className="text-slate-600 hover:text-rose-400 transition-colors"
+                className="text-blue-200/50 hover:text-rose-300 transition-colors"
               >
                 <LogOut className="h-4 w-4" />
               </button>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2 py-2">
-              <Avatar className="h-8 w-8 border border-white/10">
-                <AvatarFallback className="bg-white/10 text-white text-xs font-bold">
+              <Avatar className="h-8 w-8 border-2 border-white/20">
+                <AvatarFallback className="bg-white/20 text-white text-xs font-bold">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <button
                 onClick={handleLogout}
                 title="Logout"
-                className="text-slate-600 hover:text-rose-400 transition-colors"
+                className="text-blue-200/50 hover:text-rose-300 transition-colors"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>
@@ -320,34 +317,18 @@ export function AppLayout() {
         </div>
       </aside>
 
+      {/* Mobile hamburger — floating, only visible on mobile when sidebar is closed */}
+      {!sidebarOpen && (
+        <button
+          className="fixed top-3 left-3 z-40 md:hidden flex items-center justify-center h-9 w-9 rounded-lg bg-brand-600 text-white shadow-md"
+          onClick={() => setSidebarOpen(true)}
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      )}
+
       {/* ── Main area ── */}
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-        {/* Slim global top bar */}
-        <header className="flex h-12 items-center border-b border-slate-200 bg-white px-4 shrink-0 shadow-sm z-30">
-          {/* Mobile menu */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden text-slate-600 hover:bg-slate-100 mr-2 h-8 w-8"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-
-          <div className="flex-1" />
-
-          <div className="flex items-center gap-1">
-            <a
-              href="/settings/gmail"
-              className="flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              title="Settings"
-            >
-              <Settings className="h-4 w-4" />
-            </a>
-            <NotificationBell />
-          </div>
-        </header>
-
         {/* Page content */}
         <main className="flex-1 overflow-y-auto bg-slate-50 relative">
           <Outlet />
