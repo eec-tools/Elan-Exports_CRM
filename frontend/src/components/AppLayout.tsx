@@ -30,8 +30,6 @@ import {
   ClipboardList,
   PieChart,
   History,
-  FileEdit,
-  MailOpen,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState } from "react";
