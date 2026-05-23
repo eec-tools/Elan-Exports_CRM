@@ -260,25 +260,27 @@ export async function sendBulkEmail(
     // Generate short codes before transaction (uniqueness checks need to run outside tx)
     const shortCodes = await Promise.all(validRows.map((s) => generateShortCode(s.company.trim())));
 
-    const createdSuppliers: any[] = await (prisma as any).$transaction(async (tx: any) => {
-      await tx.sourcingVaultSupplier.createMany({
-        data: validRows.map((s) => ({
-          folderId,
-          company: s.company.trim(),
-          email: s.email?.trim() || null,
-          phone: s.phone?.trim() || null,
-          contactPerson: s.contactPerson?.trim() || null,
-          country: s.country?.trim() || null,
-          product: s.product?.trim() || null,
-          notes: s.notes?.trim() || null,
-          emailStatus: "Sent",
-          createdBy: req.user!.id,
-        })),
-      });
+    // [vaultSupplierId, sourcingSupplier] pairs — built inside transaction so we can
+    // mark each vault record "Sent" individually after its campaign actually starts.
+    const pairs: Array<{ vaultId: string; supplier: any }> = [];
 
-      const created: any[] = [];
+    await (prisma as any).$transaction(async (tx: any) => {
       for (let i = 0; i < validRows.length; i++) {
         const s = validRows[i];
+        const vs = await tx.sourcingVaultSupplier.create({
+          data: {
+            folderId,
+            company: s.company.trim(),
+            email: s.email?.trim() || null,
+            phone: s.phone?.trim() || null,
+            contactPerson: s.contactPerson?.trim() || null,
+            country: s.country?.trim() || null,
+            product: s.product?.trim() || null,
+            notes: s.notes?.trim() || null,
+            emailStatus: "Not Sent",
+            createdBy: req.user!.id,
+          },
+        });
         try {
           const supplier = await tx.sourcingSupplier.create({
             data: {
@@ -308,21 +310,33 @@ export async function sendBulkEmail(
               createdBy: req.user!.id,
             },
           });
-          created.push(supplier);
+          pairs.push({ vaultId: vs.id, supplier });
         } catch (e: any) {
-          if (e?.code === "P2002") continue;
+          if (e?.code === "P2002") {
+            pairs.push({ vaultId: vs.id, supplier: null });
+            continue;
+          }
           throw e;
         }
       }
-
-      return created;
     });
 
+    const createdSuppliers = pairs.map((p) => p.supplier).filter(Boolean);
+
     let emailsSent = 0;
-    for (const supplier of createdSuppliers) {
+    for (const { vaultId, supplier } of pairs) {
+      if (!supplier) continue;
+      let campaignStarted = false;
       if (supplier.assignedGmailAccount && supplier.email) {
-        const sent = await startCampaignForSupplier(supplier.id, req.user?.id);
-        if (sent) emailsSent++;
+        campaignStarted = await startCampaignForSupplier(supplier.id, req.user?.id);
+        if (campaignStarted) emailsSent++;
+      }
+      // Mark vault "Sent" only when email went out, or when no campaign was expected.
+      if (campaignStarted || !supplier.assignedGmailAccount || !supplier.email) {
+        await (prisma as any).sourcingVaultSupplier.update({
+          where: { id: vaultId },
+          data: { emailStatus: "Sent" },
+        });
       }
     }
 

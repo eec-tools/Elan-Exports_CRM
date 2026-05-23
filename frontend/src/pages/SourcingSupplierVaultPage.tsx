@@ -1462,7 +1462,16 @@ function BulkAddDialog({
             </Button>
             <Button
               onClick={handleSendBulkEmailClick}
-              disabled={isWorking || filledCount === 0}
+              disabled={isWorking || filledCount === 0 || !sharedGmail || !sharedTemplateId || !sharedEmailTemplateId}
+              title={
+                !sharedGmail
+                  ? "Select a campaign email account first"
+                  : !sharedTemplateId
+                  ? "Select a form template first"
+                  : !sharedEmailTemplateId
+                  ? "Select an email template first"
+                  : undefined
+              }
             >
               {sendingEmail ? (
                 <>

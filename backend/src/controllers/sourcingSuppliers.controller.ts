@@ -692,6 +692,11 @@ export async function addFromVaultFolder(
     // Generate short codes before transaction (uniqueness checks need to run outside tx)
     const shortCodes = await Promise.all(vaultSuppliers.map((s: any) => generateShortCode(s.company)));
 
+    // Build a map so we can mark each vault supplier "Sent" individually after campaign starts
+    const vaultIdByCompany = new Map<string, string>(
+      vaultSuppliers.map((s: any) => [s.company, s.id] as [string, string]),
+    );
+
     const supplierData = vaultSuppliers.map((s: any, i: number) => ({
       company: s.company,
       email: s.email,
@@ -730,20 +735,26 @@ export async function addFromVaultFolder(
           throw e;
         }
       }
-
-      await tx.sourcingVaultSupplier.updateMany({
-        where: { folderId, emailStatus: "Not Sent" },
-        data: { emailStatus: "Sent" },
-      });
-
       return created;
     });
 
     let emailsSent = 0;
     for (const supplier of createdSuppliers) {
+      let campaignStarted = false;
       if (supplier.assignedGmailAccount && supplier.email) {
-        const sent = await startCampaignForSupplier(supplier.id, req.user?.id);
-        if (sent) emailsSent++;
+        campaignStarted = await startCampaignForSupplier(supplier.id, req.user?.id);
+        if (campaignStarted) emailsSent++;
+      }
+      // Mark vault supplier "Sent" only when the email was actually sent,
+      // or when no Gmail account was assigned (intentionally added without a campaign).
+      if (campaignStarted || !supplier.assignedGmailAccount || !supplier.email) {
+        const vaultId = vaultIdByCompany.get(supplier.company);
+        if (vaultId) {
+          await (prisma as any).sourcingVaultSupplier.update({
+            where: { id: vaultId },
+            data: { emailStatus: "Sent" },
+          });
+        }
       }
     }
 

@@ -89,6 +89,7 @@ async function checkCampaignReplies() {
 
         let repliesFound = 0;
         const now = new Date();
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
         for (const campaign of campaigns) {
             const supplier = campaign.sourcingSupplier;
@@ -124,6 +125,8 @@ async function checkCampaignReplies() {
             } catch (err) {
                 console.error(`[ReplyDetector] Error for ${supplier.company}:`, err);
             }
+
+            await sleep(300);
         }
 
         if (repliesFound > 0) {
@@ -139,7 +142,7 @@ export function startGmailReplyDetector() {
         console.log("[ReplyDetector] GMAIL_CLIENT_ID/SECRET not set — reply detection disabled");
         return;
     }
-    // Every minute
-    cron.schedule("* * * * *", checkCampaignReplies);
-    console.log("[ReplyDetector] Gmail reply detection scheduled every minute");
+    // Every 5 minutes
+    cron.schedule("*/5 * * * *", checkCampaignReplies);
+    console.log("[ReplyDetector] Gmail reply detection scheduled every 5 minutes");
 }

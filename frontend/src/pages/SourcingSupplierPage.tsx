@@ -133,6 +133,7 @@ export default function SourcingSupplierPage() {
   const queryClient = useQueryClient();
 
   const [runningScheduler, setRunningScheduler] = useState(false);
+  const [retryingPending, setRetryingPending] = useState(false);
 
   async function runSchedulerNow() {
     setRunningScheduler(true);
@@ -144,6 +145,24 @@ export default function SourcingSupplierPage() {
       toast.error("Failed to trigger scheduler.");
     } finally {
       setRunningScheduler(false);
+    }
+  }
+
+  async function retryPendingCampaigns() {
+    setRetryingPending(true);
+    try {
+      const res = await api.post("/sourcing-campaigns/admin/retry-pending");
+      const { total, started } = res.data as { total: number; started: number };
+      if (total === 0) {
+        toast.info("No pending suppliers found with a Gmail account assigned.");
+      } else {
+        toast.success(`Sent intro emails to ${started} of ${total} pending suppliers.`);
+        setTimeout(() => queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] }), 3000);
+      }
+    } catch {
+      toast.error("Failed to retry pending campaigns.");
+    } finally {
+      setRetryingPending(false);
     }
   }
 
@@ -468,18 +487,32 @@ export default function SourcingSupplierPage() {
             Form Templates
           </Button>
           {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={runSchedulerNow}
-              disabled={runningScheduler}
-              className="gap-1.5 border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300"
-            >
-              {runningScheduler
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : <Zap className="h-4 w-4" />}
-              {runningScheduler ? "Sending…" : "Send Overdue Now"}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={runSchedulerNow}
+                disabled={runningScheduler}
+                className="gap-1.5 border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300"
+              >
+                {runningScheduler
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Zap className="h-4 w-4" />}
+                {runningScheduler ? "Sending…" : "Send Overdue Now"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={retryPendingCampaigns}
+                disabled={retryingPending}
+                className="gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50"
+              >
+                {retryingPending
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Mail className="h-4 w-4" />}
+                {retryingPending ? "Sending…" : "Retry Pending"}
+              </Button>
+            </>
           )}
           <PermissionGate permission="sourcing_suppliers" editOnly>
             <Button size="sm" onClick={() => setCreateOpen(true)}>
