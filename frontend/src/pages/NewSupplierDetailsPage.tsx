@@ -607,7 +607,7 @@ export default function NewSupplierDetailsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* ── Breadcrumb ── */}
       <div className="text-sm text-muted-foreground flex items-center gap-1">
         <Link to="/" className="hover:underline">
