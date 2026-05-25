@@ -219,6 +219,21 @@ export async function getNewSupplier(
             return;
         }
 
+        // Backfill designation from sourcing supplier if missing on this record
+        if (!supplier.designation && supplier.convertedFromSourcingId) {
+            const sourcing = await (prisma as any).sourcingSupplier.findUnique({
+                where: { id: supplier.convertedFromSourcingId },
+                select: { designation: true },
+            });
+            if (sourcing?.designation) {
+                await (prisma as any).newSupplier.update({
+                    where: { id: supplier.id },
+                    data: { designation: sourcing.designation },
+                });
+                supplier.designation = sourcing.designation;
+            }
+        }
+
         res.json(supplier);
     } catch (err) {
         console.error("Get new supplier error:", err);

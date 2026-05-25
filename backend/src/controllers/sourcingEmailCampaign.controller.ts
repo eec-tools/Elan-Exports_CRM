@@ -54,6 +54,7 @@ export async function autoConvertToNewSupplier(sourcingId: string): Promise<stri
             email: sourcing.email,
             phone: sourcing.phone,
             contactPerson: sourcing.contactPerson,
+            designation: sourcing.designation,
             productCategory: sourcing.productCategory,
             product: sourcing.product,
             country: sourcing.country,

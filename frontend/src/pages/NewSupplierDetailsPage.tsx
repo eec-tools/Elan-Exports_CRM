@@ -114,6 +114,7 @@ interface NewSupplier {
   productCategory?: string;
   product?: string;
   country?: string;
+  contactPerson?: string;
   accountManager?: string;
   currentStatus?: string;
   certifications?: string;
@@ -756,7 +757,7 @@ export default function NewSupplierDetailsPage() {
                 <InfoRow
                   icon={Users}
                   label="Account Manager"
-                  value={supplier.accountManager}
+                  value={supplier.accountManager || supplier.contactPerson}
                 />
                 <InfoRow icon={Phone} label="Phone" value={supplier.phone} />
                 <InfoRow
@@ -2199,6 +2200,16 @@ export default function NewSupplierDetailsPage() {
                 Contact Details
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Contact Person Name</Label>
+                  <Input
+                    value={form.contactPerson ?? ""}
+                    onChange={(e) =>
+                      setForm({ ...form, contactPerson: e.target.value })
+                    }
+                    placeholder="e.g., Mr. John Doe"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>Account Manager</Label>
                   <Input
