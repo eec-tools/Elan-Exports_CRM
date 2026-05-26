@@ -310,24 +310,71 @@ model SupplierEmailCampaign {
 }
 
 model OldSupplier {
-  id                    String   @id @default(uuid())
-  company               String
-  country               String?
-  notes                 String?
-  createdBy             String?  @map("created_by")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-  accountManager        String?  @map("account_manager")
-  certifications        String?
-  currentStatus         String?  @map("current_status")
-  dateMarkedInactive    String?  @map("date_marked_inactive")
-  latestQuotation       String?  @map("latest_quotation")
-  product               String?
-  productCategory       String?  @map("product_category")
-  reactivationPotential String?  @map("reactivation_potential")
-  reasonInactive        String?  @map("reason_inactive")
-  supplierStage         String   @default("Closed") @map("supplier_stage")
-  dealStage             String   @default("Communication") @map("deal_stage")
+  id                      String   @id @default(uuid())
+  company                 String
+  country                 String?
+  notes                   String?
+  createdBy               String?  @map("created_by")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+  accountManager          String?  @map("account_manager")
+  certifications          String?
+  currentStatus           String?  @map("current_status")
+  dateMarkedInactive      String?  @map("date_marked_inactive")
+  latestQuotation         String?  @map("latest_quotation")
+  product                 String?
+  productCategory         String?  @map("product_category")
+  reactivationPotential   String?  @map("reactivation_potential")
+  reasonInactive          String?  @map("reason_inactive")
+  supplierStage           String   @default("Closed") @map("supplier_stage")
+  dealStage               String   @default("Communication") @map("deal_stage")
+  // Extended fields from full CSV import
+  supplierExternalId      String?  @map("supplier_external_id")
+  email                   String?
+  phone                   String?
+  whatsapp                String?
+  website                 String?
+  city                    String?
+  companyAddress          String?  @map("company_address")
+  contactPerson           String?  @map("contact_person")
+  designation             String?
+  legalName               String?  @map("legal_name")
+  secondaryContactName    String?  @map("secondary_contact_name")
+  secondaryEmail          String?  @map("secondary_email")
+  secondaryPhone          String?  @map("secondary_phone")
+  subCategory             String?  @map("sub_category")
+  commodityType           String?  @map("commodity_type")
+  productionCapacity      String?  @map("production_capacity")
+  moq                     String?
+  priceRange              String?  @map("price_range")
+  currency                String?
+  exportMarkets           String?  @map("export_markets")
+  certBody                String?  @map("cert_body")
+  certStatus              String?  @map("cert_status")
+  certExpiryDate          String?  @map("cert_expiry_date")
+  yearsInBusiness         String?  @map("years_in_business")
+  factoryType             String?  @map("factory_type")
+  paymentTerms            String?  @map("payment_terms")
+  incoterms               String?
+  leadTime                String?  @map("lead_time")
+  portOfLoading           String?  @map("port_of_loading")
+  packagingType           String?  @map("packaging_type")
+  privateLabelAvailable   String?  @map("private_label_available")
+  complianceDocsAvailable String?  @map("compliance_docs_available")
+  leadSource              String?  @map("lead_source")
+  riskScore               String?  @map("risk_score")
+  dueDiligenceStatus      String?  @map("due_diligence_status")
+  lastContactDate         String?  @map("last_contact_date")
+  followUpRequired        String?  @map("follow_up_required")
+  followUpDate            String?  @map("follow_up_date")
+  internalNotes           String?  @map("internal_notes")
+  contractSigned          String?  @map("contract_signed")
+  contractDate            String?  @map("contract_date")
+  performanceRating       String?  @map("performance_rating")
+  blacklisted             String?
+  sourceSheet             String?  @map("source_sheet")
+  yearFirstAdded          String?  @map("year_first_added")
+  yearLog                 Json?    @map("year_log")
 
   @@map("old_suppliers")
 }

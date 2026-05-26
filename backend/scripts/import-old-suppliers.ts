@@ -1,86 +1,132 @@
-import { neon } from "@neondatabase/serverless";
+import { PrismaClient, Prisma } from "@prisma/client";
 import fs from "fs";
+import readline from "readline";
 import csv from "csv-parser";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const sql = neon(process.env.DATABASE_URL!);
+const dbUrl = process.env.DATABASE_URL!;
+const separator = dbUrl.includes("?") ? "&" : "?";
+const prisma = new PrismaClient({
+  datasources: {
+    db: { url: dbUrl + separator + "connection_limit=2&pool_timeout=120" },
+  },
+});
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COLUMN ALIASES
-//
-// Each key is the db field. The array lists every possible column header
-// that could represent that field across different sheets.
-// When you add a new sheet with yet another header name, just append it here.
-// Matching is case-insensitive and ignores extra spaces.
-// ─────────────────────────────────────────────────────────────────────────────
+const BATCH_SIZE = 50;
+
 const COLUMN_ALIASES: Record<string, string[]> = {
-  company: ["Company Name", "Company", "Supplier Name", "Supplier", "Organization"],
-  productCategory: ["Product Category", "Category"],
-  product: ["Product", "Product Name", "Products", "Products dealing with", "Items"],
-  country: ["Country", "Country Name", "Location", "Region"],
-  accountManager: ["Account Manager", "Manager"],
-  currentStatus: ["Current Status", "Status"],
-  certifications: ["Certifications", "Certification"],
-  latestQuotation: ["Latest Quotation", "Quotation"],
-  reasonInactive: ["Reason Inactive", "Reason"],
-  dateMarkedInactive: ["Date Marked Inactive", "Date Inactive"],
-  reactivationPotential: ["Reactivation Potential", "Potential"],
-  notes: ["Notes", "Note", "Remark", "Remarks", "Comments", "COMMENTS"],
+  supplierExternalId:      ["Supplier ID"],
+  company:                 ["Company Name", "Company", "Supplier Name", "Supplier", "Organization"],
+  productCategory:         ["Product Category", "Category"],
+  product:                 ["Product", "Product Name", "Products", "Products dealing with", "Items"],
+  country:                 ["Country", "Country Name", "Location", "Region"],
+  city:                    ["City"],
+  companyAddress:          ["Full Address", "Company Address", "Address"],
+  website:                 ["Website"],
+  yearFirstAdded:          ["Year First Added", "Year"],
+  sourceSheet:             ["Source Sheet"],
+  currentStatus:           ["Current Status", "Status"],
+  contactPerson:           ["Primary Contact Name", "Contact Person", "Contact Name"],
+  designation:             ["Designation"],
+  email:                   ["Email", "Email Id", "Primary Email"],
+  phone:                   ["Phone", "Phone Number", "Mobile"],
+  whatsapp:                ["WhatsApp", "Whatsapp Number"],
+  legalName:               ["Legal Name"],
+  secondaryContactName:    ["Secondary Contact Name"],
+  secondaryEmail:          ["Secondary Email"],
+  secondaryPhone:          ["Secondary Phone"],
+  accountManager:          ["Account Manager", "Manager"],
+  subCategory:             ["Sub-category", "Sub Category", "Subcategory"],
+  commodityType:           ["Commodity Type"],
+  productionCapacity:      ["Annual Production Capacity", "Production Capacity"],
+  moq:                     ["MOQ"],
+  priceRange:              ["Price Range"],
+  currency:                ["Currency"],
+  exportMarkets:           ["Export Markets"],
+  certifications:          ["Certifications", "Certification"],
+  certBody:                ["Cert Body", "Certification Body"],
+  certStatus:              ["Cert Status", "Certification Status"],
+  certExpiryDate:          ["Cert Expiry Date", "Certification Expiry"],
+  yearsInBusiness:         ["Years in Business"],
+  factoryType:             ["Factory Type"],
+  paymentTerms:            ["Payment Terms"],
+  incoterms:               ["Incoterms"],
+  leadTime:                ["Lead Time"],
+  portOfLoading:           ["Port of Loading"],
+  packagingType:           ["Packaging Type"],
+  privateLabelAvailable:   ["Private Label Available"],
+  complianceDocsAvailable: ["Compliance Documents Available"],
+  leadSource:              ["Lead Source"],
+  riskScore:               ["Risk Score"],
+  dueDiligenceStatus:      ["Due Diligence Status"],
+  lastContactDate:         ["Last Contact Date"],
+  followUpRequired:        ["Follow-up Required", "Follow Up Required"],
+  followUpDate:            ["Follow-up Date", "Follow Up Date"],
+  internalNotes:           ["Internal Notes"],
+  contractSigned:          ["Contract Signed"],
+  contractDate:            ["Contract Date"],
+  latestQuotation:         ["Latest Quotation", "Quotation"],
+  performanceRating:       ["Performance Rating"],
+  blacklisted:             ["Blacklisted"],
+  reasonInactive:          ["Reason Inactive", "Reason"],
+  dateMarkedInactive:      ["Date Marked Inactive", "Date Inactive"],
+  reactivationPotential:   ["Reactivation Potential", "Potential"],
+  notes:                   ["Notes", "Note", "Remark", "Remarks", "Comments", "COMMENTS"],
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Detects which actual CSV header maps to which db field.
-// Returns a map like: { company: "Company Name", email: "Email Id", ... }
-// Fields missing from the sheet are simply omitted (treated as null on insert).
-// ─────────────────────────────────────────────────────────────────────────────
 function detectColumns(csvHeaders: string[]): Record<string, string> {
   const normalise = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
   const normalisedHeaders = csvHeaders.map(normalise);
-
   const detected: Record<string, string> = {};
-
   for (const [dbField, aliases] of Object.entries(COLUMN_ALIASES)) {
     for (const alias of aliases) {
       const idx = normalisedHeaders.indexOf(normalise(alias));
       if (idx !== -1) {
-        detected[dbField] = csvHeaders[idx]; // store the original casing
+        detected[dbField] = csvHeaders[idx];
         break;
       }
     }
   }
-
   return detected;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Parses a CSV file and extracts only the 6 fields we care about.
-// Rows without a company name are skipped.
-// ─────────────────────────────────────────────────────────────────────────────
-async function parseCSV(
-  filePath: string
-): Promise<Record<string, string | null>[]> {
+function detectSkipLines(filePath: string): Promise<number> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: fs.createReadStream(filePath), crlfDelay: Infinity });
+    let lineNum = 0;
+    let resolved = false;
+    rl.on("line", (line: string) => {
+      if (!resolved && line.toLowerCase().includes("company name")) {
+        resolved = true;
+        rl.close();
+        resolve(lineNum);
+      }
+      lineNum++;
+    });
+    rl.on("close", () => { if (!resolved) resolve(0); });
+  });
+}
+
+async function parseCSV(filePath: string): Promise<Record<string, string | null>[]> {
+  const skipLines = await detectSkipLines(filePath);
+  console.log(`  ℹ️  Auto-detected ${skipLines} line(s) to skip before header row.`);
+
   const allRows: Record<string, string>[] = [];
   let detectedColumns: Record<string, string> = {};
 
   await new Promise<void>((resolve, reject) => {
     fs.createReadStream(filePath)
-      .pipe(csv({ skipLines: 1 }))
+      .pipe(csv({ skipLines }))
       .on("headers", (headers: string[]) => {
         detectedColumns = detectColumns(headers);
-
-        console.log("📋 Detected column mapping:");
+        console.log("📋 Column mapping detected:");
         for (const [dbField, csvHeader] of Object.entries(detectedColumns)) {
-          console.log(`  ${dbField.padEnd(10)} ← "${csvHeader}"`);
+          console.log(`  ${dbField.padEnd(24)} ← "${csvHeader}"`);
         }
-
-        const missing = Object.keys(COLUMN_ALIASES).filter(
-          (f) => !detectedColumns[f]
-        );
-        if (missing.length) {
-          console.log(`  ⚠️  Not found in this sheet (will be null): ${missing.join(", ")}`);
-        }
+        const missing = Object.keys(COLUMN_ALIASES).filter((f) => !detectedColumns[f]);
+        if (missing.length) console.log(`  ⚠️  Not found (will be null): ${missing.join(", ")}`);
         console.log();
       })
       .on("data", (row: Record<string, string>) => allRows.push(row))
@@ -89,140 +135,173 @@ async function parseCSV(
   });
 
   const suppliers: Record<string, string | null>[] = [];
-
   for (const row of allRows) {
     const companyCol = detectedColumns["company"];
     const companyValue = companyCol ? row[companyCol]?.trim() : null;
-
-    // Skip rows with no company name (section headers, empty rows, etc.)
     if (!companyValue) continue;
-
     const supplier: Record<string, string | null> = {};
-
     for (const dbField of Object.keys(COLUMN_ALIASES)) {
       const csvHeader = detectedColumns[dbField];
       supplier[dbField] = csvHeader ? row[csvHeader]?.trim() || null : null;
     }
-
     suppliers.push(supplier);
   }
-
   return suppliers;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Inserts suppliers into old_suppliers. Safe to re-run (ON CONFLICT = upsert).
-// ─────────────────────────────────────────────────────────────────────────────
+function buildRecord(row: Record<string, string | null>, id: string): Prisma.OldSupplierCreateInput {
+  const v = (f: string) => row[f] ?? undefined;
+  return {
+    id,
+    company:                 row.company!,
+    productCategory:         v("productCategory"),
+    product:                 v("product"),
+    country:                 v("country"),
+    city:                    v("city"),
+    companyAddress:          v("companyAddress"),
+    website:                 v("website"),
+    yearFirstAdded:          v("yearFirstAdded"),
+    sourceSheet:             v("sourceSheet"),
+    currentStatus:           v("currentStatus"),
+    contactPerson:           v("contactPerson"),
+    designation:             v("designation"),
+    email:                   v("email"),
+    phone:                   v("phone"),
+    whatsapp:                v("whatsapp"),
+    legalName:               v("legalName"),
+    secondaryContactName:    v("secondaryContactName"),
+    secondaryEmail:          v("secondaryEmail"),
+    secondaryPhone:          v("secondaryPhone"),
+    accountManager:          v("accountManager"),
+    subCategory:             v("subCategory"),
+    commodityType:           v("commodityType"),
+    productionCapacity:      v("productionCapacity"),
+    moq:                     v("moq"),
+    priceRange:              v("priceRange"),
+    currency:                v("currency"),
+    exportMarkets:           v("exportMarkets"),
+    certifications:          v("certifications"),
+    certBody:                v("certBody"),
+    certStatus:              v("certStatus"),
+    certExpiryDate:          v("certExpiryDate"),
+    yearsInBusiness:         v("yearsInBusiness"),
+    factoryType:             v("factoryType"),
+    paymentTerms:            v("paymentTerms"),
+    incoterms:               v("incoterms"),
+    leadTime:                v("leadTime"),
+    portOfLoading:           v("portOfLoading"),
+    packagingType:           v("packagingType"),
+    privateLabelAvailable:   v("privateLabelAvailable"),
+    complianceDocsAvailable: v("complianceDocsAvailable"),
+    leadSource:              v("leadSource"),
+    riskScore:               v("riskScore"),
+    dueDiligenceStatus:      v("dueDiligenceStatus"),
+    lastContactDate:         v("lastContactDate"),
+    followUpRequired:        v("followUpRequired"),
+    followUpDate:            v("followUpDate"),
+    internalNotes:           v("internalNotes"),
+    contractSigned:          v("contractSigned"),
+    contractDate:            v("contractDate"),
+    latestQuotation:         v("latestQuotation"),
+    performanceRating:       v("performanceRating"),
+    blacklisted:             v("blacklisted"),
+    reasonInactive:          v("reasonInactive"),
+    dateMarkedInactive:      v("dateMarkedInactive"),
+    reactivationPotential:   v("reactivationPotential"),
+    notes:                   v("notes"),
+    supplierExternalId:      v("supplierExternalId"),
+    createdBy:               process.env.CREATED_BY_USER_ID ?? undefined,
+  };
+}
+
 async function importSuppliers(
   suppliers: Record<string, string | null>[],
   startCounter = 1
 ) {
-  console.log(`📦 Importing ${suppliers.length} suppliers...\n`);
+  console.log(`📦 Importing ${suppliers.length} suppliers in batches of ${BATCH_SIZE}...\n`);
   let counter = startCounter;
 
-  for (const row of suppliers) {
-    const id = `old_sup_${String(counter).padStart(3, "0")}`;
-    counter++;
+  // Split into batches
+  for (let i = 0; i < suppliers.length; i += BATCH_SIZE) {
+    const batch = suppliers.slice(i, i + BATCH_SIZE);
 
-    await sql`
-      INSERT INTO old_suppliers (
-        id,
-        company,
-        product_category,
-        product,
-        country,
-        account_manager,
-        current_status,
-        certifications,
-        latest_quotation,
-        reason_inactive,
-        date_marked_inactive,
-        reactivation_potential,
-        notes,
-        created_by,
-        updated_at
-      ) VALUES (
-        ${id},
-        ${row.company},
-        ${row.productCategory},
-        ${row.product},
-        ${row.country},
-        ${row.accountManager},
-        ${row.currentStatus},
-        ${row.certifications},
-        ${row.latestQuotation},
-        ${row.reasonInactive},
-        ${row.dateMarkedInactive},
-        ${row.reactivationPotential},
-        ${row.notes},
-        ${process.env.CREATED_BY_USER_ID ?? null},
-        CURRENT_TIMESTAMP
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        company                = EXCLUDED.company,
-        product_category       = EXCLUDED.product_category,
-        product                = EXCLUDED.product,
-        country                = EXCLUDED.country,
-        account_manager        = EXCLUDED.account_manager,
-        current_status         = EXCLUDED.current_status,
-        certifications         = EXCLUDED.certifications,
-        latest_quotation       = EXCLUDED.latest_quotation,
-        reason_inactive        = EXCLUDED.reason_inactive,
-        date_marked_inactive   = EXCLUDED.date_marked_inactive,
-        reactivation_potential = EXCLUDED.reactivation_potential,
-        notes                  = EXCLUDED.notes,
-        updated_at             = CURRENT_TIMESTAMP
-    `;
+    const ops = batch.map((row) => {
+      const id = `old_sup_${String(counter).padStart(5, "0")}`;
+      counter++;
+      const data = buildRecord(row, id);
+      return prisma.oldSupplier.upsert({
+        where: { id },
+        create: data,
+        update: { ...data, id: undefined },
+      });
+    });
 
-    console.log(`  ✅  [${id}] ${row.company}`);
+    // Retry once on transient connection errors
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await prisma.$transaction(ops);
+        break;
+      } catch (err: any) {
+        if (attempt < 3 && (err.code === "P1017" || err.code === "P2024")) {
+          console.log(`  ⚠️  Connection error on batch ${Math.ceil(i / BATCH_SIZE) + 1}, retrying (${attempt}/3)...`);
+          await prisma.$disconnect();
+          await new Promise((r) => setTimeout(r, 2000 * attempt));
+          await prisma.$connect();
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    const lastId = `old_sup_${String(counter - 1).padStart(5, "0")}`;
+    const lastCompany = batch[batch.length - 1].company;
+    console.log(`  ✅  Batch ${String(Math.ceil((i + 1) / BATCH_SIZE)).padStart(4)} | up to [${lastId}] ${lastCompany}`);
   }
 
+  const finalId = `old_sup_${String(counter - 1).padStart(5, "0")}`;
+  console.log(`\n  ✅  Done — last id: ${finalId}`);
   return counter;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Entry point
-//
-// Usage:
-//   npx tsx scripts/import-old-suppliers.ts ./scripts/your-file.csv
-//   npx tsx scripts/import-old-suppliers.ts ./scripts/sheet1.csv ./scripts/sheet2.csv
-//
-// Multiple files are processed in order; IDs continue from where the last
-// file left off (e.g. old_sup_001 … old_sup_045 across two files).
-// ─────────────────────────────────────────────────────────────────────────────
 async function run() {
   const files = process.argv.slice(2);
-
   if (files.length === 0) {
-    console.error(
-      "❌  No CSV files provided.\n" +
-      "Usage: npx tsx scripts/import-old-suppliers.ts <file1.csv> [file2.csv ...]"
-    );
+    console.error("❌  No CSV files provided.\nUsage: npx tsx scripts/import-old-suppliers.ts <file1.csv> [file2.csv ...]");
     process.exit(1);
   }
 
+  const existing = await prisma.$queryRaw<{ max_num: number }[]>`
+    SELECT MAX(CAST(SUBSTRING(id FROM 9) AS INTEGER)) AS max_num
+    FROM old_suppliers
+    WHERE id LIKE 'old_sup_%'
+    AND SUBSTRING(id FROM 9) ~ '^[0-9]+$'
+  `;
   let counter = 1;
+  if (existing.length > 0 && existing[0].max_num) {
+    counter = existing[0].max_num + 1;
+    console.log(`ℹ️  Resuming from counter: ${counter} (last numeric id: ${existing[0].max_num})\n`);
+  }
 
   for (const filePath of files) {
     if (!fs.existsSync(filePath)) {
       console.error(`❌  File not found: ${filePath}`);
       process.exit(1);
     }
-
     console.log(`\n${"─".repeat(60)}`);
     console.log(`📂 Processing: ${filePath}`);
     console.log("─".repeat(60));
 
     const suppliers = await parseCSV(filePath);
     console.log(`📋 Found ${suppliers.length} suppliers in this sheet.\n`);
-
     counter = await importSuppliers(suppliers, counter);
   }
 
+  await prisma.$disconnect();
   console.log("\n🚀 All imports complete!");
 }
 
-run().catch((err) => {
+run().catch(async (err) => {
   console.error("❌ Import failed:", err);
+  await prisma.$disconnect();
   process.exit(1);
 });
