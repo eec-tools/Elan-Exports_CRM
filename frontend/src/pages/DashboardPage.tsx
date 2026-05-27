@@ -339,6 +339,7 @@ export default function DashboardPage() {
     pendingTasks: stats.pendingTasks ?? 0,
     taskAnalytics: stats.taskAnalytics ?? [],
     recentDeals: stats.recentDeals ?? [],
+    invalidSourcingEmails: stats.invalidSourcingEmails ?? 0,
   };
 
   const dueCampaigns = dueCampaignsRaw?.slice(0, 5) ?? [];
