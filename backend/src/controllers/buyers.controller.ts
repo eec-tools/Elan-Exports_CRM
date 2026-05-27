@@ -628,8 +628,31 @@ export async function deleteBuyer(
 }
 
 /**
+ * GET /api/buyers/upload-signature
+ * Returns a signed Cloudinary upload params for direct browser-to-Cloudinary uploads
+ */
+export function getBuyerUploadSignature(
+  _req: AuthRequest,
+  res: Response,
+): void {
+  const timestamp = Math.round(Date.now() / 1000);
+  const params = { folder: "elan-buyers", timestamp };
+  const signature = cloudinary.utils.api_sign_request(
+    params,
+    process.env.CLOUDINARY_API_SECRET!,
+  );
+  res.json({
+    signature,
+    timestamp,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    folder: "elan-buyers",
+  });
+}
+
+/**
  * POST /api/buyers/:id/documents
- * Upload a document (NDA, contract, compliance doc, etc.) to a buyer record
+ * Save a pre-uploaded Cloudinary document URL to a buyer record
  */
 export async function uploadBuyerDocument(
   req: AuthRequest,
@@ -642,19 +665,16 @@ export async function uploadBuyerDocument(
       return;
     }
 
-    const file = req.file as any;
-    if (!file) {
-      res.status(400).json({ error: "No file uploaded" });
+    const { url, name, documentType = "Other" } = req.body;
+    if (!url) {
+      res.status(400).json({ error: "No file URL provided" });
       return;
     }
 
-    const { documentType = "Other" } = req.body;
-    const fileUrl: string = file.path || file.secure_url || file.url;
-
     const newDoc = {
       id: crypto.randomUUID(),
-      name: file.originalname || file.filename || "document",
-      url: fileUrl,
+      name: name || "document",
+      url,
       documentType,
       uploadedAt: new Date().toISOString(),
       uploadedBy: req.user!.fullName || req.user!.email,

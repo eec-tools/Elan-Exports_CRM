@@ -13,6 +13,7 @@ import {
   uploadBuyerFile,
   uploadBuyerDocument,
   deleteBuyerDocument,
+  getBuyerUploadSignature,
 } from "../controllers/buyers.controller.js";
 import {
   authenticate,
@@ -30,12 +31,13 @@ router.get("/list", listBuyersForDropdown);
 router.get("/stats", getBuyerStats);
 router.get("/cr-products", getCrProducts);
 router.get("/export/csv", exportBuyersCsv);
+router.get("/upload-signature", requireEdit("buyers"), getBuyerUploadSignature);
 router.get("/:id", getBuyer);
 
 // Write operations require edit access
 router.post("/upload", requireEdit("buyers"), uploadBuyerFile.single("file"), uploadBuyerCatalog);
 router.post("/", requireEdit("buyers"), createBuyer);
-router.post("/:id/documents", requireEdit("buyers"), uploadBuyerFile.single("file"), uploadBuyerDocument);
+router.post("/:id/documents", requireEdit("buyers"), uploadBuyerDocument);
 router.put("/:id", requireEdit("buyers"), updateBuyer);
 router.delete("/:id/documents/:docId", requireEdit("buyers"), deleteBuyerDocument);
 router.delete("/:id", requireEdit("buyers"), deleteBuyer);

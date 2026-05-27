@@ -397,11 +397,27 @@ export default function BuyerDetailsPage() {
 
   const uploadDocMutation = useMutation({
     mutationFn: async ({ file, documentType }: { file: File; documentType: string }) => {
+      const { data: sig } = await api.get("/buyers/upload-signature");
+      const isRaw =
+        /\.(pdf|doc|docx|xls|xlsx|csv|zip)$/i.test(file.name) ||
+        file.type === "application/pdf";
+      const resourceType = isRaw ? "raw" : "auto";
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("documentType", documentType);
-      const res = await api.post(`/buyers/${id}/documents`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
+      fd.append("signature", sig.signature);
+      fd.append("timestamp", String(sig.timestamp));
+      fd.append("api_key", sig.apiKey);
+      fd.append("folder", sig.folder);
+      const cloudRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${sig.cloudName}/${resourceType}/upload`,
+        { method: "POST", body: fd },
+      );
+      const cloudData = await cloudRes.json();
+      if (!cloudData.secure_url) throw new Error("Upload failed");
+      const res = await api.post(`/buyers/${id}/documents`, {
+        url: cloudData.secure_url,
+        name: file.name,
+        documentType,
       });
       return res.data;
     },
@@ -520,13 +536,30 @@ export default function BuyerDetailsPage() {
       try {
         await updateMutation.mutateAsync({ id: buyer.id, d: { ...form, productCatalog: catalogUrl, quotations: finalQuotations } as any });
         if (pendingDocFiles.length > 0) {
+          const { data: sig } = await api.get("/buyers/upload-signature");
           for (const { file, docType: dt } of pendingDocFiles) {
+            const isRaw =
+              /\.(pdf|doc|docx|xls|xlsx|csv|zip)$/i.test(file.name) ||
+              file.type === "application/pdf";
+            const resourceType = isRaw ? "raw" : "auto";
             const fd = new FormData();
             fd.append("file", file);
-            fd.append("documentType", dt);
-            await api.post(`/buyers/${buyer.id}/documents`, fd, {
-              headers: { "Content-Type": "multipart/form-data" },
-            });
+            fd.append("signature", sig.signature);
+            fd.append("timestamp", String(sig.timestamp));
+            fd.append("api_key", sig.apiKey);
+            fd.append("folder", sig.folder);
+            const cloudRes = await fetch(
+              `https://api.cloudinary.com/v1_1/${sig.cloudName}/${resourceType}/upload`,
+              { method: "POST", body: fd },
+            );
+            const cloudData = await cloudRes.json();
+            if (cloudData.secure_url) {
+              await api.post(`/buyers/${buyer.id}/documents`, {
+                url: cloudData.secure_url,
+                name: file.name,
+                documentType: dt,
+              });
+            }
           }
           queryClient.invalidateQueries({ queryKey: ["buyer", id] });
           setPendingDocFiles([]);
