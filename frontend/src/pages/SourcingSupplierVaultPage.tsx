@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
+import * as XLSX from "xlsx";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -30,6 +31,8 @@ import {
   Tag,
   Database,
   Box,
+  Upload,
+  FileDown,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/client";
@@ -1037,6 +1040,70 @@ function BulkAddDialog({
   const [addingToList, setAddingToList] = useState(false);
   const [confirmSendOpen, setConfirmSendOpen] = useState(false);
   const [pendingRows, setPendingRows] = useState<BulkRow[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleDownloadTemplate() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["Company Name", "Email", "Phone", "Contact Person", "Country", "Product", "Notes"],
+    ]);
+    ws["!cols"] = [
+      { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 30 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Suppliers");
+    XLSX.writeFile(wb, "supplier_import_template.xlsx");
+  }
+
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const wb = XLSX.read(evt.target?.result, { type: "binary" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        if (raw.length < 2) { toast.error("File has no data rows"); return; }
+
+        const headers = (raw[0] as string[]).map((h) => String(h ?? "").toLowerCase().trim());
+        const colMap: Record<number, keyof BulkRow> = {};
+        headers.forEach((h, i) => {
+          if (h.includes("company"))                          colMap[i] = "company";
+          else if (h.includes("email"))                      colMap[i] = "email";
+          else if (h.includes("phone") || h.includes("mobile")) colMap[i] = "phone";
+          else if (h.includes("contact"))                    colMap[i] = "contactPerson";
+          else if (h.includes("country"))                    colMap[i] = "country";
+          else if (h.includes("product"))                    colMap[i] = "product";
+          else if (h.includes("note") || h.includes("remark")) colMap[i] = "notes";
+        });
+
+        const parsed: BulkRow[] = raw
+          .slice(1)
+          .filter((row) => row.some((c) => String(c).trim()))
+          .map((row) => {
+            const r = emptyBulkRow();
+            Object.entries(colMap).forEach(([ci, key]) => {
+              const val = row[Number(ci)];
+              if (val != null) r[key] = String(val).trim();
+            });
+            return r;
+          });
+
+        if (parsed.length === 0) { toast.error("No valid rows found in file"); return; }
+
+        const padded = parsed.length < 5
+          ? [...parsed, ...Array.from({ length: 5 - parsed.length }, emptyBulkRow)]
+          : parsed;
+        setRows(padded);
+        setErrors(new Set());
+        toast.success(`Imported ${parsed.length} row${parsed.length !== 1 ? "s" : ""} from file`);
+      } catch {
+        toast.error("Failed to read file — make sure it's a valid Excel or CSV file");
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = "";
+  }
 
   const { data: gmailAccounts = [] } = useQuery<GmailAccount[]>({
     queryKey: ["gmail-accounts"],
@@ -1266,8 +1333,7 @@ function BulkAddDialog({
         <DialogHeader>
           <DialogTitle>Add Suppliers to "{folder.name}"</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Fill in rows or paste a table from SpreadSheets — columns auto-fill
-            on paste.
+            Fill in rows, paste from SpreadSheets, or import an Excel / CSV file.
           </p>
         </DialogHeader>
 
@@ -1340,6 +1406,38 @@ function BulkAddDialog({
 
           <span className="text-xs text-muted-foreground ml-auto">
             Used only when sending emails
+          </span>
+        </div>
+
+        {/* Import / Template buttons */}
+        <div className="flex items-center gap-2 py-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadTemplate}
+          >
+            <FileDown className="h-4 w-4 mr-1.5" />
+            Download Template
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="h-4 w-4 mr-1.5" />
+            Import Excel / CSV
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <span className="text-xs text-muted-foreground ml-1">
+            Download the template first, fill it in, then import.
           </span>
         </div>
 
