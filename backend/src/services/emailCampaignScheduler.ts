@@ -4,6 +4,9 @@ import { sendFollowupReminderEmail } from "./mailer.js";
 import { createNotification } from "./notificationService.js";
 import { executeSendStep } from "../controllers/sourcingEmailCampaign.controller.js";
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
+
 function endOfDay(date: Date): Date {
   const d = new Date(date);
   d.setHours(23, 59, 59, 999);
@@ -112,13 +115,17 @@ async function autoSendDueFollowups() {
     if (dueCampaigns.length === 0) return;
 
     let sent = 0;
-    for (const campaign of dueCampaigns) {
+    for (let i = 0; i < dueCampaigns.length; i++) {
+      const campaign = dueCampaigns[i];
       if (!campaign.sourcingSupplier.assignedGmailAccount) continue;
       try {
         await executeSendStep(campaign.sourcingId);
         sent++;
       } catch (err) {
         console.error(`[EmailCampaignScheduler] Failed to auto-send for ${campaign.sourcingSupplier.company}:`, err);
+      }
+      if (i < dueCampaigns.length - 1) {
+        await sleep(EMAIL_SEND_DELAY_MS);
       }
     }
 

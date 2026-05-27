@@ -5,6 +5,9 @@ import { AuthRequest } from "../types/index.js";
 import { startCampaignForSupplier } from "./sourcingEmailCampaign.controller.js";
 import { generateShortCode } from "../utils/shortCode.js";
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
+
 /**
  * GET /api/sourcing-vault
  * Returns all vault folders, each enriched with a SourcingVaultSupplier count.
@@ -323,24 +326,31 @@ export async function sendBulkEmail(
 
     const createdSuppliers = pairs.map((p) => p.supplier).filter(Boolean);
 
-    let emailsSent = 0;
-    for (const { vaultId, supplier } of pairs) {
-      if (!supplier) continue;
-      let campaignStarted = false;
-      if (supplier.assignedGmailAccount && supplier.email) {
-        campaignStarted = await startCampaignForSupplier(supplier.id, req.user?.id);
-        if (campaignStarted) emailsSent++;
-      }
-      // Mark vault "Sent" only when email went out, or when no campaign was expected.
-      if (campaignStarted || !supplier.assignedGmailAccount || !supplier.email) {
-        await (prisma as any).sourcingVaultSupplier.update({
-          where: { id: vaultId },
-          data: { emailStatus: "Sent" },
-        });
-      }
-    }
+    // Respond immediately so the UI is not blocked — emails are sent in the background
+    res.status(201).json({ added: createdSuppliers.length, sending: true });
 
-    res.status(201).json({ added: createdSuppliers.length, emailsSent });
+    const userId = req.user?.id;
+    (async () => {
+      for (let i = 0; i < pairs.length; i++) {
+        const { vaultId, supplier } = pairs[i];
+        if (!supplier) continue;
+        let campaignStarted = false;
+        if (supplier.assignedGmailAccount && supplier.email) {
+          campaignStarted = await startCampaignForSupplier(supplier.id, userId);
+        }
+        // Mark vault "Sent" only when email went out, or when no campaign was expected.
+        if (campaignStarted || !supplier.assignedGmailAccount || !supplier.email) {
+          await (prisma as any).sourcingVaultSupplier.update({
+            where: { id: vaultId },
+            data: { emailStatus: "Sent" },
+          });
+        }
+        if (campaignStarted && i < pairs.length - 1) {
+          await sleep(EMAIL_SEND_DELAY_MS);
+        }
+      }
+      console.log(`[sendBulkEmail] Background send complete for folder ${folderId}`);
+    })().catch((err) => console.error("[sendBulkEmail] Background send error:", err));
   } catch (err) {
     console.error("Send bulk email error:", err);
     res.status(500).json({ error: "Internal server error" });

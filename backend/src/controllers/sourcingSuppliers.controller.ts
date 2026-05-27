@@ -6,6 +6,9 @@ import { createNotification } from "../services/notificationService.js";
 import { startCampaignForSupplier } from "./sourcingEmailCampaign.controller.js";
 import { generateShortCode } from "../utils/shortCode.js";
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
+
 const SOURCING_FIELDS = [
   "company",
   "productCategory",
@@ -738,31 +741,38 @@ export async function addFromVaultFolder(
       return created;
     });
 
-    let emailsSent = 0;
-    for (const supplier of createdSuppliers) {
-      let campaignStarted = false;
-      if (supplier.assignedGmailAccount && supplier.email) {
-        campaignStarted = await startCampaignForSupplier(supplier.id, req.user?.id);
-        if (campaignStarted) emailsSent++;
-      }
-      // Mark vault supplier "Sent" only when the email was actually sent,
-      // or when no Gmail account was assigned (intentionally added without a campaign).
-      if (campaignStarted || !supplier.assignedGmailAccount || !supplier.email) {
-        const vaultId = vaultIdByCompany.get(supplier.company);
-        if (vaultId) {
-          await (prisma as any).sourcingVaultSupplier.update({
-            where: { id: vaultId },
-            data: { emailStatus: "Sent" },
-          });
-        }
-      }
-    }
-
+    // Respond immediately so the UI is not blocked — emails are sent in the background
     res.status(201).json({
       added: createdSuppliers.length,
-      emailsSent,
+      sending: true,
       suppliers: createdSuppliers.map((s: any) => ({ company: s.company, formToken: s.formToken })),
     });
+
+    const userId = req.user?.id;
+    (async () => {
+      for (let i = 0; i < createdSuppliers.length; i++) {
+        const supplier = createdSuppliers[i];
+        let campaignStarted = false;
+        if (supplier.assignedGmailAccount && supplier.email) {
+          campaignStarted = await startCampaignForSupplier(supplier.id, userId);
+        }
+        // Mark vault supplier "Sent" only when the email was actually sent,
+        // or when no Gmail account was assigned (intentionally added without a campaign).
+        if (campaignStarted || !supplier.assignedGmailAccount || !supplier.email) {
+          const vaultId = vaultIdByCompany.get(supplier.company);
+          if (vaultId) {
+            await (prisma as any).sourcingVaultSupplier.update({
+              where: { id: vaultId },
+              data: { emailStatus: "Sent" },
+            });
+          }
+        }
+        if (campaignStarted && i < createdSuppliers.length - 1) {
+          await sleep(EMAIL_SEND_DELAY_MS);
+        }
+      }
+      console.log(`[addFromVaultFolder] Background send complete`);
+    })().catch((err) => console.error("[addFromVaultFolder] Background send error:", err));
   } catch (err) {
     console.error("Add from vault folder error:", err);
     res.status(500).json({ error: "Internal server error" });
