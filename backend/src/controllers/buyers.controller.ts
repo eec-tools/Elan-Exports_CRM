@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { randomUUID } from "crypto";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
@@ -672,7 +673,7 @@ export async function uploadBuyerDocument(
     }
 
     const newDoc = {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       name: name || "document",
       url,
       documentType,
