@@ -83,6 +83,7 @@ interface Stats {
   responseReceived: number;
   converted: number;
   noResponse: number;
+  invalidEmails: number;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
@@ -111,6 +112,7 @@ const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
   },
   // 'converted' is a legacy alias — same display as converted_to_new
   converted: { label: "Converted", class: "bg-purple-100 text-purple-700" },
+  invalid: { label: "Invalid Email", class: "bg-rose-100 text-rose-700" },
 };
 
 // Deduplicated status options for the filter dropdown
@@ -123,6 +125,7 @@ const STATUS_FILTER_OPTIONS = [
   { value: "response_received", label: "Responded" },
   { value: "no_response", label: "No Response" },
   { value: "converted_to_new", label: "Converted" },
+  { value: "invalid", label: "Invalid Email" },
 ];
 
 export default function SourcingSupplierPage() {
@@ -525,7 +528,7 @@ export default function SourcingSupplierPage() {
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
           {[
             { label: "Total", value: stats.total, color: "text-slate-700" },
             {
@@ -547,6 +550,11 @@ export default function SourcingSupplierPage() {
               label: "No Response",
               value: stats.noResponse,
               color: "text-red-700",
+            },
+            {
+              label: "Invalid Emails",
+              value: stats.invalidEmails ?? 0,
+              color: "text-rose-700",
             },
           ].map((s) => (
             <div

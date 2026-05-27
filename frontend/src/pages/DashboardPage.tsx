@@ -63,6 +63,7 @@ interface DashboardStats {
   pendingTasks: number;
   taskAnalytics: TaskAnalyticsOwner[];
   recentDeals: RecentDeal[];
+  invalidSourcingEmails: number;
 }
 
 interface TaskAnalyticsOwner {
@@ -585,7 +586,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Secondary stats row ──────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
           {[
             { label: "Vault Docs", value: s.totalVaultDocs.toString(), sub: "Documents stored", alert: false },
             { label: "Reports", value: s.totalReports.toString(), sub: "Report records", alert: false },
@@ -593,6 +594,7 @@ export default function DashboardPage() {
             { label: "Follow-ups Due", value: (dueCampaignsRaw?.length ?? 0).toString(), sub: "Email campaigns", alert: (dueCampaignsRaw?.length ?? 0) > 0 },
             { label: "Active Suppliers", value: supplierHealth.active.toString(), sub: "Supplier health", alert: false },
             { label: "Team Members", value: s.activeUsers.toString(), sub: "Active users", alert: false },
+            { label: "Invalid Emails", value: (s.invalidSourcingEmails ?? 0).toString(), sub: "Bounced / undelivered", alert: (s.invalidSourcingEmails ?? 0) > 0 },
           ].map((stat) => (
             <div
               key={stat.label}

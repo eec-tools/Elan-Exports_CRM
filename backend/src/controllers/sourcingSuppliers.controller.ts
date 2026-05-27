@@ -213,7 +213,7 @@ export async function getSourcingSupplierStats(
   res: Response,
 ): Promise<void> {
   try {
-    const [total, activeCampaigns, responseReceived, converted, noResponse] =
+    const [total, activeCampaigns, responseReceived, converted, noResponse, invalidEmails] =
       await Promise.all([
         (prisma as any).sourcingSupplier.count(),
         (prisma as any).sourcingEmailCampaign.count({
@@ -228,6 +228,9 @@ export async function getSourcingSupplierStats(
         (prisma as any).sourcingSupplier.count({
           where: { status: "no_response" },
         }),
+        (prisma as any).sourcingSupplier.count({
+          where: { status: "invalid" },
+        }),
       ]);
     res.json({
       total,
@@ -235,6 +238,7 @@ export async function getSourcingSupplierStats(
       responseReceived,
       converted,
       noResponse,
+      invalidEmails,
     });
   } catch (err) {
     console.error("Sourcing supplier stats error:", err);

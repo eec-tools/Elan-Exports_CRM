@@ -146,6 +146,38 @@ function isAutoReplyMessage(headers: Array<{ name?: string | null; value?: strin
   return false;
 }
 
+const DELIVERY_FAILURE_SENDER_PATTERNS = [
+  "mailer-daemon",
+  "postmaster",
+  "bounce+",
+  "bounce@",
+  "delivery-status",
+  "delivery+",
+];
+
+const DELIVERY_FAILURE_SUBJECT_PATTERNS = [
+  "undeliverable",
+  "delivery failed",
+  "delivery status notification",
+  "mail delivery failed",
+  "failure notice",
+  "returned mail",
+  "delivery failure",
+];
+
+export function isDeliveryFailure(
+  headers: Array<{ name?: string | null; value?: string | null }>
+): boolean {
+  const get = (name: string) =>
+    headers.find((h) => h.name?.toLowerCase() === name)?.value ?? "";
+  if (get("x-failed-recipients")) return true;
+  const from = get("from").toLowerCase();
+  if (DELIVERY_FAILURE_SENDER_PATTERNS.some((p) => from.includes(p))) return true;
+  const subject = get("subject").toLowerCase();
+  if (DELIVERY_FAILURE_SUBJECT_PATTERNS.some((p) => subject.includes(p))) return true;
+  return false;
+}
+
 export interface EmailReplyMessage {
   gmailMessageId: string;
   direction: "sent" | "received";
@@ -154,6 +186,7 @@ export interface EmailReplyMessage {
   subject?: string;
   body: string;
   receivedAt: Date;
+  isDeliveryFailure?: boolean;
 }
 
 function decodeBase64Body(data: string): string {
@@ -245,8 +278,23 @@ export async function fetchThreadReplies(params: {
 
       const from = getHeader("from");
 
-      // Skip bounces / delivery notifications / auto-replies regardless of direction
-      if (isAutoReplyMessage(headers)) continue;
+      // Skip auto-replies; surface delivery failures so callers can track bounced addresses
+      if (isAutoReplyMessage(headers)) {
+        if (isDeliveryFailure(headers)) {
+          const rawBody = extractTextBody(msg.payload);
+          result.push({
+            gmailMessageId: msg.id ?? "",
+            direction: "received",
+            fromEmail: getHeader("from"),
+            fromName: undefined,
+            subject: getHeader("subject") || undefined,
+            body: rawBody.slice(0, 2000),
+            receivedAt: msg.internalDate ? new Date(Number(msg.internalDate)) : new Date(),
+            isDeliveryFailure: true,
+          });
+        }
+        continue;
+      }
 
       const isSentByUs = from.toLowerCase().includes(ourEmail);
       const direction: "sent" | "received" = isSentByUs ? "sent" : "received";

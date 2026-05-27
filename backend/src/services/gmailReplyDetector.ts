@@ -12,9 +12,9 @@ async function syncThreadMessages(
     sourcingId: string,
     accountEmail: string,
     threadId: string,
-): Promise<boolean> {
+): Promise<{ hasReply: boolean; hasBounce: boolean }> {
     const messages = await fetchThreadReplies({ accountEmail, threadId });
-    if (messages.length === 0) return false;
+    if (messages.length === 0) return { hasReply: false, hasBounce: false };
 
     const existing = await (prisma as any).supplierEmailReply.findMany({
         where: { sourcingId },
@@ -38,8 +38,9 @@ async function syncThreadMessages(
         });
     }
 
-    // A "received" message anywhere in the thread means the supplier replied
-    return messages.some((m) => m.direction === "received");
+    const hasReply = messages.some((m) => m.direction === "received" && !m.isDeliveryFailure);
+    const hasBounce = messages.some((m) => m.isDeliveryFailure === true);
+    return { hasReply, hasBounce };
 }
 
 async function flagReplyReceived(sourcingId: string, company: string): Promise<void> {
@@ -62,6 +63,43 @@ async function flagReplyReceived(sourcingId: string, company: string): Promise<v
         type: "campaign_responded",
         title: "Supplier Replied — Action Required",
         message: `${company} replied to your email. Open their record and click "Convert" to move them to New Supplier.`,
+        entityType: "sourcing_supplier",
+        entityId: sourcingId,
+        entityName: company,
+        entityLink: `/suppliers/sourcing/${sourcingId}`,
+    });
+}
+
+async function flagDeliveryFailure(sourcingId: string, company: string): Promise<void> {
+    const supplier = await (prisma as any).sourcingSupplier.findUnique({
+        where: { id: sourcingId },
+        select: { status: true },
+    });
+    if (!supplier) return;
+
+    // Don't overwrite a positive terminal state
+    if (["response_received", "converted_to_new", "converted"].includes(supplier.status)) {
+        console.log(`[ReplyDetector] Skipping invalid flag for ${company} — already in state: ${supplier.status}`);
+        return;
+    }
+
+    await (prisma as any).$transaction([
+        (prisma as any).sourcingEmailCampaign.update({
+            where: { sourcingId },
+            data: { status: "completed", nextFollowupDue: null },
+        }),
+        (prisma as any).sourcingSupplier.update({
+            where: { id: sourcingId },
+            data: { status: "invalid" },
+        }),
+    ]);
+
+    console.log(`[ReplyDetector] Delivery failure detected for ${company} — marked as invalid`);
+
+    await createNotification({
+        type: "campaign_bounced",
+        title: "Invalid Email Address Detected",
+        message: `Email to ${company} bounced. Their email address may be invalid.`,
         entityType: "sourcing_supplier",
         entityId: sourcingId,
         entityName: company,
@@ -96,17 +134,21 @@ async function checkCampaignReplies() {
             if (!supplier.assignedGmailAccount || !campaign.gmailThreadId) continue;
 
             try {
-                const hasReply = await syncThreadMessages(
+                const { hasReply, hasBounce } = await syncThreadMessages(
                     campaign.sourcingId,
                     supplier.assignedGmailAccount,
                     campaign.gmailThreadId,
                 );
 
-                if (hasReply && campaign.status === "active") {
+                if (hasBounce && campaign.status === "active") {
+                    repliesFound++;
+                    console.log(`[ReplyDetector] Bounce detected from ${supplier.company} — marking invalid`);
+                    await flagDeliveryFailure(campaign.sourcingId, supplier.company);
+                } else if (hasReply && campaign.status === "active") {
                     repliesFound++;
                     console.log(`[ReplyDetector] Reply detected from ${supplier.company} — flagging`);
                     await flagReplyReceived(campaign.sourcingId, supplier.company);
-                } else if (!hasReply && campaign.status === "active") {
+                } else if (!hasReply && !hasBounce && campaign.status === "active") {
                     await (prisma as any).sourcingEmailCampaign.update({
                         where: { sourcingId: campaign.sourcingId },
                         data: { lastCheckedAt: now },
