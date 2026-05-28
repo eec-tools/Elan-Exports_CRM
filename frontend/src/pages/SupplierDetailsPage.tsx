@@ -560,7 +560,7 @@ export default function SupplierDetailsPage() {
     e.preventDefault();
     if (!form.company) return;
     if (!form.contactPerson?.trim()) {
-      toast.error("Contact Person is required before saving.");
+      toast.error("Account Manager is required before saving.");
       return;
     }
 
@@ -662,7 +662,7 @@ export default function SupplierDetailsPage() {
             {!supplier.contactPerson && (
               <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
                 <AlertTriangle className="h-3 w-3" />
-                No Contact Person
+                No Account Manager
               </Badge>
             )}
           </div>
@@ -716,7 +716,7 @@ export default function SupplierDetailsPage() {
           <CardContent className="space-y-1">
             <InfoRow
               icon={User}
-              label="Contact Person"
+              label="Account Manager"
               value={supplier.contactPerson}
             />
             <InfoRow
@@ -1670,9 +1670,9 @@ export default function SupplierDetailsPage() {
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Contact Details</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label className="flex items-center gap-1">Contact Person <span className="text-red-500">*</span></Label>
+                <Label className="flex items-center gap-1">Account Manager <span className="text-red-500">*</span></Label>
                 <Input value={form.contactPerson ?? ""} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} className={!form.contactPerson?.trim() ? "border-yellow-400 focus-visible:ring-yellow-300" : ""} placeholder="Required" />
-                {!form.contactPerson?.trim() && <p className="text-xs text-yellow-600">Contact name is required to save.</p>}
+                {!form.contactPerson?.trim() && <p className="text-xs text-yellow-600">Account Manager is required to save.</p>}
               </div>
               <div className="space-y-2"><Label>Role/Designation</Label><Input value={form.designation ?? ""} onChange={(e) => setForm({ ...form, designation: e.target.value })} placeholder="e.g., Sales Manager, Owner" /></div>
               <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>

@@ -2201,16 +2201,6 @@ export default function NewSupplierDetailsPage() {
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Contact Person Name</Label>
-                  <Input
-                    value={form.contactPerson ?? ""}
-                    onChange={(e) =>
-                      setForm({ ...form, contactPerson: e.target.value })
-                    }
-                    placeholder="e.g., Mr. John Doe"
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label>Account Manager</Label>
                   <Input
                     list="detail-list-manager"

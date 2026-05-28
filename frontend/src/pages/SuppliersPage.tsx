@@ -671,7 +671,7 @@ export default function SuppliersPage() {
               <tr>
                 <th className="px-5 py-3.5 font-semibold sticky left-0 z-30 bg-slate-50 shadow-[inset_-1px_0_0_0_#e2e8f0]">Company Name</th>
                 <th className="px-5 py-3.5 font-semibold">Country</th>
-                <th className="px-5 py-3.5 font-semibold">Contact Person</th>
+                <th className="px-5 py-3.5 font-semibold">Account Manager</th>
                 <th className="px-5 py-3.5 font-semibold">Email</th>
                 <th className="px-5 py-3.5 font-semibold">Products</th>
                 <th className="px-5 py-3.5 font-semibold">Certifications</th>
@@ -899,7 +899,7 @@ export default function SuppliersPage() {
             {/* ── Contact Details ── */}
             <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Contact Details</p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><Label>Contact Person</Label><Input value={form.contactPerson ?? ""} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Account Manager</Label><Input value={form.contactPerson ?? ""} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Role/Designation</Label><Input value={form.designation ?? ""} onChange={(e) => setForm({ ...form, designation: e.target.value })} placeholder="e.g., Sales Manager, Owner" /></div>
                 <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                 <div className="space-y-2"><Label>WhatsApp</Label><Input value={form.whatsapp ?? ""} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="With country code" /></div>
