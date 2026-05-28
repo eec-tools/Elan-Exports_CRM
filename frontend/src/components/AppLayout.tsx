@@ -53,9 +53,15 @@ const NAV_SECTIONS: NavSection[] = [
     label: "MAIN",
     items: [
       { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-      { to: "/buyers", label: "Buyers", icon: Users, perms: "buyers" },
       { to: "/deals", label: "Deal Pipeline", icon: TrendingUp, perms: "deals" },
       { to: "/quotations", label: "RFQs", icon: ClipboardList, perms: ["suppliers", "quotations"] },
+    ],
+  },
+  {
+    label: "BUYERS",
+    items: [
+      { to: "/buyers", label: "Buyers Directory", icon: Users, perms: "buyers", end: true },
+      { to: "/buyers/sourcing-vault", label: "Sourcing Vault", icon: Database, perms: "buyers" },
     ],
   },
   {

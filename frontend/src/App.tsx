@@ -41,6 +41,7 @@ import PayrollSlipPage from "@/pages/admin/PayrollSlipPage";
 import SourcingSupplierPage from "@/pages/SourcingSupplierPage";
 import SourcingSupplierDetailsPage from "@/pages/SourcingSupplierDetailsPage";
 import SourcingSupplierVaultPage from "@/pages/SourcingSupplierVaultPage";
+import BuyersSourcingVaultPage from "@/pages/BuyersSourcingVaultPage";
 import FormTemplatesPage from "@/pages/FormTemplatesPage";
 import EmailTemplatesPage from "@/pages/EmailTemplatesPage";
 import PublicSupplierFormPage from "@/pages/PublicSupplierFormPage";
@@ -107,6 +108,14 @@ export default function App() {
                   element={
                     <PermissionGate permission="buyers">
                       <BuyersPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="buyers/sourcing-vault"
+                  element={
+                    <PermissionGate permission="buyers">
+                      <BuyersSourcingVaultPage />
                     </PermissionGate>
                   }
                 />

@@ -40,6 +40,8 @@ model User {
   sourcingSuppliers        SourcingSupplier[]
   sourcingVaultFolders     SourcingVaultFolder[]
   sourcingVaultSuppliers   SourcingVaultSupplier[]
+  buyerVaultFolders        BuyerVaultFolder[]
+  buyerVaultContacts       BuyerVaultContact[]
   permissions          UserPermission[]
   roles             UserRole[]
   vaultDocuments    VaultDocument[]
@@ -1226,4 +1228,36 @@ model SourcingVaultSupplier {
   updatedAt     DateTime            @updatedAt @map("updated_at")
 
   @@map("sourcing_vault_suppliers")
+}
+
+model BuyerVaultFolder {
+  id        String              @id @default(uuid())
+  name      String              @unique
+  createdBy String?             @map("created_by")
+  creator   User?               @relation(fields: [createdBy], references: [id])
+  contacts  BuyerVaultContact[]
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  @@map("buyer_vault_folders")
+}
+
+model BuyerVaultContact {
+  id            String           @id @default(uuid())
+  folderId      String           @map("folder_id")
+  folder        BuyerVaultFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  company       String
+  email         String?
+  phone         String?
+  contactPerson String?          @map("contact_person")
+  country       String?
+  product       String?
+  notes         String?
+  emailStatus   String           @default("Not Sent") @map("email_status")
+  createdBy     String?          @map("created_by")
+  creator       User?            @relation(fields: [createdBy], references: [id])
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  @@map("buyer_vault_contacts")
 }

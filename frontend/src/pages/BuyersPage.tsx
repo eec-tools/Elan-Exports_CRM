@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
+import BuyersTabBar from "@/components/BuyersTabBar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -442,6 +443,7 @@ export default function BuyersPage() {
 
   return (
     <div className="flex flex-col h-full min-h-0 gap-0 p-6">
+      <BuyersTabBar />
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-4">
         <div>
