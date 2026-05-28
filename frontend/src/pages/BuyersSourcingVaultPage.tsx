@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
+import * as XLSX from "xlsx";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -30,6 +31,8 @@ import {
   Tag,
   Database,
   Box,
+  FileDown,
+  Upload,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/client";
@@ -89,13 +92,11 @@ interface GmailAccount {
 }
 
 interface BulkRow {
+  name: string;
   company: string;
+  products: string;
+  certifications: string;
   email: string;
-  phone: string;
-  contactPerson: string;
-  country: string;
-  product: string;
-  notes: string;
 }
 
 // ─── Folder icon palette ──────────────────────────────
@@ -134,13 +135,11 @@ function folderStyle(name: string) {
 
 function emptyBulkRow(): BulkRow {
   return {
+    name: "",
     company: "",
+    products: "",
+    certifications: "",
     email: "",
-    phone: "",
-    contactPerson: "",
-    country: "",
-    product: "",
-    notes: "",
   };
 }
 
@@ -150,13 +149,11 @@ const BULK_COLS: {
   required?: boolean;
   width: string;
 }[] = [
-  { key: "company", label: "Company Name *", required: true, width: "180px" },
+  { key: "name", label: "Name *", required: true, width: "160px" },
+  { key: "company", label: "Company *", required: true, width: "180px" },
+  { key: "products", label: "Products", width: "180px" },
+  { key: "certifications", label: "Certifications", width: "180px" },
   { key: "email", label: "Email *", required: true, width: "180px" },
-  { key: "phone", label: "Phone", width: "130px" },
-  { key: "contactPerson", label: "Contact Person", width: "150px" },
-  { key: "country", label: "Country", width: "120px" },
-  { key: "product", label: "Product", width: "150px" },
-  { key: "notes", label: "Notes", width: "180px" },
 ];
 
 // ─── Main Page ────────────────────────────────────────
@@ -1020,6 +1017,68 @@ function BulkAddDialog({
   const [errors, setErrors] = useState<Set<number>>(new Set());
   const [sendingEmail, setSendingEmail] = useState(false);
   const [addingToList, setAddingToList] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleDownloadTemplate() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["Name", "Company", "Products", "Certifications", "Email"],
+    ]);
+    ws["!cols"] = [
+      { wch: 20 }, { wch: 25 }, { wch: 25 }, { wch: 25 }, { wch: 25 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Buyers");
+    XLSX.writeFile(wb, "buyer_import_template.xlsx");
+  }
+
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const wb = XLSX.read(evt.target?.result, { type: "binary" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        if (raw.length < 2) { toast.error("File has no data rows"); return; }
+
+        const headers = (raw[0] as string[]).map((h) => String(h ?? "").toLowerCase().trim());
+        const colMap: Record<number, keyof BulkRow> = {};
+        headers.forEach((h, i) => {
+          if (h.includes("name"))                                    colMap[i] = "name";
+          else if (h.includes("company"))                            colMap[i] = "company";
+          else if (h.includes("product"))                            colMap[i] = "products";
+          else if (h.includes("certif"))                             colMap[i] = "certifications";
+          else if (h.includes("email"))                              colMap[i] = "email";
+        });
+
+        const parsed: BulkRow[] = raw
+          .slice(1)
+          .filter((row) => row.some((c) => String(c).trim()))
+          .map((row) => {
+            const r = emptyBulkRow();
+            Object.entries(colMap).forEach(([ci, key]) => {
+              const val = row[Number(ci)];
+              if (val != null) r[key] = String(val).trim();
+            });
+            return r;
+          });
+
+        if (parsed.length === 0) { toast.error("No valid rows found in file"); return; }
+
+        const padded = parsed.length < 5
+          ? [...parsed, ...Array.from({ length: 5 - parsed.length }, emptyBulkRow)]
+          : parsed;
+        setRows(padded);
+        setErrors(new Set());
+        toast.success(`Imported ${parsed.length} row${parsed.length !== 1 ? "s" : ""} from file`);
+      } catch {
+        toast.error("Failed to read file — make sure it's a valid Excel or CSV file");
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = "";
+  }
   const [confirmSendOpen, setConfirmSendOpen] = useState(false);
   const [pendingRows, setPendingRows] = useState<BulkRow[]>([]);
 
@@ -1126,30 +1185,31 @@ function BulkAddDialog({
     const newErrors = new Set<number>();
     rows.forEach((r, i) => {
       const hasAnyData = Object.values(r).some((v) => v.trim());
-      if (hasAnyData && (!r.company.trim() || !r.email.trim()))
+      if (hasAnyData && (!r.name.trim() || !r.company.trim() || !r.email.trim()))
         newErrors.add(i);
     });
 
     if (newErrors.size > 0) {
       setErrors(newErrors);
-      toast.error("Highlighted rows are missing Company Name or Email");
+      toast.error("Highlighted rows are missing Name, Company, or Email");
       return null;
     }
 
-    const validRows = rows.filter((r) => r.company.trim());
+    const validRows = rows.filter((r) => r.name.trim() || r.company.trim());
     if (validRows.length === 0) {
       toast.error("Please fill in at least one contact");
       return null;
     }
 
-    const missingEmail = validRows.some((r) => !r.email.trim());
-    if (missingEmail) {
+    const missingRequired = validRows.some((r) => !r.name.trim() || !r.company.trim() || !r.email.trim());
+    if (missingRequired) {
       const newErr = new Set<number>();
       rows.forEach((r, i) => {
-        if (r.company.trim() && !r.email.trim()) newErr.add(i);
+        if ((r.name.trim() || r.company.trim()) && (!r.name.trim() || !r.company.trim() || !r.email.trim()))
+          newErr.add(i);
       });
       setErrors(newErr);
-      toast.error("All contacts must have an Email address");
+      toast.error("All contacts must have a Name, Company, and Email");
       return null;
     }
 
@@ -1164,13 +1224,11 @@ function BulkAddDialog({
     try {
       const res = await api.post(`/buyers-vault/${folder.id}/suppliers`, {
         suppliers: validRows.map((r) => ({
+          contactPerson: r.name.trim() || undefined,
           company: r.company.trim(),
+          product: r.products.trim() || undefined,
+          notes: r.certifications.trim() || undefined,
           email: r.email.trim() || undefined,
-          phone: r.phone.trim() || undefined,
-          contactPerson: r.contactPerson.trim() || undefined,
-          country: r.country.trim() || undefined,
-          product: r.product.trim() || undefined,
-          notes: r.notes.trim() || undefined,
         })),
       });
       toast.success(
@@ -1202,13 +1260,11 @@ function BulkAddDialog({
         `/buyers-vault/${folder.id}/suppliers/send`,
         {
           suppliers: pendingRows.map((r) => ({
+            contactPerson: r.name.trim() || undefined,
             company: r.company.trim(),
+            product: r.products.trim() || undefined,
+            notes: r.certifications.trim() || undefined,
             email: r.email.trim() || undefined,
-            phone: r.phone.trim() || undefined,
-            contactPerson: r.contactPerson.trim() || undefined,
-            country: r.country.trim() || undefined,
-            product: r.product.trim() || undefined,
-            notes: r.notes.trim() || undefined,
           })),
           assignedGmailAccount: sharedGmail || undefined,
           emailTemplateId: sharedEmailTemplateId || undefined,
@@ -1227,7 +1283,7 @@ function BulkAddDialog({
     }
   }
 
-  const filledCount = rows.filter((r) => r.company.trim()).length;
+  const filledCount = rows.filter((r) => r.name.trim() || r.company.trim()).length;
   const isWorking = sendingEmail || addingToList;
 
   return (
@@ -1291,6 +1347,28 @@ function BulkAddDialog({
 
           <span className="text-xs text-muted-foreground ml-auto">
             Used only when sending emails
+          </span>
+        </div>
+
+        {/* Import / Template buttons */}
+        <div className="flex items-center gap-2 py-1">
+          <Button type="button" variant="outline" size="sm" onClick={handleDownloadTemplate}>
+            <FileDown className="h-4 w-4 mr-1.5" />
+            Download Template
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="h-4 w-4 mr-1.5" />
+            Import Excel / CSV
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <span className="text-xs text-muted-foreground ml-1">
+            Download the template first, fill it in, then import.
           </span>
         </div>
 
