@@ -38,6 +38,7 @@ model User {
   reports           Report[]
   suppliers         Supplier[]
   sourcingSuppliers        SourcingSupplier[]
+  sourcingBuyers           SourcingBuyer[]
   sourcingVaultFolders     SourcingVaultFolder[]
   sourcingVaultSuppliers   SourcingVaultSupplier[]
   buyerVaultFolders        BuyerVaultFolder[]
@@ -720,6 +721,25 @@ model EmailCampaignTemplate {
   @@map("email_campaign_templates")
 }
 
+model BuyerEmailCampaignTemplate {
+  id               String   @id @default(uuid())
+  name             String
+  isDefault        Boolean  @default(false) @map("is_default")
+  introSubject     String   @map("intro_subject")
+  introBody        String   @map("intro_body")
+  followup1Subject String   @map("followup1_subject")
+  followup1Body    String   @map("followup1_body")
+  followup2Subject String   @map("followup2_subject")
+  followup2Body    String   @map("followup2_body")
+  followup3Subject String   @map("followup3_subject")
+  followup3Body    String   @map("followup3_body")
+  createdBy        String?  @map("created_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("buyer_email_campaign_templates")
+}
+
 model SupplierFormTemplate {
   id        String   @id @default(uuid())
   name      String
@@ -1038,6 +1058,7 @@ enum Permission {
   signed_suppliers
   old_suppliers
   sourcing_suppliers
+  sourcing_buyers
   quotations
 }
 
@@ -1260,4 +1281,66 @@ model BuyerVaultContact {
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
   @@map("buyer_vault_contacts")
+}
+
+model SourcingBuyer {
+  id                   String                      @id @default(uuid())
+  company              String
+  email                String?
+  phone                String?
+  contactPerson        String?                     @map("contact_person")
+  country              String?
+  product              String?
+  productCategory      String?                     @map("product_category")
+  notes                String?
+  status               String                      @default("pending")
+  // "pending"|"intro_sent"|"followup1_sent"|"followup2_sent"|"followup3_sent"|"response_received"|"no_response"|"converted_to_buyer"|"invalid"
+  assignedGmailAccount String?                     @map("assigned_gmail_account")
+  emailTemplateId      String?                     @map("email_template_id")
+  createdBy            String?                     @map("created_by")
+  creator              User?                       @relation(fields: [createdBy], references: [id])
+  emailCampaign        SourcingBuyerEmailCampaign?
+  createdAt            DateTime                    @default(now()) @map("created_at")
+  updatedAt            DateTime                    @updatedAt @map("updated_at")
+
+  @@map("sourcing_buyers")
+}
+
+model SourcingBuyerEmailCampaign {
+  id                 String        @id @default(uuid())
+  sourcingBuyerId    String        @unique @map("sourcing_buyer_id")
+  status             String        @default("active")
+  // "active" | "completed" | "response_received"
+  currentStep        Int           @default(1) @map("current_step")
+  // 1=intro_sent · 2=followup1_sent · 3=followup2_sent · 4=followup3_sent
+  introEmailSentAt   DateTime      @map("intro_email_sent_at")
+  followup1SentAt    DateTime?     @map("followup1_sent_at")
+  followup2SentAt    DateTime?     @map("followup2_sent_at")
+  followup3SentAt    DateTime?     @map("followup3_sent_at")
+  responseReceivedAt DateTime?     @map("response_received_at")
+  nextFollowupDue    DateTime?     @map("next_followup_due")
+  gmailThreadId      String?       @map("gmail_thread_id")
+  gmailMessageId     String?       @map("gmail_message_id")
+  lastCheckedAt      DateTime?     @map("last_checked_at")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  sourcingBuyer      SourcingBuyer @relation(fields: [sourcingBuyerId], references: [id], onDelete: Cascade)
+
+  @@map("sourcing_buyer_email_campaigns")
+}
+
+model BuyerEmailReply {
+  id              String   @id @default(uuid())
+  sourcingBuyerId String?  @map("sourcing_buyer_id")
+  gmailMessageId  String?  @map("gmail_message_id")
+  direction       String   @default("received") @map("direction")
+  // "sent" = email we sent | "received" = reply from buyer
+  fromEmail       String   @map("from_email")
+  fromName        String?  @map("from_name")
+  subject         String?
+  body            String
+  receivedAt      DateTime @map("received_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("buyer_email_replies")
 }

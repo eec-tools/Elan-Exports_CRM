@@ -1,7 +1,8 @@
 import { Response } from "express";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
-import { sendGmailEmail } from "../services/gmailService.js";
+import { startCampaignForBuyer } from "./sourcingBuyerEmailCampaign.controller.js";
+import { BUYER_GMAIL_ACCOUNT } from "./sourcingBuyers.controller.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
@@ -216,7 +217,7 @@ export async function sendBulkEmail(
 ): Promise<void> {
   try {
     const { folderId } = req.params as { folderId: string };
-    const { suppliers, assignedGmailAccount, emailTemplateId } = req.body as {
+    const { suppliers, emailTemplateId } = req.body as {
       suppliers: Array<{
         company: string;
         email?: string;
@@ -226,7 +227,6 @@ export async function sendBulkEmail(
         product?: string;
         notes?: string;
       }>;
-      assignedGmailAccount?: string;
       emailTemplateId?: string;
     };
 
@@ -249,16 +249,8 @@ export async function sendBulkEmail(
       return;
     }
 
-    // Fetch email template if provided
-    let emailTemplate: any = null;
-    if (emailTemplateId) {
-      emailTemplate = await (prisma as any).emailCampaignTemplate.findUnique({
-        where: { id: emailTemplateId },
-      });
-    }
-
-    // Create vault contact records
-    const createdContacts: Array<{ id: string; email?: string | null; company: string }> = [];
+    // Create vault contacts + SourcingBuyer records in one transaction
+    const createdPairs: Array<{ vaultId: string; sourcingBuyerId: string; hasEmail: boolean }> = [];
 
     await (prisma as any).$transaction(async (tx: any) => {
       for (const s of validRows) {
@@ -276,42 +268,47 @@ export async function sendBulkEmail(
             createdBy: req.user!.id,
           },
         });
-        createdContacts.push({ id: contact.id, email: contact.email, company: contact.company });
+        const sourcingBuyer = await tx.sourcingBuyer.create({
+          data: {
+            company: s.company.trim(),
+            email: s.email?.trim() || null,
+            phone: s.phone?.trim() || null,
+            contactPerson: s.contactPerson?.trim() || null,
+            country: s.country?.trim() || null,
+            product: s.product?.trim() || null,
+            notes: s.notes?.trim() || null,
+            status: "pending",
+            assignedGmailAccount: BUYER_GMAIL_ACCOUNT,
+            emailTemplateId: emailTemplateId || null,
+            createdBy: req.user!.id,
+          },
+        });
+        createdPairs.push({ vaultId: contact.id, sourcingBuyerId: sourcingBuyer.id, hasEmail: !!s.email?.trim() });
       }
     });
 
-    // Respond immediately — emails sent in background
-    res.status(201).json({ added: createdContacts.length, sending: true });
+    // Respond immediately — campaigns start in background
+    res.status(201).json({ added: createdPairs.length, sending: true });
 
     (async () => {
-      for (let i = 0; i < createdContacts.length; i++) {
-        const contact = createdContacts[i];
-        if (!contact.email || !assignedGmailAccount || !emailTemplate) continue;
+      for (let i = 0; i < createdPairs.length; i++) {
+        const pair = createdPairs[i];
+        if (!pair.hasEmail) continue;
 
-        let emailSent = false;
         try {
-          const subject = emailTemplate.introSubject || `Introduction from Elan Exports`;
-          const body = (emailTemplate.introBody || "").replace(/\{\{company\}\}/gi, contact.company);
-
-          await sendGmailEmail({
-            fromEmail: assignedGmailAccount,
-            to: contact.email,
-            subject,
-            html: body,
-          });
-          emailSent = true;
+          const started = await startCampaignForBuyer(pair.sourcingBuyerId, req.user?.id);
+          if (started) {
+            await (prisma as any).buyerVaultContact.update({
+              where: { id: pair.vaultId },
+              data: { emailStatus: "Sent" },
+            });
+          }
         } catch (e) {
-          console.error(`[buyersVault sendBulkEmail] Failed to send to ${contact.email}:`, e);
+          console.error(`[buyersVault sendBulkEmail] Failed campaign for ${pair.sourcingBuyerId}:`, e);
         }
 
-        if (emailSent) {
-          await (prisma as any).buyerVaultContact.update({
-            where: { id: contact.id },
-            data: { emailStatus: "Sent" },
-          });
-          if (i < createdContacts.length - 1) {
-            await sleep(EMAIL_SEND_DELAY_MS);
-          }
+        if (i < createdPairs.length - 1) {
+          await sleep(EMAIL_SEND_DELAY_MS);
         }
       }
       console.log(`[buyersVault sendBulkEmail] Background send complete for folder ${folderId}`);

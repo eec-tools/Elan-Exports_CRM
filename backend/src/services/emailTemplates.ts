@@ -394,3 +394,175 @@ export function getTemplate(step: number, data: TemplateData): EmailTemplate {
     default: throw new Error(`Unknown campaign step: ${step}`);
   }
 }
+
+// ─── Buyer-specific outreach templates ───────────────────────────────────────
+
+interface BuyerTemplateData {
+  company: string;
+  contactPerson?: string | null;
+  product?: string | null;
+  fromEmail: string;
+  signature?: SignatureData | null;
+}
+
+export function buyerIntroTemplate(data: BuyerTemplateData): EmailTemplate {
+  const greeting = data.contactPerson ? `Dear ${data.contactPerson},` : `Dear Sir/Madam,`;
+  const productLine = data.product ?? "your product category of interest";
+  const content = `
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">${greeting}</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  Greetings from <strong>Élan Exports &amp; Consultancy</strong>.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  We are a Singapore-headquartered sourcing and execution consultancy with an established network of verified, export-ready suppliers across South Asia, Southeast Asia, and Africa. We work with international buyers to simplify their procurement — handling supplier identification, quality evaluation, compliance documentation, commercial negotiations, and end-to-end execution.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  We came across <strong>${data.company}</strong> and believe there may be a strong fit, particularly for <strong>${productLine}</strong>. Our supplier network for this category includes manufacturers and exporters with established certifications (ISO, HACCP, BRC, organic, etc.), competitive pricing, and proven export track records.
+</p>
+
+<p style="margin:0 0 8px;color:#374151;font-size:15px;line-height:1.6;">
+  We would be glad to explore the following with you:
+</p>
+
+<ul style="margin:8px 0 16px;padding-left:20px;color:#374151;font-size:15px;line-height:1.8;">
+  <li>Product availability, specifications, and pricing</li>
+  <li>Supplier certifications and compliance documentation</li>
+  <li>MOQ, lead times, and packaging options</li>
+  <li>Samples and pre-shipment quality inspection</li>
+  <li>Logistics, incoterms, and payment terms</li>
+</ul>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  We operate as the central coordination point, ensuring pricing discipline, compliance, and smooth execution throughout. Buyer identity is kept confidential during the initial evaluation phase.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  If this aligns with your current or upcoming sourcing requirements, we would welcome a brief introductory conversation or a written exchange. Please feel free to reply to this email or reach out directly.
+</p>
+
+${buildSignatureHtml(data.signature, "Warm regards", data.fromEmail)}`;
+
+  return {
+    subject: `Sourcing Partnership Inquiry — ${productLine} | Élan Exports`,
+    html: baseLayout(content, data.fromEmail),
+  };
+}
+
+export function buyerFollowup1Template(data: BuyerTemplateData): EmailTemplate {
+  const greeting = data.contactPerson ? `Dear ${data.contactPerson},` : `Dear Sir/Madam,`;
+  const productLine = data.product ?? "the product category we discussed";
+  const content = `
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">${greeting}</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  I hope this message finds you well. I am following up on my previous email regarding a potential sourcing partnership for <strong>${productLine}</strong> through <strong>Élan Exports &amp; Consultancy</strong>.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  In case my earlier email was missed, I wanted to reiterate that we have a curated network of verified, export-ready suppliers for this category — with the right certifications, competitive pricing, and the capacity to meet international buyer requirements.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  We handle all the complexity — supplier vetting, compliance, documentation, and execution — so you can focus on your business.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  If you have any current or upcoming requirements, I would be delighted to connect and share supplier profiles and indicative pricing. A brief reply is all it takes to get started.
+</p>
+
+${buildSignatureHtml(data.signature, "Best regards", data.fromEmail)}`;
+
+  return {
+    subject: `Follow-Up — Sourcing Partnership | Élan Exports × ${data.company}`,
+    html: baseLayout(content, data.fromEmail),
+  };
+}
+
+export function buyerFollowup2Template(data: BuyerTemplateData): EmailTemplate {
+  const greeting = data.contactPerson ? `Dear ${data.contactPerson},` : `Dear Sir/Madam,`;
+  const productLine = data.product ?? "the product category we discussed";
+  const content = `
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">${greeting}</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  I wanted to reach out once more regarding our sourcing services for <strong>${data.company}</strong>, particularly for <strong>${productLine}</strong>.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  At Élan Exports, we help international buyers source reliably from South Asia and Southeast Asia. Our service covers everything from identifying the right suppliers to managing compliance, quality checks, and shipment execution — all under one roof.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  We genuinely believe we can add value to your procurement process. If now is not the right time or your requirements have changed, please let us know and we will respect that entirely.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  Otherwise, we would love to schedule a quick 15-minute call or exchange some product-specific details over email — whichever is more convenient for you.
+</p>
+
+${buildSignatureHtml(data.signature, "Best regards", data.fromEmail)}`;
+
+  return {
+    subject: `Reminder — Sourcing Opportunity | Élan Exports × ${data.company}`,
+    html: baseLayout(content, data.fromEmail),
+  };
+}
+
+export function buyerFollowup3Template(data: BuyerTemplateData): EmailTemplate {
+  const greeting = data.contactPerson ? `Dear ${data.contactPerson},` : `Dear Sir/Madam,`;
+  const productLine = data.product ?? "the product category we discussed";
+  const content = `
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">${greeting}</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  This is our final follow-up regarding the sourcing partnership inquiry we sent to <strong>${data.company}</strong> for <strong>${productLine}</strong>.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  We have genuinely valued the opportunity to reach out and hope our services may be of use to you at some point. If this is not the right time, we completely understand — and you are always welcome to reach out to us in the future when circumstances change.
+</p>
+
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+  Should you wish to explore a sourcing partnership with Élan Exports — whether now or in the future — we would be happy to reconnect. Please do not hesitate to write to us directly.
+</p>
+
+${buildSignatureHtml(data.signature, "Best regards", data.fromEmail)}`;
+
+  return {
+    subject: `Final Follow-Up — Élan Exports Sourcing Partnership | ${data.company}`,
+    html: baseLayout(content, data.fromEmail),
+  };
+}
+
+export function getBuyerTemplate(step: number, data: BuyerTemplateData): EmailTemplate {
+  switch (step) {
+    case 1: return buyerIntroTemplate(data);
+    case 2: return buyerFollowup1Template(data);
+    case 3: return buyerFollowup2Template(data);
+    case 4: return buyerFollowup3Template(data);
+    default: throw new Error(`Unknown buyer campaign step: ${step}`);
+  }
+}
+
+export function getCustomBuyerTemplate(step: number, customTpl: CustomEmailTemplate, data: BuyerTemplateData): EmailTemplate {
+  const introSubject = renderSubject(customTpl.introSubject, { ...data, formLink: "", fromEmail: data.fromEmail });
+  let subject: string;
+  let bodyText: string;
+  let salutation: string;
+
+  switch (step) {
+    case 1: subject = introSubject; bodyText = customTpl.introBody; salutation = "Warm regards"; break;
+    case 2: subject = `Re: ${introSubject}`; bodyText = customTpl.followup1Body; salutation = "Best regards"; break;
+    case 3: subject = `Re: ${introSubject}`; bodyText = customTpl.followup2Body; salutation = "Best regards"; break;
+    case 4: subject = `Re: ${introSubject}`; bodyText = customTpl.followup3Body; salutation = "Best regards"; break;
+    default: throw new Error(`Unknown buyer campaign step: ${step}`);
+  }
+
+  // Render body without formLink/formButton — buyer templates don't use forms
+  const templateData = { ...data, formLink: "", fromEmail: data.fromEmail };
+  const bodyHtml = renderBodyText(stripTrailingSignoff(bodyText), templateData) + "\n" + buildSignatureHtml(data.signature, salutation, data.fromEmail);
+  return { subject, html: baseLayout(bodyHtml, data.fromEmail) };
+}

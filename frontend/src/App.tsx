@@ -42,6 +42,9 @@ import SourcingSupplierPage from "@/pages/SourcingSupplierPage";
 import SourcingSupplierDetailsPage from "@/pages/SourcingSupplierDetailsPage";
 import SourcingSupplierVaultPage from "@/pages/SourcingSupplierVaultPage";
 import BuyersSourcingVaultPage from "@/pages/BuyersSourcingVaultPage";
+import SourcingBuyersPage from "@/pages/SourcingBuyersPage";
+import SourcingBuyerDetailsPage from "@/pages/SourcingBuyerDetailsPage";
+import BuyerEmailTemplatesPage from "@/pages/BuyerEmailTemplatesPage";
 import FormTemplatesPage from "@/pages/FormTemplatesPage";
 import EmailTemplatesPage from "@/pages/EmailTemplatesPage";
 import PublicSupplierFormPage from "@/pages/PublicSupplierFormPage";
@@ -116,6 +119,30 @@ export default function App() {
                   element={
                     <PermissionGate permission="buyers">
                       <BuyersSourcingVaultPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="buyers/email-templates"
+                  element={
+                    <PermissionGate permission="buyers">
+                      <BuyerEmailTemplatesPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="buyers/sourcing"
+                  element={
+                    <PermissionGate permission="buyers">
+                      <SourcingBuyersPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="buyers/sourcing/:id"
+                  element={
+                    <PermissionGate permission="buyers">
+                      <SourcingBuyerDetailsPage />
                     </PermissionGate>
                   }
                 />

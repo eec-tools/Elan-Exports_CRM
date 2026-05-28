@@ -3,6 +3,7 @@ import prisma from "../config/db.js";
 import { sendFollowupReminderEmail } from "./mailer.js";
 import { createNotification } from "./notificationService.js";
 import { executeSendStep } from "../controllers/sourcingEmailCampaign.controller.js";
+import { executeSendStep as executeBuyerSendStep } from "../controllers/sourcingBuyerEmailCampaign.controller.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
@@ -135,18 +136,65 @@ async function autoSendDueFollowups() {
   }
 }
 
-export { autoSendDueFollowups };
+async function autoSendDueBuyerFollowups() {
+  if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET) {
+    console.warn("[EmailCampaignScheduler] GMAIL credentials not set — skipping buyer auto-send.");
+    return;
+  }
+
+  try {
+    const today = endOfDay(new Date());
+
+    const dueCampaigns = await (prisma as any).sourcingBuyerEmailCampaign.findMany({
+      where: {
+        status: "active",
+        currentStep: { lt: 4 },
+        nextFollowupDue: { lte: today },
+      },
+      include: {
+        sourcingBuyer: {
+          select: { id: true, company: true, assignedGmailAccount: true },
+        },
+      },
+    });
+
+    if (dueCampaigns.length === 0) return;
+
+    let sent = 0;
+    for (let i = 0; i < dueCampaigns.length; i++) {
+      const campaign = dueCampaigns[i];
+      try {
+        await executeBuyerSendStep(campaign.sourcingBuyerId);
+        sent++;
+      } catch (err) {
+        console.error(`[EmailCampaignScheduler] Failed to auto-send buyer follow-up for ${campaign.sourcingBuyer.company}:`, err);
+      }
+      if (i < dueCampaigns.length - 1) {
+        await sleep(EMAIL_SEND_DELAY_MS);
+      }
+    }
+
+    console.log(`[EmailCampaignScheduler] Auto-sent ${sent}/${dueCampaigns.length} due buyer follow-ups`);
+  } catch (err) {
+    console.error("[EmailCampaignScheduler] autoSendDueBuyerFollowups error:", err);
+  }
+}
+
+export { autoSendDueFollowups, autoSendDueBuyerFollowups };
 
 export function startEmailCampaignScheduler() {
   // Signed supplier follow-up reminders — 9:00 AM IST daily
   cron.schedule("0 9 * * *", sendDailyFollowupReminders, { timezone: "Asia/Kolkata" });
   // Auto-send due sourcing supplier follow-ups — 9:00 AM IST daily
   cron.schedule("0 9 * * *", autoSendDueFollowups, { timezone: "Asia/Kolkata" });
+  // Auto-send due buyer outreach follow-ups — 9:00 AM IST daily
+  cron.schedule("0 9 * * *", autoSendDueBuyerFollowups, { timezone: "Asia/Kolkata" });
   console.log("[EmailCampaignScheduler] Daily follow-up jobs scheduled at 9:00 AM IST.");
 
-  // Run immediately on startup to catch any overdue campaigns missed while server was down
+  // Run immediately on startup to catch any overdue campaigns
   setTimeout(() => {
     console.log("[EmailCampaignScheduler] Running startup check for overdue follow-ups...");
     autoSendDueFollowups();
+    autoSendDueBuyerFollowups();
   }, 5000);
 }

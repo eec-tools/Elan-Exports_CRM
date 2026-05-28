@@ -30,6 +30,7 @@ import {
   ClipboardList,
   PieChart,
   History,
+  UserSearch,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState } from "react";
@@ -62,6 +63,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: "/buyers", label: "Buyers Directory", icon: Users, perms: "buyers", end: true },
       { to: "/buyers/sourcing-vault", label: "Sourcing Vault", icon: Database, perms: "buyers" },
+      { to: "/buyers/sourcing", label: "Sourcing Buyers", icon: UserSearch, perms: "buyers" },
     ],
   },
   {

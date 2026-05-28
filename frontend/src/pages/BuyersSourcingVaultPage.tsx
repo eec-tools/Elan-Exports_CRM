@@ -1097,9 +1097,9 @@ function BulkAddDialog({
   const { data: emailTemplates = [] } = useQuery<
     { id: string; name: string; isDefault: boolean }[]
   >({
-    queryKey: ["email-campaign-templates"],
+    queryKey: ["buyer-email-campaign-templates"],
     queryFn: async () => {
-      const res = await api.get("/email-campaign-templates");
+      const res = await api.get("/buyer-email-templates");
       return res.data;
     },
     enabled: open,
