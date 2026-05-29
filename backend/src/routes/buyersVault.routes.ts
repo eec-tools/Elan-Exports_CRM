@@ -18,19 +18,19 @@ import {
 
 const router = Router();
 
-router.use(authenticate, requirePermission(["buyers"]));
+router.use(authenticate, requirePermission(["sourcing_buyers"]));
 
 router.get("/", listFolders);
-router.post("/", requireEdit(["buyers"]), createFolder);
+router.post("/", requireEdit(["sourcing_buyers"]), createFolder);
 
 router.get("/:folderId/suppliers", listVaultSuppliers);
 router.get("/:folderId/creators", listVaultCreators);
-router.post("/:folderId/suppliers/send", requireEdit(["buyers"]), sendBulkEmail);
-router.post("/:folderId/suppliers", requireEdit(["buyers"]), addToList);
+router.post("/:folderId/suppliers/send", requireEdit(["sourcing_buyers"]), sendBulkEmail);
+router.post("/:folderId/suppliers", requireEdit(["sourcing_buyers"]), addToList);
 
-router.put("/:folderId/suppliers/:supplierId", requireEdit(["buyers"]), updateVaultSupplier);
-router.delete("/:folderId/suppliers/:supplierId", requireEdit(["buyers"]), deleteVaultSupplier);
+router.put("/:folderId/suppliers/:supplierId", requireEdit(["sourcing_buyers"]), updateVaultSupplier);
+router.delete("/:folderId/suppliers/:supplierId", requireEdit(["sourcing_buyers"]), deleteVaultSupplier);
 
-router.delete("/:id", requireEdit(["buyers"]), deleteFolder);
+router.delete("/:id", requireEdit(["sourcing_buyers"]), deleteFolder);
 
 export default router;

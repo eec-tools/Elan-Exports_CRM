@@ -14,17 +14,17 @@ import { authenticate, requirePermission, requireEdit } from "../middleware/auth
 
 const router = Router();
 
-router.use(authenticate, requirePermission("buyers"));
+router.use(authenticate, requirePermission("sourcing_buyers"));
 
 router.get("/stats", getSourcingBuyerStats);
 router.get("/from-folder", getVaultFolderNotSent);
 router.get("/", listSourcingBuyers);
 router.get("/:id", getSourcingBuyer);
 
-router.post("/", requireEdit("buyers"), createSourcingBuyer);
-router.post("/from-folder", requireEdit("buyers"), addFromVaultFolder);
-router.post("/:id/convert", requireEdit("buyers"), convertToBuyer);
-router.put("/:id", requireEdit("buyers"), updateSourcingBuyer);
-router.delete("/:id", requireEdit("buyers"), deleteSourcingBuyer);
+router.post("/", requireEdit("sourcing_buyers"), createSourcingBuyer);
+router.post("/from-folder", requireEdit("sourcing_buyers"), addFromVaultFolder);
+router.post("/:id/convert", requireEdit("sourcing_buyers"), convertToBuyer);
+router.put("/:id", requireEdit("sourcing_buyers"), updateSourcingBuyer);
+router.delete("/:id", requireEdit("sourcing_buyers"), deleteSourcingBuyer);
 
 export default router;

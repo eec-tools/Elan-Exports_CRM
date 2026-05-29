@@ -1047,6 +1047,7 @@ model NotificationRead {
 
 enum Permission {
   buyers
+  buyers_directory
   suppliers
   analytics
   reports
