@@ -201,7 +201,7 @@ export async function executeSendStep(sourcingBuyerId: string, createdBy?: strin
     const attachment = await getGlobalEmailAttachment();
     await sendGmailEmail({
         fromEmail,
-        to: buyer.email,
+        to: buyer.email.split(";").map((e: string) => e.trim()).filter(Boolean).join(", "),
         subject,
         html,
         threadId: campaign.gmailThreadId ?? undefined,
