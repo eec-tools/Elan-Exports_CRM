@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { authenticate, requireEdit } from "../middleware/auth.js";
 import {
   getAttachment,
   uploadAttachment,
@@ -10,7 +10,7 @@ import {
 const router = Router();
 
 router.get("/attachment", authenticate, getAttachment);
-router.post("/attachment", authenticate, requireAdmin, uploadAttachmentMiddleware.single("file"), uploadAttachment);
-router.delete("/attachment", authenticate, requireAdmin, deleteAttachment);
+router.post("/attachment", authenticate, requireEdit("sourcing_buyers"), uploadAttachmentMiddleware.single("file"), uploadAttachment);
+router.delete("/attachment", authenticate, requireEdit("sourcing_buyers"), deleteAttachment);
 
 export default router;

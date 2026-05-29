@@ -11,13 +11,13 @@ import {
 
 const router = Router();
 
-router.use(authenticate, requirePermission("buyers"));
+router.use(authenticate, requirePermission("sourcing_buyers"));
 
 router.get("/default-content", getBuyerDefaultContent);
 router.get("/",   listBuyerEmailTemplates);
 router.get("/:id", getBuyerEmailTemplate);
-router.post("/",   requireEdit("buyers"), createBuyerEmailTemplate);
-router.put("/:id", requireEdit("buyers"), updateBuyerEmailTemplate);
-router.delete("/:id", requireEdit("buyers"), deleteBuyerEmailTemplate);
+router.post("/",   requireEdit("sourcing_buyers"), createBuyerEmailTemplate);
+router.put("/:id", requireEdit("sourcing_buyers"), updateBuyerEmailTemplate);
+router.delete("/:id", requireEdit("sourcing_buyers"), deleteBuyerEmailTemplate);
 
 export default router;

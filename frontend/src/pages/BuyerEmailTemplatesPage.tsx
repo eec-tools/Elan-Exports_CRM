@@ -132,7 +132,7 @@ function SigPreview({ sig }: { sig: Partial<EmailSignature> }) {
 export default function BuyerEmailTemplatesPage() {
   const queryClient = useQueryClient();
   const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("buyers");
+  const canEdit = hasEditPermission("sourcing_buyers");
 
   // ── Template state ──
   const [editorOpen, setEditorOpen] = useState(false);
@@ -362,7 +362,7 @@ export default function BuyerEmailTemplatesPage() {
             <Settings className="h-4 w-4" />
             Signatures
           </Button>
-          <PermissionGate permission="buyers" editOnly>
+          <PermissionGate permission="sourcing_buyers" editOnly>
             <Button size="sm" onClick={openCreate}>
               <Plus className="h-4 w-4 mr-1.5" />
               New Template
