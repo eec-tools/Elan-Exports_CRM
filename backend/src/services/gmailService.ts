@@ -24,6 +24,49 @@ async function getAuthedClient(email: string) {
   return auth;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  mimeType: string;
+}
+
+function getMimeTypeFromFilename(filename: string): string {
+  const ext = filename.toLowerCase().split(".").pop() ?? "";
+  const map: Record<string, string> = {
+    pdf: "application/pdf",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xls: "application/vnd.ms-excel",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ppt: "application/vnd.ms-powerpoint",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    zip: "application/zip",
+  };
+  return map[ext] ?? "application/octet-stream";
+}
+
+export async function getGlobalEmailAttachment(): Promise<EmailAttachment | null> {
+  const [urlSetting, nameSetting] = await Promise.all([
+    prisma.appSetting.findUnique({ where: { key: "email_campaign_attachment_url" } }),
+    prisma.appSetting.findUnique({ where: { key: "email_campaign_attachment_name" } }),
+  ]);
+  if (!urlSetting?.value) return null;
+  try {
+    const response = await fetch(urlSetting.value);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const content = Buffer.from(await response.arrayBuffer());
+    const filename = nameSetting?.value ?? "attachment";
+    return { filename, content, mimeType: getMimeTypeFromFilename(filename) };
+  } catch (err) {
+    console.error("[gmailService] Failed to fetch global attachment:", err);
+    return null;
+  }
+}
+
 function buildRawMessage(params: {
   from: string;
   to: string;
@@ -31,33 +74,60 @@ function buildRawMessage(params: {
   html: string;
   inReplyTo?: string;
   references?: string;
+  attachments?: EmailAttachment[];
 }): string {
-  const { from, to, subject, html, inReplyTo, references } = params;
+  const { from, to, subject, html, inReplyTo, references, attachments } = params;
 
-  // RFC 2047 encode any header value that may contain non-ASCII characters
   const encodeHeader = (v: string) => `=?UTF-8?B?${Buffer.from(v, "utf-8").toString("base64")}?=`;
-
-  // Base64-encode the HTML body and wrap at 76 chars (MIME requirement)
   const encodedBody = Buffer.from(html, "utf-8").toString("base64").match(/.{1,76}/g)!.join("\r\n");
 
-  const headers: string[] = [
+  const baseHeaders: string[] = [
     `From: ${encodeHeader("Élan Exports")} <${from}>`,
     `To: ${to}`,
     `Subject: ${encodeHeader(subject)}`,
   ];
+  if (inReplyTo) baseHeaders.push(`In-Reply-To: ${inReplyTo}`);
+  if (references) baseHeaders.push(`References: ${references}`);
+  baseHeaders.push(`MIME-Version: 1.0`);
 
-  if (inReplyTo) headers.push(`In-Reply-To: ${inReplyTo}`);
-  if (references) headers.push(`References: ${references}`);
+  if (!attachments?.length) {
+    const lines = [
+      ...baseHeaders,
+      `Content-Type: text/html; charset=UTF-8`,
+      `Content-Transfer-Encoding: base64`,
+      ``,
+      encodedBody,
+    ];
+    return Buffer.from(lines.join("\r\n")).toString("base64url");
+  }
 
-  headers.push(
-    `MIME-Version: 1.0`,
+  // multipart/mixed — HTML body + one or more attachments
+  const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const lines: string[] = [
+    ...baseHeaders,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
     `Content-Type: text/html; charset=UTF-8`,
     `Content-Transfer-Encoding: base64`,
     ``,
     encodedBody,
-  );
+  ];
 
-  return Buffer.from(headers.join("\r\n")).toString("base64url");
+  for (const att of attachments) {
+    const encodedAtt = att.content.toString("base64").match(/.{1,76}/g)!.join("\r\n");
+    lines.push(
+      `--${boundary}`,
+      `Content-Type: ${att.mimeType}; name="${att.filename}"`,
+      `Content-Transfer-Encoding: base64`,
+      `Content-Disposition: attachment; filename="${att.filename}"`,
+      ``,
+      encodedAtt,
+    );
+  }
+
+  lines.push(`--${boundary}--`);
+  return Buffer.from(lines.join("\r\n")).toString("base64url");
 }
 
 export async function sendGmailEmail(params: {
@@ -68,12 +138,13 @@ export async function sendGmailEmail(params: {
   threadId?: string;
   inReplyTo?: string;
   references?: string;
+  attachments?: EmailAttachment[];
 }): Promise<{ messageId: string; threadId: string }> {
-  const { fromEmail, to, subject, html, threadId, inReplyTo, references } = params;
+  const { fromEmail, to, subject, html, threadId, inReplyTo, references, attachments } = params;
   const auth = await getAuthedClient(fromEmail);
   const gmail = google.gmail({ version: "v1", auth });
 
-  const raw = buildRawMessage({ from: fromEmail, to, subject, html, inReplyTo, references });
+  const raw = buildRawMessage({ from: fromEmail, to, subject, html, inReplyTo, references, attachments });
 
   const res = await gmail.users.messages.send({
     userId: "me",

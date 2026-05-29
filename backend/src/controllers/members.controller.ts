@@ -9,6 +9,7 @@ import { isValidWorkWindow } from "../utils/attendance.js";
 
 const DEFAULT_WORK_START = "09:00";
 const DEFAULT_WORK_END = "18:00";
+const VALID_COMPANIES = ["EEC", "Skin'd India"];
 
 /**
  * GET /api/members
@@ -40,7 +41,7 @@ export async function listMembers(
           permission: p.permission,
           accessLevel: p.accessLevel,
         })),
-        assignedCompanies: m.assignedCompanies || [],
+        assignedCompanies: (m.assignedCompanies || []).filter((c) => VALID_COMPANIES.includes(c)),
       })),
     );
   } catch (err) {
@@ -132,7 +133,7 @@ export async function createMember(
         permission: p.permission,
         accessLevel: p.accessLevel,
       })),
-      assignedCompanies: user.assignedCompanies || [],
+      assignedCompanies: (user.assignedCompanies || []).filter((c) => VALID_COMPANIES.includes(c)),
     });
   } catch (err) {
     console.error("Create member error:", err);
@@ -240,7 +241,7 @@ export async function updateMember(
         permission: p.permission,
         accessLevel: p.accessLevel,
       })),
-      assignedCompanies: updated.assignedCompanies || [],
+      assignedCompanies: (updated.assignedCompanies || []).filter((c) => VALID_COMPANIES.includes(c)),
     });
   } catch (err) {
     console.error("Update member error:", err);

@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, Trash2, Pencil, Loader2, Star, Mail,
   Settings, PenLine, User, Briefcase, Building2, AlignLeft,
-  Link2, GripVertical, X, CheckCircle2,
+  Link2, GripVertical, X, CheckCircle2, Paperclip, Upload, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -143,6 +143,9 @@ export default function BuyerEmailTemplatesPage() {
   const [deleteTarget, setDeleteTarget] = useState<EmailTemplate | null>(null);
   const [activeTab, setActiveTab] = useState("intro");
 
+  // ── Attachment state ──
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+
   // ── Signature dialog state ──
   const [sigOpen, setSigOpen] = useState(false);
   const [sigView, setSigView] = useState<"list" | "form">("list");
@@ -178,6 +181,31 @@ export default function BuyerEmailTemplatesPage() {
       return res.data?.id ?? null;
     },
     enabled: sigOpen,
+  });
+
+  // ── Attachment queries ──
+  const { data: attachmentData, refetch: refetchAttachment } = useQuery<{ attachment: { url: string; filename: string } | null }>({
+    queryKey: ["email-campaign-attachment"],
+    queryFn: async () => (await api.get("/email-settings/attachment")).data,
+  });
+  const currentAttachment = attachmentData?.attachment ?? null;
+
+  const uploadAttachmentMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return api.post("/email-settings/attachment", form, { headers: { "Content-Type": "multipart/form-data" } });
+    },
+    onMutate: () => setAttachmentUploading(true),
+    onSettled: () => setAttachmentUploading(false),
+    onSuccess: () => { refetchAttachment(); toast.success("Attachment uploaded"); },
+    onError: () => toast.error("Failed to upload attachment"),
+  });
+
+  const removeAttachmentMutation = useMutation({
+    mutationFn: () => api.delete("/email-settings/attachment"),
+    onSuccess: () => { refetchAttachment(); toast.success("Attachment removed"); },
+    onError: () => toast.error("Failed to remove attachment"),
   });
 
   // ── Template mutations ──
@@ -412,6 +440,79 @@ export default function BuyerEmailTemplatesPage() {
           ))}
         </div>
       )}
+
+      {/* ── Email Attachment ── */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+              <Paperclip className="h-4 w-4 text-brand-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800 text-sm">Campaign Attachment</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                A single file attached to every buyer intro &amp; follow-up email (e.g. company profile, brochure).
+              </p>
+            </div>
+          </div>
+          {canEdit && (
+            <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-colors shrink-0
+              ${attachmentUploading
+                ? "border-slate-200 bg-slate-50 text-slate-400 pointer-events-none"
+                : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"}`}>
+              {attachmentUploading
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Upload className="h-3.5 w-3.5" />}
+              {currentAttachment ? "Replace" : "Upload"}
+              <input
+                type="file"
+                className="hidden"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg"
+                disabled={attachmentUploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadAttachmentMutation.mutate(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
+        </div>
+
+        <div className="mt-4">
+          {currentAttachment ? (
+            <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+              <Paperclip className="h-4 w-4 text-slate-400 shrink-0" />
+              <span className="text-sm text-slate-700 font-medium flex-1 truncate">{currentAttachment.filename}</span>
+              <a
+                href={currentAttachment.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 shrink-0"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> View
+              </a>
+              {canEdit && (
+                <button
+                  onClick={() => removeAttachmentMutation.mutate()}
+                  disabled={removeAttachmentMutation.isPending}
+                  className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors shrink-0"
+                  title="Remove attachment"
+                >
+                  {removeAttachmentMutation.isPending
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <X className="h-3.5 w-3.5" />}
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-lg px-4 py-3">
+              <Paperclip className="h-3.5 w-3.5" />
+              No attachment set — buyer emails will be sent without one.
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ── Template Editor Dialog ── */}
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>

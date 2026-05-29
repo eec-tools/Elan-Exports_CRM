@@ -2,7 +2,7 @@ import { Response } from "express";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { createNotification } from "../services/notificationService.js";
-import { sendGmailEmail, fetchThreadReplies, getSmtpMessageId } from "../services/gmailService.js";
+import { sendGmailEmail, fetchThreadReplies, getSmtpMessageId, getGlobalEmailAttachment } from "../services/gmailService.js";
 import { getBuyerTemplate, getCustomBuyerTemplate, CustomEmailTemplate } from "../services/emailTemplates.js";
 import { fetchDefaultSignatureForAccount } from "./emailSignatures.controller.js";
 import { BUYER_GMAIL_ACCOUNT } from "./sourcingBuyers.controller.js";
@@ -87,11 +87,13 @@ export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?:
             html = result.html;
         }
 
+        const attachment = await getGlobalEmailAttachment();
         const { messageId, threadId } = await sendGmailEmail({
             fromEmail,
             to: buyer.email,
             subject,
             html,
+            attachments: attachment ? [attachment] : undefined,
         });
 
         const now = new Date();
@@ -196,6 +198,7 @@ export async function executeSendStep(sourcingBuyerId: string, createdBy?: strin
         ? await getSmtpMessageId(fromEmail, campaign.gmailMessageId)
         : null;
 
+    const attachment = await getGlobalEmailAttachment();
     await sendGmailEmail({
         fromEmail,
         to: buyer.email,
@@ -204,6 +207,7 @@ export async function executeSendStep(sourcingBuyerId: string, createdBy?: strin
         threadId: campaign.gmailThreadId ?? undefined,
         inReplyTo: smtpMessageId ?? undefined,
         references: smtpMessageId ?? undefined,
+        attachments: attachment ? [attachment] : undefined,
     });
 
     const now = new Date();

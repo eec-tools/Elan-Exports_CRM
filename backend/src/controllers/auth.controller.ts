@@ -5,6 +5,8 @@ import { comparePassword } from "../utils/password.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
 
+const VALID_COMPANIES = ["EEC", "Skin'd India"];
+
 /**
  * POST /api/auth/login
  */
@@ -57,7 +59,9 @@ export async function login(req: Request, res: Response): Promise<void> {
           permission: p.permission,
           accessLevel: p.accessLevel,
         })),
-        assignedCompanies: user.assignedCompanies || [],
+        assignedCompanies: (user.assignedCompanies || []).filter((c) =>
+          VALID_COMPANIES.includes(c)
+        ),
       },
     });
   } catch (err) {
@@ -98,7 +102,9 @@ export async function getMe(req: AuthRequest, res: Response): Promise<void> {
         permission: p.permission,
         accessLevel: p.accessLevel,
       })),
-      assignedCompanies: user.assignedCompanies || [],
+      assignedCompanies: (user.assignedCompanies || []).filter((c) =>
+          VALID_COMPANIES.includes(c)
+        ),
     });
   } catch (err) {
     console.error("GetMe error:", err);
