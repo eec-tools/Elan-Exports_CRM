@@ -280,6 +280,7 @@ export async function sendBulkEmail(
             status: "pending",
             assignedGmailAccount: BUYER_GMAIL_ACCOUNT,
             emailTemplateId: emailTemplateId || null,
+            buyerVaultContactId: contact.id,
             createdBy: req.user!.id,
           },
         });

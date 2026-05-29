@@ -220,7 +220,7 @@ async function checkBuyerCampaignReplies() {
                 gmailThreadId: { not: null },
             },
             include: {
-                sourcingBuyer: { select: { id: true, company: true, email: true } },
+                sourcingBuyer: { select: { id: true, company: true, email: true, buyerVaultContactId: true } },
             },
         });
 
@@ -237,7 +237,7 @@ async function checkBuyerCampaignReplies() {
                 const hasReply = await syncBuyerThreadMessages(buyer.id, campaign.gmailThreadId);
 
                 if (hasReply && campaign.status === "active") {
-                    await (prisma as any).$transaction([
+                    const updateOps: any[] = [
                         (prisma as any).sourcingBuyerEmailCampaign.update({
                             where: { sourcingBuyerId: buyer.id },
                             data: { status: "response_received", responseReceivedAt: new Date(), nextFollowupDue: null },
@@ -246,7 +246,16 @@ async function checkBuyerCampaignReplies() {
                             where: { id: buyer.id },
                             data: { status: "response_received" },
                         }),
-                    ]);
+                    ];
+                    if (buyer.buyerVaultContactId) {
+                        updateOps.push(
+                            (prisma as any).buyerVaultContact.update({
+                                where: { id: buyer.buyerVaultContactId },
+                                data: { emailStatus: "Responded" },
+                            })
+                        );
+                    }
+                    await (prisma as any).$transaction(updateOps);
 
                     await createNotification({
                         type: "buyer_response_received",

@@ -1309,6 +1309,7 @@ model SourcingBuyer {
   // "pending"|"intro_sent"|"followup1_sent"|"followup2_sent"|"followup3_sent"|"response_received"|"no_response"|"converted_to_buyer"|"invalid"
   assignedGmailAccount String?                     @map("assigned_gmail_account")
   emailTemplateId      String?                     @map("email_template_id")
+  buyerVaultContactId  String?                     @map("buyer_vault_contact_id")
   createdBy            String?                     @map("created_by")
   creator              User?                       @relation(fields: [createdBy], references: [id])
   emailCampaign        SourcingBuyerEmailCampaign?
