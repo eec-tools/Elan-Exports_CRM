@@ -90,7 +90,7 @@ export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?:
         const attachment = await getGlobalEmailAttachment();
         const { messageId, threadId } = await sendGmailEmail({
             fromEmail,
-            to: buyer.email,
+            to: buyer.email.split(";").map((e: string) => e.trim()).filter(Boolean).join(", "),
             subject,
             html,
             attachments: attachment ? [attachment] : undefined,

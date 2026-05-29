@@ -153,7 +153,7 @@ const BULK_COLS: {
   { key: "company", label: "Company *", required: true, width: "180px" },
   { key: "products", label: "Products", width: "180px" },
   { key: "certifications", label: "Certifications", width: "180px" },
-  { key: "email", label: "Email *", required: true, width: "180px" },
+  { key: "email", label: "Email *", required: true, width: "260px" },
 ];
 
 // ─── Main Page ────────────────────────────────────────
@@ -1213,6 +1213,19 @@ function BulkAddDialog({
       return null;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmailRows = new Set<number>();
+    rows.forEach((r, i) => {
+      if (!validRows.includes(r)) return;
+      const parts = r.email.trim().split(";").map((e) => e.trim()).filter(Boolean);
+      if (parts.some((e) => !emailRegex.test(e))) invalidEmailRows.add(i);
+    });
+    if (invalidEmailRows.size > 0) {
+      setErrors(invalidEmailRows);
+      toast.error("One or more email addresses are invalid. Use semicolons to separate multiple emails.");
+      return null;
+    }
+
     return validRows;
   }
 
@@ -1415,7 +1428,7 @@ function BulkAddDialog({
                               ? "ring-2 ring-red-400 bg-red-50 placeholder-red-300"
                               : "focus:ring-primary/40 focus:bg-background"
                           }`}
-                          placeholder={col.required ? "Required" : ""}
+                          placeholder={col.key === "email" ? "abc@xyz.com; def@xyz.com" : col.required ? "Required" : ""}
                           value={row[col.key]}
                           onChange={(e) =>
                             updateCell(ri, col.key, e.target.value)
