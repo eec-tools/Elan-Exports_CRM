@@ -41,13 +41,13 @@ function countDaysExcludingSundays(start: Date, end: Date): number {
 }
 
 /**
- * Count the employee's scheduled working days in the month.
- * - Sunday is treated as an official paid day.
- * - Saturday is off only when saturdaySchedule === "off".
- * - Full and half Saturday schedules count Saturday as a working day.
- *
- * This is the denominator for perDaySalary so that an employee who
- * works every scheduled day receives exactly their monthlySalary.
+ * Count the employee's scheduled days in the month (the salary denominator).
+ * Sundays ARE included — they are official paid-off days counted in the denominator
+ * so that perDaySalary stays proportionate and a fully-present employee earns
+ * exactly their monthlySalary.
+ * Saturdays are excluded only when saturdaySchedule === "off".
+ * Declared holidays are NOT subtracted — their paid days are added to paidDays
+ * (numerator) instead, which preserves the salary balance.
  */
 function countScheduledWorkingDays(month: number, year: number, saturdaySchedule: string): number {
   const daysInMonth = getDaysInMonth(month, year);
@@ -71,11 +71,40 @@ function countSundaysInMonth(month: number, year: number): number {
 }
 
 /**
+ * Count holidays that fall on scheduled working days (not Sundays, not off-Saturdays).
+ * These days are automatically paid regardless of attendance.
+ * Returns { count, paidDays } where count = total holidays in month,
+ * paidDays = holidays on scheduled working days.
+ */
+async function countHolidaysInMonth(
+  month: number,
+  year: number,
+  saturdaySchedule: string,
+): Promise<{ count: number; paidDays: number }> {
+  const holidays = await prisma.holiday.findMany({
+    where: {
+      date: {
+        gte: new Date(Date.UTC(year, month - 1, 1)),
+        lte: new Date(Date.UTC(year, month - 1, getDaysInMonth(month, year))),
+      },
+    },
+    select: { date: true },
+  });
+
+  let paidDays = 0;
+  for (const h of holidays) {
+    const dow = h.date.getUTCDay(); // 0=Sun, 6=Sat
+    if (dow === 0) continue; // Sunday already paid via sundayPaidDays
+    if (dow === 6 && saturdaySchedule === "off") continue; // Off Saturday, employee already has the day off
+    paidDays++;
+  }
+
+  return { count: holidays.length, paidDays };
+}
+
+/**
  * Regular present days: days where isWeekendWork=false and status Present/HalfDay.
- * - For "off" schedule: these are Mon–Fri days.
- * - For "full"/"half" schedule: Mon–Fri + Saturdays (since Saturdays have isWeekendWork=false).
- * HalfDay counts as 0.5 — but note that Saturday half-day employees always get
- * Present (not HalfDay) status since they check out at 2 PM on a normal checkout flow.
+ * HalfDay counts as 0.5.
  */
 async function countRegularPresentDays(
   userId: string,
@@ -99,9 +128,7 @@ async function countRegularPresentDays(
 
 /**
  * Bonus days worked on off days (isWeekendWork=true).
- * - Sundays are official paid days, so they are not treated as bonus days.
- * - For "off" schedule: only Saturdays voluntarily worked are bonus.
- * - For "full"/"half" schedule: Saturdays are regular workdays, so no weekend bonus.
+ * Sundays are official paid days, so they are not treated as bonus days.
  */
 async function countBonusDaysWorked(
   userId: string,
@@ -192,18 +219,24 @@ async function countApprovedLeavesYTD(
  * Formula:
  *   scheduledWorkingDays = Mon–Fri + Saturdays (if full/half schedule) in the month
  *   perDaySalary         = monthlySalary / scheduledWorkingDays
- *   sundayPaidDays       = Sundays in month (official paid days)
+ *   sundayPaidDays       = Sundays in month (official paid days off)
+ *   holidayPaidDays      = declared holidays falling on scheduled working days (paid days off)
+ *   holidayCount         = total holidays declared in the month
  *   regularPresentDays   = days clocked in on scheduled working days (isWeekendWork=false)
- *                          HalfDay = 0.5; Saturday half-day employees always get Present = 1.0
- *   bonusDaysWorked      = days worked on off days (isWeekendWork=true) — paid at same perDaySalary
- *   paidDays             = regularPresentDays + sundayPaidDays + bonusDaysWorked + approvedLeavesThisMonth
+ *                          HalfDay = 0.5
+ *   bonusDaysWorked      = days worked on off days (isWeekendWork=true) — paid at perDaySalary
+ *   approvedLeavesMonth  = approved leave days in this month (within quota = paid)
+ *   paidDays             = regularPresentDays + sundayPaidDays + bonusDaysWorked
+ *                          + approvedLeavesMonth + holidayPaidDays
  *   grossSalary          = perDaySalary × paidDays
  *   excessLeaveDays      = min(max(0, approvedLeavesYTD − 14), approvedLeavesThisMonth)
  *   leaveSalaryDeduction = perDaySalary × excessLeaveDays
  *   netSalary            = grossSalary − leaveSalaryDeduction − professionalTax
  *
- * Note: if an employee works ALL their scheduled days, paidDays = scheduledWorkingDays
- * and grossSalary ≈ monthlySalary (leaves may push it above if within quota).
+ * Holiday note: holidays are always paid even if the employee was absent on that day.
+ * If an employee works on a holiday, their Present record counts in regularPresentDays
+ * AND holidayPaidDays still applies — effectively double pay for working on a holiday,
+ * which is the standard practice for declared public holidays.
  */
 export async function generatePayroll(
   userId: string,
@@ -233,25 +266,34 @@ export async function generatePayroll(
   const sundayPaidDays = countSundaysInMonth(month, year);
 
   // Step 2: Per-day rate based on employee's actual work schedule
-  // Employees who work every scheduled day receive exactly their monthlySalary
   const perDaySalary = user.monthlySalary / scheduledWorkingDays;
 
   // Step 3: Attendance counts
   const weekdayPresentDays = await countRegularPresentDays(userId, month, year);
   const weekendWorkedDays = await countBonusDaysWorked(userId, month, year);
 
-  // Step 4: Leave counts
+  // Step 4: Holiday counts
+  const { count: holidayCount, paidDays: holidayPaidDays } = await countHolidaysInMonth(
+    month, year, user.saturdaySchedule,
+  );
+
+  // Step 5: Leave counts
   const approvedLeavesMonth = await countApprovedLeavesInMonth(userId, month, year);
   const approvedLeavesYTD = await countApprovedLeavesYTD(userId, year, month);
 
-  // Step 5: Excess leave calculation (annual quota = 14 days)
+  // Step 6: Excess leave calculation (annual quota = 14 days)
   const excessLeavesYTD = Math.max(0, approvedLeavesYTD - 14);
   const excessLeaveDays = Math.min(excessLeavesYTD, approvedLeavesMonth);
 
-  // Step 6: Paid days — presence + bonus days + approved leaves (excess deducted below)
-  const paidDays = weekdayPresentDays + sundayPaidDays + weekendWorkedDays + approvedLeavesMonth;
+  // Step 7: Paid days — presence + Sundays + bonus days + leaves + holidays
+  const paidDays =
+    weekdayPresentDays +
+    sundayPaidDays +
+    weekendWorkedDays +
+    approvedLeavesMonth +
+    holidayPaidDays;
 
-  // Step 7: Salary calculation
+  // Step 8: Salary calculation
   const grossSalary = perDaySalary * paidDays;
   const leaveSalaryDeduction = perDaySalary * excessLeaveDays;
   const professionalTax = calculatePT(user.monthlySalary, user.gender, month);
@@ -268,6 +310,8 @@ export async function generatePayroll(
       saturdaySchedule: user.saturdaySchedule,
       weekdayPresentDays,
       weekendWorkedDays,
+      holidayCount,
+      holidayPaidDays,
       approvedLeavesMonth,
       excessLeaveDays,
       paidDays,
@@ -283,6 +327,8 @@ export async function generatePayroll(
       saturdaySchedule: user.saturdaySchedule,
       weekdayPresentDays,
       weekendWorkedDays,
+      holidayCount,
+      holidayPaidDays,
       approvedLeavesMonth,
       excessLeaveDays,
       paidDays,

@@ -1137,10 +1137,21 @@ model Payroll {
   professionalTax      Float    @map("professional_tax")
   netSalary            Float    @map("net_salary")
   generatedAt          DateTime @default(now()) @map("generated_at")
+  holidayCount         Int      @default(0) @map("holiday_count")
+  holidayPaidDays      Float    @default(0) @map("holiday_paid_days")
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, month, year])
   @@map("payrolls")
+}
+
+model Holiday {
+  id        String   @id @default(uuid())
+  date      DateTime @unique @db.Date
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("holidays")
 }
 
 model AttendanceSettings {

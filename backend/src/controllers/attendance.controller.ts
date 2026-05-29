@@ -744,9 +744,20 @@ export async function getAttendanceHistory(req: AuthRequest, res: Response): Pro
 
     const rawHistory = records.map((r) => serializeAttendance(r, user.minHoursPresent, user.workStartTime, user.workEndTime));
 
-    // Exclude Sunday absent records — Sundays are paid holidays, not absent days
+    // Fetch holidays in the date range to exclude no-show Absents on holiday dates
+    const holidays = await prisma.holiday.findMany({
+      where: { date: { gte: startOfLocalDay(startDate), lte: startOfLocalDay(endDate) } },
+      select: { date: true },
+    });
+    const holidayDateSet = new Set(holidays.map((h) => h.date.toISOString()));
+
+    // Exclude Absent records on Sundays and declared holidays (both are paid days off)
     const history = rawHistory.filter((h) => {
-      if (h.status === "Absent") return new Date(h.date).getDay() !== 0;
+      if (h.status === "Absent") {
+        const d = new Date(h.date);
+        if (d.getDay() === 0) return false;
+        if (holidayDateSet.has(d.toISOString())) return false;
+      }
       return true;
     });
 
@@ -872,7 +883,12 @@ export async function getAdminTodayAttendance(
       };
     });
 
-    res.json({ date: today, rows });
+    const todayHoliday = await prisma.holiday.findUnique({
+      where: { date: today },
+      select: { id: true, name: true },
+    });
+
+    res.json({ date: today, rows, todayHoliday: todayHoliday ?? null });
   } catch (err) {
     console.error("Get admin today attendance error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -933,9 +949,20 @@ export async function getAdminAttendanceHistory(
       email: r.user.email,
     }));
 
-    // Exclude Sunday absent records — Sundays are paid holidays, not absent days
+    // Fetch holidays in the date range to exclude no-show Absents on holiday dates
+    const holidays = await prisma.holiday.findMany({
+      where: { date: { gte: startOfLocalDay(startDate), lte: startOfLocalDay(endDate) } },
+      select: { date: true },
+    });
+    const holidayDateSet = new Set(holidays.map((h) => h.date.toISOString()));
+
+    // Exclude Absent records on Sundays and declared holidays (both are paid days off)
     const history = rawHistory.filter((h) => {
-      if (h.status === "Absent") return new Date(h.date).getDay() !== 0;
+      if (h.status === "Absent") {
+        const d = new Date(h.date);
+        if (d.getDay() === 0) return false;
+        if (holidayDateSet.has(d.toISOString())) return false;
+      }
       return true;
     });
 

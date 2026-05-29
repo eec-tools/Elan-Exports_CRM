@@ -18,6 +18,8 @@ interface Payroll {
   saturdaySchedule: string;
   weekdayPresentDays: number;
   weekendWorkedDays: number;
+  holidayCount: number;
+  holidayPaidDays: number;
   approvedLeavesMonth: number;
   excessLeaveDays: number;
   paidDays: number;
@@ -177,11 +179,33 @@ export default function PayrollSlipPage() {
             </p>
             <SlipRow label="Monthly Salary" value={fmt(payroll.user.monthlySalary ?? 0)} />
             <SlipRow
-              label={`Per Day Salary (÷ ${payroll.scheduledWorkingDays} working days)`}
+              label={`Per Day Salary (÷ ${payroll.scheduledWorkingDays} scheduled days)`}
               value={fmt(payroll.perDaySalary)}
             />
+
+            <div className="border-t border-slate-100 my-2" />
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide pb-1">
+              Paid Days Breakdown
+            </p>
+            <SlipRow label="Days Present" value={String(payroll.weekdayPresentDays)} />
+            <SlipRow label="Sundays (paid off)" value={String(Math.round(payroll.paidDays - payroll.weekdayPresentDays - payroll.weekendWorkedDays - payroll.approvedLeavesMonth - payroll.holidayPaidDays))} />
+            {payroll.weekendWorkedDays > 0 && (
+              <SlipRow label="Bonus Days (weekend work)" value={String(payroll.weekendWorkedDays)} />
+            )}
+            {payroll.holidayPaidDays > 0 && (
+              <SlipRow
+                label={`Holidays (${payroll.holidayCount} declared, ${payroll.holidayPaidDays} on working days)`}
+                value={String(payroll.holidayPaidDays)}
+              />
+            )}
+            {payroll.approvedLeavesMonth > 0 && (
+              <SlipRow label="Approved Leaves" value={String(payroll.approvedLeavesMonth)} />
+            )}
+            <SlipRow label="Total Paid Days" value={String(payroll.paidDays)} bold />
+
+            <div className="border-t border-slate-100 my-2" />
             <SlipRow
-              label={`Gross Salary (× ${payroll.paidDays} paid days)`}
+              label={`Gross Salary (${fmt(payroll.perDaySalary)} × ${payroll.paidDays} days)`}
               value={fmt(payroll.grossSalary)}
             />
 
@@ -216,10 +240,14 @@ export default function PayrollSlipPage() {
             {/* Formula note */}
             <div className="border-t border-slate-100 mt-3 pt-3">
               <p className="text-[10px] text-slate-400 leading-relaxed">
-                Net = ({fmt(payroll.user.monthlySalary ?? 0)} ÷ {payroll.scheduledWorkingDays} work days) × {payroll.paidDays} paid days
-                {payroll.leaveSalaryDeduction > 0
-                  ? ` − ${fmt(payroll.leaveSalaryDeduction)} (excess leaves)`
-                  : ""}
+                Paid days = {payroll.weekdayPresentDays} present
+                {" "}+ {Math.round(payroll.paidDays - payroll.weekdayPresentDays - payroll.weekendWorkedDays - payroll.approvedLeavesMonth - payroll.holidayPaidDays)} Sundays
+                {payroll.holidayPaidDays > 0 ? ` + ${payroll.holidayPaidDays} holidays` : ""}
+                {payroll.weekendWorkedDays > 0 ? ` + ${payroll.weekendWorkedDays} bonus` : ""}
+                {payroll.approvedLeavesMonth > 0 ? ` + ${payroll.approvedLeavesMonth} leaves` : ""}
+                {" "}= {payroll.paidDays}
+                {" "}· Net = ({fmt(payroll.user.monthlySalary ?? 0)} ÷ {payroll.scheduledWorkingDays}) × {payroll.paidDays}
+                {payroll.leaveSalaryDeduction > 0 ? ` − ${fmt(payroll.leaveSalaryDeduction)} (excess leaves)` : ""}
                 {payroll.professionalTax > 0 ? ` − ${fmt(payroll.professionalTax)} (PT)` : ""}
                 {" "}= {fmt(payroll.netSalary)}
               </p>

@@ -183,6 +183,10 @@ async function markNoShowAbsent(): Promise<void> {
   try {
     const today = startOfLocalDay();
 
+    // Skip marking absent on holidays — everyone is paid without attending
+    const todayHoliday = await prisma.holiday.findUnique({ where: { date: today } });
+    if (todayHoliday) return;
+
     // Get all active users
     const activeUsers = await prisma.user.findMany({
       where: {

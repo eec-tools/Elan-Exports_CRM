@@ -9,11 +9,13 @@ import {
   Eye,
   ExternalLink,
   FileText,
+  Gift,
   Loader2,
   LogIn,
   LogOut,
   MoreVertical,
   Paperclip,
+  Plus,
   Square,
   Timer,
   Trash2,
@@ -55,6 +57,13 @@ import { useAuth } from "@/contexts/AuthContext";
 /* ─── Types ────────────────────────────────────────── */
 
 type AttendanceStatus = "Present" | "Absent";
+
+interface Holiday {
+  id: string;
+  date: string;
+  name: string;
+  createdAt: string;
+}
 
 interface AttendanceRecord {
   id: string;
@@ -134,6 +143,7 @@ interface AdminAttendanceRow {
 interface AdminTodayResponse {
   date: string;
   rows: AdminAttendanceRow[];
+  todayHoliday: { id: string; name: string } | null;
 }
 
 interface HistorySummary {
@@ -382,7 +392,7 @@ function StatCard({ label, value, sublabel, icon: Icon, color = "slate" }: {
 export default function AttendanceDashboardPage() {
   const queryClient = useQueryClient();
   const { isAdmin, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"my" | "history" | "admin" | "admin-history">(
+  const [activeTab, setActiveTab] = useState<"my" | "history" | "admin" | "admin-history" | "holidays">(
     isAdmin ? "admin" : "my"
   );
   const [historyRange, setHistoryRange] = useState("30d");
@@ -399,6 +409,8 @@ export default function AttendanceDashboardPage() {
   const [proofViewerOpen, setProofViewerOpen] = useState(false);
   const [selectedProofRecord, setSelectedProofRecord] = useState<HistoryRecord | null>(null);
   const [loadedDraftKey, setLoadedDraftKey] = useState<string | null>(null);
+  const [newHolidayDate, setNewHolidayDate] = useState("");
+  const [newHolidayName, setNewHolidayName] = useState("");
 
   /* ─── Queries ────────────────────────────────────── */
 
@@ -428,6 +440,33 @@ export default function AttendanceDashboardPage() {
     queryKey: ["admin-attendance-history", adminHistoryRange],
     queryFn: () => api.get("/attendance/admin/history", { params: adminHistoryParams }).then((r) => r.data),
     enabled: isAdmin && activeTab === "admin-history",
+  });
+
+  const currentYear = new Date().getFullYear();
+  const holidaysQuery = useQuery<Holiday[]>({
+    queryKey: ["holidays", currentYear],
+    queryFn: () => api.get(`/holidays?year=${currentYear}`).then((r) => r.data),
+    enabled: isAdmin,
+  });
+
+  const createHolidayMutation = useMutation({
+    mutationFn: (data: { date: string; name: string }) => api.post("/holidays", data),
+    onSuccess: () => {
+      toast.success("Holiday added.");
+      setNewHolidayDate("");
+      setNewHolidayName("");
+      queryClient.invalidateQueries({ queryKey: ["holidays", currentYear] });
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, "Could not add holiday")),
+  });
+
+  const deleteHolidayMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/holidays/${id}`),
+    onSuccess: () => {
+      toast.success("Holiday removed.");
+      queryClient.invalidateQueries({ queryKey: ["holidays", currentYear] });
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, "Could not remove holiday")),
   });
 
   const earliestCheckoutMs = todayQuery.data?.earliestCheckoutTime
@@ -466,6 +505,8 @@ export default function AttendanceDashboardPage() {
   const todayIsSunday = adminTodayQuery.data
     ? new Date(adminTodayQuery.data.date).getDay() === 0
     : new Date().getDay() === 0;
+
+  const todayHoliday = adminTodayQuery.data?.todayHoliday ?? null;
 
   /* ─── Mutations ──────────────────────────────────── */
 
@@ -703,6 +744,9 @@ export default function AttendanceDashboardPage() {
             </TabButton>
             <TabButton active={activeTab === "admin-history"} onClick={() => setActiveTab("admin-history")} icon={TrendingUp}>
               Team Analytics
+            </TabButton>
+            <TabButton active={activeTab === "holidays"} onClick={() => setActiveTab("holidays")} icon={Gift}>
+              Holidays
             </TabButton>
           </>
         )}
@@ -972,6 +1016,16 @@ export default function AttendanceDashboardPage() {
             <h2 className="text-lg font-semibold text-slate-900">Team Attendance — Today</h2>
           </div>
 
+          {todayHoliday && (
+            <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+              <Gift className="h-5 w-5 text-violet-600 shrink-0" />
+              <div>
+                <p className="font-semibold text-violet-800">Today is a Holiday — {todayHoliday.name}</p>
+                <p className="text-xs text-violet-600 mt-0.5">No attendance required. Everyone is marked as paid for today.</p>
+              </div>
+            </div>
+          )}
+
           {adminTodayQuery.isLoading ? (
             <div className="py-16 text-center">
               <Loader2 className="mx-auto h-6 w-6 animate-spin text-slate-400" />
@@ -1064,9 +1118,9 @@ export default function AttendanceDashboardPage() {
                             </td>
                             <td className="px-4 py-3 font-semibold text-slate-700 whitespace-nowrap">{row.realTimeLabel}</td>
                             <td className="px-4 py-3">
-                              {todayIsSunday && !row.startTime ? (
-                                <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
-                                  Holiday
+                              {(todayIsSunday || todayHoliday) && !row.startTime ? (
+                                <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
+                                  {todayHoliday ? todayHoliday.name : "Sunday"}
                                 </span>
                               ) : (
                                 <StatusPill status={row.status} autoEnded={row.autoEnded} />
@@ -1434,6 +1488,125 @@ export default function AttendanceDashboardPage() {
               </div>
             </>
           ) : null}
+        </div>
+      )}
+
+      {/* ═══ Admin: Holidays ═══ */}
+      {activeTab === "holidays" && isAdmin && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-2">
+            <Gift className="h-5 w-5 text-slate-500" />
+            <h2 className="text-lg font-semibold text-slate-900">Holiday Calendar — {currentYear}</h2>
+          </div>
+
+          {/* Info banner */}
+          <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-700">
+            Declared holidays are <strong>paid days off</strong> for all employees. The scheduler will not mark anyone Absent on these dates, and payroll automatically adds holiday days to each employee's paid days count.
+          </div>
+
+          {/* Add holiday form */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">Declare a New Holiday</h3>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-500">Date</label>
+                <input
+                  type="date"
+                  value={newHolidayDate}
+                  onChange={(e) => setNewHolidayDate(e.target.value)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+                />
+              </div>
+              <div className="flex flex-col gap-1 flex-1">
+                <label className="text-xs font-medium text-slate-500">Holiday Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Diwali, Republic Day…"
+                  value={newHolidayName}
+                  onChange={(e) => setNewHolidayName(e.target.value)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newHolidayDate && newHolidayName.trim()) {
+                      createHolidayMutation.mutate({ date: newHolidayDate, name: newHolidayName.trim() });
+                    }
+                  }}
+                />
+              </div>
+              <Button
+                onClick={() => createHolidayMutation.mutate({ date: newHolidayDate, name: newHolidayName.trim() })}
+                disabled={!newHolidayDate || !newHolidayName.trim() || createHolidayMutation.isPending}
+                className="gap-2 bg-violet-600 hover:bg-violet-700 text-white shrink-0"
+              >
+                {createHolidayMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Add Holiday
+              </Button>
+            </div>
+          </div>
+
+          {/* Holiday list */}
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            {holidaysQuery.isLoading ? (
+              <div className="py-12 text-center">
+                <Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-400" />
+              </div>
+            ) : (holidaysQuery.data?.length ?? 0) === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-sm">
+                No holidays declared for {currentYear}. Add one above.
+              </div>
+            ) : (
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Holiday Name</th>
+                    <th className="px-4 py-3">Day</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(holidaysQuery.data ?? []).map((h) => {
+                    const d = new Date(h.date);
+                    const dayName = d.toLocaleDateString("en-IN", { weekday: "long", timeZone: "UTC" });
+                    const dow = d.getUTCDay();
+                    const isWeekend = dow === 0 || dow === 6;
+                    return (
+                      <tr key={h.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">
+                          {d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex h-2 w-2 rounded-full bg-violet-500 shrink-0" />
+                            <span className="font-semibold text-slate-800">{h.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border ${
+                            isWeekend
+                              ? "bg-amber-50 border-amber-200 text-amber-700"
+                              : "bg-violet-50 border-violet-200 text-violet-700"
+                          }`}>
+                            {dayName}
+                            {isWeekend && <span className="ml-1 opacity-60">(weekend)</span>}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => deleteHolidayMutation.mutate(h.id)}
+                            disabled={deleteHolidayMutation.isPending}
+                            className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                            title="Remove holiday"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
 
