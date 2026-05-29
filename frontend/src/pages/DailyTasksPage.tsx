@@ -50,7 +50,7 @@ interface PaginationData {
 const PRIORITY_OPTIONS = ["Urgent", "High", "Medium", "Low"];
 const STATUS_OPTIONS = ["Pending", "completed", "closed"];
 const OWNER_OPTIONS: string[] = [];
-const ALL_COMPANIES = ["EEC", "MTG", "Skin'd India", "Fresh Food Company"];
+const ALL_COMPANIES = ["EEC", "Skin'd India"];
 
 // Premium styling helpers
 const priorityStyles = (p: string | null) => {

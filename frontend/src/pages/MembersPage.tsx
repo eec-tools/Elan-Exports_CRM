@@ -36,7 +36,8 @@ interface Member {
 }
 
 const PERMISSIONS = [
-  "buyers",
+  "buyers_directory",
+  "sourcing_buyers",
   "new_suppliers",
   "signed_suppliers",
   "old_suppliers",
@@ -51,6 +52,8 @@ const PERMISSIONS = [
 ];
 
 const formatPermission = (perm: string) => {
+  if (perm === "buyers_directory") return "Buyers Directory";
+  if (perm === "sourcing_buyers") return "Sourcing Buyers";
   if (perm === "task_tracker") return "Daily Task Tracker";
   if (perm === "email_tracker") return "Email Tracker";
   if (perm === "new_suppliers") return "New Suppliers";
@@ -61,7 +64,7 @@ const formatPermission = (perm: string) => {
   return perm.replace('_', ' ');
 };
 
-const ALL_COMPANIES = ["EEC", "MTG", "Skin'd India", "Fresh Food Company"];
+const ALL_COMPANIES = ["EEC", "Skin'd India"];
 
 export default function MembersPage() {
   const queryClient = useQueryClient();

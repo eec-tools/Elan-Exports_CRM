@@ -15,7 +15,9 @@ import { toast } from "sonner";
 import api from "@/api/client";
 
 const permissionMap: Record<string, string> = {
-  "/buyers": "buyers",
+  "/buyers": "buyers_directory",
+  "/buyers/sourcing-vault": "sourcing_buyers",
+  "/buyers/sourcing": "sourcing_buyers",
   "/suppliers": "suppliers",
   "/reports": "reports",
   "/analytics": "analytics",

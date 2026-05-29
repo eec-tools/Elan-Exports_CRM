@@ -160,7 +160,7 @@ const BULK_COLS: {
 
 export default function BuyersSourcingVaultPage() {
   const { hasEditPermission } = useAuth();
-  const canEdit = hasEditPermission("buyers");
+  const canEdit = hasEditPermission("sourcing_buyers");
   const queryClient = useQueryClient();
 
   const [currentFolder, setCurrentFolder] = useState<VaultFolder | null>(null);

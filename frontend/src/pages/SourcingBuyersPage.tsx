@@ -376,7 +376,7 @@ export default function SourcingBuyersPage() {
               </Button>
             </>
           )}
-          <PermissionGate permission="buyers" editOnly>
+          <PermissionGate permission="sourcing_buyers" editOnly>
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" />
               Add Sourcing Buyer
@@ -592,7 +592,7 @@ export default function SourcingBuyersPage() {
                           )}
 
                           {/* Delete */}
-                          <PermissionGate permission="buyers" editOnly>
+                          <PermissionGate permission="sourcing_buyers" editOnly>
                             <Button
                               size="sm" variant="ghost"
                               className="h-7 px-2 text-xs text-red-500 hover:bg-red-50"

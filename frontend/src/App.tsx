@@ -109,7 +109,7 @@ export default function App() {
                 <Route
                   path="buyers"
                   element={
-                    <PermissionGate permission="buyers">
+                    <PermissionGate permission="buyers_directory">
                       <BuyersPage />
                     </PermissionGate>
                   }
@@ -117,7 +117,7 @@ export default function App() {
                 <Route
                   path="buyers/sourcing-vault"
                   element={
-                    <PermissionGate permission="buyers">
+                    <PermissionGate permission="sourcing_buyers">
                       <BuyersSourcingVaultPage />
                     </PermissionGate>
                   }
@@ -125,7 +125,7 @@ export default function App() {
                 <Route
                   path="buyers/email-templates"
                   element={
-                    <PermissionGate permission="buyers">
+                    <PermissionGate permission="buyers_directory">
                       <BuyerEmailTemplatesPage />
                     </PermissionGate>
                   }
@@ -133,7 +133,7 @@ export default function App() {
                 <Route
                   path="buyers/sourcing"
                   element={
-                    <PermissionGate permission="buyers">
+                    <PermissionGate permission="sourcing_buyers">
                       <SourcingBuyersPage />
                     </PermissionGate>
                   }
@@ -141,7 +141,7 @@ export default function App() {
                 <Route
                   path="buyers/sourcing/:id"
                   element={
-                    <PermissionGate permission="buyers">
+                    <PermissionGate permission="sourcing_buyers">
                       <SourcingBuyerDetailsPage />
                     </PermissionGate>
                   }
@@ -149,7 +149,7 @@ export default function App() {
                 <Route
                   path="buyers/:id"
                   element={
-                    <PermissionGate permission="buyers">
+                    <PermissionGate permission="buyers_directory">
                       <BuyerDetailsPage />
                     </PermissionGate>
                   }
