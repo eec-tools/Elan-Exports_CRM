@@ -102,7 +102,7 @@ export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?:
                     status: "active",
                     currentStep: 1,
                     introEmailSentAt: now,
-                    nextFollowupDue: addDays(now, 7),
+                    nextFollowupDue: addDays(now, 3),
                     gmailThreadId: threadId ?? null,
                     gmailMessageId: messageId ?? null,
                 },

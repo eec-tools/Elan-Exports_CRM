@@ -226,6 +226,7 @@ async function checkBuyerCampaignReplies() {
 
         if (campaigns.length === 0) return;
 
+        const now = new Date();
         const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
         for (const campaign of campaigns) {
@@ -256,6 +257,25 @@ async function checkBuyerCampaignReplies() {
                         entityName: buyer.company,
                         entityLink: `/buyers/sourcing/${buyer.id}`,
                     });
+                } else if (!hasReply && campaign.status === "active") {
+                    // FU3 sent + 3-day grace period passed + still no reply → mark completed
+                    if (
+                        campaign.currentStep === 4 &&
+                        campaign.nextFollowupDue &&
+                        new Date(campaign.nextFollowupDue) <= now
+                    ) {
+                        await (prisma as any).$transaction([
+                            (prisma as any).sourcingBuyerEmailCampaign.update({
+                                where: { sourcingBuyerId: buyer.id },
+                                data: { status: "completed", nextFollowupDue: null },
+                            }),
+                            (prisma as any).sourcingBuyer.update({
+                                where: { id: buyer.id },
+                                data: { status: "no_response" },
+                            }),
+                        ]);
+                        console.log(`[ReplyDetector] No reply after FU3 for buyer ${buyer.company} — marked completed`);
+                    }
                 }
             } catch (err) {
                 console.error(`[ReplyDetector] Buyer error for ${buyer.company}:`, err);
