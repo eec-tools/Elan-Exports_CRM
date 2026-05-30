@@ -589,6 +589,7 @@ export default function NewSupplierDetailsPage() {
   const openEdit = () => {
     setForm({
       ...(supplier || {}),
+      accountManager: supplier?.accountManager || supplier?.contactPerson || "",
       supplierProducts: supplier?.supplierProducts || [],
       productCatalogs: supplier?.productCatalogs || [],
       productCatalogImages: supplier?.productCatalogImages || [],
