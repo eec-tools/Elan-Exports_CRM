@@ -179,6 +179,8 @@ interface Supplier {
   factoryVisitDate?: string;
   factoryVisitOutcome?: string;
   referralSource?: string;
+  createdAt?: string;
+  convertedFromSourcingId?: string | null;
 }
 
 interface SupplierProduct {
@@ -284,6 +286,25 @@ const COMPLETENESS_FIELDS: string[] = [
   "haccpAvailable", "isoFsscCertNo", "paymentTerms", "incotermsSupported",
   "currencyPreferred", "moq",
 ];
+
+function isNewSupplier(createdAt?: string): boolean {
+  if (!createdAt) return false;
+  const created = new Date(createdAt);
+  const today = new Date();
+
+  const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  // Count non-Sunday days elapsed since creation
+  let nonSundayDays = 0;
+  const d = new Date(createdDay);
+  while (d < todayDay) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0) nonSundayDays++; // 0 = Sunday
+  }
+
+  return nonSundayDays <= 1;
+}
 
 function computeCompleteness(s: Partial<Supplier>): number {
   const rec = s as Record<string, unknown>;
@@ -1115,6 +1136,11 @@ export default function NewSuppliersPage() {
                         >
                           {s.company}
                         </Link>
+                        {isNewSupplier(s.createdAt) && (
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200">
+                            New
+                          </span>
+                        )}
                         {computeCompleteness(s) < 60 && (
                           <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200">
                             Incomplete

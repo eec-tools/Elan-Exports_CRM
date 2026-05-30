@@ -223,7 +223,7 @@ export async function getSourcingSupplierStats(
           where: { status: "response_received" },
         }),
         (prisma as any).sourcingSupplier.count({
-          where: { status: "converted" },
+          where: { status: { in: ["converted_to_new", "converted"] } },
         }),
         (prisma as any).sourcingSupplier.count({
           where: { status: "no_response" },
