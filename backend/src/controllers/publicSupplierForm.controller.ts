@@ -74,22 +74,12 @@ function scheduleSupplierThankYou(params: {
     assignedGmailAccount?: string | null;
     createdBy?: string | null;
 }): void {
-    const { supplierEmail, supplierCompany, contactPerson, assignedGmailAccount, createdBy } = params;
+    const { supplierEmail, supplierCompany, contactPerson, assignedGmailAccount } = params;
     setTimeout(async () => {
         try {
-            let senderEmail = process.env.SMTP_EMAIL ?? "sales@elanexports.com";
-            let senderName = "Élan Exports Team";
-
-            if (createdBy) {
-                const creator = await (prisma as any).user.findUnique({
-                    where: { id: createdBy },
-                    select: { email: true, fullName: true },
-                });
-                if (creator?.email) {
-                    senderEmail = creator.email;
-                    senderName = creator.fullName ?? senderName;
-                }
-            }
+            // Use assignedGmailAccount as sender (the account that sourced this supplier)
+            const senderEmail = assignedGmailAccount ?? process.env.SMTP_EMAIL ?? "sales@elanexports.com";
+            const senderName = "Élan Exports Team";
 
             const { subject, html } = buildSupplierThankYouEmailHtml({
                 contactPerson,
@@ -110,6 +100,7 @@ function scheduleSupplierThankYou(params: {
 }
 
 async function sendNotificationToCreator(
+    assignedGmailAccount: string | null | undefined,
     createdBy: string | null | undefined,
     params: {
         supplierCompany: string;
@@ -124,29 +115,43 @@ async function sendNotificationToCreator(
     }
 ): Promise<void> {
     try {
-        let recipientEmail: string | null = process.env.SMTP_EMAIL ?? null;
-        let adminName = "Team";
+        // Primary recipient = the Gmail account that did the sourcing
+        // (e.g. procurement1@eectrade.com, partners@eectrade.com, procurement2@eectrade.com)
+        // Fallback = the CRM user who created the record, then the SMTP account
+        let recipient: string | null = assignedGmailAccount ?? null;
+        let adminName = assignedGmailAccount ?? "Team";
 
-        if (createdBy) {
+        if (!recipient && createdBy) {
             const creator = await (prisma as any).user.findUnique({
                 where: { id: createdBy },
                 select: { email: true, fullName: true },
             });
             if (creator?.email) {
-                recipientEmail = creator.email;
+                recipient = creator.email;
                 adminName = creator.fullName ?? "Team";
             }
         }
 
-        if (!recipientEmail) return;
+        if (!recipient) {
+            recipient = process.env.SMTP_EMAIL ?? null;
+        }
+
+        if (!recipient) {
+            console.warn("[FormNotification] No recipient email found — skipping notification.");
+            return;
+        }
+
+        console.log(`[FormNotification] Sending submission notification for "${params.supplierCompany}" to: ${recipient}`);
 
         await sendFormSubmissionNotificationEmail({
-            to: recipientEmail,
+            to: recipient,
             adminName,
             ...params,
         });
+
+        console.log(`[FormNotification] Notification sent successfully to ${recipient}`);
     } catch (err) {
-        console.error("Form submission notification email failed:", err);
+        console.error("[FormNotification] Failed to send notification email:", err);
     }
 }
 
@@ -263,10 +268,11 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
                 });
             }
 
-            // Auto-convert to New Supplier on final submission if not already converted
-            if (finalSubmit && sourcing.status !== "converted_to_new") {
-                // Notify the creator (CRM user) immediately
-                sendNotificationToCreator(sourcing.createdBy, {
+            if (finalSubmit) {
+                const frontendBase = (process.env.FRONTEND_URL ?? "http://localhost:5173").split(",")[0];
+
+                // Notify the sourcing account (assignedGmailAccount) — awaited so errors appear in logs
+                await sendNotificationToCreator(sourcing.assignedGmailAccount, sourcing.createdBy, {
                     supplierCompany: merged.company,
                     contactPerson: merged.contactPerson,
                     supplierEmail: merged.email,
@@ -275,7 +281,7 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
                     product: merged.product,
                     country: merged.country,
                     city: merged.city,
-                    viewFormUrl: `${(process.env.FRONTEND_URL ?? "http://localhost:5173").split(",")[0]}/suppliers/sourcing/${sourcing.id}`,
+                    viewFormUrl: `${frontendBase}/suppliers/sourcing/${sourcing.id}`,
                 });
 
                 // Schedule a thank-you email to the supplier after 5 minutes
@@ -289,20 +295,22 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
                     });
                 }
 
-                try {
-                    const newSupplierId = await executeMarkResponse(sourcing.id);
-                    if (newSupplierId) {
-                        // Store the sourcing origin on the new supplier record
-                        await (prisma as any).newSupplier.update({
-                            where: { id: newSupplierId },
-                            data: { convertedFromSourcingId: sourcing.id },
-                        });
+                // Auto-convert to New Supplier if not already converted
+                if (sourcing.status !== "converted_to_new") {
+                    try {
+                        const newSupplierId = await executeMarkResponse(sourcing.id);
+                        if (newSupplierId) {
+                            await (prisma as any).newSupplier.update({
+                                where: { id: newSupplierId },
+                                data: { convertedFromSourcingId: sourcing.id },
+                            });
+                        }
+                        res.json({ success: true, converted: true, newSupplierId });
+                        return;
+                    } catch (convErr) {
+                        console.error("Auto-convert error after form submit:", convErr);
+                        // Non-fatal — form data is already saved
                     }
-                    res.json({ success: true, converted: true, newSupplierId });
-                    return;
-                } catch (convErr) {
-                    console.error("Auto-convert error after form submit:", convErr);
-                    // Non-fatal — form data is already saved
                 }
             }
 
