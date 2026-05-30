@@ -4,6 +4,8 @@ import { v2 as cloudinary } from "cloudinary";
 import { executeMarkResponse } from "./sourcingEmailCampaign.controller.js";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
+import { sendFormSubmissionNotificationEmail, buildSupplierThankYouEmailHtml, sendSupplierThankYouEmail } from "../services/mailer.js";
+import { sendGmailEmail } from "../services/gmailService.js";
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -64,6 +66,89 @@ const ALL_SECTIONS_ENABLED = {
     processing: { enabled: true, requiredFields: [] },
     media: { enabled: true, requiredFields: [] },
 };
+
+function scheduleSupplierThankYou(params: {
+    supplierEmail: string;
+    supplierCompany: string;
+    contactPerson?: string | null;
+    assignedGmailAccount?: string | null;
+    createdBy?: string | null;
+}): void {
+    const { supplierEmail, supplierCompany, contactPerson, assignedGmailAccount, createdBy } = params;
+    setTimeout(async () => {
+        try {
+            let senderEmail = process.env.SMTP_EMAIL ?? "sales@elanexports.com";
+            let senderName = "Élan Exports Team";
+
+            if (createdBy) {
+                const creator = await (prisma as any).user.findUnique({
+                    where: { id: createdBy },
+                    select: { email: true, fullName: true },
+                });
+                if (creator?.email) {
+                    senderEmail = creator.email;
+                    senderName = creator.fullName ?? senderName;
+                }
+            }
+
+            const { subject, html } = buildSupplierThankYouEmailHtml({
+                contactPerson,
+                supplierCompany,
+                senderName,
+                senderEmail,
+            });
+
+            if (assignedGmailAccount) {
+                await sendGmailEmail({ fromEmail: assignedGmailAccount, to: supplierEmail, subject, html });
+            } else {
+                await sendSupplierThankYouEmail({ to: supplierEmail, contactPerson, supplierCompany, senderName, senderEmail });
+            }
+        } catch (err) {
+            console.error("Supplier thank-you email failed:", err);
+        }
+    }, 5 * 60 * 1000);
+}
+
+async function sendNotificationToCreator(
+    createdBy: string | null | undefined,
+    params: {
+        supplierCompany: string;
+        contactPerson?: string | null;
+        supplierEmail?: string | null;
+        phone?: string | null;
+        whatsapp?: string | null;
+        product?: string | null;
+        country?: string | null;
+        city?: string | null;
+        viewFormUrl: string;
+    }
+): Promise<void> {
+    try {
+        let recipientEmail: string | null = process.env.SMTP_EMAIL ?? null;
+        let adminName = "Team";
+
+        if (createdBy) {
+            const creator = await (prisma as any).user.findUnique({
+                where: { id: createdBy },
+                select: { email: true, fullName: true },
+            });
+            if (creator?.email) {
+                recipientEmail = creator.email;
+                adminName = creator.fullName ?? "Team";
+            }
+        }
+
+        if (!recipientEmail) return;
+
+        await sendFormSubmissionNotificationEmail({
+            to: recipientEmail,
+            adminName,
+            ...params,
+        });
+    } catch (err) {
+        console.error("Form submission notification email failed:", err);
+    }
+}
 
 /**
  * GET /api/public/supplier-form/:token
@@ -169,6 +254,8 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
         });
 
         if (sourcing) {
+            const merged = { ...sourcing, ...update };
+
             if (Object.keys(update).length > 0) {
                 await (prisma as any).sourcingSupplier.update({
                     where: { formToken: token },
@@ -178,6 +265,30 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
 
             // Auto-convert to New Supplier on final submission if not already converted
             if (finalSubmit && sourcing.status !== "converted_to_new") {
+                // Notify the creator (CRM user) immediately
+                sendNotificationToCreator(sourcing.createdBy, {
+                    supplierCompany: merged.company,
+                    contactPerson: merged.contactPerson,
+                    supplierEmail: merged.email,
+                    phone: merged.phone,
+                    whatsapp: merged.whatsapp,
+                    product: merged.product,
+                    country: merged.country,
+                    city: merged.city,
+                    viewFormUrl: `${(process.env.FRONTEND_URL ?? "http://localhost:5173").split(",")[0]}/suppliers/sourcing/${sourcing.id}`,
+                });
+
+                // Schedule a thank-you email to the supplier after 5 minutes
+                if (merged.email) {
+                    scheduleSupplierThankYou({
+                        supplierEmail: merged.email as string,
+                        supplierCompany: merged.company,
+                        contactPerson: merged.contactPerson as string | null,
+                        assignedGmailAccount: sourcing.assignedGmailAccount,
+                        createdBy: sourcing.createdBy,
+                    });
+                }
+
                 try {
                     const newSupplierId = await executeMarkResponse(sourcing.id);
                     if (newSupplierId) {
