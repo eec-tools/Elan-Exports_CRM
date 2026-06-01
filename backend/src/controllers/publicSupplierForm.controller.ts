@@ -298,7 +298,7 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
             }
 
             if (finalSubmit) {
-                const frontendBase = (process.env.FRONTEND_URL ?? "http://localhost:5173").split(",")[0];
+                const crmBase = "https://crm.eectrade.com";
 
                 // Notify the sourcing account (assignedGmailAccount) — awaited so errors appear in logs
                 await sendNotificationToCreator(sourcing.assignedGmailAccount, sourcing.createdBy, {
@@ -310,7 +310,7 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
                     product: merged.product,
                     country: merged.country,
                     city: merged.city,
-                    viewFormUrl: `${frontendBase}/suppliers/sourcing/${sourcing.id}`,
+                    viewFormUrl: `${crmBase}/supplier-form/${sourcing.formToken}${sourcing.formTemplateId ? `?t=${sourcing.formTemplateId}` : ""}`,
                 });
 
                 // Schedule a thank-you email to the supplier after 5 minutes
