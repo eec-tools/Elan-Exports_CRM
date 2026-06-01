@@ -5,7 +5,7 @@ import { executeMarkResponse } from "./sourcingEmailCampaign.controller.js";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { sendFormSubmissionNotificationEmail, buildSupplierThankYouEmailHtml, sendSupplierThankYouEmail } from "../services/mailer.js";
-import { sendGmailEmail, getSmtpMessageId } from "../services/gmailService.js";
+import { sendGmailEmail, getIntroEmailHeaders } from "../services/gmailService.js";
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -90,21 +90,29 @@ function scheduleSupplierThankYou(params: {
             });
 
             if (assignedGmailAccount) {
-                // Resolve the SMTP Message-ID of the original outbound email so the
-                // thank-you lands in the same thread on the supplier's mail client.
                 let inReplyTo: string | undefined;
                 let references: string | undefined;
-                if (assignedGmailAccount && gmailMessageId) {
-                    const smtpMsgId = await getSmtpMessageId(assignedGmailAccount, gmailMessageId);
-                    if (smtpMsgId) {
-                        inReplyTo = smtpMsgId;
-                        references = smtpMsgId;
+                let replySubject = subject;
+
+                if (gmailMessageId) {
+                    // Fetch the intro email's SMTP Message-ID AND subject in one call.
+                    // Gmail requires the subject to match the thread AND In-Reply-To to be set
+                    // for threadId to work on both sender and recipient side.
+                    const headers = await getIntroEmailHeaders(assignedGmailAccount, gmailMessageId);
+                    if (headers.smtpMessageId) {
+                        inReplyTo = headers.smtpMessageId;
+                        references = headers.smtpMessageId;
+                    }
+                    if (headers.subject) {
+                        // Strip any existing Re: prefix then add one
+                        replySubject = `Re: ${headers.subject.replace(/^Re:\s*/i, "")}`;
                     }
                 }
+
                 await sendGmailEmail({
                     fromEmail: assignedGmailAccount,
                     to: supplierEmail,
-                    subject,
+                    subject: replySubject,
                     html,
                     threadId: gmailThreadId ?? undefined,
                     inReplyTo,

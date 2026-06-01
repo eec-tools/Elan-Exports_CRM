@@ -177,6 +177,25 @@ export async function getSmtpMessageId(accountEmail: string, gmailMessageId: str
   }
 }
 
+export async function getIntroEmailHeaders(accountEmail: string, gmailMessageId: string): Promise<{ smtpMessageId: string | null; subject: string | null }> {
+  try {
+    const auth = await getAuthedClient(accountEmail);
+    const gmail = google.gmail({ version: "v1", auth });
+    const res = await gmail.users.messages.get({
+      userId: "me",
+      id: gmailMessageId,
+      format: "METADATA",
+      metadataHeaders: ["Message-ID", "Subject"],
+    });
+    const headers = res.data.payload?.headers ?? [];
+    const get = (name: string) =>
+      (headers as any[]).find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? null;
+    return { smtpMessageId: get("message-id"), subject: get("subject") };
+  } catch {
+    return { smtpMessageId: null, subject: null };
+  }
+}
+
 const AUTO_REPLY_SENDER_PATTERNS = [
   "mailer-daemon",
   "postmaster",
