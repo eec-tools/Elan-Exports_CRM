@@ -78,7 +78,7 @@ function scheduleSupplierThankYou(params: {
     setTimeout(async () => {
         try {
             // Use assignedGmailAccount as sender (the account that sourced this supplier)
-            const senderEmail = assignedGmailAccount ?? process.env.SMTP_EMAIL ?? "sales@elanexports.com";
+            const senderEmail = assignedGmailAccount ?? process.env.SMTP_EMAIL!;
             const senderName = "Élan Exports Team";
 
             const { subject, html } = buildSupplierThankYouEmailHtml({
