@@ -273,9 +273,10 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
             delete update[key];
         }
 
-        // Try sourcing supplier
+        // Try sourcing supplier (include campaign so we can get gmailThreadId / gmailMessageId)
         const sourcing = await (prisma as any).sourcingSupplier.findUnique({
             where: { formToken: token },
+            include: { emailCampaign: { select: { gmailThreadId: true, gmailMessageId: true } } },
         });
 
         if (sourcing) {
@@ -312,8 +313,9 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
                         contactPerson: merged.contactPerson as string | null,
                         assignedGmailAccount: sourcing.assignedGmailAccount,
                         createdBy: sourcing.createdBy,
-                        gmailThreadId: sourcing.gmailThreadId,
-                        gmailMessageId: sourcing.gmailMessageId,
+                        // Thread IDs live on SourcingEmailCampaign, not SourcingSupplier
+                        gmailThreadId: sourcing.emailCampaign?.gmailThreadId ?? null,
+                        gmailMessageId: sourcing.emailCampaign?.gmailMessageId ?? null,
                     });
                 }
 
