@@ -73,14 +73,14 @@ function countSundaysInMonth(month: number, year: number): number {
 /**
  * Count holidays that fall on scheduled working days (not Sundays, not off-Saturdays).
  * These days are automatically paid regardless of attendance.
- * Returns { count, paidDays } where count = total holidays in month,
- * paidDays = holidays on scheduled working days.
+ * Returns { count, paidDays, scheduledHolidayDates } where scheduledHolidayDates
+ * are the dates used to exclude those days from regularPresentDays (prevents double-counting).
  */
 async function countHolidaysInMonth(
   month: number,
   year: number,
   saturdaySchedule: string,
-): Promise<{ count: number; paidDays: number }> {
+): Promise<{ count: number; paidDays: number; scheduledHolidayDates: Date[] }> {
   const holidays = await prisma.holiday.findMany({
     where: {
       date: {
@@ -92,24 +92,28 @@ async function countHolidaysInMonth(
   });
 
   let paidDays = 0;
+  const scheduledHolidayDates: Date[] = [];
   for (const h of holidays) {
     const dow = h.date.getUTCDay(); // 0=Sun, 6=Sat
     if (dow === 0) continue; // Sunday already paid via sundayPaidDays
     if (dow === 6 && saturdaySchedule === "off") continue; // Off Saturday, employee already has the day off
     paidDays++;
+    scheduledHolidayDates.push(h.date);
   }
 
-  return { count: holidays.length, paidDays };
+  return { count: holidays.length, paidDays, scheduledHolidayDates };
 }
 
 /**
  * Regular present days: days where isWeekendWork=false and status Present/HalfDay.
- * HalfDay counts as 0.5.
+ * HalfDay counts as 0.5. Holiday dates are excluded to prevent double-counting
+ * with holidayPaidDays.
  */
 async function countRegularPresentDays(
   userId: string,
   month: number,
   year: number,
+  holidayDates: Date[] = [],
 ): Promise<number> {
   const records = await prisma.attendance.findMany({
     where: {
@@ -118,10 +122,18 @@ async function countRegularPresentDays(
       status: { in: [AttendanceStatus.Present, AttendanceStatus.HalfDay] },
       isWeekendWork: false,
     },
-    select: { status: true },
+    select: { status: true, date: true },
   });
 
   return records.reduce((sum, r) => {
+    const localDate = new Date(r.date.getTime() + ATTENDANCE_TZ_OFFSET_MINUTES * 60 * 1000);
+    const isHoliday = holidayDates.some(
+      (h) =>
+        h.getUTCFullYear() === localDate.getUTCFullYear() &&
+        h.getUTCMonth() === localDate.getUTCMonth() &&
+        h.getUTCDate() === localDate.getUTCDate(),
+    );
+    if (isHoliday) return sum;
     return sum + (r.status === AttendanceStatus.HalfDay ? 0.5 : 1);
   }, 0);
 }
@@ -268,14 +280,13 @@ export async function generatePayroll(
   // Step 2: Per-day rate based on employee's actual work schedule
   const perDaySalary = user.monthlySalary / scheduledWorkingDays;
 
-  // Step 3: Attendance counts
-  const weekdayPresentDays = await countRegularPresentDays(userId, month, year);
-  const weekendWorkedDays = await countBonusDaysWorked(userId, month, year);
+  // Step 3: Holiday counts (fetched before attendance so holiday dates can be excluded)
+  const { count: holidayCount, paidDays: holidayPaidDays, scheduledHolidayDates } =
+    await countHolidaysInMonth(month, year, user.saturdaySchedule);
 
-  // Step 4: Holiday counts
-  const { count: holidayCount, paidDays: holidayPaidDays } = await countHolidaysInMonth(
-    month, year, user.saturdaySchedule,
-  );
+  // Step 4: Attendance counts (holidays excluded from regularPresentDays to avoid double-counting)
+  const weekdayPresentDays = await countRegularPresentDays(userId, month, year, scheduledHolidayDates);
+  const weekendWorkedDays = await countBonusDaysWorked(userId, month, year);
 
   // Step 5: Leave counts
   const approvedLeavesMonth = await countApprovedLeavesInMonth(userId, month, year);
