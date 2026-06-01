@@ -4,6 +4,7 @@ import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { startCampaignForSupplier } from "./sourcingEmailCampaign.controller.js";
 import { generateShortCode } from "../utils/shortCode.js";
+import { sanitizeEmail } from "../utils/email.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
@@ -194,7 +195,7 @@ export async function addToList(
     const data = validRows.map((s) => ({
       folderId,
       company: s.company.trim(),
-      email: s.email?.trim() || null,
+      email: sanitizeEmail(s.email?.trim() || null),
       phone: s.phone?.trim() || null,
       contactPerson: s.contactPerson?.trim() || null,
       country: s.country?.trim() || null,
@@ -274,7 +275,7 @@ export async function sendBulkEmail(
           data: {
             folderId,
             company: s.company.trim(),
-            email: s.email?.trim() || null,
+            email: sanitizeEmail(s.email?.trim() || null),
             phone: s.phone?.trim() || null,
             contactPerson: s.contactPerson?.trim() || null,
             country: s.country?.trim() || null,
@@ -288,7 +289,7 @@ export async function sendBulkEmail(
           const supplier = await tx.sourcingSupplier.create({
             data: {
               company: s.company.trim(),
-              email: s.email?.trim() || null,
+              email: sanitizeEmail(s.email?.trim() || null),
               phone: s.phone?.trim() || null,
               contactPerson: s.contactPerson?.trim() || null,
               country: s.country?.trim() || null,

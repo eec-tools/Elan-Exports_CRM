@@ -5,6 +5,7 @@ import { AuthRequest } from "../types/index.js";
 import { createNotification } from "../services/notificationService.js";
 import { startCampaignForSupplier } from "./sourcingEmailCampaign.controller.js";
 import { generateShortCode } from "../utils/shortCode.js";
+import { sanitizeEmail } from "../utils/email.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
@@ -307,11 +308,12 @@ export async function createSourcingSupplier(
       return;
     }
 
+    const cleanEmail = sanitizeEmail(email)!;
     const shortCode = await generateShortCode(company);
     const supplier = await (prisma as any).sourcingSupplier.create({
       data: {
         company,
-        email,
+        email: cleanEmail,
         assignedGmailAccount: assignedGmailAccount ?? null,
         emailTemplateId: emailTemplateId ?? null,
         formTemplateId: formTemplateId ?? null,
@@ -341,7 +343,7 @@ export async function createSourcingSupplier(
     });
 
     let campaignStarted = false;
-    if (assignedGmailAccount && email) {
+    if (assignedGmailAccount && cleanEmail) {
       campaignStarted = await startCampaignForSupplier(supplier.id, req.user?.id);
     }
 
@@ -374,7 +376,7 @@ export async function updateSourcingSupplier(
     const updateData: any = {};
     for (const field of SOURCING_FIELDS) {
       if (req.body[field] !== undefined) {
-        updateData[field] = req.body[field];
+        updateData[field] = field === "email" ? sanitizeEmail(req.body[field]) : req.body[field];
       }
     }
 
@@ -588,7 +590,7 @@ export async function bulkCreateSourcingSuppliers(
 
       return {
         company: s.company.trim(),
-        email: s.email?.trim() || null,
+        email: sanitizeEmail(s.email?.trim() || null),
         country: s.country?.trim() || null,
         city: s.city?.trim() || null,
         contactPerson: s.contactPerson?.trim() || null,

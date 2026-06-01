@@ -3,6 +3,7 @@ import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { startCampaignForBuyer } from "./sourcingBuyerEmailCampaign.controller.js";
 import { BUYER_GMAIL_ACCOUNT } from "./sourcingBuyers.controller.js";
+import { sanitizeEmail } from "../utils/email.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
@@ -187,7 +188,7 @@ export async function addToList(
     const data = validRows.map((s) => ({
       folderId,
       company: s.company.trim(),
-      email: s.email?.trim() || null,
+      email: sanitizeEmail(s.email?.trim() || null),
       phone: s.phone?.trim() || null,
       contactPerson: s.contactPerson?.trim() || null,
       country: s.country?.trim() || null,
@@ -258,7 +259,7 @@ export async function sendBulkEmail(
           data: {
             folderId,
             company: s.company.trim(),
-            email: s.email?.trim() || null,
+            email: sanitizeEmail(s.email?.trim() || null),
             phone: s.phone?.trim() || null,
             contactPerson: s.contactPerson?.trim() || null,
             country: s.country?.trim() || null,
@@ -271,7 +272,7 @@ export async function sendBulkEmail(
         const sourcingBuyer = await tx.sourcingBuyer.create({
           data: {
             company: s.company.trim(),
-            email: s.email?.trim() || null,
+            email: sanitizeEmail(s.email?.trim() || null),
             phone: s.phone?.trim() || null,
             contactPerson: s.contactPerson?.trim() || null,
             country: s.country?.trim() || null,
@@ -349,7 +350,7 @@ export async function updateVaultSupplier(
       where: { id: supplierId },
       data: {
         company: company?.trim() || contact.company,
-        email: email?.trim() || null,
+        email: sanitizeEmail(email?.trim() || null),
         phone: phone?.trim() || null,
         contactPerson: contactPerson?.trim() || null,
         country: country?.trim() || null,

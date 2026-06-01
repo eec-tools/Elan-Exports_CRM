@@ -3,6 +3,7 @@ import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { createNotification } from "../services/notificationService.js";
 import { startCampaignForBuyer } from "./sourcingBuyerEmailCampaign.controller.js";
+import { sanitizeEmail } from "../utils/email.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
@@ -126,9 +127,10 @@ export async function createSourcingBuyer(req: AuthRequest, res: Response): Prom
     if (!company) { res.status(400).json({ error: "Company name is required" }); return; }
     if (!email) { res.status(400).json({ error: "Buyer email is required" }); return; }
 
+    const cleanEmail = sanitizeEmail(email)!;
     const buyer = await (prisma as any).sourcingBuyer.create({
       data: {
-        company, email, phone: phone ?? null, contactPerson: contactPerson ?? null,
+        company, email: cleanEmail, phone: phone ?? null, contactPerson: contactPerson ?? null,
         country: country ?? null, product: product ?? null,
         productCategory: productCategory ?? null, notes: notes ?? null,
         assignedGmailAccount: BUYER_GMAIL_ACCOUNT,
@@ -159,7 +161,7 @@ export async function updateSourcingBuyer(req: AuthRequest, res: Response): Prom
 
     const updateData: any = {};
     for (const field of BUYER_FIELDS) {
-      if (req.body[field] !== undefined) updateData[field] = req.body[field];
+      if (req.body[field] !== undefined) updateData[field] = field === "email" ? sanitizeEmail(req.body[field]) : req.body[field];
     }
 
     const updated = await (prisma as any).sourcingBuyer.update({ where: { id }, data: updateData });
