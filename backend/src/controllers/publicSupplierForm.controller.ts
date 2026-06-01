@@ -5,7 +5,7 @@ import { executeMarkResponse } from "./sourcingEmailCampaign.controller.js";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { sendFormSubmissionNotificationEmail, buildSupplierThankYouEmailHtml, sendSupplierThankYouEmail } from "../services/mailer.js";
-import { sendGmailEmail } from "../services/gmailService.js";
+import { sendGmailEmail, getSmtpMessageId } from "../services/gmailService.js";
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -73,11 +73,12 @@ function scheduleSupplierThankYou(params: {
     contactPerson?: string | null;
     assignedGmailAccount?: string | null;
     createdBy?: string | null;
+    gmailThreadId?: string | null;
+    gmailMessageId?: string | null;
 }): void {
-    const { supplierEmail, supplierCompany, contactPerson, assignedGmailAccount } = params;
+    const { supplierEmail, supplierCompany, contactPerson, assignedGmailAccount, gmailThreadId, gmailMessageId } = params;
     setTimeout(async () => {
         try {
-            // Use assignedGmailAccount as sender (the account that sourced this supplier)
             const senderEmail = assignedGmailAccount ?? process.env.SMTP_EMAIL!;
             const senderName = "Élan Exports Team";
 
@@ -89,7 +90,26 @@ function scheduleSupplierThankYou(params: {
             });
 
             if (assignedGmailAccount) {
-                await sendGmailEmail({ fromEmail: assignedGmailAccount, to: supplierEmail, subject, html });
+                // Resolve the SMTP Message-ID of the original outbound email so the
+                // thank-you lands in the same thread on the supplier's mail client.
+                let inReplyTo: string | undefined;
+                let references: string | undefined;
+                if (assignedGmailAccount && gmailMessageId) {
+                    const smtpMsgId = await getSmtpMessageId(assignedGmailAccount, gmailMessageId);
+                    if (smtpMsgId) {
+                        inReplyTo = smtpMsgId;
+                        references = smtpMsgId;
+                    }
+                }
+                await sendGmailEmail({
+                    fromEmail: assignedGmailAccount,
+                    to: supplierEmail,
+                    subject,
+                    html,
+                    threadId: gmailThreadId ?? undefined,
+                    inReplyTo,
+                    references,
+                });
             } else {
                 await sendSupplierThankYouEmail({ to: supplierEmail, contactPerson, supplierCompany, senderName, senderEmail });
             }
@@ -292,6 +312,8 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
                         contactPerson: merged.contactPerson as string | null,
                         assignedGmailAccount: sourcing.assignedGmailAccount,
                         createdBy: sourcing.createdBy,
+                        gmailThreadId: sourcing.gmailThreadId,
+                        gmailMessageId: sourcing.gmailMessageId,
                     });
                 }
 
