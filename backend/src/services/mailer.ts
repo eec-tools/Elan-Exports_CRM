@@ -41,8 +41,8 @@ export async function sendFollowupReminderEmail(params: {
       (s) => `
       <tr>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;">${s.company}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${s.contactPerson ?? "—"}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${s.email ?? "—"}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${s.contactPerson ?? "-"}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${s.email ?? "-"}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;">${stepLabel(s.step)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;">${s.dueDate.toDateString()}</td>
       </tr>`,
@@ -256,7 +256,7 @@ export function buildSupplierThankYouEmailHtml(params: {
   const { contactPerson, supplierCompany, senderName, senderEmail } = params;
   const recipientName = contactPerson ?? supplierCompany;
 
-  const subject = `Thank you for submitting your supplier form — Élan Exports`;
+  const subject = `Thank you for submitting your supplier form - Élan Exports`;
 
   const html = `
 <!DOCTYPE html>
@@ -289,7 +289,7 @@ export function buildSupplierThankYouEmailHtml(params: {
           <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">
             We have successfully received your supplier form for
             <strong>${supplierCompany}</strong>. Thank you for taking the time to provide us
-            with your details — we truly appreciate it.
+            with your details - we truly appreciate it.
           </p>
 
           <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">
@@ -302,7 +302,7 @@ export function buildSupplierThankYouEmailHtml(params: {
           <div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #d97706;border-radius:6px;padding:16px 20px;margin:24px 0;">
             <p style="margin:0 0 6px;color:#92400e;font-size:13px;font-weight:bold;">What happens next?</p>
             <ul style="margin:0;padding:0 0 0 18px;color:#78350f;font-size:13px;line-height:1.8;">
-              <li>Our team reviews your submission within 1–2 business days</li>
+              <li>Our team reviews your submission within 1-2 business days</li>
               <li>We may reach out for any additional clarification</li>
               <li>If there is a mutual fit, we will schedule an introductory call</li>
             </ul>
@@ -310,7 +310,7 @@ export function buildSupplierThankYouEmailHtml(params: {
 
           <p style="margin:0 0 28px;color:#374151;font-size:15px;line-height:1.7;">
             In the meantime, if you have any questions or would like to share
-            additional information, please feel free to reply to this email — we
+            additional information, please feel free to reply to this email - we
             are happy to help.
           </p>
 
@@ -351,7 +351,7 @@ export async function sendSupplierThankYouEmail(params: {
   const { to, ...rest } = params;
   const { subject, html } = buildSupplierThankYouEmailHtml(rest);
   await transporter.sendMail({
-    from: `"${rest.senderName} — Élan Exports" <${process.env.SMTP_EMAIL}>`,
+    from: `"${rest.senderName} - Élan Exports" <${process.env.SMTP_EMAIL}>`,
     to,
     subject,
     html,

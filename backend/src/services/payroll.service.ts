@@ -115,25 +115,22 @@ async function countRegularPresentDays(
   year: number,
   holidayDates: Date[] = [],
 ): Promise<number> {
+  const holidayFilter = holidayDates.length > 0
+    ? { NOT: { date: { in: holidayDates } } }
+    : {};
+
   const records = await prisma.attendance.findMany({
     where: {
       userId,
       date: { gte: monthStartUTC(month, year), lte: monthEndUTC(month, year) },
       status: { in: [AttendanceStatus.Present, AttendanceStatus.HalfDay] },
       isWeekendWork: false,
+      ...holidayFilter,
     },
-    select: { status: true, date: true },
+    select: { status: true },
   });
 
   return records.reduce((sum, r) => {
-    const localDate = new Date(r.date.getTime() + ATTENDANCE_TZ_OFFSET_MINUTES * 60 * 1000);
-    const isHoliday = holidayDates.some(
-      (h) =>
-        h.getUTCFullYear() === localDate.getUTCFullYear() &&
-        h.getUTCMonth() === localDate.getUTCMonth() &&
-        h.getUTCDate() === localDate.getUTCDate(),
-    );
-    if (isHoliday) return sum;
     return sum + (r.status === AttendanceStatus.HalfDay ? 0.5 : 1);
   }, 0);
 }

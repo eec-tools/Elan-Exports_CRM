@@ -352,7 +352,7 @@ export async function startCampaign(req: AuthRequest, res: Response): Promise<vo
         if (existing) { res.status(400).json({ error: "Campaign already started" }); return; }
 
         const started = await startCampaignForBuyer(id, req.user?.id);
-        if (!started) { res.status(500).json({ error: "Failed to start campaign — check Gmail connection" }); return; }
+        if (!started) { res.status(500).json({ error: "Failed to start campaign - check Gmail connection" }); return; }
 
         res.json({ success: true });
     } catch (err) {

@@ -285,7 +285,7 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
 
     if (isLastStep) {
         // Give 3 days after FU3 before moving to old supplier (handled by reply detector)
-        console.log(`[campaign] FU3 sent to ${supplier.company} — waiting 3 days for reply before archiving`);
+        console.log(`[campaign] FU3 sent to ${supplier.company} - waiting 3 days for reply before archiving`);
     }
 }
 
@@ -315,7 +315,7 @@ export async function executeMarkResponse(sourcingId: string, createdBy?: string
 
     await createNotification({
         type: "campaign_responded",
-        title: "Supplier Responded — Converted",
+        title: "Supplier Responded - Converted",
         message: `${company} replied and has been automatically converted to a New Supplier`,
         entityType: "new_supplier",
         entityId: newSupplierId,

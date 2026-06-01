@@ -2,13 +2,13 @@ import { Response } from "express";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 
-const DEFAULT_INTRO_SUBJECT = `Sourcing Partnership Inquiry — {{product}} | Élan Exports`;
+const DEFAULT_INTRO_SUBJECT = `Sourcing Partnership Inquiry - {{product}} | Élan Exports`;
 
 const DEFAULT_INTRO_BODY = `{{greeting}}
 
 Greetings from Élan Exports & Consultancy.
 
-We are a Singapore-headquartered sourcing and execution consultancy with an established network of verified, export-ready suppliers across South Asia, Southeast Asia, and Africa. We work with international buyers to simplify their procurement — handling supplier identification, quality evaluation, compliance documentation, commercial negotiations, and end-to-end execution.
+We are a Singapore-headquartered sourcing and execution consultancy with an established network of verified, export-ready suppliers across South Asia, Southeast Asia, and Africa. We work with international buyers to simplify their procurement - handling supplier identification, quality evaluation, compliance documentation, commercial negotiations, and end-to-end execution.
 
 We came across {{company}} and believe there may be a strong fit, particularly for {{product}}. Our supplier network for this category includes manufacturers and exporters with established certifications (ISO, HACCP, BRC, organic, etc.), competitive pricing, and proven export track records.
 
@@ -23,39 +23,39 @@ We operate as the central coordination point, ensuring pricing discipline, compl
 
 If this aligns with your current or upcoming sourcing requirements, we would welcome a brief introductory conversation or a written exchange. Please feel free to reply to this email or reach out directly.`;
 
-const DEFAULT_FOLLOWUP1_SUBJECT = `Follow-Up — Sourcing Partnership | Élan Exports × {{company}}`;
+const DEFAULT_FOLLOWUP1_SUBJECT = `Follow-Up - Sourcing Partnership | Élan Exports × {{company}}`;
 
 const DEFAULT_FOLLOWUP1_BODY = `{{greeting}}
 
 I hope this message finds you well. I am following up on my previous email regarding a potential sourcing partnership for {{product}} through Élan Exports & Consultancy.
 
-In case my earlier email was missed, I wanted to reiterate that we have a curated network of verified, export-ready suppliers for this category — with the right certifications, competitive pricing, and the capacity to meet international buyer requirements.
+In case my earlier email was missed, I wanted to reiterate that we have a curated network of verified, export-ready suppliers for this category - with the right certifications, competitive pricing, and the capacity to meet international buyer requirements.
 
-We handle all the complexity — supplier vetting, compliance, documentation, and execution — so you can focus on your business.
+We handle all the complexity - supplier vetting, compliance, documentation, and execution - so you can focus on your business.
 
 If you have any current or upcoming requirements, I would be delighted to connect and share supplier profiles and indicative pricing. A brief reply is all it takes to get started.`;
 
-const DEFAULT_FOLLOWUP2_SUBJECT = `Reminder — Sourcing Opportunity | Élan Exports × {{company}}`;
+const DEFAULT_FOLLOWUP2_SUBJECT = `Reminder - Sourcing Opportunity | Élan Exports × {{company}}`;
 
 const DEFAULT_FOLLOWUP2_BODY = `{{greeting}}
 
 I wanted to reach out once more regarding our sourcing services for {{company}}, particularly for {{product}}.
 
-At Élan Exports, we help international buyers source reliably from South Asia and Southeast Asia. Our service covers everything from identifying the right suppliers to managing compliance, quality checks, and shipment execution — all under one roof.
+At Élan Exports, we help international buyers source reliably from South Asia and Southeast Asia. Our service covers everything from identifying the right suppliers to managing compliance, quality checks, and shipment execution - all under one roof.
 
 We genuinely believe we can add value to your procurement process. If now is not the right time or your requirements have changed, please let us know and we will respect that entirely.
 
-Otherwise, we would love to schedule a quick 15-minute call or exchange some product-specific details over email — whichever is more convenient for you.`;
+Otherwise, we would love to schedule a quick 15-minute call or exchange some product-specific details over email - whichever is more convenient for you.`;
 
-const DEFAULT_FOLLOWUP3_SUBJECT = `Final Follow-Up — Élan Exports Sourcing Partnership | {{company}}`;
+const DEFAULT_FOLLOWUP3_SUBJECT = `Final Follow-Up - Élan Exports Sourcing Partnership | {{company}}`;
 
 const DEFAULT_FOLLOWUP3_BODY = `{{greeting}}
 
 This is our final follow-up regarding the sourcing partnership inquiry we sent to {{company}} for {{product}}.
 
-We have genuinely valued the opportunity to reach out and hope our services may be of use to you at some point. If this is not the right time, we completely understand — and you are always welcome to reach out to us in the future when circumstances change.
+We have genuinely valued the opportunity to reach out and hope our services may be of use to you at some point. If this is not the right time, we completely understand - and you are always welcome to reach out to us in the future when circumstances change.
 
-Should you wish to explore a sourcing partnership with Élan Exports — whether now or in the future — we would be happy to reconnect. Please do not hesitate to write to us directly.`;
+Should you wish to explore a sourcing partnership with Élan Exports - whether now or in the future - we would be happy to reconnect. Please do not hesitate to write to us directly.`;
 
 export const BUYER_DEFAULT_TEMPLATE_CONTENT = {
     introSubject: DEFAULT_INTRO_SUBJECT,
