@@ -310,7 +310,7 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
                     product: merged.product,
                     country: merged.country,
                     city: merged.city,
-                    viewFormUrl: `${frontendBase}/supplier-form/${sourcing.formToken}${sourcing.formTemplateId ? `?t=${sourcing.formTemplateId}` : ""}`,
+                    viewFormUrl: `${frontendBase}/suppliers/sourcing/${sourcing.id}`,
                 });
 
                 // Schedule a thank-you email to the supplier after 5 minutes
