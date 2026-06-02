@@ -30,6 +30,7 @@ import notificationsRoutes from "./routes/notifications.routes.js";
 import { startEmailCampaignScheduler } from "./services/emailCampaignScheduler.js";
 import { startGmailInboxScheduler } from "./services/gmailInboxScheduler.js";
 import { startGmailReplyDetector } from "./services/gmailReplyDetector.js";
+import { startDailyReportScheduler } from "./services/dailyReportScheduler.js";
 import attendanceRoutes from "./routes/attendance.routes.js";
 import { startAttendanceScheduler } from "./services/attendanceScheduler.js";
 import activityTrackingRoutes from "./routes/activityTracking.routes.js";
@@ -248,6 +249,7 @@ app.listen(PORT, () => {
   startAttendanceScheduler();
   startGmailInboxScheduler();
   startGmailReplyDetector();
+  startDailyReportScheduler();
 });
 
 // Graceful shutdown

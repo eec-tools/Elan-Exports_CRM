@@ -687,17 +687,18 @@ model SourcingEmailCampaign {
 }
 
 model SupplierEmailReply {
-  id             String   @id @default(uuid())
-  sourcingId     String?  @map("sourcing_id")
-  gmailMessageId String?  @map("gmail_message_id")
-  direction      String   @default("received") @map("direction")
+  id             String    @id @default(uuid())
+  sourcingId     String?   @map("sourcing_id")
+  gmailMessageId String?   @map("gmail_message_id")
+  direction      String    @default("received") @map("direction")
   // "sent" = email we sent to supplier | "received" = reply from supplier
-  fromEmail      String   @map("from_email")
-  fromName       String?  @map("from_name")
+  fromEmail      String    @map("from_email")
+  fromName       String?   @map("from_name")
   subject        String?
   body           String
-  receivedAt     DateTime @map("received_at")
-  createdAt      DateTime @default(now()) @map("created_at")
+  receivedAt     DateTime  @map("received_at")
+  repliedAt      DateTime? @map("replied_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   @@map("supplier_email_replies")
 }
@@ -957,17 +958,19 @@ model VaultDocumentVersion {
 }
 
 model DailyTask {
-  id        String    @id @default(uuid())
-  date      DateTime  @db.Date
-  taskText  String    @map("task_text")
-  company   String?
-  priority  String?
-  owner     String?
-  status    String    @default("Not Started")
-  deadline  DateTime? @db.Date
-  notes     String?
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  id          String    @id @default(uuid())
+  date        DateTime  @db.Date
+  taskText    String    @map("task_text")
+  company     String?
+  priority    String?
+  owner       String?
+  status      String    @default("Not Started")
+  deadline    DateTime? @db.Date
+  notes       String?
+  completedAt DateTime? @map("completed_at")
+  completedBy String?   @map("completed_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@map("daily_tasks")
 }
@@ -1343,17 +1346,18 @@ model SourcingBuyerEmailCampaign {
 }
 
 model BuyerEmailReply {
-  id              String   @id @default(uuid())
-  sourcingBuyerId String?  @map("sourcing_buyer_id")
-  gmailMessageId  String?  @map("gmail_message_id")
-  direction       String   @default("received") @map("direction")
+  id              String    @id @default(uuid())
+  sourcingBuyerId String?   @map("sourcing_buyer_id")
+  gmailMessageId  String?   @map("gmail_message_id")
+  direction       String    @default("received") @map("direction")
   // "sent" = email we sent | "received" = reply from buyer
-  fromEmail       String   @map("from_email")
-  fromName        String?  @map("from_name")
+  fromEmail       String    @map("from_email")
+  fromName        String?   @map("from_name")
   subject         String?
   body            String
-  receivedAt      DateTime @map("received_at")
-  createdAt       DateTime @default(now()) @map("created_at")
+  receivedAt      DateTime  @map("received_at")
+  repliedAt       DateTime? @map("replied_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
 
   @@map("buyer_email_replies")
 }
