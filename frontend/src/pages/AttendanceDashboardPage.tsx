@@ -4,6 +4,8 @@ import type { AxiosError } from "axios";
 import {
   Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Download,
   Eye,
@@ -235,14 +237,26 @@ function isImageProof(file: AttendanceProofFile): boolean {
   return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(file.url) || /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(file.name);
 }
 
-function getDateRangeParams(range: string): { from: string; to: string } {
-  // Use IST date (en-CA gives YYYY-MM-DD). toISOString() gives UTC which can be
-  // yesterday in IST (UTC+5:30) and would exclude today's records.
-  const to = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-  const days = range === "7d" ? 7 : range === "90d" ? 90 : 30;
-  const fromMs = new Date(to).getTime() - days * 24 * 60 * 60 * 1000;
-  const from = new Date(fromMs).toISOString().split("T")[0];
+function currentMonthStr(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthDateRange(monthStr: string): { from: string; to: string } {
+  const [year, month] = monthStr.split("-").map(Number);
+  // First day of month
+  const from = new Date(year, month - 1, 1).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  // Last day of month (day 0 of next month)
+  const to = new Date(year, month, 0).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   return { from, to };
+}
+
+function formatMonthYear(monthStr: string): string {
+  const [year, month] = monthStr.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("en-IN", {
+    month: "long",
+    year: "numeric",
+  });
 }
 
 /* ─── Status Pill ──────────────────────────────────── */
@@ -323,30 +337,72 @@ function TabButton({ active, onClick, children, icon: Icon }: {
   );
 }
 
-/* ─── Date Range Picker ────────────────────────────── */
+/* ─── Month Picker ─────────────────────────────────── */
 
-function DateRangePicker({ value, onChange }: { value: string; onChange: (val: string) => void }) {
-  const options = [
-    { value: "7d", label: "Last 7 Days" },
-    { value: "30d", label: "Last 30 Days" },
-    { value: "90d", label: "Last 90 Days" },
-  ];
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function MonthPicker({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const selectedYear = parseInt(value.split("-")[0]);
+  const selectedMonth = parseInt(value.split("-")[1]);
+  const [pickerYear, setPickerYear] = useState(selectedYear);
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  // Keep picker year in sync when value changes externally
+  useEffect(() => {
+    setPickerYear(parseInt(value.split("-")[0]));
+  }, [value]);
 
   return (
-    <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
-      {options.map((opt) => (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm min-w-[240px]">
+      {/* Year navigation */}
+      <div className="flex items-center justify-between mb-2.5">
         <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-            value === opt.value
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-          }`}
+          onClick={() => setPickerYear((y) => y - 1)}
+          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
         >
-          {opt.label}
+          <ChevronLeft className="h-3.5 w-3.5" />
         </button>
-      ))}
+        <span className="text-sm font-bold text-slate-800">{pickerYear}</span>
+        <button
+          onClick={() => setPickerYear((y) => y + 1)}
+          disabled={pickerYear >= currentYear}
+          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {/* Month grid — 6 columns × 2 rows */}
+      <div className="grid grid-cols-6 gap-1">
+        {MONTHS_SHORT.map((m, i) => {
+          const monthNum = i + 1;
+          const isFuture =
+            pickerYear > currentYear ||
+            (pickerYear === currentYear && monthNum > currentMonth);
+          const isSelected = selectedYear === pickerYear && selectedMonth === monthNum;
+          const isCurrentMonth = pickerYear === currentYear && monthNum === currentMonth;
+          return (
+            <button
+              key={m}
+              disabled={isFuture}
+              onClick={() => onChange(`${pickerYear}-${String(monthNum).padStart(2, "0")}`)}
+              className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                isSelected
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : isFuture
+                    ? "text-slate-200 cursor-not-allowed"
+                    : isCurrentMonth
+                      ? "bg-slate-100 text-slate-800 ring-1 ring-slate-300"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              }`}
+            >
+              {m}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -395,8 +451,8 @@ export default function AttendanceDashboardPage() {
   const [activeTab, setActiveTab] = useState<"my" | "history" | "admin" | "admin-history" | "holidays">(
     isAdmin ? "admin" : "my"
   );
-  const [historyRange, setHistoryRange] = useState("30d");
-  const [adminHistoryRange, setAdminHistoryRange] = useState("30d");
+  const [selectedHistoryMonth, setSelectedHistoryMonth] = useState(currentMonthStr);
+  const [selectedAdminHistoryMonth, setSelectedAdminHistoryMonth] = useState(currentMonthStr);
   const [selectedAdminEmployee, setSelectedAdminEmployee] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<
     | { type: "record"; attendanceId: string; name: string; date: string }
@@ -428,16 +484,16 @@ export default function AttendanceDashboardPage() {
     refetchInterval: 30000,
   });
 
-  const historyParams = getDateRangeParams(historyRange);
+  const historyParams = getMonthDateRange(selectedHistoryMonth);
   const historyQuery = useQuery<HistoryResponse>({
-    queryKey: ["attendance-history", historyRange],
+    queryKey: ["attendance-history", selectedHistoryMonth],
     queryFn: () => api.get("/attendance/history", { params: historyParams }).then((r) => r.data),
     enabled: !isAdmin && activeTab === "history",
   });
 
-  const adminHistoryParams = getDateRangeParams(adminHistoryRange);
+  const adminHistoryParams = getMonthDateRange(selectedAdminHistoryMonth);
   const adminHistoryQuery = useQuery<AdminHistoryResponse>({
-    queryKey: ["admin-attendance-history", adminHistoryRange],
+    queryKey: ["admin-attendance-history", selectedAdminHistoryMonth],
     queryFn: () => api.get("/attendance/admin/history", { params: adminHistoryParams }).then((r) => r.data),
     enabled: isAdmin && activeTab === "admin-history",
   });
@@ -485,7 +541,7 @@ export default function AttendanceDashboardPage() {
 
   useEffect(() => {
     setSelectedAdminEmployee(null);
-  }, [adminHistoryRange]);
+  }, [selectedAdminHistoryMonth]);
 
   /* ─── Derived admin history data ─────────────────── */
 
@@ -949,9 +1005,13 @@ export default function AttendanceDashboardPage() {
       {/* ═══ My History Tab (employees only) ═══ */}
       {!isAdmin && activeTab === "history" && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Attendance History</h2>
-            <DateRangePicker value={historyRange} onChange={setHistoryRange} />
+          {/* Header + Month Picker */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Attendance History</h2>
+              <p className="mt-0.5 text-sm text-slate-400">{formatMonthYear(selectedHistoryMonth)}</p>
+            </div>
+            <MonthPicker value={selectedHistoryMonth} onChange={setSelectedHistoryMonth} />
           </div>
 
           {historyQuery.isLoading ? (
@@ -961,15 +1021,34 @@ export default function AttendanceDashboardPage() {
           ) : historyQuery.data ? (
             <>
               {/* Summary Cards */}
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-                <StatCard label="Total Days" value={historyQuery.data.summary.totalDays} icon={Calendar} color="slate" />
-                <StatCard label="Present" value={historyQuery.data.summary.presentDays} icon={Eye} color="emerald" />
-                <StatCard label="Absent" value={historyQuery.data.summary.absentDays} icon={Eye} color="rose" />
-                <StatCard label="Auto-Present" value={historyQuery.data.summary.autoEndedDays} icon={Zap} color="emerald" />
-              </div>
+              {(() => {
+                const totalMonthMinutes = (historyQuery.data.records ?? []).reduce(
+                  (sum, r) => sum + r.realTimeMinutes,
+                  0,
+                );
+                const { summary } = historyQuery.data;
+                return (
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+                    <StatCard label="Present" value={summary.presentDays} sublabel={`of ${summary.totalDays} days`} icon={CheckCircle2} color="emerald" />
+                    <StatCard label="Absent" value={summary.absentDays} icon={XCircle} color="rose" />
+                    <StatCard label="Auto-Present" value={summary.autoEndedDays} icon={Zap} color="emerald" />
+                    <StatCard label="Late Logins" value={summary.lateLoginDays} icon={Clock} color="amber" />
+                    <StatCard label="Early Logouts" value={summary.earlyLogoutDays} icon={LogOut} color="amber" />
+                    <StatCard label="Total Worked" value={formatMinutes(totalMonthMinutes)} icon={Timer} color="violet" />
+                  </div>
+                );
+              })()}
 
-              {/* History Table */}
+              {/* Monthly Records Table */}
               <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    Daily Records
+                    <span className="ml-2 text-xs font-normal text-slate-400">
+                      ({historyQuery.data.records.length})
+                    </span>
+                  </h3>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-left text-sm">
                     <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
@@ -978,26 +1057,55 @@ export default function AttendanceDashboardPage() {
                         <th className="px-4 py-3">Check In</th>
                         <th className="px-4 py-3">Check Out</th>
                         <th className="px-4 py-3">Work Time</th>
+                        <th className="px-4 py-3">Flags</th>
                         <th className="px-4 py-3">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(historyQuery.data.records ?? []).length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
-                            No attendance records found for this period.
+                          <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                            No attendance records found for {formatMonthYear(selectedHistoryMonth)}.
                           </td>
                         </tr>
                       ) : (
-                        historyQuery.data.records.map((r) => (
-                          <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
-                            <td className="px-4 py-3 font-medium text-slate-800">{formatDateShort(r.date)}</td>
-                            <td className="px-4 py-3 text-slate-600">{formatDateTime(r.startTime)}</td>
-                            <td className="px-4 py-3 text-slate-600">{formatDateTime(r.endTime)}</td>
-                            <td className="px-4 py-3 font-semibold text-slate-700">{r.realTimeLabel}</td>
-                            <td className="px-4 py-3"><StatusPill status={r.status} autoEnded={r.autoEnded} /></td>
-                          </tr>
-                        ))
+                        [...(historyQuery.data.records ?? [])]
+                          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                          .map((r) => {
+                            const dayName = new Date(r.date).toLocaleDateString("en-IN", {
+                              weekday: "short",
+                              timeZone: "Asia/Kolkata",
+                            });
+                            return (
+                              <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
+                                <td className="px-4 py-3">
+                                  <p className="font-semibold text-slate-800">{formatDateShort(r.date)}</p>
+                                  <p className="text-xs text-slate-400">{dayName}</p>
+                                </td>
+                                <td className="px-4 py-3 text-slate-600">{formatDateTime(r.startTime)}</td>
+                                <td className="px-4 py-3 text-slate-600">{formatDateTime(r.endTime)}</td>
+                                <td className="px-4 py-3 font-semibold text-slate-700">{r.realTimeLabel}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-wrap gap-1">
+                                    {r.lateLogin && (
+                                      <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                                        Late
+                                      </span>
+                                    )}
+                                    {r.earlyLogout && (
+                                      <span className="inline-flex items-center rounded-full bg-orange-50 border border-orange-200 px-2 py-0.5 text-xs font-semibold text-orange-700">
+                                        Early Out
+                                      </span>
+                                    )}
+                                    {!r.lateLogin && !r.earlyLogout && (
+                                      <span className="text-xs text-slate-300">—</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3"><StatusPill status={r.status} autoEnded={r.autoEnded} /></td>
+                              </tr>
+                            );
+                          })
                       )}
                     </tbody>
                   </table>
@@ -1179,13 +1287,16 @@ export default function AttendanceDashboardPage() {
       {/* ═══ Admin: Team Analytics & History ═══ */}
       {activeTab === "admin-history" && isAdmin && (
         <div className="space-y-6">
-          {/* Header + Date Range */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-slate-500" />
-              <h2 className="text-lg font-semibold text-slate-900">Team Attendance Analytics</h2>
+          {/* Header + Month Picker */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-2">
+              <TrendingUp className="h-5 w-5 text-slate-500 mt-0.5 shrink-0" />
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Team Attendance Analytics</h2>
+                <p className="mt-0.5 text-sm text-slate-400">{formatMonthYear(selectedAdminHistoryMonth)}</p>
+              </div>
             </div>
-            <DateRangePicker value={adminHistoryRange} onChange={setAdminHistoryRange} />
+            <MonthPicker value={selectedAdminHistoryMonth} onChange={setSelectedAdminHistoryMonth} />
           </div>
 
           {adminHistoryQuery.isLoading ? (
