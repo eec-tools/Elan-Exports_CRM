@@ -12,7 +12,6 @@ interface Payroll {
   daysInMonth: number;
   scheduledWorkingDays: number;
   weekdayPresentDays: number;
-  weekendWorkedDays: number;
   holidayCount: number;
   holidayPaidDays: number;
   approvedLeavesMonth: number;
@@ -143,8 +142,7 @@ export default function PayrollPage() {
                 label="Official Paid Sundays"
                 value={String(countSundaysInMonth(payroll.month, payroll.year))}
               />
-              <SlipRow label="Weekday Present Days" value={String(payroll.weekdayPresentDays)} />
-              <SlipRow label="Weekend Days Worked" value={String(payroll.weekendWorkedDays)} />
+              <SlipRow label="Present Days" value={String(payroll.weekdayPresentDays)} />
               {payroll.holidayPaidDays > 0 && (
                 <SlipRow
                   label={`Paid Holidays (${payroll.holidayCount} declared)`}

@@ -22,7 +22,6 @@ interface PayrollRow {
   scheduledWorkingDays: number;
   saturdaySchedule: string;
   weekdayPresentDays: number;
-  weekendWorkedDays: number;
   holidayCount: number;
   holidayPaidDays: number;
   approvedLeavesMonth: number;
@@ -192,9 +191,6 @@ export default function AdminPayrollPage() {
                         <ColHeader label="Present" tip="Regular present days on scheduled workdays (Mon–Fri + Sat for full/half). HalfDay = 0.5." />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
-                        <ColHeader label="Bonus Days" tip="Extra days worked on off days (typically Saturday for off-schedule employees). Sundays are already counted as official paid days." />
-                      </th>
-                      <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
                         <ColHeader label="Holidays" tip="Declared holidays falling on scheduled working days — automatically counted as paid days off for all employees." />
                       </th>
                       <th className="text-right px-3 py-3 font-medium whitespace-nowrap">
@@ -240,7 +236,6 @@ export default function AdminPayrollPage() {
                         <td className="px-3 py-3 text-right text-slate-600">{row.scheduledWorkingDays}</td>
                         <td className="px-3 py-3 text-right text-slate-600">{fmtPrecise(row.perDaySalary)}</td>
                         <td className="px-3 py-3 text-right text-slate-600">{row.weekdayPresentDays}</td>
-                        <td className="px-3 py-3 text-right text-slate-600">{row.weekendWorkedDays}</td>
                         <td className="px-3 py-3 text-right">
                           {row.holidayPaidDays > 0 ? (
                             <span className="text-violet-600 font-medium" title={`${row.holidayCount} holiday(s) declared; ${row.holidayPaidDays} fall on working days`}>
@@ -301,7 +296,7 @@ export default function AdminPayrollPage() {
               {/* Summary footer */}
               <div className="border-t border-slate-100 px-4 py-3 flex items-center justify-between text-sm">
                 <p className="text-slate-500 text-xs">
-                  Formula: Net = (Salary ÷ Sched. Days) × Paid Days − Excess Leave Ded. − PT &nbsp;|&nbsp; Paid Days = Present + Sundays + Bonus + Holidays + Leaves
+                  Formula: Net = (Salary ÷ Sched. Days) × Paid Days − Excess Leave Ded. − PT &nbsp;|&nbsp; Paid Days = Present + Sundays + Holidays + Leaves
                 </p>
                 <p className="font-semibold text-slate-800">
                   Total Payout: {fmt(totalNet)}

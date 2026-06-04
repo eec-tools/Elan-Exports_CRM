@@ -215,6 +215,21 @@ function formatDateShort(value: string): string {
   });
 }
 
+function formatDateWithDay(value: string): string {
+  const d = new Date(value);
+  const datePart = d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  });
+  const dayPart = d.toLocaleDateString("en-IN", {
+    weekday: "long",
+    timeZone: "Asia/Kolkata",
+  });
+  return `${datePart} — ${dayPart}`;
+}
+
 function formatMinutes(minutes: number): string {
   const h = Math.floor(Math.max(0, minutes) / 60);
   const m = Math.max(0, minutes) % 60;
@@ -461,7 +476,6 @@ export default function AttendanceDashboardPage() {
   >(null);
   const [checkoutProofs, setCheckoutProofs] = useState<CheckoutProofUpload[]>([]);
   const [isUploadingProofs, setIsUploadingProofs] = useState(false);
-  const [isWeekendWork, setIsWeekendWork] = useState(false);
   const [proofViewerOpen, setProofViewerOpen] = useState(false);
   const [selectedProofRecord, setSelectedProofRecord] = useState<HistoryRecord | null>(null);
   const [loadedDraftKey, setLoadedDraftKey] = useState<string | null>(null);
@@ -567,13 +581,12 @@ export default function AttendanceDashboardPage() {
   /* ─── Mutations ──────────────────────────────────── */
 
   const startMutation = useMutation({
-    mutationFn: () => api.post("/attendance/start", { isWeekendWork }),
+    mutationFn: () => api.post("/attendance/start"),
     onSuccess: () => {
       toast.success("Checked in successfully!");
       if (draftStorageKey) localStorage.removeItem(draftStorageKey);
       setCheckoutProofs([]);
       setLoadedDraftKey(null);
-      setIsWeekendWork(false);
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       queryClient.invalidateQueries({ queryKey: ["attendance-admin-today"] });
     },
@@ -856,20 +869,6 @@ export default function AttendanceDashboardPage() {
               <div className="flex flex-col items-center gap-3">
                 {checkInStage === "not-started" && (
                   <>
-                    {[0, 6].includes(new Date().getDay()) && (
-                      <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-                        <input
-                          type="checkbox"
-                          checked={isWeekendWork}
-                          onChange={(e) => setIsWeekendWork(e.target.checked)}
-                          className="h-4 w-4 rounded accent-emerald-600"
-                        />
-                        <span>
-                          I am working today ({new Date().getDay() === 6 ? "Saturday" : "Sunday"}) —
-                          this day will count as a <strong>paid workday</strong>
-                        </span>
-                      </label>
-                    )}
                     <Button
                       onClick={() => startMutation.mutate()}
                       disabled={startMutation.isPending || todayQuery.isLoading}
@@ -1072,15 +1071,10 @@ export default function AttendanceDashboardPage() {
                         [...(historyQuery.data.records ?? [])]
                           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                           .map((r) => {
-                            const dayName = new Date(r.date).toLocaleDateString("en-IN", {
-                              weekday: "short",
-                              timeZone: "Asia/Kolkata",
-                            });
                             return (
                               <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
-                                <td className="px-4 py-3">
-                                  <p className="font-semibold text-slate-800">{formatDateShort(r.date)}</p>
-                                  <p className="text-xs text-slate-400">{dayName}</p>
+                                <td className="px-4 py-3 whitespace-nowrap font-semibold text-slate-800">
+                                  {formatDateWithDay(r.date)}
                                 </td>
                                 <td className="px-4 py-3 text-slate-600">{formatDateTime(r.startTime)}</td>
                                 <td className="px-4 py-3 text-slate-600">{formatDateTime(r.endTime)}</td>
@@ -1491,14 +1485,17 @@ export default function AttendanceDashboardPage() {
                             colSpan={selectedAdminEmployee ? 9 : 10}
                             className="px-4 py-12 text-center text-slate-400"
                           >
-                            No attendance records found for this period.
+                            No attendance records found for {formatMonthYear(selectedAdminHistoryMonth)}.
                           </td>
                         </tr>
                       ) : (
-                        filteredRecords.map((r) => (
+                        [...filteredRecords]
+                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                          .map((r) => {
+                          return (
                           <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
-                            <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">
-                              {formatDateShort(r.date)}
+                            <td className="px-4 py-3 whitespace-nowrap font-semibold text-slate-800">
+                              {formatDateWithDay(r.date)}
                             </td>
                             {!selectedAdminEmployee && (
                               <td className="px-4 py-3">
@@ -1591,7 +1588,8 @@ export default function AttendanceDashboardPage() {
                               </DropdownMenu>
                             </td>
                           </tr>
-                        ))
+                        );
+                        })
                       )}
                     </tbody>
                   </table>

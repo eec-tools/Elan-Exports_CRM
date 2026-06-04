@@ -17,7 +17,6 @@ interface Payroll {
   scheduledWorkingDays: number;
   saturdaySchedule: string;
   weekdayPresentDays: number;
-  weekendWorkedDays: number;
   holidayCount: number;
   holidayPaidDays: number;
   approvedLeavesMonth: number;
@@ -188,10 +187,7 @@ export default function PayrollSlipPage() {
               Paid Days Breakdown
             </p>
             <SlipRow label="Days Present" value={String(payroll.weekdayPresentDays)} />
-            <SlipRow label="Sundays (paid off)" value={String(Math.round(payroll.paidDays - payroll.weekdayPresentDays - payroll.weekendWorkedDays - payroll.approvedLeavesMonth - payroll.holidayPaidDays))} />
-            {payroll.weekendWorkedDays > 0 && (
-              <SlipRow label="Bonus Days (weekend work)" value={String(payroll.weekendWorkedDays)} />
-            )}
+            <SlipRow label="Sundays (paid off)" value={String(Math.round(payroll.paidDays - payroll.weekdayPresentDays - payroll.approvedLeavesMonth - payroll.holidayPaidDays))} />
             {payroll.holidayPaidDays > 0 && (
               <SlipRow
                 label={`Holidays (${payroll.holidayCount} declared, ${payroll.holidayPaidDays} on working days)`}
@@ -241,9 +237,8 @@ export default function PayrollSlipPage() {
             <div className="border-t border-slate-100 mt-3 pt-3">
               <p className="text-[10px] text-slate-400 leading-relaxed">
                 Paid days = {payroll.weekdayPresentDays} present
-                {" "}+ {Math.round(payroll.paidDays - payroll.weekdayPresentDays - payroll.weekendWorkedDays - payroll.approvedLeavesMonth - payroll.holidayPaidDays)} Sundays
+                {" "}+ {Math.round(payroll.paidDays - payroll.weekdayPresentDays - payroll.approvedLeavesMonth - payroll.holidayPaidDays)} Sundays
                 {payroll.holidayPaidDays > 0 ? ` + ${payroll.holidayPaidDays} holidays` : ""}
-                {payroll.weekendWorkedDays > 0 ? ` + ${payroll.weekendWorkedDays} bonus` : ""}
                 {payroll.approvedLeavesMonth > 0 ? ` + ${payroll.approvedLeavesMonth} leaves` : ""}
                 {" "}= {payroll.paidDays}
                 {" "}· Net = ({fmt(payroll.user.monthlySalary ?? 0)} ÷ {payroll.scheduledWorkingDays}) × {payroll.paidDays}

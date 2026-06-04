@@ -105,7 +105,7 @@ async function countHolidaysInMonth(
 }
 
 /**
- * Regular present days: days where isWeekendWork=false and status Present/HalfDay.
+ * Present days (all scheduled days including weekends worked).
  * HalfDay counts as 0.5. Holiday dates are excluded to prevent double-counting
  * with holidayPaidDays.
  */
@@ -124,7 +124,6 @@ async function countRegularPresentDays(
       userId,
       date: { gte: monthStartUTC(month, year), lte: monthEndUTC(month, year) },
       status: { in: [AttendanceStatus.Present, AttendanceStatus.HalfDay] },
-      isWeekendWork: false,
       ...holidayFilter,
     },
     select: { status: true },
@@ -133,33 +132,6 @@ async function countRegularPresentDays(
   return records.reduce((sum, r) => {
     return sum + (r.status === AttendanceStatus.HalfDay ? 0.5 : 1);
   }, 0);
-}
-
-/**
- * Bonus days worked on off days (isWeekendWork=true).
- * Sundays are official paid days, so they are not treated as bonus days.
- */
-async function countBonusDaysWorked(
-  userId: string,
-  month: number,
-  year: number,
-): Promise<number> {
-  const records = await prisma.attendance.findMany({
-    where: {
-      userId,
-      date: { gte: monthStartUTC(month, year), lte: monthEndUTC(month, year) },
-      isWeekendWork: true,
-      status: { in: [AttendanceStatus.Present, AttendanceStatus.HalfDay] },
-    },
-    select: { date: true },
-  });
-
-  return records.filter((record) => {
-    const localDate = new Date(
-      record.date.getTime() + ATTENDANCE_TZ_OFFSET_MINUTES * 60 * 1000,
-    );
-    return localDate.getUTCDay() !== 0;
-  }).length;
 }
 
 /** Approved leave days falling within the given month */
@@ -231,11 +203,9 @@ async function countApprovedLeavesYTD(
  *   sundayPaidDays       = Sundays in month (official paid days off)
  *   holidayPaidDays      = declared holidays falling on scheduled working days (paid days off)
  *   holidayCount         = total holidays declared in the month
- *   regularPresentDays   = days clocked in on scheduled working days (isWeekendWork=false)
- *                          HalfDay = 0.5
- *   bonusDaysWorked      = days worked on off days (isWeekendWork=true) — paid at perDaySalary
+ *   regularPresentDays   = days clocked in (all days, HalfDay = 0.5)
  *   approvedLeavesMonth  = approved leave days in this month (within quota = paid)
- *   paidDays             = regularPresentDays + sundayPaidDays + bonusDaysWorked
+ *   paidDays             = regularPresentDays + sundayPaidDays
  *                          + approvedLeavesMonth + holidayPaidDays
  *   grossSalary          = perDaySalary × paidDays
  *   excessLeaveDays      = min(max(0, approvedLeavesYTD − 14), approvedLeavesThisMonth)
@@ -283,7 +253,6 @@ export async function generatePayroll(
 
   // Step 4: Attendance counts (holidays excluded from regularPresentDays to avoid double-counting)
   const weekdayPresentDays = await countRegularPresentDays(userId, month, year, scheduledHolidayDates);
-  const weekendWorkedDays = await countBonusDaysWorked(userId, month, year);
 
   // Step 5: Leave counts
   const approvedLeavesMonth = await countApprovedLeavesInMonth(userId, month, year);
@@ -293,11 +262,10 @@ export async function generatePayroll(
   const excessLeavesYTD = Math.max(0, approvedLeavesYTD - 14);
   const excessLeaveDays = Math.min(excessLeavesYTD, approvedLeavesMonth);
 
-  // Step 7: Paid days — presence + Sundays + bonus days + leaves + holidays
+  // Step 7: Paid days — presence + Sundays + leaves + holidays
   const paidDays =
     weekdayPresentDays +
     sundayPaidDays +
-    weekendWorkedDays +
     approvedLeavesMonth +
     holidayPaidDays;
 
@@ -317,7 +285,7 @@ export async function generatePayroll(
       scheduledWorkingDays,
       saturdaySchedule: user.saturdaySchedule,
       weekdayPresentDays,
-      weekendWorkedDays,
+      weekendWorkedDays: 0,
       holidayCount,
       holidayPaidDays,
       approvedLeavesMonth,
@@ -334,7 +302,7 @@ export async function generatePayroll(
       scheduledWorkingDays,
       saturdaySchedule: user.saturdaySchedule,
       weekdayPresentDays,
-      weekendWorkedDays,
+      weekendWorkedDays: 0,
       holidayCount,
       holidayPaidDays,
       approvedLeavesMonth,
