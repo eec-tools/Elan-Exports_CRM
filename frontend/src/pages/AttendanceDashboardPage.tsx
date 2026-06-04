@@ -1069,7 +1069,7 @@ export default function AttendanceDashboardPage() {
                         </tr>
                       ) : (
                         [...(historyQuery.data.records ?? [])]
-                          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                           .map((r) => {
                             return (
                               <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">

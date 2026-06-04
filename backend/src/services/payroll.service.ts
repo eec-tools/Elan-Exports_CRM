@@ -105,9 +105,11 @@ async function countHolidaysInMonth(
 }
 
 /**
- * Present days (all scheduled days including weekends worked).
- * HalfDay counts as 0.5. Holiday dates are excluded to prevent double-counting
- * with holidayPaidDays.
+ * Present days in the month. HalfDay = 0.5.
+ * Attendance.date is @db.Date (PostgreSQL DATE). PostgreSQL ignores the time
+ * component of any DateTime filter, so we pass IST calendar-date boundaries
+ * as UTC-midnight values (which map 1-to-1 to the stored DATE rows).
+ * Holiday dates are excluded so they are not double-counted with holidayPaidDays.
  */
 async function countRegularPresentDays(
   userId: string,
@@ -115,16 +117,16 @@ async function countRegularPresentDays(
   year: number,
   holidayDates: Date[] = [],
 ): Promise<number> {
-  const holidayFilter = holidayDates.length > 0
-    ? { NOT: { date: { in: holidayDates } } }
-    : {};
+  // IST month boundaries expressed as UTC midnight of the IST date
+  const istMonthStart = new Date(Date.UTC(year, month - 1, 1));                           // e.g. 2026-05-01
+  const istMonthEnd   = new Date(Date.UTC(year, month - 1, getDaysInMonth(month, year))); // e.g. 2026-05-31
 
   const records = await prisma.attendance.findMany({
     where: {
       userId,
-      date: { gte: monthStartUTC(month, year), lte: monthEndUTC(month, year) },
+      date: { gte: istMonthStart, lte: istMonthEnd },
       status: { in: [AttendanceStatus.Present, AttendanceStatus.HalfDay] },
-      ...holidayFilter,
+      ...(holidayDates.length > 0 && { NOT: { date: { in: holidayDates } } }),
     },
     select: { status: true },
   });
