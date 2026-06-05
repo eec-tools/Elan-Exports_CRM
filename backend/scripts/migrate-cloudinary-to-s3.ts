@@ -1,15 +1,14 @@
 /**
  * One-time migration: download every Cloudinary file and re-upload to S3.
  *
- * Uses cloudinary.utils.private_download_url() which downloads via api.cloudinary.com
- * (with your API credentials) instead of res.cloudinary.com — this bypasses expired
- * signed tokens and URL authentication settings on the account.
+ * Uses cloudinary.utils.api_sign_request() to build a fresh authenticated download
+ * URL via api.cloudinary.com — this bypasses expired signed tokens and CDN auth.
  *
  * Usage:
  *   cd backend
  *   npx tsx scripts/migrate-cloudinary-to-s3.ts
  *
- * Safe to re-run — rows without "cloudinary" in fileUrl are skipped.
+ * Safe to re-run — rows/items without "cloudinary" in the URL are skipped.
  */
 
 import { PrismaClient } from "@prisma/client";
@@ -60,13 +59,6 @@ function cloudinaryPublicIdToS3Key(publicId: string): string {
   return `${FOLDER_MAP[folder] ?? "misc"}/${filename}`;
 }
 
-/**
- * Extract the publicId and resource_type from a Cloudinary delivery URL.
- * Works for signed and unsigned URLs, with or without version numbers.
- *
- * URL format:
- *   https://res.cloudinary.com/{cloud}/{resource_type}/upload[/s--SIG--][/v123456]/{public_id}
- */
 function parseCloudinaryUrl(url: string): { publicId: string; resourceType: string } | null {
   try {
     const m = url.match(
@@ -75,7 +67,6 @@ function parseCloudinaryUrl(url: string): { publicId: string; resourceType: stri
     if (!m) return null;
     const resourceType = m[1].toLowerCase();
     let publicId = m[2];
-    // For image/video resources, Cloudinary publicId does NOT include the file extension
     if (resourceType === "image" || resourceType === "video") {
       publicId = publicId.replace(/\.[a-zA-Z0-9]+$/, "");
     }
@@ -85,11 +76,6 @@ function parseCloudinaryUrl(url: string): { publicId: string; resourceType: stri
   }
 }
 
-/**
- * Manually construct a Cloudinary signed download URL.
- * Puts the correct resource_type in the URL path so raw/image/video all work.
- * Downloads via api.cloudinary.com — bypasses CDN auth and expired delivery tokens.
- */
 function makeFreshDownloadUrl(publicId: string, resourceType: string): string {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME!;
   const apiKey    = process.env.CLOUDINARY_API_KEY!;
@@ -148,7 +134,6 @@ async function migrateFile(
     return null;
   }
 
-  // ── Resolve publicId and resource_type ──────────────────────────────────
   let resolvedPublicId = publicId;
   let resourceType     = fileType === "image" ? "image" : "raw";
 
@@ -166,10 +151,8 @@ async function migrateFile(
     return null;
   }
 
-  // ── Derive S3 key ────────────────────────────────────────────────────────
   const s3Key = cloudinaryPublicIdToS3Key(resolvedPublicId);
 
-  // ── Download via fresh signed URL (bypasses expired CDN tokens) ──────────
   let buffer: Buffer;
   let contentType: string;
 
@@ -179,7 +162,6 @@ async function migrateFile(
     ({ buffer, contentType } = await tryDownload(resourceType));
   } catch (firstErr) {
     const firstMsg = (firstErr as Error).message ?? "";
-    // 404 → try the other resource type before giving up
     if (firstMsg.includes("404")) {
       const altType = resourceType === "raw" ? "image" : "raw";
       try {
@@ -187,7 +169,6 @@ async function migrateFile(
       } catch (altErr) {
         const altMsg = (altErr as Error).message ?? "";
         if (altMsg.includes("404")) {
-          // File genuinely doesn't exist in Cloudinary (may have been deleted)
           console.warn(`  ⚠ [${label}] ${recordId}: Not found in Cloudinary — skipping`);
           skipped++;
         } else {
@@ -203,7 +184,6 @@ async function migrateFile(
     }
   }
 
-  // ── Upload to S3 ─────────────────────────────────────────────────────────
   try {
     await s3.send(new PutObjectCommand({
       Bucket: BUCKET,
@@ -222,6 +202,27 @@ async function migrateFile(
   }
 }
 
+/** Migrate a JSON array field where each item has a .url string property. */
+async function migrateJsonArray(
+  recordId: string,
+  items: { url: string; [key: string]: any }[],
+  label: string,
+): Promise<{ changed: boolean; result: { url: string; [key: string]: any }[] }> {
+  let changed = false;
+  const result = await Promise.all(
+    items.map(async (item) => {
+      if (!item.url?.includes("cloudinary")) return item;
+      const migrated = await migrateFile(recordId, item.url, null, null, label);
+      if (migrated) {
+        changed = true;
+        return { ...item, url: migrated.newUrl };
+      }
+      return item;
+    }),
+  );
+  return { changed, result };
+}
+
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -231,7 +232,7 @@ async function main() {
 
   console.log(`\nMigrating Cloudinary → s3://${BUCKET} (CDN: ${CDN_BASE})\n`);
 
-  // VaultDocument
+  // ── VaultDocument ──────────────────────────────────────────────────────────
   const vaultDocs = await prisma.vaultDocument.findMany({
     where: { isFolder: false, fileUrl: { contains: "cloudinary" } },
     select: { id: true, fileUrl: true, publicId: true, fileType: true },
@@ -243,7 +244,7 @@ async function main() {
     if (result) await prisma.vaultDocument.update({ where: { id: row.id }, data: { fileUrl: result.newUrl, publicId: result.newKey } });
   }
 
-  // VaultDocumentVersion
+  // ── VaultDocumentVersion ───────────────────────────────────────────────────
   const vaultVersions = await prisma.vaultDocumentVersion.findMany({
     where: { fileUrl: { contains: "cloudinary" } },
     select: { id: true, fileUrl: true, publicId: true, fileType: true },
@@ -254,62 +255,162 @@ async function main() {
     if (result) await prisma.vaultDocumentVersion.update({ where: { id: row.id }, data: { fileUrl: result.newUrl, publicId: result.newKey } });
   }
 
-  // Supplier productCatalogShared
-  const suppliers = await (prisma as any).supplier.findMany({
-    where: { productCatalogShared: { contains: "cloudinary" } },
-    select: { id: true, productCatalogShared: true },
+  // ── Supplier ───────────────────────────────────────────────────────────────
+  const allSuppliers = await (prisma as any).supplier.findMany({
+    select: {
+      id: true,
+      productCatalogShared: true,
+      documents: true,
+      contractDocument: true,
+      productCatalogs: true,
+      productCatalogImages: true,
+      warehousePhotos: true,
+    },
   });
-  console.log(`\n[Supplier] ${suppliers.length} records`);
-  for (const row of suppliers) {
-    const result = await migrateFile(row.id, row.productCatalogShared, null, null, "Supplier");
-    if (result) await (prisma as any).supplier.update({ where: { id: row.id }, data: { productCatalogShared: result.newUrl } });
-  }
+  let supplierCount = 0;
+  for (const row of allSuppliers) {
+    let touched = false;
+    const update: Record<string, any> = {};
 
-  // NewSupplier productCatalog
-  const newSuppliers = await (prisma as any).newSupplier.findMany({
-    where: { productCatalog: { contains: "cloudinary" } },
-    select: { id: true, productCatalog: true },
+    // single string field
+    if (row.productCatalogShared?.includes("cloudinary")) {
+      const r = await migrateFile(row.id, row.productCatalogShared, null, null, "Supplier.catalog");
+      if (r) { update.productCatalogShared = r.newUrl; touched = true; }
+    }
+
+    // JSON array fields
+    for (const field of ["documents", "contractDocument", "productCatalogs", "productCatalogImages", "warehousePhotos"] as const) {
+      const raw = row[field];
+      const items: { url: string; [k: string]: any }[] = Array.isArray(raw) ? raw : (raw?.url ? [raw] : []);
+      if (!items.some((i: any) => i.url?.includes("cloudinary"))) continue;
+      const { changed, result } = await migrateJsonArray(row.id, items, `Supplier.${field}`);
+      if (changed) {
+        // contractDocument may have been stored as a single object originally — keep as array
+        update[field] = field === "contractDocument" ? result : result;
+        touched = true;
+      }
+    }
+
+    if (touched) {
+      supplierCount++;
+      await (prisma as any).supplier.update({ where: { id: row.id }, data: update });
+    }
+  }
+  console.log(`\n[Supplier] ${supplierCount} records updated`);
+
+  // ── NewSupplier ────────────────────────────────────────────────────────────
+  const allNewSuppliers = await (prisma as any).newSupplier.findMany({
+    select: {
+      id: true,
+      productCatalog: true,
+      certificates: true,
+      productCatalogs: true,
+      productCatalogImages: true,
+      warehousePhotos: true,
+    },
   });
-  console.log(`\n[NewSupplier] ${newSuppliers.length} records`);
-  for (const row of newSuppliers) {
-    const result = await migrateFile(row.id, row.productCatalog, null, null, "NewSupplier");
-    if (result) await (prisma as any).newSupplier.update({ where: { id: row.id }, data: { productCatalog: result.newUrl } });
-  }
+  let newSupplierCount = 0;
+  for (const row of allNewSuppliers) {
+    let touched = false;
+    const update: Record<string, any> = {};
 
-  // Buyer productCatalog
-  const buyers = await (prisma as any).buyer.findMany({
-    where: { productCatalog: { contains: "cloudinary" } },
-    select: { id: true, productCatalog: true },
+    if (row.productCatalog?.includes("cloudinary")) {
+      const r = await migrateFile(row.id, row.productCatalog, null, null, "NewSupplier.catalog");
+      if (r) { update.productCatalog = r.newUrl; touched = true; }
+    }
+
+    for (const field of ["certificates", "productCatalogs", "productCatalogImages", "warehousePhotos"] as const) {
+      const items: { url: string; [k: string]: any }[] = Array.isArray(row[field]) ? row[field] : [];
+      if (!items.some((i: any) => i.url?.includes("cloudinary"))) continue;
+      const { changed, result } = await migrateJsonArray(row.id, items, `NewSupplier.${field}`);
+      if (changed) { update[field] = result; touched = true; }
+    }
+
+    if (touched) {
+      newSupplierCount++;
+      await (prisma as any).newSupplier.update({ where: { id: row.id }, data: update });
+    }
+  }
+  console.log(`\n[NewSupplier] ${newSupplierCount} records updated`);
+
+  // ── SourcingSupplier ───────────────────────────────────────────────────────
+  const allSourcing = await (prisma as any).sourcingSupplier.findMany({
+    select: {
+      id: true,
+      productCatalog: true,
+      certificates: true,
+      productCatalogs: true,
+      productCatalogImages: true,
+      warehousePhotos: true,
+    },
   });
-  console.log(`\n[Buyer] ${buyers.length} records`);
-  for (const row of buyers) {
-    const result = await migrateFile(row.id, row.productCatalog, null, null, "Buyer");
-    if (result) await (prisma as any).buyer.update({ where: { id: row.id }, data: { productCatalog: result.newUrl } });
-  }
+  let sourcingCount = 0;
+  for (const row of allSourcing) {
+    let touched = false;
+    const update: Record<string, any> = {};
 
-  // Attendance proofFiles (JSON array of {url, name, ...})
+    if (row.productCatalog?.includes("cloudinary")) {
+      const r = await migrateFile(row.id, row.productCatalog, null, null, "SourcingSupplier.catalog");
+      if (r) { update.productCatalog = r.newUrl; touched = true; }
+    }
+
+    for (const field of ["certificates", "productCatalogs", "productCatalogImages", "warehousePhotos"] as const) {
+      const items: { url: string; [k: string]: any }[] = Array.isArray(row[field]) ? row[field] : [];
+      if (!items.some((i: any) => i.url?.includes("cloudinary"))) continue;
+      const { changed, result } = await migrateJsonArray(row.id, items, `SourcingSupplier.${field}`);
+      if (changed) { update[field] = result; touched = true; }
+    }
+
+    if (touched) {
+      sourcingCount++;
+      await (prisma as any).sourcingSupplier.update({ where: { id: row.id }, data: update });
+    }
+  }
+  console.log(`\n[SourcingSupplier] ${sourcingCount} records updated`);
+
+  // ── Buyer ──────────────────────────────────────────────────────────────────
+  const allBuyers = await (prisma as any).buyer.findMany({
+    select: { id: true, productCatalog: true, documents: true },
+  });
+  let buyerCount = 0;
+  for (const row of allBuyers) {
+    let touched = false;
+    const update: Record<string, any> = {};
+
+    if (row.productCatalog?.includes("cloudinary")) {
+      const r = await migrateFile(row.id, row.productCatalog, null, null, "Buyer.catalog");
+      if (r) { update.productCatalog = r.newUrl; touched = true; }
+    }
+
+    const docs: { url: string; [k: string]: any }[] = Array.isArray(row.documents) ? row.documents : [];
+    if (docs.some((d: any) => d.url?.includes("cloudinary"))) {
+      const { changed, result } = await migrateJsonArray(row.id, docs, "Buyer.documents");
+      if (changed) { update.documents = result; touched = true; }
+    }
+
+    if (touched) {
+      buyerCount++;
+      await (prisma as any).buyer.update({ where: { id: row.id }, data: update });
+    }
+  }
+  console.log(`\n[Buyer] ${buyerCount} records updated`);
+
+  // ── Attendance proofFiles ──────────────────────────────────────────────────
   const attendances = await (prisma as any).attendance.findMany({
     where: { proofFiles: { not: null } },
     select: { id: true, proofFiles: true },
   });
   let attCount = 0;
   for (const row of attendances) {
-    const proofs: { url: string; name: string; mimeType?: string; size?: number }[] =
-      Array.isArray(row.proofFiles) ? row.proofFiles : [];
+    const proofs: { url: string; [k: string]: any }[] = Array.isArray(row.proofFiles) ? row.proofFiles : [];
     if (!proofs.some((p) => p.url?.includes("cloudinary"))) continue;
     attCount++;
-    const updated = await Promise.all(
-      proofs.map(async (p) => {
-        if (!p.url?.includes("cloudinary")) return p;
-        const result = await migrateFile(row.id, p.url, null, null, "Attendance");
-        return result ? { ...p, url: result.newUrl } : p;
-      }),
-    );
-    await (prisma as any).attendance.update({ where: { id: row.id }, data: { proofFiles: updated } });
+    const { result } = await migrateJsonArray(row.id, proofs, "Attendance");
+    await (prisma as any).attendance.update({ where: { id: row.id }, data: { proofFiles: result } });
   }
-  console.log(`\n[Attendance] ${attCount} records with Cloudinary URLs`);
+  console.log(`\n[Attendance] ${attCount} records updated`);
 
-  // AppSetting (email attachment URL)
+  // ── AppSetting email attachment ────────────────────────────────────────────
   const attachmentSetting = await prisma.appSetting.findUnique({ where: { key: "email_campaign_attachment_url" } });
   if (attachmentSetting?.value?.includes("cloudinary")) {
     console.log(`\n[AppSetting] email_campaign_attachment_url`);
