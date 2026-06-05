@@ -1,8 +1,10 @@
 import { AttendanceStatus, Prisma } from "@prisma/client";
 import { Response } from "express";
 import multer from "multer";
-import { v2 as cloudinary } from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
+import multerS3 from "multer-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { s3, S3_BUCKET, s3FileUrl } from "../lib/s3.js";
 import prisma from "../config/db.js";
 import { logActivity } from "../services/activityLogger.js";
 import { AuthRequest } from "../types/index.js";
@@ -73,56 +75,36 @@ function buildScheduleDateTime(referenceDate: Date, hhmm: string): Date | null {
   return new Date(shifted.getTime() - ATTENDANCE_TZ_OFFSET_MINUTES * 60 * 1000);
 }
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-const attendanceProofStorage = new CloudinaryStorage({
-  cloudinary,
-  params: async (_req: Express.Request, file: Express.Multer.File) => {
-    const lowerName = file.originalname.toLowerCase();
-    const isRaw =
-      file.mimetype === "application/pdf" ||
-      lowerName.endsWith(".pdf") ||
-      lowerName.endsWith(".doc") ||
-      lowerName.endsWith(".docx");
-    const resource_type = isRaw ? "raw" : "image";
+const attendanceProofStorage = multerS3({
+  s3,
+  bucket: S3_BUCKET,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  key: (_req: any, file: Express.Multer.File, cb: (err: Error | null, key: string) => void) => {
+    const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
     const extMatch = file.originalname.match(/\.[^/.]+$/);
-    const ext = isRaw && extMatch ? extMatch[0] : "";
-    const baseName = file.originalname
-      .replace(/\.[^/.]+$/, "")
-      .replace(/\s+/g, "_")
-      .replace(/[^a-zA-Z0-9._-]/g, "");
-
-    return {
-      folder: "elan-attendance-proofs",
-      resource_type,
-      public_id: `attendance_proof_${Date.now()}_${baseName}${ext}`,
-    };
+    const ext = extMatch ? extMatch[0] : "";
+    cb(null, `attendance-proofs/attendance_proof_${Date.now()}_${baseName}${ext}`);
   },
-} as any);
+});
 
 export const uploadAttendanceProofFile = multer({
   storage: attendanceProofStorage,
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
-export async function getAttendanceUploadSignature(_req: AuthRequest, res: Response): Promise<void> {
-  const timestamp = Math.round(Date.now() / 1000);
-  const params = { folder: "elan-attendance-proofs", timestamp };
-  const signature = cloudinary.utils.api_sign_request(
-    params,
-    process.env.CLOUDINARY_API_SECRET!
-  );
-  res.json({
-    signature,
-    timestamp,
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-    apiKey: process.env.CLOUDINARY_API_KEY,
-    folder: "elan-attendance-proofs",
-  });
+export async function getAttendanceUploadSignature(req: AuthRequest, res: Response): Promise<void> {
+  const { filename = "file", contentType = "application/octet-stream" } = req.query as {
+    filename?: string;
+    contentType?: string;
+  };
+  const baseName = filename.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
+  const extMatch = filename.match(/\.[^/.]+$/);
+  const ext = extMatch ? extMatch[0] : "";
+  const s3Key = `attendance-proofs/attendance_proof_${Date.now()}_${baseName}${ext}`;
+
+  const command = new PutObjectCommand({ Bucket: S3_BUCKET, Key: s3Key, ContentType: contentType });
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+  res.json({ uploadUrl, fileUrl: s3FileUrl(s3Key), s3Key });
 }
 
 function normalizeCheckoutProofs(value: unknown): CheckoutProofFile[] {
@@ -271,7 +253,7 @@ export async function uploadAttendanceProof(req: AuthRequest, res: Response): Pr
       return;
     }
 
-    const fileUrl: string = file.path || file.secure_url || file.url;
+    const fileUrl: string = s3FileUrl((file as any).key);
     const fileName = file.originalname || "Work Proof";
     const mimeType = file.mimetype || null;
     const size = typeof file.size === "number" ? file.size : null;

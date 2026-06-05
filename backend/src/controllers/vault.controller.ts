@@ -1,89 +1,60 @@
 import { Request, Response, NextFunction } from "express";
-import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
+import multerS3 from "multer-s3";
+import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PrismaClient } from "@prisma/client";
 import { AuthRequest } from "../types/index.js";
 import { resolveFolderPolicy } from "../config/vaultPermissions.js";
+import { s3, S3_BUCKET, s3FileUrl } from "../lib/s3.js";
 
 const prisma = new PrismaClient();
 
-// ─── Cloudinary config ──────────────────────────────
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-// ─── Multer + Cloudinary storage ────────────────────
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async (_req: Express.Request, file: Express.Multer.File) => {
-    let resource_type = "auto";
-    let isRaw = false;
-    if (
-      file.mimetype === "application/pdf" ||
-      file.originalname.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|csv|zip)$/)
-    ) {
-      resource_type = "raw";
-      isRaw = true;
-    }
-
-    const extMatch = file.originalname.match(/\.[^/.]+$/);
-    const ext = isRaw && extMatch ? extMatch[0] : "";
+// ─── Multer + S3 storage ─────────────────────────────
+const storage = multerS3({
+  s3,
+  bucket: S3_BUCKET,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  key: (_req: any, file: Express.Multer.File, cb: (err: Error | null, key: string) => void) => {
     const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
-
-    return {
-      folder: "elan-vault",
-      resource_type,
-      public_id: `vault_${Date.now()}_${baseName}${ext}`,
-    };
+    const extMatch = file.originalname.match(/\.[^/.]+$/);
+    const ext = extMatch ? extMatch[0] : "";
+    cb(null, `vault/vault_${Date.now()}_${baseName}${ext}`);
   },
-} as any);
+});
 
 export const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
-
-// ─── Helper: derive fileType from mimetype ──────────
-function deriveFileType(mimetype: string): string {
-  if (mimetype === "application/pdf") return "pdf";
-  if (mimetype.startsWith("image/")) return "image";
-  if (
-    mimetype.includes("word") ||
-    mimetype.includes("document") ||
-    mimetype.includes("openxmlformats-officedocument.wordprocessingml")
-  )
-    return "doc";
-  if (
-    mimetype.includes("excel") ||
-    mimetype.includes("sheet") ||
-    mimetype.includes("openxmlformats-officedocument.spreadsheetml")
-  )
-    return "sheet";
-  return "file";
-}
 
 // ─── Controllers ────────────────────────────────────
 
-/** GET /api/vault/upload-signature - generate a signed Cloudinary upload params */
+/** GET /api/vault/upload-signature - returns S3 presigned PUT URL for direct browser upload */
 export async function getVaultUploadSignature(
-  _req: AuthRequest,
+  req: AuthRequest,
   res: Response,
 ): Promise<void> {
-  const timestamp = Math.round(Date.now() / 1000);
-  const params = { folder: "elan-vault", timestamp };
-  const signature = cloudinary.utils.api_sign_request(
-    params,
-    process.env.CLOUDINARY_API_SECRET!,
-  );
+  const { filename = "file", contentType = "application/octet-stream" } = req.query as {
+    filename?: string;
+    contentType?: string;
+  };
+  const baseName = filename.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
+  const extMatch = filename.match(/\.[^/.]+$/);
+  const ext = extMatch ? extMatch[0] : "";
+  const s3Key = `vault/vault_${Date.now()}_${baseName}${ext}`;
+
+  const command = new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: s3Key,
+    ContentType: contentType,
+  });
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+
   res.json({
-    signature,
-    timestamp,
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-    apiKey: process.env.CLOUDINARY_API_KEY,
-    folder: "elan-vault",
+    uploadUrl,
+    fileUrl: s3FileUrl(s3Key),
+    s3Key,
   });
 }
 
@@ -244,7 +215,7 @@ export async function createFolder(
 
 /**
  * POST /api/vault/upload
- * Accepts a JSON body with the Cloudinary result already uploaded from the frontend.
+ * Accepts a JSON body with the S3 file already uploaded from the frontend.
  * { name, category, region, parentId, fileUrl, publicId, fileType, expiryDate? }
  */
 export async function uploadDocument(
@@ -391,7 +362,7 @@ export async function replaceDocument(
       });
     }
 
-    // Update document with new file (do NOT delete old Cloudinary asset — it's versioned)
+    // Update document with new file (do NOT delete old S3 asset — it's versioned)
     const updated = await prisma.vaultDocument.update({
       where: { id: id as string },
       data: {
@@ -486,7 +457,7 @@ export async function getFolderPolicy(
   }
 }
 
-/** DELETE /api/vault/:id - delete a document/folder and its Cloudinary file */
+/** DELETE /api/vault/:id - delete a document/folder and its S3 file */
 export async function deleteDocument(
   req: Request,
   res: Response,
@@ -510,14 +481,12 @@ export async function deleteDocument(
       return;
     }
 
-    // If it's a file, remove from Cloudinary
+    // If it's a file, remove from S3
     if (!existing.isFolder && existing.publicId) {
       try {
-        await cloudinary.uploader.destroy(existing.publicId, {
-          resource_type: existing.fileType === "image" ? "image" : "raw",
-        });
+        await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: existing.publicId }));
       } catch {
-        // File may already be removed from Cloudinary; continue
+        // File may already be removed from S3; continue
       }
     }
 

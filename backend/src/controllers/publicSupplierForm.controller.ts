@@ -1,32 +1,23 @@
 import { Request, Response } from "express";
 import prisma from "../config/db.js";
-import { v2 as cloudinary } from "cloudinary";
 import { executeMarkResponse } from "./sourcingEmailCampaign.controller.js";
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
+import multerS3 from "multer-s3";
 import { sendFormSubmissionNotificationEmail, buildSupplierThankYouEmailHtml, sendSupplierThankYouEmail } from "../services/mailer.js";
 import { sendGmailEmail, getIntroEmailHeaders } from "../services/gmailService.js";
+import { s3, S3_BUCKET, s3FileUrl } from "../lib/s3.js";
 
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-const publicFormStorage = new CloudinaryStorage({
-    cloudinary,
-    params: async (_req: Express.Request, file: Express.Multer.File) => {
-        const isPdf = file.mimetype === "application/pdf" || file.originalname.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|csv|zip)$/);
-        const extMatch = file.originalname.match(/\.[^/.]+$/);
-        const ext = isPdf && extMatch ? extMatch[0] : "";
+const publicFormStorage = multerS3({
+    s3,
+    bucket: S3_BUCKET,
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: (_req: any, file: Express.Multer.File, cb: (err: Error | null, key: string) => void) => {
         const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
-        return {
-            folder: "elan-supplier-forms",
-            resource_type: isPdf ? "raw" : "auto",
-            public_id: `form_upload_${Date.now()}_${baseName}${ext}`,
-        };
+        const extMatch = file.originalname.match(/\.[^/.]+$/);
+        const ext = extMatch ? extMatch[0] : "";
+        cb(null, `supplier-forms/form_upload_${Date.now()}_${baseName}${ext}`);
     },
-} as any);
+});
 
 export const publicFormUpload = multer({
     storage: publicFormStorage,
@@ -44,7 +35,7 @@ export async function uploadPublicFormFile(_req: Request, res: Response): Promis
             res.status(400).json({ error: "No file uploaded" });
             return;
         }
-        const url: string = file.path || file.secure_url || file.url;
+        const url: string = s3FileUrl((file as any).key);
         res.json({ url, name: (_req as any).file.originalname });
     } catch (err) {
         console.error("Public form upload error:", err);

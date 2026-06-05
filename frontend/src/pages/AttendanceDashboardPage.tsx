@@ -673,25 +673,18 @@ export default function AttendanceDashboardPage() {
     setIsUploadingProofs(true);
 
     try {
-      const sigRes = await api.get("/attendance/upload-signature");
-      const { signature, timestamp, cloudName, apiKey, folder } = sigRes.data;
-
       const uploaded = await Promise.all(
         incomingFiles.map(async (file) => {
-          const fd = new FormData();
-          fd.append("file", file);
-          fd.append("signature", signature);
-          fd.append("timestamp", String(timestamp));
-          fd.append("api_key", apiKey);
-          fd.append("folder", folder);
-
-          const cloudRes = await fetch(
-            `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
-            { method: "POST", body: fd },
-          );
-          if (!cloudRes.ok) throw new Error("Cloudinary upload failed");
-          const data = await cloudRes.json();
-          return { url: data.secure_url, name: file.name, mimeType: file.type, size: file.size } as CheckoutProofUpload;
+          const { data: sig } = await api.get("/attendance/upload-signature", {
+            params: { filename: file.name, contentType: file.type || "application/octet-stream" },
+          });
+          const uploadRes = await fetch(sig.uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": file.type || "application/octet-stream" },
+            body: file,
+          });
+          if (!uploadRes.ok) throw new Error("S3 upload failed");
+          return { url: sig.fileUrl, name: file.name, mimeType: file.type, size: file.size } as CheckoutProofUpload;
         }),
       );
 

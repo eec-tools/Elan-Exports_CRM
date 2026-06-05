@@ -4,39 +4,23 @@ import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
 import { logActivity } from "../services/activityLogger.js";
 import { syncBuyerDocsToVault } from "../services/vaultSync.service.js";
-import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
+import multerS3 from "multer-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { s3, S3_BUCKET, s3FileUrl } from "../lib/s3.js";
 
-// ─── Cloudinary config ──────────────────────────────
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-const buyerCatalogStorage = new CloudinaryStorage({
-  cloudinary,
-  params: async (_req: Express.Request, file: Express.Multer.File) => {
-    let resource_type = "auto";
-    let isRaw = false;
-    if (
-      file.mimetype === "application/pdf" ||
-      file.originalname.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|csv|zip)$/)
-    ) {
-      resource_type = "raw";
-      isRaw = true;
-    }
-    const extMatch = file.originalname.match(/\.[^/.]+$/);
-    const ext = isRaw && extMatch ? extMatch[0] : "";
+const buyerCatalogStorage = multerS3({
+  s3,
+  bucket: S3_BUCKET,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  key: (_req: any, file: Express.Multer.File, cb: (err: Error | null, key: string) => void) => {
     const baseName = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
-    return {
-      folder: "elan-buyers",
-      resource_type,
-      public_id: `buyer_catalog_${Date.now()}_${baseName}${ext}`,
-    };
+    const extMatch = file.originalname.match(/\.[^/.]+$/);
+    const ext = extMatch ? extMatch[0] : "";
+    cb(null, `buyers/buyer_catalog_${Date.now()}_${baseName}${ext}`);
   },
-} as any);
+});
 
 export const uploadBuyerFile = multer({
   storage: buyerCatalogStorage,
@@ -56,7 +40,7 @@ export async function uploadBuyerCatalog(
       res.status(400).json({ error: "No file uploaded" });
       return;
     }
-    const fileUrl: string = file.path || file.secure_url || file.url;
+    const fileUrl: string = s3FileUrl((file as any).key);
     res.json({ url: fileUrl });
   } catch (err) {
     console.error("Upload buyer catalog error:", err);
@@ -630,30 +614,29 @@ export async function deleteBuyer(
 
 /**
  * GET /api/buyers/upload-signature
- * Returns a signed Cloudinary upload params for direct browser-to-Cloudinary uploads
+ * Returns S3 presigned PUT URL for direct browser-to-S3 uploads
  */
-export function getBuyerUploadSignature(
-  _req: AuthRequest,
+export async function getBuyerUploadSignature(
+  req: AuthRequest,
   res: Response,
-): void {
-  const timestamp = Math.round(Date.now() / 1000);
-  const params = { folder: "elan-buyers", timestamp };
-  const signature = cloudinary.utils.api_sign_request(
-    params,
-    process.env.CLOUDINARY_API_SECRET!,
-  );
-  res.json({
-    signature,
-    timestamp,
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-    apiKey: process.env.CLOUDINARY_API_KEY,
-    folder: "elan-buyers",
-  });
+): Promise<void> {
+  const { filename = "file", contentType = "application/octet-stream" } = req.query as {
+    filename?: string;
+    contentType?: string;
+  };
+  const baseName = filename.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
+  const extMatch = filename.match(/\.[^/.]+$/);
+  const ext = extMatch ? extMatch[0] : "";
+  const s3Key = `buyers/buyer_catalog_${Date.now()}_${baseName}${ext}`;
+
+  const command = new PutObjectCommand({ Bucket: S3_BUCKET, Key: s3Key, ContentType: contentType });
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+  res.json({ uploadUrl, fileUrl: s3FileUrl(s3Key), s3Key });
 }
 
 /**
  * POST /api/buyers/:id/documents
- * Save a pre-uploaded Cloudinary document URL to a buyer record
+ * Save a pre-uploaded document URL to a buyer record
  */
 export async function uploadBuyerDocument(
   req: AuthRequest,

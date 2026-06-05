@@ -402,24 +402,16 @@ export default function NewSupplierDetailsPage() {
 
   const uploadCatalogMutation = useMutation({
     mutationFn: async (file: File) => {
-      const { data: sig } = await api.get("/new-suppliers/upload-signature");
-      const isRaw =
-        /\.(pdf|doc|docx|xls|xlsx|csv|zip)$/i.test(file.name) ||
-        file.type === "application/pdf";
-      const resourceType = isRaw ? "raw" : "auto";
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("signature", sig.signature);
-      fd.append("timestamp", String(sig.timestamp));
-      fd.append("api_key", sig.apiKey);
-      fd.append("folder", sig.folder);
-      const cloudRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${sig.cloudName}/${resourceType}/upload`,
-        { method: "POST", body: fd },
-      );
-      const data = await cloudRes.json();
-      if (!data.secure_url) throw new Error("Upload failed");
-      return { url: data.secure_url as string };
+      const { data: sig } = await api.get("/new-suppliers/upload-signature", {
+        params: { filename: file.name, contentType: file.type || "application/octet-stream" },
+      });
+      const uploadRes = await fetch(sig.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      return { url: sig.fileUrl as string };
     },
     onError: () => toast.error("File upload failed"),
   });

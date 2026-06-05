@@ -330,7 +330,7 @@ export default function VaultPage() {
   // Upload status: idle | uploading | saving | done | error
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "saving" | "done" | "error">("idle");
 
-  // ─── Upload: direct-to-Cloudinary (mirrors NewSupplier pattern) ──────
+  // ─── Upload: direct-to-S3 via presigned URL ──────
 
   function deriveFileType(mimetype: string): string {
     if (mimetype === "application/pdf") return "pdf";
@@ -340,32 +340,22 @@ export default function VaultPage() {
     return "file";
   }
 
-  async function uploadSingleFileToCloudinary(
+  async function uploadSingleFileToS3(
     file: File,
-    sig: { signature: string; timestamp: number; cloudName: string; apiKey: string; folder: string },
   ): Promise<{ secure_url: string; public_id: string }> {
-    const isRaw =
-      /\.(pdf|doc|docx|xls|xlsx|csv|zip)$/i.test(file.name) ||
-      file.type === "application/pdf";
-    const resourceType = isRaw ? "raw" : "auto";
-
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("signature", sig.signature);
-    fd.append("timestamp", String(sig.timestamp));
-    fd.append("api_key", sig.apiKey);
-    fd.append("folder", sig.folder);
-
-    const cloudRes = await fetch(
-      `https://api.cloudinary.com/v1_1/${sig.cloudName}/${resourceType}/upload`,
-      { method: "POST", body: fd },
-    );
-    const cloudData = await cloudRes.json();
-    if (!cloudData.secure_url) throw new Error("Cloudinary upload failed");
-    return { secure_url: cloudData.secure_url, public_id: cloudData.public_id };
+    const { data: sig } = await api.get("/vault/upload-signature", {
+      params: { filename: file.name, contentType: file.type || "application/octet-stream" },
+    });
+    const uploadRes = await fetch(sig.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!uploadRes.ok) throw new Error("S3 upload failed");
+    return { secure_url: sig.fileUrl, public_id: sig.s3Key };
   }
 
-  async function uploadToCloudinaryAndSave() {
+  async function uploadToS3AndSave() {
     if (uploadFiles.length === 0) { toast.error("Please select at least one file"); return; }
     if (!uploadForm.category) { toast.error("Category is required"); return; }
     if (uploadFiles.length === 1 && !uploadForm.name) { toast.error("Document name is required"); return; }
@@ -377,15 +367,13 @@ export default function VaultPage() {
     setUploadProgress(uploadFiles.map((f) => ({ file: f, status: "pending" })));
 
     try {
-      const { data: sig } = await api.get("/vault/upload-signature");
-
       for (let i = 0; i < uploadFiles.length; i++) {
         const file = uploadFiles[i];
         setUploadProgress((prev) =>
           prev.map((p, idx) => (idx === i ? { ...p, status: "uploading" } : p)),
         );
 
-        const { secure_url, public_id } = await uploadSingleFileToCloudinary(file, sig);
+        const { secure_url, public_id } = await uploadSingleFileToS3(file);
 
         const docName = isSingle
           ? uploadForm.name
@@ -435,8 +423,7 @@ export default function VaultPage() {
     if (!replaceDoc || !replaceFile) return;
     try {
       setReplaceStatus("uploading");
-      const { data: sig } = await api.get("/vault/upload-signature");
-      const { secure_url, public_id } = await uploadSingleFileToCloudinary(replaceFile, sig);
+      const { secure_url, public_id } = await uploadSingleFileToS3(replaceFile);
       setReplaceStatus("saving");
       const newName = replaceFile.name.replace(/\.[^/.]+$/, "") || replaceFile.name;
       await api.post(`/vault/${replaceDoc.id}/replace`, {
@@ -557,7 +544,7 @@ export default function VaultPage() {
   }
 
   function handleUploadSubmit() {
-    uploadToCloudinaryAndSave();
+    uploadToS3AndSave();
   }
 
   function handleFileDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -1339,7 +1326,7 @@ export default function VaultPage() {
               <strong>{deleteDoc?.name}</strong> will be permanently removed
               {deleteDoc?.isFolder
                 ? " along with all its contents"
-                : " from Cloudinary"}
+                : " from storage"}
               {" and cannot be recovered."}
             </AlertDialogDescription>
           </AlertDialogHeader>
