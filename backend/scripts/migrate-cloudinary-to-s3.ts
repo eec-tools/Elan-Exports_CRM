@@ -254,26 +254,26 @@ async function main() {
     if (result) await prisma.vaultDocumentVersion.update({ where: { id: row.id }, data: { fileUrl: result.newUrl, publicId: result.newKey } });
   }
 
-  // Supplier catalogUrl
+  // Supplier productCatalogShared
   const suppliers = await (prisma as any).supplier.findMany({
-    where: { catalogUrl: { contains: "cloudinary" } },
-    select: { id: true, catalogUrl: true },
+    where: { productCatalogShared: { contains: "cloudinary" } },
+    select: { id: true, productCatalogShared: true },
   });
   console.log(`\n[Supplier] ${suppliers.length} records`);
   for (const row of suppliers) {
-    const result = await migrateFile(row.id, row.catalogUrl, null, null, "Supplier");
-    if (result) await (prisma as any).supplier.update({ where: { id: row.id }, data: { catalogUrl: result.newUrl } });
+    const result = await migrateFile(row.id, row.productCatalogShared, null, null, "Supplier");
+    if (result) await (prisma as any).supplier.update({ where: { id: row.id }, data: { productCatalogShared: result.newUrl } });
   }
 
-  // NewSupplier catalogUrl
+  // NewSupplier productCatalog
   const newSuppliers = await (prisma as any).newSupplier.findMany({
-    where: { catalogUrl: { contains: "cloudinary" } },
-    select: { id: true, catalogUrl: true },
+    where: { productCatalog: { contains: "cloudinary" } },
+    select: { id: true, productCatalog: true },
   });
   console.log(`\n[NewSupplier] ${newSuppliers.length} records`);
   for (const row of newSuppliers) {
-    const result = await migrateFile(row.id, row.catalogUrl, null, null, "NewSupplier");
-    if (result) await (prisma as any).newSupplier.update({ where: { id: row.id }, data: { catalogUrl: result.newUrl } });
+    const result = await migrateFile(row.id, row.productCatalog, null, null, "NewSupplier");
+    if (result) await (prisma as any).newSupplier.update({ where: { id: row.id }, data: { productCatalog: result.newUrl } });
   }
 
   // Buyer productCatalog
