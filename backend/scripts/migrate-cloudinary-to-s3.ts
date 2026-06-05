@@ -76,27 +76,14 @@ function parseCloudinaryUrl(url: string): { publicId: string; resourceType: stri
   }
 }
 
-function makeFreshDownloadUrl(publicId: string, resourceType: string): string {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME!;
-  const apiKey    = process.env.CLOUDINARY_API_KEY!;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET!;
-  const timestamp = Math.round(Date.now() / 1000);
-  const expiresAt = timestamp + 3600;
-
-  const signature = cloudinary.utils.api_sign_request(
-    { public_id: publicId, expires_at: expiresAt, timestamp },
-    apiSecret,
-  );
-
-  const qs = new URLSearchParams({
-    public_id:  publicId,
-    expires_at: String(expiresAt),
-    timestamp:  String(timestamp),
-    signature,
-    api_key:    apiKey,
+async function fetchCloudinaryBuffer(publicId: string, resourceType: string): Promise<{ buffer: Buffer; contentType: string }> {
+  // Use admin API to get fresh delivery URL, then download from it directly.
+  // This works for both public and private resources and bypasses expired CDN tokens.
+  const resource = await cloudinary.api.resource(publicId, {
+    resource_type: resourceType,
+    type: "upload",
   });
-
-  return `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/download?${qs}`;
+  return downloadBuffer(resource.secure_url);
 }
 
 function downloadBuffer(url: string): Promise<{ buffer: Buffer; contentType: string }> {
@@ -156,19 +143,19 @@ async function migrateFile(
   let buffer: Buffer;
   let contentType: string;
 
-  const tryDownload = async (rt: string) => downloadBuffer(makeFreshDownloadUrl(resolvedPublicId!, rt));
+  const tryFetch = async (rt: string) => fetchCloudinaryBuffer(resolvedPublicId!, rt);
 
   try {
-    ({ buffer, contentType } = await tryDownload(resourceType));
+    ({ buffer, contentType } = await tryFetch(resourceType));
   } catch (firstErr) {
-    const firstMsg = (firstErr as Error).message ?? "";
-    if (firstMsg.includes("404")) {
+    const firstMsg = String((firstErr as any)?.error?.message ?? (firstErr as Error).message ?? firstErr);
+    if (firstMsg.includes("not found") || firstMsg.includes("404") || firstMsg.includes("Resource not found")) {
       const altType = resourceType === "raw" ? "image" : "raw";
       try {
-        ({ buffer, contentType } = await tryDownload(altType));
+        ({ buffer, contentType } = await tryFetch(altType));
       } catch (altErr) {
-        const altMsg = (altErr as Error).message ?? "";
-        if (altMsg.includes("404")) {
+        const altMsg = String((altErr as any)?.error?.message ?? (altErr as Error).message ?? altErr);
+        if (altMsg.includes("not found") || altMsg.includes("404") || altMsg.includes("Resource not found")) {
           console.warn(`  ⚠ [${label}] ${recordId}: Not found in Cloudinary — skipping`);
           skipped++;
         } else {
@@ -395,18 +382,17 @@ async function main() {
   }
   console.log(`\n[Buyer] ${buyerCount} records updated`);
 
-  // ── Attendance proofFiles ──────────────────────────────────────────────────
+  // ── Attendance checkoutProofs ──────────────────────────────────────────────
   const attendances = await (prisma as any).attendance.findMany({
-    where: { proofFiles: { not: null } },
-    select: { id: true, proofFiles: true },
+    select: { id: true, checkoutProofs: true },
   });
   let attCount = 0;
   for (const row of attendances) {
-    const proofs: { url: string; [k: string]: any }[] = Array.isArray(row.proofFiles) ? row.proofFiles : [];
+    const proofs: { url: string; [k: string]: any }[] = Array.isArray(row.checkoutProofs) ? row.checkoutProofs : [];
     if (!proofs.some((p) => p.url?.includes("cloudinary"))) continue;
     attCount++;
     const { result } = await migrateJsonArray(row.id, proofs, "Attendance");
-    await (prisma as any).attendance.update({ where: { id: row.id }, data: { proofFiles: result } });
+    await (prisma as any).attendance.update({ where: { id: row.id }, data: { checkoutProofs: result } });
   }
   console.log(`\n[Attendance] ${attCount} records updated`);
 
