@@ -43,6 +43,7 @@ const FOLDER_MAP: Record<string, string> = {
   "elan-attendance-proofs": "attendance-proofs",
   "elan-email-attachments": "email-attachments",
   "elan-supplier-forms":    "supplier-forms",
+  "elan-exports-reports":   "exports-reports",
 };
 
 let succeeded = 0;
@@ -121,16 +122,10 @@ async function migrateFile(
     return null;
   }
 
-  let resolvedPublicId = publicId;
-  let resourceType     = fileType === "image" ? "image" : "raw";
-
-  if (!resolvedPublicId) {
-    const parsed = parseCloudinaryUrl(fileUrl);
-    if (parsed) {
-      resolvedPublicId = parsed.publicId;
-      resourceType     = parsed.resourceType;
-    }
-  }
+  // Always parse from URL — the stored publicId may be in wrong format
+  const parsed = parseCloudinaryUrl(fileUrl);
+  let resolvedPublicId = parsed?.publicId ?? publicId ?? null;
+  let resourceType     = parsed?.resourceType ?? (fileType === "image" ? "image" : "raw");
 
   if (!resolvedPublicId) {
     console.error(`  ✗ [${label}] ${recordId}: Cannot determine publicId — skipping`);
@@ -395,6 +390,18 @@ async function main() {
     await (prisma as any).attendance.update({ where: { id: row.id }, data: { checkoutProofs: result } });
   }
   console.log(`\n[Attendance] ${attCount} records updated`);
+
+  // ── Report productImageUrl ─────────────────────────────────────────────────
+  const reports = await prisma.report.findMany({
+    where: { productImageUrl: { contains: "cloudinary" } },
+    select: { id: true, productImageUrl: true },
+  });
+  console.log(`\n[Report] ${reports.length} records`);
+  for (const row of reports) {
+    if (!row.productImageUrl) continue;
+    const result = await migrateFile(row.id, row.productImageUrl, null, "image", "Report");
+    if (result) await prisma.report.update({ where: { id: row.id }, data: { productImageUrl: result.newUrl } });
+  }
 
   // ── AppSetting email attachment ────────────────────────────────────────────
   const attachmentSetting = await prisma.appSetting.findUnique({ where: { key: "email_campaign_attachment_url" } });
