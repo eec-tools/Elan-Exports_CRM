@@ -129,7 +129,7 @@ async function saveReportToVault(fileUrl: string, reportDate: string) {
 }
 
 // ── Send email ────────────────────────────────────────────────────────────────
-async function sendReportEmail(html: string, pdfBuffer: Buffer, reportDate: string) {
+async function sendReportEmail(html: string, pdfBuffer: Buffer | null, reportDate: string) {
   const transporter = getTransporter();
 
   await transporter.sendMail({
@@ -137,13 +137,15 @@ async function sendReportEmail(html: string, pdfBuffer: Buffer, reportDate: stri
     to: REPORT_RECIPIENT,
     subject: `CRM Daily Digest — ${reportDate}`,
     html,
-    attachments: [
-      {
-        filename: `CRM-Daily-Report-${reportDate.replace(/,\s*/g, "_").replace(/\s+/g, "_")}.pdf`,
-        content: pdfBuffer,
-        contentType: "application/pdf",
-      },
-    ],
+    attachments: pdfBuffer
+      ? [
+          {
+            filename: `CRM-Daily-Report-${reportDate.replace(/,\s*/g, "_").replace(/\s+/g, "_")}.pdf`,
+            content: pdfBuffer,
+            contentType: "application/pdf",
+          },
+        ]
+      : [],
   });
 
   console.log(`[DailyReport] Email sent to ${REPORT_RECIPIENT}`);
@@ -161,21 +163,28 @@ export async function runDailyReport() {
     // 2. Build HTML
     const html = buildDailyReportHtml(data);
 
-    // 3. Convert HTML → PDF
-    console.log("[DailyReport] Rendering PDF via Puppeteer...");
-    const pdfBuffer = await htmlToPdf(html);
-    console.log(`[DailyReport] PDF generated (${Math.round(pdfBuffer.length / 1024)} KB)`);
+    // 3. Try to convert HTML → PDF (non-fatal — email still sends if this fails)
+    let pdfBuffer: Buffer | null = null;
+    try {
+      console.log("[DailyReport] Rendering PDF via Puppeteer...");
+      pdfBuffer = await htmlToPdf(html);
+      console.log(`[DailyReport] PDF generated (${Math.round(pdfBuffer.length / 1024)} KB)`);
+    } catch (pdfErr) {
+      console.error("[DailyReport] PDF generation failed — sending email without attachment:", pdfErr);
+    }
 
-    // 4. Send email (HTML body + PDF attachment)
+    // 4. Send email (HTML body + PDF attachment if available)
     await sendReportEmail(html, pdfBuffer, data.reportDate);
 
     // 5. Upload to Cloudinary + save vault entry (non-blocking on failure)
-    try {
-      const fileUrl = await uploadPdfToCloudinary(pdfBuffer, data.isoDate);
-      await saveReportToVault(fileUrl, data.reportDate);
-      console.log(`[DailyReport] Vault entry saved for ${data.reportDate}`);
-    } catch (vaultErr) {
-      console.error("[DailyReport] Vault save failed (email still sent):", vaultErr);
+    if (pdfBuffer) {
+      try {
+        const fileUrl = await uploadPdfToCloudinary(pdfBuffer, data.isoDate);
+        await saveReportToVault(fileUrl, data.reportDate);
+        console.log(`[DailyReport] Vault entry saved for ${data.reportDate}`);
+      } catch (vaultErr) {
+        console.error("[DailyReport] Vault save failed (email still sent):", vaultErr);
+      }
     }
 
     console.log(`[DailyReport] Completed successfully for ${data.reportDate}`);
