@@ -129,12 +129,13 @@ export default function SourcingBuyersPage() {
     setRetryingPending(true);
     try {
       const res = await api.post("/buyer-campaigns/admin/retry-pending");
-      const { total, started } = res.data as { total: number; started: number };
+      const { total } = res.data as { total: number };
       if (total === 0) {
         toast.info("No pending buyers without a campaign found.");
       } else {
-        toast.success(`Started campaigns for ${started} of ${total} pending buyers.`);
-        setTimeout(() => queryClient.invalidateQueries({ queryKey: ["sourcing-buyers"] }), 3000);
+        toast.success(`Sending intro emails to ${total} pending buyer${total !== 1 ? "s" : ""} in the background.`);
+        setTimeout(() => queryClient.invalidateQueries({ queryKey: ["sourcing-buyers"] }), 5000);
+        setTimeout(() => queryClient.invalidateQueries({ queryKey: ["sourcing-buyers"] }), 15000);
       }
     } catch {
       toast.error("Failed to retry pending campaigns.");
