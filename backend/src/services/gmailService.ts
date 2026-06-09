@@ -130,6 +130,50 @@ function buildRawMessage(params: {
   return Buffer.from(lines.join("\r\n")).toString("base64url");
 }
 
+function isRateLimitError(err: any): boolean {
+  const status = err?.status ?? err?.code ?? err?.response?.status;
+  if (status === 429 || status === 403) return true;
+  const msg: string = err?.message ?? "";
+  return /rate limit|quota|userRateLimit/i.test(msg);
+}
+
+function extractRetryAfter(err: any): Date {
+  const msg: string = err?.message ?? "";
+  const match = msg.match(/retry after\s+(\S+)/i);
+  if (match) {
+    const d = new Date(match[1]);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return new Date(Date.now() + 10 * 60 * 1000);
+}
+
+const SEND_COOLDOWN_KEY = (email: string) => `gmail_send_rate_limit_until_${email}`;
+
+async function checkSendCooldown(email: string): Promise<void> {
+  const setting = await prisma.appSetting.findUnique({ where: { key: SEND_COOLDOWN_KEY(email) } });
+  if (setting?.value) {
+    const until = new Date(setting.value);
+    if (until > new Date()) {
+      throw new Error(`Gmail send rate-limit cooldown active for ${email} until ${until.toISOString()}. Please try after ${until.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })} IST.`);
+    }
+  }
+}
+
+async function setSendCooldown(email: string, until: Date): Promise<void> {
+  await prisma.appSetting.upsert({
+    where: { key: SEND_COOLDOWN_KEY(email) },
+    update: { value: until.toISOString() },
+    create: { key: SEND_COOLDOWN_KEY(email), value: until.toISOString() },
+  });
+}
+
+export async function getSendCooldownUntil(email: string): Promise<Date | null> {
+  const setting = await prisma.appSetting.findUnique({ where: { key: SEND_COOLDOWN_KEY(email) } });
+  if (!setting?.value) return null;
+  const d = new Date(setting.value);
+  return d > new Date() ? d : null;
+}
+
 export async function sendGmailEmail(params: {
   fromEmail: string;
   to: string;
@@ -141,23 +185,36 @@ export async function sendGmailEmail(params: {
   attachments?: EmailAttachment[];
 }): Promise<{ messageId: string; threadId: string }> {
   const { fromEmail, to, subject, html, threadId, inReplyTo, references, attachments } = params;
+
+  await checkSendCooldown(fromEmail);
+
   const auth = await getAuthedClient(fromEmail);
   const gmail = google.gmail({ version: "v1", auth });
 
   const raw = buildRawMessage({ from: fromEmail, to, subject, html, inReplyTo, references, attachments });
 
-  const res = await gmail.users.messages.send({
-    userId: "me",
-    requestBody: {
-      raw,
-      ...(threadId ? { threadId } : {}),
-    },
-  });
+  try {
+    const res = await gmail.users.messages.send({
+      userId: "me",
+      requestBody: {
+        raw,
+        ...(threadId ? { threadId } : {}),
+      },
+    });
 
-  return {
-    messageId: res.data.id ?? "",
-    threadId: res.data.threadId ?? "",
-  };
+    return {
+      messageId: res.data.id ?? "",
+      threadId: res.data.threadId ?? "",
+    };
+  } catch (err) {
+    if (isRateLimitError(err)) {
+      const until = extractRetryAfter(err);
+      await setSendCooldown(fromEmail, until);
+      console.warn(`[gmailService] Rate limit hit for ${fromEmail} — cooldown set until ${until.toISOString()}`);
+      throw new Error(`Gmail rate limit exceeded for ${fromEmail}. Retry after ${until.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })} IST.`);
+    }
+    throw err;
+  }
 }
 
 export async function getSmtpMessageId(accountEmail: string, gmailMessageId: string): Promise<string | null> {

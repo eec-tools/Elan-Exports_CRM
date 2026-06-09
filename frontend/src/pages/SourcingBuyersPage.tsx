@@ -112,6 +112,16 @@ export default function SourcingBuyersPage() {
   const [runningScheduler, setRunningScheduler] = useState(false);
   const [retryingPending, setRetryingPending] = useState(false);
 
+  const { data: gmailStatus } = useQuery({
+    queryKey: ["buyer-gmail-status"],
+    queryFn: async () => {
+      const res = await api.get("/buyer-campaigns/admin/gmail-status");
+      return res.data as { account: string; rateLimited: boolean; cooldownUntil: string | null };
+    },
+    enabled: isAdmin,
+    refetchInterval: 30_000,
+  });
+
   async function runSchedulerNow() {
     setRunningScheduler(true);
     try {
@@ -367,14 +377,25 @@ export default function SourcingBuyersPage() {
                 {runningScheduler ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
                 {runningScheduler ? "Sending…" : "Send Overdue Now"}
               </Button>
-              <Button
-                variant="outline" size="sm"
-                onClick={retryPendingCampaigns} disabled={retryingPending}
-                className="gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50"
-              >
-                {retryingPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                {retryingPending ? "Sending…" : "Retry Pending"}
-              </Button>
+              <div className="flex flex-col items-end gap-0.5">
+                <Button
+                  variant="outline" size="sm"
+                  onClick={retryPendingCampaigns}
+                  disabled={retryingPending || !!gmailStatus?.rateLimited}
+                  className="gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50"
+                  title={gmailStatus?.rateLimited && gmailStatus.cooldownUntil
+                    ? `Gmail rate limited — retry after ${new Date(gmailStatus.cooldownUntil).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })} IST`
+                    : undefined}
+                >
+                  {retryingPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                  {retryingPending ? "Sending…" : "Retry Pending"}
+                </Button>
+                {gmailStatus?.rateLimited && gmailStatus.cooldownUntil && (
+                  <span className="text-xs text-amber-600">
+                    Rate limited · retry after {new Date(gmailStatus.cooldownUntil).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })} IST
+                  </span>
+                )}
+              </div>
             </>
           )}
           <PermissionGate permission="sourcing_buyers" editOnly>

@@ -191,10 +191,13 @@ export function startEmailCampaignScheduler() {
   cron.schedule("0 9 * * *", autoSendDueBuyerFollowups, { timezone: "Asia/Kolkata" });
   console.log("[EmailCampaignScheduler] Daily follow-up jobs scheduled at 9:00 AM IST.");
 
-  // Run immediately on startup to catch any overdue campaigns
+  // Run on startup to catch overdue campaigns — stagger to avoid hitting rate limits simultaneously
   setTimeout(() => {
-    console.log("[EmailCampaignScheduler] Running startup check for overdue follow-ups...");
+    console.log("[EmailCampaignScheduler] Running startup check for overdue supplier follow-ups...");
     autoSendDueFollowups();
-    autoSendDueBuyerFollowups();
   }, 5000);
+  setTimeout(() => {
+    console.log("[EmailCampaignScheduler] Running startup check for overdue buyer follow-ups...");
+    autoSendDueBuyerFollowups();
+  }, 10 * 60 * 1000); // 10 minutes after supplier scheduler
 }

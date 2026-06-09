@@ -51,13 +51,6 @@ function fmt(n: number): string { return n.toLocaleString("en-IN"); }
 
 function dashIfZero(n: number): string { return n === 0 ? "—" : fmt(n); }
 
-function fmtRevenue(n: number): string {
-  if (n === 0) return "—";
-  if (n >= 10_000_000) return `$${(n / 10_000_000).toFixed(2)}Cr`;
-  if (n >= 100_000)    return `$${(n / 100_000).toFixed(1)}L`;
-  if (n >= 1_000)      return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
-}
 
 // ── Layout primitives ──────────────────────────────────────────────────────────
 
@@ -154,16 +147,23 @@ function buildSuppliersSection(d: CRMReportData): string {
   const kpiRow2 = `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;">
       <tr>
-        <td style="width:50%;padding:3px;">
+        <td style="width:33.33%;padding:3px;">
           <div style="background:${C.blue}10;border:1.5px solid ${C.blue}28;border-radius:8px;padding:12px;text-align:center;">
-            <div style="font-size:22px;font-weight:800;color:${C.blue};">${fmt(s.newOnboardingCount)}</div>
-            <div style="font-size:10px;color:${C.slate};font-weight:700;text-transform:uppercase;margin-top:4px;">New / Onboarding</div>
+            <div style="font-size:22px;font-weight:800;color:${C.blue};">${dashIfZero(s.respondedCount)}</div>
+            <div style="font-size:10px;color:${C.slate};font-weight:700;text-transform:uppercase;margin-top:4px;">Responded</div>
           </div>
         </td>
-        <td style="width:50%;padding:3px;">
+        <td style="width:33.33%;padding:3px;">
           <div style="background:${C.green}10;border:1.5px solid ${C.green}28;border-radius:8px;padding:12px;text-align:center;">
             <div style="font-size:22px;font-weight:800;color:${C.green};">${fmt(s.inSourcingCount)}</div>
             <div style="font-size:10px;color:${C.slate};font-weight:700;text-transform:uppercase;margin-top:4px;">In Sourcing</div>
+            <div style="font-size:9px;color:${C.slate};margin-top:2px;">(Follow-ups are going on)</div>
+          </div>
+        </td>
+        <td style="width:33.33%;padding:3px;">
+          <div style="background:${C.red}10;border:1.5px solid ${C.red}28;border-radius:8px;padding:12px;text-align:center;">
+            <div style="font-size:22px;font-weight:800;color:${C.red};">${dashIfZero(s.invalidEmailCount)}</div>
+            <div style="font-size:10px;color:${C.slate};font-weight:700;text-transform:uppercase;margin-top:4px;">Bounced / Invalid</div>
           </div>
         </td>
       </tr>
@@ -223,7 +223,7 @@ function buildBuyersSection(d: CRMReportData): string {
   const periodDesc = buildPeriodDesc(d);
 
   const kpiRow = `
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;">
       <tr>
         ${smallKpi(fmt(b.totalAdded),           "Buyers Added",       C.amber)}
         ${smallKpi(dashIfZero(b.introEmailsSent),"Intro Emails Sent",  C.blue)}
@@ -231,6 +231,31 @@ function buildBuyersSection(d: CRMReportData): string {
         ${smallKpi(dashIfZero(b.fu2Sent),        "Follow-Up 2 Sent",   C.slate)}
         ${smallKpi(dashIfZero(b.fu3Sent),        "Follow-Up 3 Sent",   C.slate)}
         ${smallKpi(dashIfZero(b.activeCount),    "Signed Buyers",      C.green)}
+      </tr>
+    </table>`;
+
+  const kpiRow2Buyers = `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;">
+      <tr>
+        <td style="width:33.33%;padding:3px;">
+          <div style="background:${C.blue}10;border:1.5px solid ${C.blue}28;border-radius:8px;padding:12px;text-align:center;">
+            <div style="font-size:22px;font-weight:800;color:${C.blue};">${dashIfZero(b.respondedCount)}</div>
+            <div style="font-size:10px;color:${C.slate};font-weight:700;text-transform:uppercase;margin-top:4px;">Responded</div>
+          </div>
+        </td>
+        <td style="width:33.33%;padding:3px;">
+          <div style="background:${C.green}10;border:1.5px solid ${C.green}28;border-radius:8px;padding:12px;text-align:center;">
+            <div style="font-size:22px;font-weight:800;color:${C.green};">${fmt(b.inSourcingCount)}</div>
+            <div style="font-size:10px;color:${C.slate};font-weight:700;text-transform:uppercase;margin-top:4px;">In Sourcing</div>
+            <div style="font-size:9px;color:${C.slate};margin-top:2px;">(Follow-ups are going on)</div>
+          </div>
+        </td>
+        <td style="width:33.33%;padding:3px;">
+          <div style="background:${C.red}10;border:1.5px solid ${C.red}28;border-radius:8px;padding:12px;text-align:center;">
+            <div style="font-size:22px;font-weight:800;color:${C.red};">${dashIfZero(b.invalidEmailCount)}</div>
+            <div style="font-size:10px;color:${C.slate};font-weight:700;text-transform:uppercase;margin-top:4px;">Bounced / Invalid</div>
+          </div>
+        </td>
       </tr>
     </table>`;
 
@@ -269,6 +294,7 @@ function buildBuyersSection(d: CRMReportData): string {
     ${sectionHeader("Buyers' Department Analytics", `Buyer sourcing, outreach &amp; conversion — ${periodDesc}`, C.blue, "cart")}
     <tr><td style="padding:10px 32px 0;">
       ${kpiRow}
+      ${kpiRow2Buyers}
       ${subLabel("Team Outreach Breakdown")}
       <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:8px;overflow:hidden;border:1px solid ${C.border};">
         ${tableHeader(
@@ -288,11 +314,15 @@ function buildDealSection(d: CRMReportData): string {
     d.reportType === "daily"   ? "New Deals Yesterday" :
     d.reportType === "weekly"  ? "New Deals This Week" : "New Deals This Month";
 
+  const CRM_BASE = "https://crm.eectrade.com";
+
   const stageRows = deals.byStage.length
     ? deals.byStage.map((s: DealStageEntry, i: number) => {
         const color = STAGE_COLORS[s.stage] ?? C.slate;
         const stageCell = `<span style="color:${color};font-weight:700;">${s.stage}</span>`;
-        return tableRow([stageCell, fmt(s.count), fmtRevenue(s.revenue)], i % 2 === 0);
+        const stageParam = encodeURIComponent(s.stage);
+        const viewLink = `<a href="${CRM_BASE}/deals?stage=${stageParam}" style="display:inline-block;padding:4px 12px;background:${C.navy}12;color:${C.navy};border:1px solid ${C.navy}30;border-radius:20px;font-size:11px;font-weight:700;text-decoration:none;letter-spacing:0.3px;">View Companies →</a>`;
+        return tableRow([stageCell, fmt(s.count), viewLink], i % 2 === 0);
       }).join("")
     : emptyRow(3, "No active deals");
 
@@ -300,7 +330,7 @@ function buildDealSection(d: CRMReportData): string {
     <tr style="background:${C.navy}08;">
       <td style="padding:9px 14px;font-size:12px;font-weight:800;color:${C.navy};border-top:2px solid ${C.navy}25;">TOTAL ACTIVE PIPELINE</td>
       <td style="padding:9px 14px;font-size:12px;font-weight:800;color:${C.navy};border-top:2px solid ${C.navy}25;">${fmt(deals.totalActive)}</td>
-      <td style="padding:9px 14px;font-size:12px;color:${C.slate};border-top:2px solid ${C.navy}25;font-style:italic;">${fmtRevenue(deals.totalRevenue)}</td>
+      <td style="padding:9px 14px;font-size:12px;border-top:2px solid ${C.navy}25;"><a href="${CRM_BASE}/deals" style="display:inline-block;padding:4px 12px;background:${C.green}12;color:${C.green};border:1px solid ${C.green}30;border-radius:20px;font-size:11px;font-weight:700;text-decoration:none;letter-spacing:0.3px;">View All Deals →</a></td>
     </tr>` : "";
 
   return `
@@ -315,11 +345,10 @@ function buildDealSection(d: CRMReportData): string {
       </table>
       ${subLabel("Pipeline Stage Breakdown")}
       <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:8px;overflow:hidden;border:1px solid ${C.border};">
-        ${tableHeader(["Pipeline Stage","Deals","Expected Revenue"], ["55%","15%","30%"])}
+        ${tableHeader(["Pipeline Stage","Deals",""], ["55%","15%","30%"])}
         ${stageRows}
         ${totalPipelineRow}
       </table>
-      <div style="font-size:10px;color:${C.slate};margin-top:6px;font-style:italic;">* Expected revenue fields to be populated once deal values are entered in CRM.</div>
     </td></tr>`;
 }
 

@@ -29,8 +29,9 @@ export interface SupplierAnalytics {
   fu2Sent: number;
   fu3Sent: number;
   signedCount: number;
-  newOnboardingCount: number;
+  respondedCount: number;
   inSourcingCount: number;
+  invalidEmailCount: number;
   teamOutreach: OutreachEntry[];
   totalSignedByTeam: number;
 }
@@ -43,6 +44,9 @@ export interface BuyerAnalytics {
   fu3Sent: number;
   activeCount: number;
   sourcingCount: number;
+  respondedCount: number;
+  inSourcingCount: number;
+  invalidEmailCount: number;
   teamOutreach: OutreachEntry[];
   totalSignedByTeam: number;
 }
@@ -326,6 +330,16 @@ export async function collectReportData(range: DateRange, reportType: ReportType
   const s2 = countEmailsByType(nsecRaw, start, end);
   const s3 = countEmailsByType(soecRaw, start, end);
 
+  // Supplier responded (period) + active sourcing campaigns (snapshot) + invalid (period)
+  const [secResp, nsecResp, soecResp, suppActiveCampaigns, suppInvalidCount] = await Promise.all([
+    prisma.supplierEmailCampaign.count({    where: { responseReceivedAt: { gte: start, lte: end } } }),
+    prisma.newSupplierEmailCampaign.count({ where: { responseReceivedAt: { gte: start, lte: end } } }),
+    prisma.sourcingEmailCampaign.count({    where: { responseReceivedAt: { gte: start, lte: end } } }),
+    prisma.sourcingEmailCampaign.count({    where: { status: "active" } }),
+    prisma.sourcingSupplier.count({         where: { status: "invalid", updatedAt: { gte: start, lte: end } } }),
+  ]);
+  const supplierRespondedCount = secResp + nsecResp + soecResp;
+
   // Per-user supplier email map
   const supplierEmailByUser = new Map<string, EmailCounts>();
   for (const c of secRaw)  addEmailToMap(c.supplier.createdBy,         c, supplierEmailByUser, start, end);
@@ -387,6 +401,13 @@ export async function collectReportData(range: DateRange, reportType: ReportType
   // Per-user buyer email map
   const buyerEmailByUser = new Map<string, EmailCounts>();
   for (const c of sbecRaw) addEmailToMap(c.sourcingBuyer.createdBy, c, buyerEmailByUser, start, end);
+
+  // Buyer responded (period) + active sourcing campaigns (snapshot) + invalid (period)
+  const [buyerRespondedCount, buyerActiveCampaigns, buyerInvalidCount] = await Promise.all([
+    prisma.sourcingBuyerEmailCampaign.count({ where: { responseReceivedAt: { gte: start, lte: end } } }),
+    prisma.sourcingBuyerEmailCampaign.count({ where: { status: "active" } }),
+    prisma.sourcingBuyer.count({             where: { status: "invalid", updatedAt: { gte: start, lte: end } } }),
+  ]);
 
   // Buyer dept employees — users who have created sourcing buyer records
   const buyerDeptUsers = await prisma.user.findMany({
@@ -575,27 +596,31 @@ export async function collectReportData(range: DateRange, reportType: ReportType
     generatedAt,
 
     suppliers: {
-      totalAdded:         signedSuppliers.length + newSups.length + sourcingSups.length,
-      introEmailsSent:    s1.intros + s2.intros + s3.intros,
-      fu1Sent:            s1.fu1 + s2.fu1 + s3.fu1,
-      fu2Sent:            s1.fu2 + s2.fu2 + s3.fu2,
-      fu3Sent:            s1.fu3 + s2.fu3 + s3.fu3,
-      signedCount:        signedSuppliers.length,
-      newOnboardingCount: newSups.length,
-      inSourcingCount:    sourcingSups.length,
-      teamOutreach:       supplierOutreach,
-      totalSignedByTeam:  supplierOutreach.reduce((s, e) => s + e.signedCount, 0),
+      totalAdded:       signedSuppliers.length + newSups.length + sourcingSups.length,
+      introEmailsSent:  s1.intros + s2.intros + s3.intros,
+      fu1Sent:          s1.fu1 + s2.fu1 + s3.fu1,
+      fu2Sent:          s1.fu2 + s2.fu2 + s3.fu2,
+      fu3Sent:          s1.fu3 + s2.fu3 + s3.fu3,
+      signedCount:      signedSuppliers.length,
+      respondedCount:   supplierRespondedCount,
+      inSourcingCount:  suppActiveCampaigns,
+      invalidEmailCount: suppInvalidCount,
+      teamOutreach:     supplierOutreach,
+      totalSignedByTeam: supplierOutreach.reduce((s, e) => s + e.signedCount, 0),
     },
 
     buyers: {
-      totalAdded:      activeBuyers.length + sourcingBuyers.length,
-      introEmailsSent: b1.intros,
-      fu1Sent:         b1.fu1,
-      fu2Sent:         b1.fu2,
-      fu3Sent:         b1.fu3,
-      activeCount:     activeBuyers.length,
-      sourcingCount:   sourcingBuyers.length,
-      teamOutreach:    buyerOutreach,
+      totalAdded:       activeBuyers.length + sourcingBuyers.length,
+      introEmailsSent:  b1.intros,
+      fu1Sent:          b1.fu1,
+      fu2Sent:          b1.fu2,
+      fu3Sent:          b1.fu3,
+      activeCount:      activeBuyers.length,
+      sourcingCount:    sourcingBuyers.length,
+      respondedCount:   buyerRespondedCount,
+      inSourcingCount:  buyerActiveCampaigns,
+      invalidEmailCount: buyerInvalidCount,
+      teamOutreach:     buyerOutreach,
       totalSignedByTeam: buyerOutreach.reduce((s, e) => s + e.signedCount, 0),
     },
 

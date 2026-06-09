@@ -11,6 +11,8 @@ import {
     startCampaignForBuyer,
 } from "../controllers/sourcingBuyerEmailCampaign.controller.js";
 import { authenticate, requirePermission, requireEdit, requireAdmin } from "../middleware/auth.js";
+import { getSendCooldownUntil } from "../services/gmailService.js";
+import { BUYER_GMAIL_ACCOUNT } from "../controllers/sourcingBuyers.controller.js";
 import { autoSendDueBuyerFollowups } from "../services/emailCampaignScheduler.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -29,6 +31,15 @@ router.post("/:id/sync-replies", syncReplies);
 router.post("/:id/start", requireEdit("buyers"), startCampaign);
 router.post("/:id/send-followup", requireEdit("buyers"), sendFollowup);
 router.post("/:id/mark-response", requireEdit("buyers"), markResponseReceived);
+
+router.get("/admin/gmail-status", requireAdmin, async (_req: Request, res: Response) => {
+    const cooldownUntil = await getSendCooldownUntil(BUYER_GMAIL_ACCOUNT);
+    res.json({
+        account: BUYER_GMAIL_ACCOUNT,
+        rateLimited: !!cooldownUntil,
+        cooldownUntil: cooldownUntil?.toISOString() ?? null,
+    });
+});
 
 router.post("/admin/run-scheduler", requireAdmin, async (_req: Request, res: Response) => {
     res.json({ message: "Buyer scheduler triggered — overdue follow-ups are being sent now." });

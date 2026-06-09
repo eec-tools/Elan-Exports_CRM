@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DEAL_STAGE_CONFIG, type StageConfig } from "@/lib/dealStages";
 import { getCustomDealStages } from "@/lib/customDealStages";
 import {
@@ -117,7 +118,8 @@ export default function DealsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterBuyer, setFilterBuyer] = useState("");
   const [filterManager, setFilterManager] = useState("");
-  const [filterStage, setFilterStage] = useState("");
+  const [searchParams] = useSearchParams();
+  const [filterStage, setFilterStage] = useState(searchParams.get("stage") ?? "");
   const [filterCategory, setFilterCategory] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
