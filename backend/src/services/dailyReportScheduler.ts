@@ -4,25 +4,45 @@ import nodemailer from "nodemailer";
 import { Readable } from "stream";
 import puppeteer from "puppeteer";
 import prisma from "../config/db.js";
-import { generateDailyReport } from "./dailyReportService.js";
-import { buildDailyReportHtml } from "./dailyReportTemplate.js";
+import {
+  generateDailyReport,
+  generateWeeklyReport,
+  generateMonthlyReport,
+  type CRMReportData,
+  type ReportType,
+} from "./dailyReportService.js";
+import { buildReportHtml } from "./dailyReportTemplate.js";
 
 const REPORT_RECIPIENT = "shirali@eectrade.com";
+
+// Vault folder names per report type
+const VAULT_FOLDER: Record<ReportType, string> = {
+  daily:   "Daily Reports",
+  weekly:  "Weekly Reports",
+  monthly: "Monthly Reports",
+};
+
+// Cloudinary public-ID prefix per report type
+const CLOUDINARY_PREFIX: Record<ReportType, string> = {
+  daily:   "vault_daily_report",
+  weekly:  "vault_weekly_report",
+  monthly: "vault_monthly_report",
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function ensureCloudinaryConfig() {
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
+    api_key:    process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
   });
 }
 
 function getTransporter() {
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT) || 465,
+    host:   process.env.SMTP_HOST || "smtp.gmail.com",
+    port:   Number(process.env.SMTP_PORT) || 465,
     secure: true,
     auth: {
       user: process.env.SMTP_EMAIL,
@@ -37,73 +57,73 @@ async function htmlToPdf(html: string): Promise<Buffer> {
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
   });
-
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
     await page.emulateMediaType("screen");
-
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: "16px", bottom: "16px", left: "0px", right: "0px" },
       scale: 0.82,
     });
-
     return Buffer.from(pdfBuffer);
   } finally {
     await browser.close();
   }
 }
 
-// ── Upload PDF buffer to Cloudinary via upload_stream ─────────────────────────
-async function uploadPdfToCloudinary(pdfBuffer: Buffer, isoDate: string): Promise<string> {
+// ── Upload PDF to Cloudinary ──────────────────────────────────────────────────
+async function uploadPdfToCloudinary(
+  pdfBuffer: Buffer,
+  reportType: ReportType,
+  isoDate: string,
+): Promise<string> {
   ensureCloudinaryConfig();
 
   return new Promise((resolve, reject) => {
-    const publicId = `vault_daily_report_${isoDate}`;
-
+    const publicId = `${CLOUDINARY_PREFIX[reportType]}_${isoDate}`;
     const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: "elan-vault",
-        resource_type: "raw",
-        public_id: publicId,
-        overwrite: true,
-        format: "pdf",
-      },
+      { folder: "elan-vault", resource_type: "raw", public_id: publicId, overwrite: true, format: "pdf" },
       (error, result) => {
         if (error || !result) return reject(error ?? new Error("No Cloudinary result"));
         resolve(result.secure_url);
-      }
+      },
     );
-
     Readable.from(pdfBuffer).pipe(uploadStream);
   });
 }
 
-// ── Save vault entry ──────────────────────────────────────────────────────────
-async function saveReportToVault(fileUrl: string, reportDate: string) {
-  // Find or create the root "Daily Reports" folder
-  let rootFolder = await prisma.vaultDocument.findFirst({
-    where: { name: "Daily Reports", isFolder: true, parentId: null },
+// ── Save to vault ─────────────────────────────────────────────────────────────
+async function saveReportToVault(
+  fileUrl: string,
+  reportType: ReportType,
+  periodLabel: string,
+) {
+  const folderName = VAULT_FOLDER[reportType];
+
+  // Find or create the parent folder for this report type
+  let parentFolder = await prisma.vaultDocument.findFirst({
+    where: { name: folderName, isFolder: true, parentId: null },
   });
 
-  if (!rootFolder) {
-    rootFolder = await prisma.vaultDocument.create({
+  if (!parentFolder) {
+    parentFolder = await prisma.vaultDocument.create({
       data: {
-        name: "Daily Reports",
+        name: folderName,
         category: "Internal Reports",
         region: "Global",
         isFolder: true,
       },
     });
-    console.log("[DailyReport] Created vault folder: Daily Reports");
+    console.log(`[Report] Created vault folder: ${folderName}`);
   }
 
-  const docName = `CRM Daily Report — ${reportDate}`;
+  const reportTypeLabel = reportType.charAt(0).toUpperCase() + reportType.slice(1);
+  const docName = `CRM ${reportTypeLabel} Report — ${periodLabel}`;
 
   const existing = await prisma.vaultDocument.findFirst({
-    where: { name: docName, parentId: rootFolder.id, isFolder: false },
+    where: { name: docName, parentId: parentFolder.id, isFolder: false },
   });
 
   if (existing) {
@@ -111,7 +131,7 @@ async function saveReportToVault(fileUrl: string, reportDate: string) {
       where: { id: existing.id },
       data: { fileUrl, updatedAt: new Date() },
     });
-    console.log(`[DailyReport] Updated vault entry: ${docName}`);
+    console.log(`[Report] Updated vault entry: ${docName}`);
   } else {
     await prisma.vaultDocument.create({
       data: {
@@ -119,95 +139,119 @@ async function saveReportToVault(fileUrl: string, reportDate: string) {
         category: "Internal Reports",
         region: "Global",
         isFolder: false,
-        parentId: rootFolder.id,
+        parentId: parentFolder.id,
         fileUrl,
         fileType: "pdf",
       },
     });
-    console.log(`[DailyReport] Created vault entry: ${docName}`);
+    console.log(`[Report] Created vault entry: ${docName}`);
   }
 }
 
 // ── Send email ────────────────────────────────────────────────────────────────
-async function sendReportEmail(html: string, pdfBuffer: Buffer | null, reportDate: string) {
+async function sendReportEmail(
+  html: string,
+  pdfBuffer: Buffer | null,
+  data: CRMReportData,
+) {
   const transporter = getTransporter();
+  const reportTypeLabel = data.reportType.charAt(0).toUpperCase() + data.reportType.slice(1);
+  const safeName = data.periodLabel.replace(/,\s*/g, "_").replace(/\s+/g, "_").replace(/[–—]/g, "-");
 
   await transporter.sendMail({
     from: `"Élan Exports CRM" <${process.env.SMTP_EMAIL}>`,
-    to: REPORT_RECIPIENT,
-    subject: `CRM Daily Digest — ${reportDate}`,
+    to:   REPORT_RECIPIENT,
+    subject: `CRM ${reportTypeLabel} Digest — ${data.periodLabel}`,
     html,
     attachments: pdfBuffer
-      ? [
-          {
-            filename: `CRM-Daily-Report-${reportDate.replace(/,\s*/g, "_").replace(/\s+/g, "_")}.pdf`,
-            content: pdfBuffer,
-            contentType: "application/pdf",
-          },
-        ]
+      ? [{
+          filename: `CRM-${reportTypeLabel}-Report-${safeName}.pdf`,
+          content:  pdfBuffer,
+          contentType: "application/pdf",
+        }]
       : [],
   });
 
-  console.log(`[DailyReport] Email sent to ${REPORT_RECIPIENT}`);
+  console.log(`[Report] ${reportTypeLabel} email sent to ${REPORT_RECIPIENT}`);
 }
 
-// ── Main runner ───────────────────────────────────────────────────────────────
-export async function runDailyReport() {
-  console.log("[DailyReport] Starting report generation...");
-
+// ── Core runner ───────────────────────────────────────────────────────────────
+async function runReport(
+  generateFn: () => Promise<CRMReportData>,
+  label: string,
+) {
+  console.log(`[Report] Starting ${label} report generation…`);
   try {
-    // 1. Collect data
-    const data = await generateDailyReport();
-    console.log(`[DailyReport] Data collected for ${data.reportDate}`);
+    const data = await generateFn();
+    console.log(`[Report] Data collected for ${data.periodLabel}`);
 
-    // 2. Build HTML
-    const html = buildDailyReportHtml(data);
+    const html = buildReportHtml(data);
 
-    // 3. Try to convert HTML → PDF (non-fatal — email still sends if this fails)
     let pdfBuffer: Buffer | null = null;
     try {
-      console.log("[DailyReport] Rendering PDF via Puppeteer...");
+      console.log("[Report] Rendering PDF via Puppeteer…");
       pdfBuffer = await htmlToPdf(html);
-      console.log(`[DailyReport] PDF generated (${Math.round(pdfBuffer.length / 1024)} KB)`);
+      console.log(`[Report] PDF generated (${Math.round(pdfBuffer.length / 1024)} KB)`);
     } catch (pdfErr) {
-      console.error("[DailyReport] PDF generation failed — sending email without attachment:", pdfErr);
+      console.error("[Report] PDF generation failed — sending email without attachment:", pdfErr);
     }
 
-    // 4. Send email (HTML body + PDF attachment if available)
-    await sendReportEmail(html, pdfBuffer, data.reportDate);
+    await sendReportEmail(html, pdfBuffer, data);
 
-    // 5. Upload to Cloudinary + save vault entry (non-blocking on failure)
     if (pdfBuffer) {
       try {
-        const fileUrl = await uploadPdfToCloudinary(pdfBuffer, data.isoDate);
-        await saveReportToVault(fileUrl, data.reportDate);
-        console.log(`[DailyReport] Vault entry saved for ${data.reportDate}`);
+        const fileUrl = await uploadPdfToCloudinary(pdfBuffer, data.reportType, data.isoDate);
+        await saveReportToVault(fileUrl, data.reportType, data.periodLabel);
+        console.log(`[Report] Vault entry saved for ${data.periodLabel}`);
       } catch (vaultErr) {
-        console.error("[DailyReport] Vault save failed (email still sent):", vaultErr);
+        console.error("[Report] Vault save failed (email still sent):", vaultErr);
       }
     }
 
-    console.log(`[DailyReport] Completed successfully for ${data.reportDate}`);
+    console.log(`[Report] ${label} report completed successfully for ${data.periodLabel}`);
   } catch (err) {
-    console.error("[DailyReport] Report generation failed:", err);
+    console.error(`[Report] ${label} report generation failed:`, err);
   }
 }
 
-// ── Scheduler — 9:00 AM IST = 03:30 UTC ──────────────────────────────────────
+// ── Public runners (exported for manual trigger) ──────────────────────────────
+
+export async function runDailyReport() {
+  return runReport(generateDailyReport, "daily");
+}
+
+export async function runWeeklyReport() {
+  return runReport(generateWeeklyReport, "weekly");
+}
+
+export async function runMonthlyReport() {
+  return runReport(generateMonthlyReport, "monthly");
+}
+
+// ── Scheduler ─────────────────────────────────────────────────────────────────
 export function startDailyReportScheduler() {
   if (!process.env.SMTP_EMAIL || !process.env.SMTP_APP_PASSWORD) {
-    console.warn("[DailyReport] SMTP not configured — scheduler skipped");
+    console.warn("[Report] SMTP not configured — all report schedulers skipped");
     return;
   }
 
-  cron.schedule(
-    "30 3 * * *",
-    () => {
-      console.log("[DailyReport] Cron triggered — 9:00 AM IST");
-      runDailyReport();
-    },
-    { timezone: "UTC" }
-  );
+  // Daily: every day at 9:00 AM IST (03:30 UTC)
+  cron.schedule("30 3 * * *", () => {
+    console.log("[Report] Cron triggered — Daily 9:00 AM IST");
+    runDailyReport();
+  }, { timezone: "UTC" });
 
-  console.log("[DailyReport] Scheduler active — fires daily at 9:00 AM IST (03:30 UTC)");
+  // Weekly: every Monday at 9:01 AM IST (03:31 UTC)
+  cron.schedule("31 3 * * 1", () => {
+    console.log("[Report] Cron triggered — Weekly 9:01 AM IST (Monday)");
+    runWeeklyReport();
+  }, { timezone: "UTC" });
+
+  // Monthly: 1st of every month at 9:02 AM IST (03:32 UTC)
+  cron.schedule("32 3 1 * *", () => {
+    console.log("[Report] Cron triggered — Monthly 9:02 AM IST (1st of month)");
+    runMonthlyReport();
+  }, { timezone: "UTC" });
+
+  console.log("[Report] Schedulers active — Daily 9:00 AM · Weekly Mon 9:01 AM · Monthly 1st 9:02 AM (all IST)");
 }

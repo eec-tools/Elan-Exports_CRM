@@ -11,7 +11,9 @@
     "db:push": "npx prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "npx prisma studio",
-    "report:now": "tsx src/scripts/generateDailyReport.ts"
+    "report:now": "tsx src/scripts/generateDailyReport.ts",
+    "report:weekly": "tsx -e \"import('dotenv/config').then(()=>import('./src/services/dailyReportScheduler.js')).then(m=>m.runWeeklyReport())\"",
+    "report:samples": "tsx src/scripts/generateSampleReports.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1062.0",
