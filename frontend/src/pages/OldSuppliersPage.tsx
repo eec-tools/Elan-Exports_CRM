@@ -39,12 +39,16 @@ import { PermissionGate } from "@/components/PermissionGate";
 interface Supplier {
   id: string;
   company: string;
+  city?: string;
+  country?: string;
+  email?: string;
+  website?: string;
   productCategory?: string;
   product?: string;
-  country?: string;
+  certifications?: string;
+  companyAddress?: string;
   accountManager?: string;
   currentStatus?: string;
-  certifications?: string;
   latestQuotation?: string;
   reasonInactive?: string;
   dateMarkedInactive?: string;
@@ -56,12 +60,16 @@ interface Supplier {
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
   company: "",
+  city: "",
+  country: "",
+  email: "",
+  website: "",
   productCategory: "",
   product: "",
-  country: "",
+  certifications: "",
+  companyAddress: "",
   accountManager: "",
   currentStatus: "",
-  certifications: "",
   latestQuotation: "",
   reasonInactive: "",
   dateMarkedInactive: "",
@@ -330,13 +338,17 @@ export default function OldSuppliersPage() {
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
               <tr>
                 <th className="px-5 py-3.5 font-semibold sticky left-0 z-30 bg-slate-50 shadow-[inset_-1px_0_0_0_#e2e8f0]">Company Name</th>
-                <th className="px-5 py-3.5 font-semibold">Product Category</th>
-                <th className="px-5 py-3.5 font-semibold">Product</th>
+                <th className="px-5 py-3.5 font-semibold">City</th>
                 <th className="px-5 py-3.5 font-semibold">Country</th>
+                <th className="px-5 py-3.5 font-semibold">Email</th>
+                <th className="px-5 py-3.5 font-semibold">Website</th>
+                <th className="px-5 py-3.5 font-semibold">Product Category</th>
+                <th className="px-5 py-3.5 font-semibold">Products</th>
+                <th className="px-5 py-3.5 font-semibold">Certifications</th>
+                <th className="px-5 py-3.5 font-semibold">Full Address</th>
                 <th className="px-5 py-3.5 font-semibold">Account Manager</th>
                 <th className="px-5 py-3.5 font-semibold">Current Status</th>
                 <th className="px-5 py-3.5 font-semibold">Deal Stage</th>
-                <th className="px-5 py-3.5 font-semibold">Certifications</th>
                 <th className="px-5 py-3.5 font-semibold">Reason Inactive</th>
                 <th className="px-5 py-3.5 font-semibold">Reactivation Potential</th>
                 <th className="px-5 py-3.5 font-semibold">Notes</th>
@@ -347,7 +359,7 @@ export default function OldSuppliersPage() {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading && suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 12 : 11} className="h-32 text-center">
+                  <td colSpan={canEdit ? 17 : 16} className="h-32 text-center">
                     <div className="flex justify-center">
                       <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                     </div>
@@ -355,7 +367,7 @@ export default function OldSuppliersPage() {
                 </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 12 : 11} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                  <td colSpan={canEdit ? 17 : 16} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                         <Building2 className="h-6 w-6 text-slate-300" />
@@ -371,9 +383,22 @@ export default function OldSuppliersPage() {
                 suppliers.map((s: Supplier) => (
                   <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
                     <td className="px-5 py-3.5 font-medium sticky left-0 z-10 bg-white group-hover:bg-slate-50 shadow-[inset_-1px_0_0_0_#f1f5f9]">{s.company}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500" title={s.productCategory}>{s.productCategory}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.product}>{s.product}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.city}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100">{s.country}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[180px] truncate" title={s.email}>
+                      {s.email ? (
+                        <a href={`mailto:${s.email}`} className="text-brand-600 hover:underline" onClick={(e) => e.stopPropagation()}>{s.email}</a>
+                      ) : null}
+                    </td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[160px] truncate" title={s.website}>
+                      {s.website ? (
+                        <a href={s.website.startsWith("http") ? s.website : `https://${s.website}`} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline" onClick={(e) => e.stopPropagation()}>{s.website}</a>
+                      ) : null}
+                    </td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[160px] truncate" title={s.productCategory}>{s.productCategory}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.product}>{s.product}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.certifications}>{s.certifications}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.companyAddress}>{s.companyAddress}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.accountManager}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.currentStatus}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
@@ -394,7 +419,6 @@ export default function OldSuppliersPage() {
                         </SelectContent>
                       </Select>
                     </td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.certifications}>{s.certifications}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reasonInactive}>{s.reasonInactive}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reactivationPotential}>{s.reactivationPotential}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.notes}>{s.notes}</td>
@@ -482,104 +506,112 @@ export default function OldSuppliersPage() {
           </div>
           <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
+              <div className="space-y-2 sm:col-span-2">
                 <Label>Company Name *</Label>
                 <Input
                   value={form.company}
-                  onChange={(e) =>
-                    setForm({ ...form, company: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, company: e.target.value })}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label>Product Category</Label>
+                <Label>City</Label>
                 <Input
-                  value={form.productCategory ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, productCategory: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Product</Label>
-                <Input
-                  value={form.product ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, product: e.target.value })
-                  }
+                  value={form.city ?? ""}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Country</Label>
                 <Input
                   value={form.country ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, country: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, country: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Account Manager</Label>
+                <Label>Email</Label>
                 <Input
-                  value={form.accountManager ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, accountManager: e.target.value })
-                  }
+                  type="email"
+                  value={form.email ?? ""}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Current Status</Label>
+                <Label>Website</Label>
                 <Input
-                  value={form.currentStatus ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, currentStatus: e.target.value })
-                  }
+                  value={form.website ?? ""}
+                  onChange={(e) => setForm({ ...form, website: e.target.value })}
+                  placeholder="e.g. www.example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Product Category</Label>
+                <Input
+                  value={form.productCategory ?? ""}
+                  onChange={(e) => setForm({ ...form, productCategory: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Products</Label>
+                <Input
+                  value={form.product ?? ""}
+                  onChange={(e) => setForm({ ...form, product: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Certifications</Label>
                 <Input
                   value={form.certifications ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, certifications: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, certifications: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Account Manager</Label>
+                <Input
+                  value={form.accountManager ?? ""}
+                  onChange={(e) => setForm({ ...form, accountManager: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Current Status</Label>
+                <Input
+                  value={form.currentStatus ?? ""}
+                  onChange={(e) => setForm({ ...form, currentStatus: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Latest Quotation</Label>
                 <Input
                   value={form.latestQuotation ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, latestQuotation: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, latestQuotation: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Reason Inactive</Label>
                 <Input
                   value={form.reasonInactive ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, reasonInactive: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, reasonInactive: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Date Marked Inactive</Label>
                 <Input
                   value={form.dateMarkedInactive ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, dateMarkedInactive: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, dateMarkedInactive: e.target.value })}
                 />
               </div>
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2">
                 <Label>Reactivation Potential</Label>
                 <Input
                   value={form.reactivationPotential ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, reactivationPotential: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, reactivationPotential: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Full Address</Label>
+                <Input
+                  value={form.companyAddress ?? ""}
+                  onChange={(e) => setForm({ ...form, companyAddress: e.target.value })}
                 />
               </div>
             </div>

@@ -34,9 +34,14 @@ export async function listOldSuppliers(
     if (search) {
       where.OR = [
         { company: { contains: search, mode: "insensitive" } },
+        { city: { contains: search, mode: "insensitive" } },
         { country: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { website: { contains: search, mode: "insensitive" } },
         { productCategory: { contains: search, mode: "insensitive" } },
         { product: { contains: search, mode: "insensitive" } },
+        { certifications: { contains: search, mode: "insensitive" } },
+        { companyAddress: { contains: search, mode: "insensitive" } },
         { accountManager: { contains: search, mode: "insensitive" } },
         { currentStatus: { contains: search, mode: "insensitive" } },
       ];
@@ -123,15 +128,17 @@ export async function createOldSupplier(
 ): Promise<void> {
   try {
     const {
-      company, productCategory, product, country, accountManager,
-      currentStatus, certifications, latestQuotation, reasonInactive,
+      company, city, country, email, website,
+      productCategory, product, certifications, companyAddress,
+      accountManager, currentStatus, latestQuotation, reasonInactive,
       dateMarkedInactive, reactivationPotential, notes
     } = req.body;
 
     const supplier = await prisma.oldSupplier.create({
       data: {
-        company, productCategory, product, country, accountManager,
-        currentStatus, certifications, latestQuotation, reasonInactive,
+        company, city, country, email, website,
+        productCategory, product, certifications, companyAddress,
+        accountManager, currentStatus, latestQuotation, reasonInactive,
         dateMarkedInactive, reactivationPotential, notes,
         createdBy: req.user!.id,
       },
@@ -173,16 +180,18 @@ export async function updateOldSupplier(
     }
 
     const {
-      company, productCategory, product, country, accountManager,
-      currentStatus, certifications, latestQuotation, reasonInactive,
+      company, city, country, email, website,
+      productCategory, product, certifications, companyAddress,
+      accountManager, currentStatus, latestQuotation, reasonInactive,
       dateMarkedInactive, reactivationPotential, notes
     } = req.body;
 
     const supplier = await prisma.oldSupplier.update({
       where: { id: req.params.id },
       data: {
-        company, productCategory, product, country, accountManager,
-        currentStatus, certifications, latestQuotation, reasonInactive,
+        company, city, country, email, website,
+        productCategory, product, certifications, companyAddress,
+        accountManager, currentStatus, latestQuotation, reasonInactive,
         dateMarkedInactive, reactivationPotential, notes,
         ...(req.body.dealStage !== undefined && { dealStage: req.body.dealStage }),
       },
@@ -344,9 +353,14 @@ export async function exportOldSuppliersCsv(
     if (search) {
       where.OR = [
         { company: { contains: search, mode: "insensitive" } },
+        { city: { contains: search, mode: "insensitive" } },
         { country: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { website: { contains: search, mode: "insensitive" } },
         { productCategory: { contains: search, mode: "insensitive" } },
         { product: { contains: search, mode: "insensitive" } },
+        { certifications: { contains: search, mode: "insensitive" } },
+        { companyAddress: { contains: search, mode: "insensitive" } },
         { accountManager: { contains: search, mode: "insensitive" } },
         { currentStatus: { contains: search, mode: "insensitive" } },
       ];
@@ -371,12 +385,16 @@ export async function exportOldSuppliersCsv(
 
     const headers = [
       "Company Name",
-      "Product Category",
-      "Product",
+      "City",
       "Country",
+      "Email",
+      "Website",
+      "Product Category",
+      "Products",
+      "Certifications",
+      "Full Address",
       "Account Manager",
       "Current Status",
-      "Certifications",
       "Latest Quotation",
       "Reason Inactive",
       "Date Marked Inactive",
@@ -387,12 +405,16 @@ export async function exportOldSuppliersCsv(
 
     const rows = suppliers.map((s) => [
       s.company,
+      s.city || "",
+      s.country || "",
+      s.email || "",
+      s.website || "",
       s.productCategory || "",
       s.product || "",
-      s.country || "",
+      s.certifications || "",
+      s.companyAddress || "",
       s.accountManager || "",
       s.currentStatus || "",
-      s.certifications || "",
       s.latestQuotation || "",
       s.reasonInactive || "",
       s.dateMarkedInactive || "",
