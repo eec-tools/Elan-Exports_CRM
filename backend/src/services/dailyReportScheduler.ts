@@ -1,9 +1,9 @@
 import cron from "node-cron";
-import { v2 as cloudinary } from "cloudinary";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import nodemailer from "nodemailer";
-import { Readable } from "stream";
 import puppeteer from "puppeteer";
 import prisma from "../config/db.js";
+import { s3, S3_BUCKET, s3FileUrl } from "../lib/s3.js";
 import {
   generateDailyReport,
   generateWeeklyReport,
@@ -22,21 +22,13 @@ const VAULT_FOLDER: Record<ReportType, string> = {
   monthly: "Monthly Reports",
 };
 
-const CLOUDINARY_PREFIX: Record<ReportType, string> = {
+const S3_KEY_PREFIX: Record<ReportType, string> = {
   daily:   "vault_daily_report",
   weekly:  "vault_weekly_report",
   monthly: "vault_monthly_report",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function ensureCloudinaryConfig() {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key:    process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-}
 
 function getTransporter() {
   return nodemailer.createTransport({
@@ -82,25 +74,20 @@ async function htmlToPdf(html: string): Promise<Buffer> {
   }
 }
 
-// ── Upload PDF to Cloudinary ──────────────────────────────────────────────────
-async function uploadPdfToCloudinary(
+// ── Upload PDF to S3 / CloudFront ─────────────────────────────────────────────
+async function uploadPdfToS3(
   pdfBuffer: Buffer,
   reportType: ReportType,
   isoDate: string,
 ): Promise<string> {
-  ensureCloudinaryConfig();
-
-  return new Promise((resolve, reject) => {
-    const publicId = `${CLOUDINARY_PREFIX[reportType]}_${isoDate}`;
-    const uploadStream = cloudinary.uploader.upload_stream(
-      { folder: "elan-vault", resource_type: "raw", public_id: publicId, overwrite: true, format: "pdf" },
-      (error, result) => {
-        if (error || !result) return reject(error ?? new Error("No Cloudinary result"));
-        resolve(result.secure_url);
-      },
-    );
-    Readable.from(pdfBuffer).pipe(uploadStream);
-  });
+  const s3Key = `vault/reports/${S3_KEY_PREFIX[reportType]}_${isoDate}.pdf`;
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: s3Key,
+    Body: pdfBuffer,
+    ContentType: "application/pdf",
+  }));
+  return s3FileUrl(s3Key);
 }
 
 // ── Save to vault (always runs, fileUrl can be null if PDF failed) ────────────
@@ -204,9 +191,9 @@ async function runReport(
     let fileUrl: string | null = null;
     if (pdfBuffer) {
       try {
-        fileUrl = await uploadPdfToCloudinary(pdfBuffer, data.reportType, data.isoDate);
-      } catch (cloudErr) {
-        console.error("[Report] Cloudinary upload failed — vault entry saved without file:", cloudErr);
+        fileUrl = await uploadPdfToS3(pdfBuffer, data.reportType, data.isoDate);
+      } catch (s3Err) {
+        console.error("[Report] S3 upload failed — vault entry saved without file:", s3Err);
       }
     }
     await saveReportToVault(fileUrl, data.reportType, data.periodLabel);
@@ -276,7 +263,7 @@ function istMidnight(y: number, m: number, d: number): Date {
   return new Date(Date.UTC(y, m, d) - IST_OFFSET_MS);
 }
 
-export async function runMissedReports(): Promise<void> {
+export async function runMissedReports(opts: { force?: boolean } = {}): Promise<void> {
   const now    = new Date();
   const nowIST = new Date(now.getTime() + IST_OFFSET_MS);
   const istHr  = nowIST.getUTCHours();
@@ -284,7 +271,8 @@ export async function runMissedReports(): Promise<void> {
   const y = nowIST.getUTCFullYear(), m = nowIST.getUTCMonth(), d = nowIST.getUTCDate();
 
   // Only check after 9:05 AM IST (gives the cron a 5-min window to fire first)
-  if (istHr < 9 || (istHr === 9 && istMin < 5)) return;
+  // force=true bypasses this check (used by manual trigger endpoint)
+  if (!opts.force && (istHr < 9 || (istHr === 9 && istMin < 5))) return;
 
   console.log("[Report] Running missed-report catch-up check…");
 

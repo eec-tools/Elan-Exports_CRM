@@ -238,6 +238,20 @@ export default function VaultPage() {
   // Preview dialog
   const [previewDoc, setPreviewDoc] = useState<VaultDocument | null>(null);
 
+  // Regenerate reports
+  const [regenerating, setRegenerating] = useState(false);
+  async function handleRegenerateReports() {
+    setRegenerating(true);
+    try {
+      await api.post("/cron-reports/run-missed");
+      toast.success("Reports are being regenerated — check the vault in ~1 minute.");
+    } catch {
+      toast.error("Failed to trigger report regeneration.");
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
   // Replace dialog
   const [replaceDoc, setReplaceDoc] = useState<VaultDocument | null>(null);
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
@@ -609,6 +623,18 @@ export default function VaultPage() {
         </div>
         {canEdit && (
           <div className="flex gap-2">
+            {isAdmin && (
+              <Button
+                variant="outline"
+                onClick={handleRegenerateReports}
+                disabled={regenerating}
+                className="gap-2"
+                title="Regenerate any missing CRM reports into the vault"
+              >
+                <RefreshCw className={`h-4 w-4 ${regenerating ? "animate-spin" : ""}`} />
+                {regenerating ? "Regenerating…" : "Regenerate Reports"}
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => setFolderOpen(true)}
@@ -1376,11 +1402,22 @@ export default function VaultPage() {
               />
             )}
             {(previewDoc?.fileType === "pdf") && previewDoc?.fileUrl && (
-              <iframe
-                src={previewDoc.fileUrl}
-                title={previewDoc.name}
+              <object
+                data={previewDoc.fileUrl}
+                type="application/pdf"
                 className="w-full h-[65vh] rounded border-0"
-              />
+              >
+                <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
+                  <FileTypeIcon fileType="pdf" className="h-16 w-16 opacity-30" />
+                  <p className="text-sm">PDF cannot be displayed inline.</p>
+                  <a href={previewDoc.fileUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" className="gap-2">
+                      <ExternalLink className="h-4 w-4" />
+                      Open PDF in new tab
+                    </Button>
+                  </a>
+                </div>
+              </object>
             )}
             {(previewDoc?.fileType === "doc" || previewDoc?.fileType === "sheet" || previewDoc?.fileType === "file") && previewDoc?.fileUrl && (
               <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">

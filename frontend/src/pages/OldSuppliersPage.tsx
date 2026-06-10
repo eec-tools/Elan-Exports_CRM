@@ -5,7 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -47,14 +46,6 @@ interface Supplier {
   product?: string;
   certifications?: string;
   companyAddress?: string;
-  accountManager?: string;
-  currentStatus?: string;
-  latestQuotation?: string;
-  reasonInactive?: string;
-  dateMarkedInactive?: string;
-  dealStage?: string;
-  reactivationPotential?: string;
-  notes?: string;
   supplierStage?: string;
 }
 
@@ -68,28 +59,7 @@ const EMPTY_SUPPLIER: Partial<Supplier> = {
   product: "",
   certifications: "",
   companyAddress: "",
-  accountManager: "",
-  currentStatus: "",
-  latestQuotation: "",
-  reasonInactive: "",
-  dateMarkedInactive: "",
-  reactivationPotential: "",
-  notes: "",
 };
-
-const DEAL_STAGES = [
-  "Communication",
-  "Sampling",
-  "Quotation",
-  "Negotiation with EEC",
-  "Price quotation to Buyer after EEC approval",
-  "Negotiation with buyer",
-  "Price approval by buyer",
-  "Quotation send to the supplier from buyer end",
-  "Orders confirmed from buyers end",
-  "Timeline (Product shipping.. etc) should be established from suppliers end",
-  "No Ongoing Deal",
-];
 
 export default function OldSuppliersPage() {
   const { hasEditPermission } = useAuth();
@@ -97,33 +67,27 @@ export default function OldSuppliersPage() {
   const canEdit = hasEditPermission("suppliers") || hasEditPermission("old_suppliers");
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [countryFilter, setCountryFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [managerFilter, setManagerFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<Supplier> | null>(null);
   const [form, setForm] = useState<Partial<Supplier>>(EMPTY_SUPPLIER);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(
-    null,
-  );
+  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["old-suppliers", search, statusFilter, countryFilter, categoryFilter, managerFilter, page],
+    queryKey: ["old-suppliers", search, countryFilter, categoryFilter, page],
     queryFn: () =>
       api
         .get("/old-suppliers", {
           params: {
             search,
-            status: statusFilter !== "all" ? statusFilter : undefined,
             country: countryFilter !== "all" ? countryFilter : undefined,
             productCategory: categoryFilter !== "all" ? categoryFilter : undefined,
-            accountManager: managerFilter !== "all" ? managerFilter : undefined,
             page,
-            limit: 20
-          }
+            limit: 20,
+          },
         })
         .then((r) => r.data),
   });
@@ -205,17 +169,15 @@ export default function OldSuppliersPage() {
       const res = await api.get("/old-suppliers/export/csv", {
         params: {
           search,
-          status: statusFilter !== "all" ? statusFilter : undefined,
           country: countryFilter !== "all" ? countryFilter : undefined,
           productCategory: categoryFilter !== "all" ? categoryFilter : undefined,
-          accountManager: managerFilter !== "all" ? managerFilter : undefined,
         },
         responseType: "blob",
       });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `suppliers_export.csv`;
+      a.download = `old_suppliers_export.csv`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success("CSV exported");
@@ -235,9 +197,7 @@ export default function OldSuppliersPage() {
             <Building2 className="h-6 w-6 text-brand-500" />
             Old Suppliers
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Manage old supplier records
-          </p>
+          <p className="text-sm text-slate-500 mt-0.5">Manage old supplier records</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExport} className="gap-2 bg-white hover:bg-slate-50 text-slate-700 shadow-sm border-slate-200 h-9">
@@ -263,25 +223,10 @@ export default function OldSuppliersPage() {
             <Input
               placeholder="Search suppliers..."
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="pl-9 h-9 bg-slate-50 border-slate-200 focus:bg-white focus:ring-brand-500/20 focus:border-brand-500 text-sm"
             />
           </div>
-
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
-              <SelectValue placeholder="All Statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {filters?.statuses?.map((s: string) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
           <Select value={countryFilter} onValueChange={(v) => { setCountryFilter(v); setPage(1); }}>
             <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
@@ -307,23 +252,11 @@ export default function OldSuppliersPage() {
             </SelectContent>
           </Select>
 
-          <Select value={managerFilter} onValueChange={(v) => { setManagerFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 bg-slate-50 border-slate-200 text-sm focus:ring-brand-500/20 min-w-[140px]">
-              <SelectValue placeholder="All Managers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Managers</SelectItem>
-              {filters?.accountManagers?.map((m: string) => (
-                <SelectItem key={m} value={m}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {(search || statusFilter !== "all" || countryFilter !== "all" || categoryFilter !== "all" || managerFilter !== "all") && (
+          {(search || countryFilter !== "all" || categoryFilter !== "all") && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setSearch(""); setStatusFilter("all"); setCountryFilter("all"); setCategoryFilter("all"); setManagerFilter("all"); setPage(1); }}
+              onClick={() => { setSearch(""); setCountryFilter("all"); setCategoryFilter("all"); setPage(1); }}
               className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 h-9 px-2 gap-1 ml-auto"
             >
               <X className="h-4 w-4" /> Clear
@@ -346,12 +279,6 @@ export default function OldSuppliersPage() {
                 <th className="px-5 py-3.5 font-semibold">Products</th>
                 <th className="px-5 py-3.5 font-semibold">Certifications</th>
                 <th className="px-5 py-3.5 font-semibold">Full Address</th>
-                <th className="px-5 py-3.5 font-semibold">Account Manager</th>
-                <th className="px-5 py-3.5 font-semibold">Current Status</th>
-                <th className="px-5 py-3.5 font-semibold">Deal Stage</th>
-                <th className="px-5 py-3.5 font-semibold">Reason Inactive</th>
-                <th className="px-5 py-3.5 font-semibold">Reactivation Potential</th>
-                <th className="px-5 py-3.5 font-semibold">Notes</th>
                 <th className="px-5 py-3.5 font-semibold">Stage</th>
                 {canEdit && <th className="px-5 py-3.5 font-semibold text-right">Actions</th>}
               </tr>
@@ -359,7 +286,7 @@ export default function OldSuppliersPage() {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading && suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 17 : 16} className="h-32 text-center">
+                  <td colSpan={canEdit ? 11 : 10} className="h-32 text-center">
                     <div className="flex justify-center">
                       <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
                     </div>
@@ -367,14 +294,14 @@ export default function OldSuppliersPage() {
                 </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 17 : 16} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
+                  <td colSpan={canEdit ? 11 : 10} className="px-5 py-16 text-center shadow-[inset_0_1px_0_#f1f5f9]">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 mb-2">
                         <Building2 className="h-6 w-6 text-slate-300" />
                       </div>
                       <p className="text-slate-600 font-medium text-base">No suppliers found</p>
                       <p className="text-slate-400 text-sm max-w-[250px]">
-                        {(search || statusFilter !== "all" || countryFilter !== "all" || categoryFilter !== "all" || managerFilter !== "all") ? "Try adjusting your search or filters." : "You have not added any suppliers yet."}
+                        {(search || countryFilter !== "all" || categoryFilter !== "all") ? "Try adjusting your search or filters." : "You have not added any suppliers yet."}
                       </p>
                     </div>
                   </td>
@@ -384,44 +311,21 @@ export default function OldSuppliersPage() {
                   <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
                     <td className="px-5 py-3.5 font-medium sticky left-0 z-10 bg-white group-hover:bg-slate-50 shadow-[inset_-1px_0_0_0_#f1f5f9]">{s.company}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.city}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100">{s.country}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[180px] truncate" title={s.email}>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.country}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.email}>
                       {s.email ? (
                         <a href={`mailto:${s.email}`} className="text-brand-600 hover:underline" onClick={(e) => e.stopPropagation()}>{s.email}</a>
                       ) : null}
                     </td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[160px] truncate" title={s.website}>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[180px] truncate" title={s.website}>
                       {s.website ? (
                         <a href={s.website.startsWith("http") ? s.website : `https://${s.website}`} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline" onClick={(e) => e.stopPropagation()}>{s.website}</a>
                       ) : null}
                     </td>
                     <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[160px] truncate" title={s.productCategory}>{s.productCategory}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.product}>{s.product}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.certifications}>{s.certifications}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.companyAddress}>{s.companyAddress}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.accountManager}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500">{s.currentStatus}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
-                      <Select
-                        value={s.dealStage || "Communication"}
-                        onValueChange={(val) => {
-                          updateMutation.mutate({ id: s.id, d: { dealStage: val } });
-                        }}
-                        disabled={updateMutation.isPending}
-                      >
-                        <SelectTrigger className="h-8 text-xs border-slate-200 bg-white min-w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DEAL_STAGES.map((stage) => (
-                            <SelectItem key={stage} value={stage}>{stage}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reasonInactive}>{s.reasonInactive}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.reactivationPotential}>{s.reactivationPotential}</td>
-                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[200px] truncate" title={s.notes}>{s.notes}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[220px] truncate" title={s.product}>{s.product}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[180px] truncate" title={s.certifications}>{s.certifications}</td>
+                    <td className="px-5 py-3.5 border-r border-slate-100 text-slate-500 max-w-[220px] truncate" title={s.companyAddress}>{s.companyAddress}</td>
                     <td className="px-5 py-3.5 border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
                       <Select
                         value={s.supplierStage || "Closed"}
@@ -454,10 +358,7 @@ export default function OldSuppliersPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                            onClick={() => {
-                              setSupplierToDelete(s);
-                              setDeleteDialogOpen(true);
-                            }}
+                            onClick={() => { setSupplierToDelete(s); setDeleteDialogOpen(true); }}
                             title="Delete Supplier"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -565,48 +466,6 @@ export default function OldSuppliersPage() {
                   onChange={(e) => setForm({ ...form, certifications: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Account Manager</Label>
-                <Input
-                  value={form.accountManager ?? ""}
-                  onChange={(e) => setForm({ ...form, accountManager: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Current Status</Label>
-                <Input
-                  value={form.currentStatus ?? ""}
-                  onChange={(e) => setForm({ ...form, currentStatus: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Latest Quotation</Label>
-                <Input
-                  value={form.latestQuotation ?? ""}
-                  onChange={(e) => setForm({ ...form, latestQuotation: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Reason Inactive</Label>
-                <Input
-                  value={form.reasonInactive ?? ""}
-                  onChange={(e) => setForm({ ...form, reasonInactive: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Date Marked Inactive</Label>
-                <Input
-                  value={form.dateMarkedInactive ?? ""}
-                  onChange={(e) => setForm({ ...form, dateMarkedInactive: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Reactivation Potential</Label>
-                <Input
-                  value={form.reactivationPotential ?? ""}
-                  onChange={(e) => setForm({ ...form, reactivationPotential: e.target.value })}
-                />
-              </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Full Address</Label>
                 <Input
@@ -614,14 +473,6 @@ export default function OldSuppliersPage() {
                   onChange={(e) => setForm({ ...form, companyAddress: e.target.value })}
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Notes</Label>
-              <Textarea
-                value={form.notes ?? ""}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                rows={3}
-              />
             </div>
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
               <Button
@@ -647,7 +498,6 @@ export default function OldSuppliersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete supplier confirmation */}
       <Dialog
         open={deleteDialogOpen}
         onOpenChange={(open) => {
@@ -678,9 +528,7 @@ export default function OldSuppliersPage() {
               variant="destructive"
               className="bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200"
               onClick={() => {
-                if (supplierToDelete) {
-                  deleteMutation.mutate(supplierToDelete.id);
-                }
+                if (supplierToDelete) deleteMutation.mutate(supplierToDelete.id);
                 setDeleteDialogOpen(false);
                 setSupplierToDelete(null);
               }}

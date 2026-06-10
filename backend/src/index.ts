@@ -55,6 +55,7 @@ import analyticsRoutes from "./routes/analytics.routes.js";
 import shortLinksRoutes from "./routes/shortLinks.routes.js";
 import emailSettingsRoutes from "./routes/emailSettings.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
+import cronReportsRoutes from "./routes/cronReports.routes.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -192,6 +193,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/f", shortLinksRoutes);
 app.use("/api/email-settings", emailSettingsRoutes);
 app.use("/api/holidays", holidayRoutes);
+app.use("/api/cron-reports", cronReportsRoutes);
 
 // Health check with detailed status
 app.get("/api/health", async (_req, res) => {
