@@ -119,7 +119,11 @@ async function saveReportToVault(
   if (existing) {
     await prisma.vaultDocument.update({
       where: { id: existing.id },
-      data: { fileUrl: fileUrl ?? existing.fileUrl, updatedAt: new Date() },
+      data: {
+        fileUrl: fileUrl ?? existing.fileUrl,
+        fileType: fileUrl ? "pdf" : existing.fileType,
+        updatedAt: new Date(),
+      },
     });
     console.log(`[Report] Updated vault entry: ${docName}`);
   } else {
