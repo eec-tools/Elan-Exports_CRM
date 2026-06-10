@@ -253,7 +253,7 @@ async function reportExistsInVault(folderName: string, since: Date): Promise<boo
   if (!folder) return false;
 
   const doc = await prisma.vaultDocument.findFirst({
-    where: { parentId: folder.id, isFolder: false, updatedAt: { gte: since } },
+    where: { parentId: folder.id, isFolder: false, updatedAt: { gte: since }, fileUrl: { not: null } },
   });
   return doc !== null;
 }
