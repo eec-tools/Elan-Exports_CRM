@@ -14,15 +14,14 @@ import {
 import { buildReportHtml } from "./dailyReportTemplate.js";
 
 const REPORT_RECIPIENT = "shirali@eectrade.com";
+const IST_OFFSET_MS    = 5.5 * 60 * 60 * 1000;
 
-// Vault folder names per report type
 const VAULT_FOLDER: Record<ReportType, string> = {
   daily:   "Daily Reports",
   weekly:  "Weekly Reports",
   monthly: "Monthly Reports",
 };
 
-// Cloudinary public-ID prefix per report type
 const CLOUDINARY_PREFIX: Record<ReportType, string> = {
   daily:   "vault_daily_report",
   weekly:  "vault_weekly_report",
@@ -55,11 +54,21 @@ function getTransporter() {
 async function htmlToPdf(html: string): Promise<Buffer> {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-extensions",
+      "--single-process",
+      "--no-first-run",
+      "--no-zygote",
+    ],
+    timeout: 60_000,
   });
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30_000 });
     await page.emulateMediaType("screen");
     const pdfBuffer = await page.pdf({
       format: "A4",
@@ -94,27 +103,21 @@ async function uploadPdfToCloudinary(
   });
 }
 
-// ── Save to vault ─────────────────────────────────────────────────────────────
+// ── Save to vault (always runs, fileUrl can be null if PDF failed) ────────────
 async function saveReportToVault(
-  fileUrl: string,
+  fileUrl: string | null,
   reportType: ReportType,
   periodLabel: string,
 ) {
   const folderName = VAULT_FOLDER[reportType];
 
-  // Find or create the parent folder for this report type
   let parentFolder = await prisma.vaultDocument.findFirst({
     where: { name: folderName, isFolder: true, parentId: null },
   });
 
   if (!parentFolder) {
     parentFolder = await prisma.vaultDocument.create({
-      data: {
-        name: folderName,
-        category: "Internal Reports",
-        region: "Global",
-        isFolder: true,
-      },
+      data: { name: folderName, category: "Internal Reports", region: "Global", isFolder: true },
     });
     console.log(`[Report] Created vault folder: ${folderName}`);
   }
@@ -129,7 +132,7 @@ async function saveReportToVault(
   if (existing) {
     await prisma.vaultDocument.update({
       where: { id: existing.id },
-      data: { fileUrl, updatedAt: new Date() },
+      data: { fileUrl: fileUrl ?? existing.fileUrl, updatedAt: new Date() },
     });
     console.log(`[Report] Updated vault entry: ${docName}`);
   } else {
@@ -141,7 +144,7 @@ async function saveReportToVault(
         isFolder: false,
         parentId: parentFolder.id,
         fileUrl,
-        fileType: "pdf",
+        fileType: fileUrl ? "pdf" : undefined,
       },
     });
     console.log(`[Report] Created vault entry: ${docName}`);
@@ -164,11 +167,7 @@ async function sendReportEmail(
     subject: `CRM ${reportTypeLabel} Digest — ${data.periodLabel}`,
     html,
     attachments: pdfBuffer
-      ? [{
-          filename: `CRM-${reportTypeLabel}-Report-${safeName}.pdf`,
-          content:  pdfBuffer,
-          contentType: "application/pdf",
-        }]
+      ? [{ filename: `CRM-${reportTypeLabel}-Report-${safeName}.pdf`, content: pdfBuffer, contentType: "application/pdf" }]
       : [],
   });
 
@@ -181,51 +180,140 @@ async function runReport(
   label: string,
 ) {
   console.log(`[Report] Starting ${label} report generation…`);
+
+  const data = await generateFn();
+  console.log(`[Report] Data collected for ${data.periodLabel}`);
+
+  const html = buildReportHtml(data);
+
+  // PDF — failure is non-fatal; email and vault still proceed
+  let pdfBuffer: Buffer | null = null;
   try {
-    const data = await generateFn();
-    console.log(`[Report] Data collected for ${data.periodLabel}`);
+    console.log("[Report] Rendering PDF via Puppeteer…");
+    pdfBuffer = await htmlToPdf(html);
+    console.log(`[Report] PDF generated (${Math.round(pdfBuffer.length / 1024)} KB)`);
+  } catch (pdfErr) {
+    console.error("[Report] PDF generation failed — continuing without attachment:", pdfErr);
+  }
 
-    const html = buildReportHtml(data);
+  // Email — always send regardless of PDF
+  await sendReportEmail(html, pdfBuffer, data);
 
-    let pdfBuffer: Buffer | null = null;
-    try {
-      console.log("[Report] Rendering PDF via Puppeteer…");
-      pdfBuffer = await htmlToPdf(html);
-      console.log(`[Report] PDF generated (${Math.round(pdfBuffer.length / 1024)} KB)`);
-    } catch (pdfErr) {
-      console.error("[Report] PDF generation failed — sending email without attachment:", pdfErr);
-    }
-
-    await sendReportEmail(html, pdfBuffer, data);
-
+  // Vault — always save, even without PDF
+  try {
+    let fileUrl: string | null = null;
     if (pdfBuffer) {
       try {
-        const fileUrl = await uploadPdfToCloudinary(pdfBuffer, data.reportType, data.isoDate);
-        await saveReportToVault(fileUrl, data.reportType, data.periodLabel);
-        console.log(`[Report] Vault entry saved for ${data.periodLabel}`);
-      } catch (vaultErr) {
-        console.error("[Report] Vault save failed (email still sent):", vaultErr);
+        fileUrl = await uploadPdfToCloudinary(pdfBuffer, data.reportType, data.isoDate);
+      } catch (cloudErr) {
+        console.error("[Report] Cloudinary upload failed — vault entry saved without file:", cloudErr);
       }
     }
+    await saveReportToVault(fileUrl, data.reportType, data.periodLabel);
+    console.log(`[Report] Vault entry saved for ${data.periodLabel}`);
+  } catch (vaultErr) {
+    console.error("[Report] Vault save failed:", vaultErr);
+  }
 
-    console.log(`[Report] ${label} report completed successfully for ${data.periodLabel}`);
-  } catch (err) {
-    console.error(`[Report] ${label} report generation failed:`, err);
+  console.log(`[Report] ${label} report completed for ${data.periodLabel}`);
+}
+
+// Retry wrapper — attempts the report up to 3 times with increasing delays
+async function runReportWithRetry(
+  generateFn: () => Promise<CRMReportData>,
+  label: string,
+  maxAttempts = 3,
+) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await runReport(generateFn, label);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) {
+        console.error(`[Report] ${label} failed after ${maxAttempts} attempts — giving up:`, err);
+        return;
+      }
+      const delayMin = attempt * 3; // 3min, 6min between attempts
+      console.warn(`[Report] ${label} attempt ${attempt} failed — retrying in ${delayMin}min…`, (err as Error).message);
+      await new Promise(r => setTimeout(r, delayMin * 60_000));
+    }
   }
 }
 
-// ── Public runners (exported for manual trigger) ──────────────────────────────
+// ── Public runners ────────────────────────────────────────────────────────────
 
 export async function runDailyReport() {
-  return runReport(generateDailyReport, "daily");
+  return runReportWithRetry(generateDailyReport, "daily");
 }
 
 export async function runWeeklyReport() {
-  return runReport(generateWeeklyReport, "weekly");
+  return runReportWithRetry(generateWeeklyReport, "weekly");
 }
 
 export async function runMonthlyReport() {
-  return runReport(generateMonthlyReport, "monthly");
+  return runReportWithRetry(generateMonthlyReport, "monthly");
+}
+
+// ── Missed-report catch-up ────────────────────────────────────────────────────
+// Checks whether each scheduled report already exists in the vault for the
+// current period. If not — and the scheduled time has passed — runs it now.
+// Called on server startup so a crashed/restarted server never skips a report.
+
+async function reportExistsInVault(folderName: string, since: Date): Promise<boolean> {
+  const folder = await prisma.vaultDocument.findFirst({
+    where: { name: folderName, isFolder: true, parentId: null },
+  });
+  if (!folder) return false;
+
+  const doc = await prisma.vaultDocument.findFirst({
+    where: { parentId: folder.id, isFolder: false, updatedAt: { gte: since } },
+  });
+  return doc !== null;
+}
+
+function istMidnight(y: number, m: number, d: number): Date {
+  // Returns the UTC instant that equals midnight IST on the given Y/M/D
+  return new Date(Date.UTC(y, m, d) - IST_OFFSET_MS);
+}
+
+export async function runMissedReports(): Promise<void> {
+  const now    = new Date();
+  const nowIST = new Date(now.getTime() + IST_OFFSET_MS);
+  const istHr  = nowIST.getUTCHours();
+  const istMin = nowIST.getUTCMinutes();
+  const y = nowIST.getUTCFullYear(), m = nowIST.getUTCMonth(), d = nowIST.getUTCDate();
+
+  // Only check after 9:05 AM IST (gives the cron a 5-min window to fire first)
+  if (istHr < 9 || (istHr === 9 && istMin < 5)) return;
+
+  console.log("[Report] Running missed-report catch-up check…");
+
+  // ── Daily — always check (report covers yesterday)
+  const todayMidnightUTC = istMidnight(y, m, d);
+  if (!(await reportExistsInVault("Daily Reports", todayMidnightUTC))) {
+    console.log("[Report] Daily report missing for today — generating catch-up…");
+    await runDailyReport();
+  }
+
+  // ── Weekly — only on Monday
+  if (nowIST.getUTCDay() === 1) {
+    const mondayMidnightUTC = istMidnight(y, m, d);
+    if (!(await reportExistsInVault("Weekly Reports", mondayMidnightUTC))) {
+      console.log("[Report] Weekly report missing for this week — generating catch-up…");
+      await runWeeklyReport();
+    }
+  }
+
+  // ── Monthly — only on the 1st
+  if (d === 1) {
+    const firstMidnightUTC = istMidnight(y, m, 1);
+    if (!(await reportExistsInVault("Monthly Reports", firstMidnightUTC))) {
+      console.log("[Report] Monthly report missing for this month — generating catch-up…");
+      await runMonthlyReport();
+    }
+  }
+
+  console.log("[Report] Catch-up check complete.");
 }
 
 // ── Scheduler ─────────────────────────────────────────────────────────────────
@@ -253,5 +341,11 @@ export function startDailyReportScheduler() {
     runMonthlyReport();
   }, { timezone: "UTC" });
 
+  // Catch-up: runs 30s after startup in case the server was down at schedule time
+  setTimeout(() => {
+    runMissedReports().catch(e => console.error("[Report] Catch-up check failed:", e));
+  }, 30_000);
+
   console.log("[Report] Schedulers active — Daily 9:00 AM · Weekly Mon 9:01 AM · Monthly 1st 9:02 AM (all IST)");
+  console.log("[Report] Missed-report catch-up will run 30s after startup.");
 }
