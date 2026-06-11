@@ -354,6 +354,9 @@ function buildDealSection(d: CRMReportData): string {
 
 function buildTaskSection(d: CRMReportData): string {
   const tasks = d.tasks;
+  const pendingLabel =
+    d.reportType === "daily"   ? "Pending Yesterday" :
+    d.reportType === "weekly"  ? "Pending This Week" : "Pending This Month";
   const completedLabel =
     d.reportType === "daily"   ? "Completed Yesterday" :
     d.reportType === "weekly"  ? "Completed This Week" : "Completed This Month";
@@ -389,10 +392,9 @@ function buildTaskSection(d: CRMReportData): string {
     <tr><td style="padding:10px 32px 0;">
       <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
         <tr>
-          ${medKpi(fmt(tasks.totalPending),      "Total Pending",    C.amber)}
-          ${medKpi(fmt(tasks.completedInPeriod), completedLabel,     C.green)}
-          ${medKpi(fmt(tasks.createdInPeriod),   newLabel,           C.blue)}
-          ${medKpi(fmt(tasks.totalCompleted),    "Total Completed",  C.green)}
+          ${medKpi(fmt(tTotPending),              pendingLabel,   C.amber)}
+          ${medKpi(fmt(tasks.completedInPeriod), completedLabel, C.green)}
+          ${medKpi(fmt(tasks.createdInPeriod),   newLabel,       C.blue)}
         </tr>
       </table>
       ${subLabel("Task Tracker")}

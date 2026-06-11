@@ -73,8 +73,6 @@ export interface TaskEmployeeEntry {
 }
 
 export interface TaskAnalytics {
-  totalPending: number;
-  totalCompleted: number;
   createdInPeriod: number;
   completedInPeriod: number;
   byEmployee: TaskEmployeeEntry[];
@@ -471,21 +469,7 @@ export async function collectReportData(range: DateRange, reportType: ReportType
   ).length;
   const totalRevenue = allDeals.reduce((s, d) => s + (d.expectedRevenue ?? 0), 0);
 
-  // ── 4. Tasks ──────────────────────────────────────────────────────────────
-  // KPI totals: all-time snapshot for Total Pending / Total Completed
-  const allTasksSnapshot = await prisma.dailyTask.findMany({
-    select: { owner: true, status: true },
-  });
-
-  let totalPending = 0, totalCompleted = 0;
-  for (const t of allTasksSnapshot) {
-    if (EXCLUDED_TASK_NAMES.has((t.owner ?? "").toLowerCase().trim())) continue;
-    const s = t.status.toLowerCase();
-    if (s === "completed") totalCompleted++;
-    else if (s !== "closed") totalPending++;
-  }
-
-  // Period-specific tasks for KPI "created" / "completed in period"
+  // ── 4. Tasks (all counts are period-specific) ─────────────────────────────
   const allPeriodTasks = await prisma.dailyTask.findMany({
     where: {
       OR: [
@@ -633,8 +617,6 @@ export async function collectReportData(range: DateRange, reportType: ReportType
     },
 
     tasks: {
-      totalPending,
-      totalCompleted,
       createdInPeriod,
       completedInPeriod,
       byEmployee: taskByEmployee,
