@@ -70,7 +70,8 @@ export const BUYER_DEFAULT_TEMPLATE_CONTENT = {
 
 export async function listBuyerEmailTemplates(_req: AuthRequest, res: Response): Promise<void> {
     try {
-        const templates = await (prisma as any).buyerEmailCampaignTemplate.findMany({
+        const templates = await prisma.buyerEmailCampaignTemplate.findMany({
+            include: { signature: true },
             orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
         });
         res.json(templates);
@@ -82,8 +83,9 @@ export async function listBuyerEmailTemplates(_req: AuthRequest, res: Response):
 
 export async function getBuyerEmailTemplate(req: AuthRequest, res: Response): Promise<void> {
     try {
-        const template = await (prisma as any).buyerEmailCampaignTemplate.findUnique({
+        const template = await prisma.buyerEmailCampaignTemplate.findUnique({
             where: { id: req.params.id },
+            include: { signature: true },
         });
         if (!template) { res.status(404).json({ error: "Template not found" }); return; }
         res.json(template);
@@ -105,19 +107,20 @@ export async function createBuyerEmailTemplate(req: AuthRequest, res: Response):
             followup1Subject, followup1Body,
             followup2Subject, followup2Body,
             followup3Subject, followup3Body,
+            signatureId,
         } = req.body;
 
         if (!name) { res.status(400).json({ error: "Template name is required" }); return; }
         if (!introSubject || !introBody) { res.status(400).json({ error: "Intro subject and body are required" }); return; }
 
         if (isDefault) {
-            await (prisma as any).buyerEmailCampaignTemplate.updateMany({
+            await prisma.buyerEmailCampaignTemplate.updateMany({
                 where: { isDefault: true },
                 data: { isDefault: false },
             });
         }
 
-        const template = await (prisma as any).buyerEmailCampaignTemplate.create({
+        const template = await prisma.buyerEmailCampaignTemplate.create({
             data: {
                 name,
                 isDefault: isDefault ?? false,
@@ -130,7 +133,9 @@ export async function createBuyerEmailTemplate(req: AuthRequest, res: Response):
                 followup3Subject: followup3Subject ?? DEFAULT_FOLLOWUP3_SUBJECT,
                 followup3Body: followup3Body ?? DEFAULT_FOLLOWUP3_BODY,
                 createdBy: req.user!.id,
+                signatureId: signatureId ?? null,
             },
+            include: { signature: true },
         });
 
         res.status(201).json(template);
@@ -149,19 +154,20 @@ export async function updateBuyerEmailTemplate(req: AuthRequest, res: Response):
             followup1Subject, followup1Body,
             followup2Subject, followup2Body,
             followup3Subject, followup3Body,
+            signatureId,
         } = req.body;
 
-        const existing = await (prisma as any).buyerEmailCampaignTemplate.findUnique({ where: { id } });
+        const existing = await prisma.buyerEmailCampaignTemplate.findUnique({ where: { id } });
         if (!existing) { res.status(404).json({ error: "Template not found" }); return; }
 
         if (isDefault) {
-            await (prisma as any).buyerEmailCampaignTemplate.updateMany({
+            await prisma.buyerEmailCampaignTemplate.updateMany({
                 where: { isDefault: true, id: { not: id } },
                 data: { isDefault: false },
             });
         }
 
-        const updated = await (prisma as any).buyerEmailCampaignTemplate.update({
+        const updated = await prisma.buyerEmailCampaignTemplate.update({
             where: { id },
             data: {
                 ...(name !== undefined && { name }),
@@ -174,7 +180,10 @@ export async function updateBuyerEmailTemplate(req: AuthRequest, res: Response):
                 ...(followup2Body !== undefined && { followup2Body }),
                 ...(followup3Subject !== undefined && { followup3Subject }),
                 ...(followup3Body !== undefined && { followup3Body }),
+                // signatureId: explicit null clears, undefined means "not sent → leave unchanged"
+                ...(signatureId !== undefined && { signatureId: signatureId || null }),
             },
+            include: { signature: true },
         });
 
         res.json(updated);
@@ -187,7 +196,7 @@ export async function updateBuyerEmailTemplate(req: AuthRequest, res: Response):
 export async function deleteBuyerEmailTemplate(req: AuthRequest, res: Response): Promise<void> {
     try {
         const { id } = req.params;
-        await (prisma as any).buyerEmailCampaignTemplate.delete({ where: { id } });
+        await prisma.buyerEmailCampaignTemplate.delete({ where: { id } });
         res.json({ success: true });
     } catch (err) {
         console.error("[buyerEmailCampaignTemplate] delete:", err);

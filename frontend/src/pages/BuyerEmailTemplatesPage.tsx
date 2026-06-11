@@ -17,11 +17,24 @@ import {
   Plus, Trash2, Pencil, Loader2, Star, Mail,
   Settings, PenLine, User, Briefcase, Building2, AlignLeft,
   Link2, GripVertical, X, CheckCircle2, Paperclip, Upload, ExternalLink,
+  PenSquare,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PermissionGate } from "@/components/PermissionGate";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface SigLink { label: string; url: string; }
+
+interface EmailSignature {
+  id: string;
+  name: string;
+  role: string;
+  company: string;
+  tagline: string;
+  links: SigLink[];
+  createdAt: string;
+}
 
 interface EmailTemplate {
   id: string;
@@ -35,6 +48,8 @@ interface EmailTemplate {
   followup2Body: string;
   followup3Subject: string;
   followup3Body: string;
+  signatureId: string | null;
+  signature: EmailSignature | null;
   createdAt: string;
 }
 
@@ -43,18 +58,6 @@ interface DefaultContent {
   followup1Subject: string; followup1Body: string;
   followup2Subject: string; followup2Body: string;
   followup3Subject: string; followup3Body: string;
-}
-
-interface SigLink { label: string; url: string; }
-
-interface EmailSignature {
-  id: string;
-  name: string;
-  role: string;
-  company: string;
-  tagline: string;
-  links: SigLink[];
-  createdAt: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -69,10 +72,10 @@ const LINK_PRESETS = [
 ];
 
 const VARIABLES = [
-  { placeholder: "{{greeting}}",       description: "Dear [Contact Name], or Dear Sir/Madam," },
-  { placeholder: "{{company}}",        description: "Buyer company name" },
+  { placeholder: "{{greeting}}",      description: "Dear [Contact Name], or Dear Sir/Madam," },
+  { placeholder: "{{company}}",       description: "Buyer company name" },
   { placeholder: "{{contactPerson}}", description: "Contact person's name" },
-  { placeholder: "{{product}}",        description: "Product / product category" },
+  { placeholder: "{{product}}",       description: "Product / product category" },
 ];
 
 const STEPS = [
@@ -127,6 +130,36 @@ function SigPreview({ sig }: { sig: Partial<EmailSignature> }) {
   );
 }
 
+// ─── Inline signature preview card (used inside template editor) ──────────────
+
+function TemplateSigPreview({ sig }: { sig: EmailSignature }) {
+  return (
+    <div className="mt-2 border border-amber-200 rounded-lg p-3 bg-amber-50/40 text-sm font-sans text-slate-700 leading-relaxed">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+        <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">Signature Preview</span>
+      </div>
+      <p className="text-xs text-slate-500 mb-1">Warm regards,</p>
+      <div className="border-l-2 border-amber-400 pl-3 space-y-0.5">
+        <p className="font-bold text-slate-900 text-sm">{sig.name}</p>
+        {sig.role    && <p className="text-xs text-amber-600 font-medium">{sig.role}</p>}
+        {sig.company && <p className="text-xs text-slate-600 font-semibold">{sig.company}</p>}
+        {sig.links.length > 0 && (
+          <div className="pt-0.5 space-y-0.5">
+            {sig.links.map((l, i) => (
+              <p key={i} className="text-[11px] text-slate-500">
+                <span className="font-medium text-slate-600">{l.label}:</span>{" "}
+                <span className="text-blue-600">{l.url.replace(/^mailto:|^tel:/, "")}</span>
+              </p>
+            ))}
+          </div>
+        )}
+        {sig.tagline && <p className="text-[11px] text-slate-400 italic pt-0.5">{sig.tagline}</p>}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function BuyerEmailTemplatesPage() {
@@ -135,27 +168,28 @@ export default function BuyerEmailTemplatesPage() {
   const canEdit = hasEditPermission("sourcing_buyers");
 
   // ── Template state ──
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorOpen, setEditorOpen]         = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
-  const [name, setName] = useState("");
-  const [isDefault, setIsDefault] = useState(false);
-  const [fields, setFields] = useState<StepFields>(emptyFields());
-  const [deleteTarget, setDeleteTarget] = useState<EmailTemplate | null>(null);
-  const [activeTab, setActiveTab] = useState("intro");
+  const [name, setName]                     = useState("");
+  const [isDefault, setIsDefault]           = useState(false);
+  const [fields, setFields]                 = useState<StepFields>(emptyFields());
+  const [selectedSignatureId, setSelectedSignatureId] = useState<string>("");
+  const [deleteTarget, setDeleteTarget]     = useState<EmailTemplate | null>(null);
+  const [activeTab, setActiveTab]           = useState("intro");
 
   // ── Attachment state ──
   const [attachmentUploading, setAttachmentUploading] = useState(false);
 
   // ── Signature dialog state ──
-  const [sigOpen, setSigOpen] = useState(false);
-  const [sigView, setSigView] = useState<"list" | "form">("list");
-  const [sigEditing, setSigEditing] = useState<EmailSignature | null>(null);
+  const [sigOpen, setSigOpen]           = useState(false);
+  const [sigView, setSigView]           = useState<"list" | "form">("list");
+  const [sigEditing, setSigEditing]     = useState<EmailSignature | null>(null);
   const [sigDeleteTarget, setSigDeleteTarget] = useState<EmailSignature | null>(null);
-  const [sigName, setSigName]       = useState("");
-  const [sigRole, setSigRole]       = useState("");
-  const [sigCompany, setSigCompany] = useState("");
-  const [sigTagline, setSigTagline] = useState("");
-  const [sigLinks, setSigLinks]     = useState<SigLink[]>([]);
+  const [sigName, setSigName]           = useState("");
+  const [sigRole, setSigRole]           = useState("");
+  const [sigCompany, setSigCompany]     = useState("");
+  const [sigTagline, setSigTagline]     = useState("");
+  const [sigLinks, setSigLinks]         = useState<SigLink[]>([]);
 
   // ── Queries ──
   const { data: templates = [], isLoading } = useQuery({
@@ -168,10 +202,11 @@ export default function BuyerEmailTemplatesPage() {
     queryFn: async () => (await api.get("/buyer-email-templates/default-content")).data,
   });
 
+  // Signatures needed for both the editor selector and the signatures dialog
   const { data: signatures = [] } = useQuery<EmailSignature[]>({
     queryKey: ["email-signatures"],
     queryFn: async () => (await api.get("/email-signatures")).data,
-    enabled: sigOpen,
+    enabled: sigOpen || editorOpen,
   });
 
   const { data: accountDefault = null } = useQuery<string | null>({
@@ -210,7 +245,7 @@ export default function BuyerEmailTemplatesPage() {
 
   // ── Template mutations ──
   const saveMutation = useMutation({
-    mutationFn: (data: { name: string; isDefault: boolean } & StepFields) =>
+    mutationFn: (data: { name: string; isDefault: boolean; signatureId: string | null } & StepFields) =>
       editingTemplate
         ? api.put(`/buyer-email-templates/${editingTemplate.id}`, data)
         : api.post("/buyer-email-templates", data),
@@ -262,6 +297,7 @@ export default function BuyerEmailTemplatesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["email-signatures"] });
       queryClient.invalidateQueries({ queryKey: ["signature-defaults", BUYER_GMAIL_ACCOUNT] });
+      queryClient.invalidateQueries({ queryKey: ["buyer-email-campaign-templates"] });
       setSigDeleteTarget(null);
       toast.success("Signature deleted");
     },
@@ -283,6 +319,7 @@ export default function BuyerEmailTemplatesPage() {
     setEditingTemplate(null);
     setName(""); setIsDefault(false);
     setFields(emptyFields(defaultContent));
+    setSelectedSignatureId("");
     setActiveTab("intro");
     setEditorOpen(true);
   };
@@ -296,6 +333,7 @@ export default function BuyerEmailTemplatesPage() {
       followup2Subject: t.followup2Subject, followup2Body: t.followup2Body,
       followup3Subject: t.followup3Subject, followup3Body: t.followup3Body,
     });
+    setSelectedSignatureId(t.signatureId ?? "");
     setActiveTab("intro");
     setEditorOpen(true);
   };
@@ -307,7 +345,12 @@ export default function BuyerEmailTemplatesPage() {
     if (!name.trim()) { toast.error("Template name is required"); return; }
     if (!fields.introSubject.trim()) { toast.error("Intro subject is required"); return; }
     if (!fields.introBody.trim()) { toast.error("Intro body is required"); return; }
-    saveMutation.mutate({ name: name.trim(), isDefault, ...fields });
+    saveMutation.mutate({
+      name: name.trim(),
+      isDefault,
+      signatureId: selectedSignatureId || null,
+      ...fields,
+    });
   };
 
   // ── Signature handlers ──
@@ -340,6 +383,9 @@ export default function BuyerEmailTemplatesPage() {
   };
 
   const sigPreview: Partial<EmailSignature> = { name: sigName, role: sigRole, company: sigCompany, tagline: sigTagline, links: sigLinks };
+
+  // Derived: the full signature object for the currently selected signature in the editor
+  const editorSelectedSig = signatures.find((s) => s.id === selectedSignatureId) ?? null;
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -401,6 +447,15 @@ export default function BuyerEmailTemplatesPage() {
                   {t.isDefault && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-xs font-medium">
                       <Star className="h-3 w-3" /> Default
+                    </span>
+                  )}
+                  {t.signature ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-xs font-medium">
+                      <PenSquare className="h-3 w-3" /> {t.signature.name}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 text-slate-400 border border-slate-200 px-2 py-0.5 text-xs">
+                      <PenSquare className="h-3 w-3" /> Account default signature
                     </span>
                   )}
                 </div>
@@ -526,6 +581,7 @@ export default function BuyerEmailTemplatesPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+            {/* Name + default */}
             <div className="flex gap-4 items-end">
               <div className="flex-1">
                 <Label className="text-xs text-slate-500 font-medium">Template Name</Label>
@@ -539,6 +595,7 @@ export default function BuyerEmailTemplatesPage() {
               </label>
             </div>
 
+            {/* Variables guide */}
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Available Variables</p>
               <div className="flex flex-wrap gap-2">
@@ -552,6 +609,7 @@ export default function BuyerEmailTemplatesPage() {
               </div>
             </div>
 
+            {/* Email content tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid grid-cols-4 w-full h-auto! p-1">
                 {STEPS.map((s) => (
@@ -586,6 +644,57 @@ export default function BuyerEmailTemplatesPage() {
                 </TabsContent>
               ))}
             </Tabs>
+
+            {/* ── Signature selector ── */}
+            <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/60 space-y-3">
+              <div className="flex items-center gap-2">
+                <PenLine className="h-4 w-4 text-slate-400 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-700">Signature</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Applied to every email in this template — intro through all follow-ups.
+                    Choosing "Account default" uses whatever signature is set globally for{" "}
+                    <span className="font-medium text-slate-600">{BUYER_GMAIL_ACCOUNT}</span>.
+                  </p>
+                </div>
+              </div>
+
+              <select
+                value={selectedSignatureId}
+                onChange={(e) => setSelectedSignatureId(e.target.value)}
+                className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+              >
+                <option value="">— Account default signature —</option>
+                {signatures.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}{s.role ? ` — ${s.role}` : ""}
+                  </option>
+                ))}
+              </select>
+
+              {signatures.length === 0 && (
+                <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <PenLine className="h-3.5 w-3.5" />
+                  No signatures created yet. Go to{" "}
+                  <button
+                    type="button"
+                    className="text-brand-600 underline hover:text-brand-800"
+                    onClick={() => { setEditorOpen(false); setSigView("list"); setSigOpen(true); }}
+                  >
+                    Signatures
+                  </button>{" "}
+                  to create one.
+                </p>
+              )}
+
+              {editorSelectedSig && <TemplateSigPreview sig={editorSelectedSig} />}
+
+              {!editorSelectedSig && selectedSignatureId === "" && (
+                <p className="text-xs text-slate-400 italic">
+                  No signature locked in — the account-level default will be used at send time.
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">
@@ -687,7 +796,9 @@ export default function BuyerEmailTemplatesPage() {
                 <div className="space-y-2">
                   <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Default for {BUYER_GMAIL_ACCOUNT}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">This signature is auto-appended to all buyer outreach emails.</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Used as fallback when a template has no signature locked in.
+                    </p>
                   </div>
                   <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -839,7 +950,7 @@ export default function BuyerEmailTemplatesPage() {
             <div>
               <DialogTitle className="text-base font-bold text-slate-900">Delete Signature</DialogTitle>
               <DialogDescription className="text-slate-500 text-sm mt-0.5">
-                This will also unset it as default for {BUYER_GMAIL_ACCOUNT}.
+                This will also unset it as default for {BUYER_GMAIL_ACCOUNT} and remove it from any templates using it.
               </DialogDescription>
             </div>
           </div>

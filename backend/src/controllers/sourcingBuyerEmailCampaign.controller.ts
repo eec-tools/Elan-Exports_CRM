@@ -49,6 +49,37 @@ const STEP_LABEL: Record<number, string> = {
     4: "Follow-up 3",
 };
 
+// ─── Signature resolution ─────────────────────────────────────────────────────
+
+type SignatureData = {
+    name: string; role: string; company: string; tagline: string;
+    links: Array<{ label: string; url: string }>;
+};
+
+async function resolveSignatureForBuyer(buyer: {
+    assignedGmailAccount: string | null;
+    emailTemplateId: string | null;
+}): Promise<SignatureData | null> {
+    if (buyer.emailTemplateId) {
+        const tpl = await prisma.buyerEmailCampaignTemplate.findUnique({
+            where: { id: buyer.emailTemplateId },
+            include: { signature: true },
+        });
+        if (tpl?.signature) {
+            const s = tpl.signature;
+            return {
+                name: s.name,
+                role: s.role,
+                company: s.company,
+                tagline: s.tagline,
+                links: (s.links as Array<{ label: string; url: string }>) ?? [],
+            };
+        }
+    }
+    const fromEmail = buyer.assignedGmailAccount ?? BUYER_GMAIL_ACCOUNT;
+    return fetchDefaultSignatureForAccount(fromEmail);
+}
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?: string): Promise<boolean> {
@@ -58,7 +89,7 @@ export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?:
 
         const fromEmail = buyer.assignedGmailAccount ?? BUYER_GMAIL_ACCOUNT;
 
-        const signature = await fetchDefaultSignatureForAccount(fromEmail);
+        const signature = await resolveSignatureForBuyer(buyer);
         const templateData = {
             company: buyer.company,
             contactPerson: buyer.contactPerson,
@@ -168,7 +199,7 @@ export async function executeSendStep(sourcingBuyerId: string, createdBy?: strin
     const nextStep = campaign.currentStep + 1;
     if (nextStep > 4) return;
 
-    const signature = await fetchDefaultSignatureForAccount(fromEmail);
+    const signature = await resolveSignatureForBuyer(buyer);
     const templateData = {
         company: buyer.company,
         contactPerson: buyer.contactPerson,

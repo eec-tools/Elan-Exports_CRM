@@ -671,20 +671,22 @@ model EmailCampaignTemplate {
 }
 
 model BuyerEmailCampaignTemplate {
-  id               String   @id @default(uuid())
+  id               String          @id @default(uuid())
   name             String
-  isDefault        Boolean  @default(false) @map("is_default")
-  introSubject     String   @map("intro_subject")
-  introBody        String   @map("intro_body")
-  followup1Subject String   @map("followup1_subject")
-  followup1Body    String   @map("followup1_body")
-  followup2Subject String   @map("followup2_subject")
-  followup2Body    String   @map("followup2_body")
-  followup3Subject String   @map("followup3_subject")
-  followup3Body    String   @map("followup3_body")
-  createdBy        String?  @map("created_by")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  isDefault        Boolean         @default(false) @map("is_default")
+  introSubject     String          @map("intro_subject")
+  introBody        String          @map("intro_body")
+  followup1Subject String          @map("followup1_subject")
+  followup1Body    String          @map("followup1_body")
+  followup2Subject String          @map("followup2_subject")
+  followup2Body    String          @map("followup2_body")
+  followup3Subject String          @map("followup3_subject")
+  followup3Body    String          @map("followup3_body")
+  createdBy        String?         @map("created_by")
+  signatureId      String?         @map("signature_id")
+  signature        EmailSignature? @relation(fields: [signatureId], references: [id], onDelete: SetNull)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
 
   @@map("buyer_email_campaign_templates")
 }
@@ -820,14 +822,15 @@ model AppSetting {
 }
 
 model EmailSignature {
-  id        String   @id @default(uuid())
-  name      String
-  role      String   @default("")
-  company   String   @default("")
-  tagline   String   @default("")
-  links     Json     @default("[]")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String                       @id @default(uuid())
+  name           String
+  role           String                       @default("")
+  company        String                       @default("")
+  tagline        String                       @default("")
+  links          Json                         @default("[]")
+  createdAt      DateTime                     @default(now()) @map("created_at")
+  updatedAt      DateTime                     @updatedAt @map("updated_at")
+  buyerTemplates BuyerEmailCampaignTemplate[]
 
   @@map("email_signatures")
 }
