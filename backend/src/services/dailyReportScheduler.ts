@@ -90,9 +90,26 @@ async function uploadPdfToS3(
   return s3FileUrl(s3Key);
 }
 
-// ── Save to vault (always runs, fileUrl can be null if PDF failed) ────────────
+// ── Upload HTML report to S3 / CloudFront (fallback when PDF fails) ───────────
+async function uploadHtmlToS3(
+  html: string,
+  reportType: ReportType,
+  isoDate: string,
+): Promise<string> {
+  const s3Key = `vault/reports/${S3_KEY_PREFIX[reportType]}_${isoDate}.html`;
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: s3Key,
+    Body: Buffer.from(html, "utf-8"),
+    ContentType: "text/html; charset=utf-8",
+  }));
+  return s3FileUrl(s3Key);
+}
+
+// ── Save to vault (always runs) ───────────────────────────────────────────────
 async function saveReportToVault(
   fileUrl: string | null,
+  fileType: "pdf" | "html" | null,
   reportType: ReportType,
   periodLabel: string,
 ) {
@@ -120,8 +137,8 @@ async function saveReportToVault(
     await prisma.vaultDocument.update({
       where: { id: existing.id },
       data: {
-        fileUrl: fileUrl ?? existing.fileUrl,
-        fileType: fileUrl ? "pdf" : existing.fileType,
+        fileUrl:  fileUrl  ?? existing.fileUrl,
+        fileType: fileType ?? existing.fileType,
         updatedAt: new Date(),
       },
     });
@@ -135,7 +152,7 @@ async function saveReportToVault(
         isFolder: false,
         parentId: parentFolder.id,
         fileUrl,
-        fileType: fileUrl ? "pdf" : undefined,
+        fileType: fileType ?? undefined,
       },
     });
     console.log(`[Report] Created vault entry: ${docName}`);
@@ -190,18 +207,33 @@ async function runReport(
   // Email — always send regardless of PDF
   await sendReportEmail(html, pdfBuffer, data);
 
-  // Vault — always save, even without PDF
+  // Vault — always save; try PDF first, fall back to HTML
   try {
     let fileUrl: string | null = null;
+    let fileType: "pdf" | "html" | null = null;
+
     if (pdfBuffer) {
       try {
-        fileUrl = await uploadPdfToS3(pdfBuffer, data.reportType, data.isoDate);
+        fileUrl  = await uploadPdfToS3(pdfBuffer, data.reportType, data.isoDate);
+        fileType = "pdf";
+        console.log("[Report] PDF uploaded to S3.");
       } catch (s3Err) {
-        console.error("[Report] S3 upload failed — vault entry saved without file:", s3Err);
+        console.error("[Report] S3 PDF upload failed — trying HTML fallback:", s3Err);
       }
     }
-    await saveReportToVault(fileUrl, data.reportType, data.periodLabel);
-    console.log(`[Report] Vault entry saved for ${data.periodLabel}`);
+
+    if (!fileUrl) {
+      try {
+        fileUrl  = await uploadHtmlToS3(html, data.reportType, data.isoDate);
+        fileType = "html";
+        console.log("[Report] HTML report uploaded to S3 as fallback.");
+      } catch (htmlErr) {
+        console.error("[Report] S3 HTML upload also failed:", htmlErr);
+      }
+    }
+
+    await saveReportToVault(fileUrl, fileType, data.reportType, data.periodLabel);
+    console.log(`[Report] Vault entry saved (${fileType ?? "no file"}) for ${data.periodLabel}`);
   } catch (vaultErr) {
     console.error("[Report] Vault save failed:", vaultErr);
   }

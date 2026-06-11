@@ -1419,6 +1419,19 @@ export default function VaultPage() {
                 </div>
               </object>
             )}
+            {previewDoc?.fileType === "html" && previewDoc?.fileUrl && (
+              <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
+                <FileTypeIcon fileType="pdf" className="h-16 w-16 opacity-30" />
+                <p className="text-sm font-medium text-foreground">Report ready to view</p>
+                <p className="text-xs text-center max-w-xs">PDF generation was unavailable — the full HTML report is stored and opens perfectly in a new tab.</p>
+                <a href={previewDoc.fileUrl} target="_blank" rel="noopener noreferrer">
+                  <Button className="gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Open Report
+                  </Button>
+                </a>
+              </div>
+            )}
             {(previewDoc?.fileType === "doc" || previewDoc?.fileType === "sheet" || previewDoc?.fileType === "file") && previewDoc?.fileUrl && (
               <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
                 <FileTypeIcon fileType={previewDoc.fileType} className="h-16 w-16 opacity-30" />
