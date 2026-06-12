@@ -443,6 +443,66 @@ export async function exportOldSuppliersCsv(
 }
 
 /**
+ * POST /api/old-suppliers/deduplicate
+ * Keeps the record with the most non-null fields per duplicate group.
+ */
+export async function deduplicateOldSuppliers(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const all = await prisma.oldSupplier.findMany({
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Group by normalized company name
+    const groups = new Map<string, typeof all>();
+    for (const s of all) {
+      const key = s.company.trim().toLowerCase();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(s);
+    }
+
+    const toDelete: string[] = [];
+
+    for (const group of groups.values()) {
+      if (group.length <= 1) continue;
+
+      // Score each record by number of non-null/non-empty fields
+      const scored = group.map((s) => ({
+        id: s.id,
+        score: [
+          s.city, s.country, s.email, s.website, s.productCategory,
+          s.product, s.certifications, s.companyAddress, s.accountManager,
+          s.currentStatus, s.notes, s.phone, s.whatsapp, s.contactPerson,
+        ].filter((v) => v && v.trim() !== "").length,
+      }));
+
+      scored.sort((a, b) => b.score - a.score);
+      // Keep the highest-scored; delete the rest
+      const [, ...dupes] = scored;
+      toDelete.push(...dupes.map((d) => d.id));
+    }
+
+    if (toDelete.length === 0) {
+      res.json({ deleted: 0, message: "No duplicates found" });
+      return;
+    }
+
+    await prisma.oldSupplier.deleteMany({ where: { id: { in: toDelete } } });
+
+    await logActivity(req.user!.id, "deduplicate", "old_suppliers", "bulk", {
+      deleted: toDelete.length,
+    });
+
+    res.json({ deleted: toDelete.length, message: `Removed ${toDelete.length} duplicate record(s)` });
+  } catch (err) {
+    console.error("Deduplicate old suppliers error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
  * GET /api/old-suppliers/filters
  */
 export async function getOldSupplierFilters(

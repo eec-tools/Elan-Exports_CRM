@@ -75,6 +75,7 @@ export default function OldSuppliersPage() {
   const [form, setForm] = useState<Partial<Supplier>>(EMPTY_SUPPLIER);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
+  const [dedupDialogOpen, setDedupDialogOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["old-suppliers", search, countryFilter, categoryFilter, page],
@@ -128,6 +129,17 @@ export default function OldSuppliersPage() {
       toast.success("Supplier deleted");
     },
     onError: () => toast.error("Failed to delete supplier"),
+  });
+
+  const dedupMutation = useMutation({
+    mutationFn: () => api.post("/old-suppliers/deduplicate"),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["old-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      setDedupDialogOpen(false);
+      toast.success(res.data.message);
+    },
+    onError: () => toast.error("Failed to remove duplicates"),
   });
 
   const changeStageMutation = useMutation({
@@ -204,6 +216,9 @@ export default function OldSuppliersPage() {
             <Download className="h-4 w-4" /> Export CSV
           </Button>
           <PermissionGate permission="old_suppliers" editOnly>
+            <Button variant="outline" onClick={() => setDedupDialogOpen(true)} className="gap-2 bg-white hover:bg-amber-50 text-amber-700 border-amber-200 shadow-sm h-9">
+              <AlertCircle className="h-4 w-4" /> Remove Duplicates
+            </Button>
             <Button onClick={openCreate} className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9">
               <Plus className="h-4 w-4" /> Add Supplier
             </Button>
@@ -495,6 +510,35 @@ export default function OldSuppliersPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dedupDialogOpen} onOpenChange={setDedupDialogOpen}>
+        <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <AlertCircle className="h-6 w-6 text-amber-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900">Remove Duplicate Suppliers</DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">
+                Finds suppliers with the same company name and keeps the one with the most data filled in. This cannot be undone.
+              </DialogDescription>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setDedupDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+              Cancel
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+              onClick={() => dedupMutation.mutate()}
+              disabled={dedupMutation.isPending}
+            >
+              {dedupMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Yes, remove duplicates
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

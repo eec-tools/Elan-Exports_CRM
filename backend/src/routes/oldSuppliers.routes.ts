@@ -8,6 +8,7 @@ import {
   exportOldSuppliersCsv,
   getOldSupplierFilters,
   updateOldSupplierStage,
+  deduplicateOldSuppliers,
 } from "../controllers/oldSuppliers.controller.js";
 import {
   authenticate,
@@ -24,6 +25,7 @@ router.get("/filters", getOldSupplierFilters);
 router.get("/export/csv", exportOldSuppliersCsv);
 router.get("/:id", getOldSupplier);
 
+router.post("/deduplicate", requireEdit(["suppliers", "old_suppliers"]), deduplicateOldSuppliers);
 router.post("/", requireEdit(["suppliers", "old_suppliers"]), createOldSupplier);
 router.put("/:id", requireEdit(["suppliers", "old_suppliers"]), updateOldSupplier);
 router.patch("/:id/stage", requireEdit(["suppliers", "old_suppliers"]), updateOldSupplierStage);
