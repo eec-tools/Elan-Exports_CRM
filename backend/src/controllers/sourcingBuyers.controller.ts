@@ -82,7 +82,7 @@ export async function getSourcingBuyerStats(_req: AuthRequest, res: Response): P
   try {
     const [total, activeCampaigns, responseReceived, converted, noResponse, invalidEmails] =
       await Promise.all([
-        (prisma as any).sourcingBuyer.count(),
+        (prisma as any).sourcingBuyer.count({ where: { status: { not: "invalid" } } }),
         (prisma as any).sourcingBuyerEmailCampaign.count({ where: { status: "active" } }),
         (prisma as any).sourcingBuyer.count({ where: { status: "response_received" } }),
         (prisma as any).sourcingBuyer.count({ where: { status: "converted_to_buyer" } }),

@@ -14,6 +14,7 @@ import { authenticate, requirePermission, requireEdit, requireAdmin } from "../m
 import { getSendCooldownUntil } from "../services/gmailService.js";
 import { BUYER_GMAIL_ACCOUNT } from "../controllers/sourcingBuyers.controller.js";
 import { autoSendDueBuyerFollowups } from "../services/emailCampaignScheduler.js";
+import { backfillInvalidBuyerEmails } from "../services/gmailReplyDetector.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
@@ -44,6 +45,13 @@ router.get("/admin/gmail-status", requireAdmin, async (_req: Request, res: Respo
 router.post("/admin/run-scheduler", requireAdmin, async (_req: Request, res: Response) => {
     res.json({ message: "Buyer scheduler triggered — overdue follow-ups are being sent now." });
     await autoSendDueBuyerFollowups();
+});
+
+router.post("/admin/backfill-invalid-emails", requireAdmin, async (_req: Request, res: Response) => {
+    res.json({ message: "Backfill started — checking all buyer email threads for bounces." });
+    backfillInvalidBuyerEmails().catch((err) =>
+        console.error("[backfill-invalid-emails] Error:", err)
+    );
 });
 
 router.post("/admin/retry-pending", requireAdmin, async (req: Request, res: Response) => {

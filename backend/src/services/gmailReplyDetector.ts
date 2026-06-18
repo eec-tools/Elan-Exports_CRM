@@ -183,9 +183,9 @@ async function checkCampaignReplies() {
 async function syncBuyerThreadMessages(
     sourcingBuyerId: string,
     threadId: string,
-): Promise<boolean> {
+): Promise<{ hasReply: boolean; hasBounce: boolean }> {
     const messages = await fetchThreadReplies({ accountEmail: BUYER_GMAIL_ACCOUNT, threadId });
-    if (messages.length === 0) return false;
+    if (messages.length === 0) return { hasReply: false, hasBounce: false };
 
     const existing = await (prisma as any).buyerEmailReply.findMany({
         where: { sourcingBuyerId },
@@ -209,7 +209,9 @@ async function syncBuyerThreadMessages(
         });
     }
 
-    return messages.some((m) => m.direction === "received" && !m.isDeliveryFailure);
+    const hasReply = messages.some((m) => m.direction === "received" && !m.isDeliveryFailure);
+    const hasBounce = messages.some((m) => m.isDeliveryFailure === true);
+    return { hasReply, hasBounce };
 }
 
 async function checkBuyerCampaignReplies() {
@@ -234,9 +236,40 @@ async function checkBuyerCampaignReplies() {
             if (!campaign.gmailThreadId) continue;
 
             try {
-                const hasReply = await syncBuyerThreadMessages(buyer.id, campaign.gmailThreadId);
+                const { hasReply, hasBounce } = await syncBuyerThreadMessages(buyer.id, campaign.gmailThreadId);
 
-                if (hasReply && campaign.status === "active") {
+                if (hasBounce && campaign.status === "active") {
+                    console.log(`[ReplyDetector] Bounce detected for buyer ${buyer.company} — marking invalid`);
+                    const updateOps: any[] = [
+                        (prisma as any).sourcingBuyerEmailCampaign.update({
+                            where: { sourcingBuyerId: buyer.id },
+                            data: { status: "completed", nextFollowupDue: null },
+                        }),
+                        (prisma as any).sourcingBuyer.update({
+                            where: { id: buyer.id },
+                            data: { status: "invalid" },
+                        }),
+                    ];
+                    if (buyer.buyerVaultContactId) {
+                        updateOps.push(
+                            (prisma as any).buyerVaultContact.update({
+                                where: { id: buyer.buyerVaultContactId },
+                                data: { emailStatus: "Invalid" },
+                            })
+                        );
+                    }
+                    await (prisma as any).$transaction(updateOps);
+
+                    await createNotification({
+                        type: "buyer_email_bounced",
+                        title: "Invalid Buyer Email Detected",
+                        message: `Email to ${buyer.company} bounced. Their email address has been marked as invalid and follow-ups have been stopped.`,
+                        entityType: "sourcing_buyer",
+                        entityId: buyer.id,
+                        entityName: buyer.company,
+                        entityLink: `/buyers/sourcing/${buyer.id}`,
+                    });
+                } else if (hasReply && campaign.status === "active") {
                     const updateOps: any[] = [
                         (prisma as any).sourcingBuyerEmailCampaign.update({
                             where: { sourcingBuyerId: buyer.id },
@@ -266,7 +299,7 @@ async function checkBuyerCampaignReplies() {
                         entityName: buyer.company,
                         entityLink: `/buyers/sourcing/${buyer.id}`,
                     });
-                } else if (!hasReply && campaign.status === "active") {
+                } else if (!hasReply && !hasBounce && campaign.status === "active") {
                     // FU3 sent + 3-day grace period passed + still no reply → mark completed
                     if (
                         campaign.currentStep === 4 &&
@@ -295,6 +328,81 @@ async function checkBuyerCampaignReplies() {
     } catch (err) {
         console.error("[ReplyDetector] Fatal error in buyer reply check:", err);
     }
+}
+
+export async function backfillInvalidBuyerEmails(): Promise<{ checked: number; markedInvalid: number; companies: string[] }> {
+    const campaigns = await (prisma as any).sourcingBuyerEmailCampaign.findMany({
+        where: { gmailThreadId: { not: null } },
+        include: {
+            sourcingBuyer: {
+                select: { id: true, company: true, status: true, buyerVaultContactId: true },
+            },
+        },
+    });
+
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    let checked = 0;
+    let markedInvalid = 0;
+    const companies: string[] = [];
+
+    for (const campaign of campaigns) {
+        const buyer = campaign.sourcingBuyer;
+
+        // Skip already-terminal positive states
+        if (["invalid", "response_received", "converted_to_buyer"].includes(buyer.status)) {
+            await sleep(200);
+            continue;
+        }
+
+        try {
+            const { hasBounce } = await syncBuyerThreadMessages(buyer.id, campaign.gmailThreadId);
+            checked++;
+
+            if (hasBounce) {
+                console.log(`[Backfill] Bounce found for buyer ${buyer.company} — marking invalid`);
+
+                const updateOps: any[] = [
+                    (prisma as any).sourcingBuyerEmailCampaign.update({
+                        where: { sourcingBuyerId: buyer.id },
+                        data: { status: "completed", nextFollowupDue: null },
+                    }),
+                    (prisma as any).sourcingBuyer.update({
+                        where: { id: buyer.id },
+                        data: { status: "invalid" },
+                    }),
+                ];
+                if (buyer.buyerVaultContactId) {
+                    updateOps.push(
+                        (prisma as any).buyerVaultContact.update({
+                            where: { id: buyer.buyerVaultContactId },
+                            data: { emailStatus: "Invalid" },
+                        })
+                    );
+                }
+                await (prisma as any).$transaction(updateOps);
+
+                await createNotification({
+                    type: "buyer_email_bounced",
+                    title: "Invalid Buyer Email Detected",
+                    message: `Email to ${buyer.company} bounced. Their email address has been marked as invalid and follow-ups have been stopped.`,
+                    entityType: "sourcing_buyer",
+                    entityId: buyer.id,
+                    entityName: buyer.company,
+                    entityLink: `/buyers/sourcing/${buyer.id}`,
+                });
+
+                markedInvalid++;
+                companies.push(buyer.company);
+            }
+        } catch (err) {
+            console.error(`[Backfill] Error checking buyer ${buyer.company}:`, err);
+        }
+
+        await sleep(300);
+    }
+
+    console.log(`[Backfill] Done — checked ${checked}, marked ${markedInvalid} invalid`);
+    return { checked, markedInvalid, companies };
 }
 
 export function startGmailReplyDetector() {
