@@ -194,23 +194,31 @@ function formatDate(d: Date | null | undefined): string {
 async function main() {
   console.log("🔍 Fetching data from database...");
 
-  const [deals, buyers, vaultFolders, sourcingBuyers] = await Promise.all([
-    prisma.deal.findMany({
-      orderBy: { createdAt: "asc" },
-      include: { complianceDocuments: true },
-    }),
-    prisma.buyer.findMany({ orderBy: { createdAt: "asc" } }),
+  const [vaultFolders, sourcingSuppliers, newSuppliers, signedSuppliers, oldSuppliers, vaultDocuments, emailTrackers] = await Promise.all([
     prisma.sourcingVaultFolder.findMany({
       orderBy: { createdAt: "asc" },
       include: { suppliers: { orderBy: { createdAt: "asc" } } },
     }),
-    prisma.sourcingBuyer.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.sourcingSupplier.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.newSupplier.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.supplier.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.oldSupplier.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.vaultDocument.findMany({
+      orderBy: { createdAt: "asc" },
+      where: { isFolder: false },
+      include: { versions: { orderBy: { versionNum: "asc" } } },
+    }),
+    prisma.emailTracker.findMany({ orderBy: { dateReceived: "desc" } }),
   ]);
 
-  console.log(`  ✅ Deals: ${deals.length}`);
-  console.log(`  ✅ Buyers Directory: ${buyers.length}`);
-  console.log(`  ✅ Sourcing Vault folders: ${vaultFolders.length}`);
-  console.log(`  ✅ Sourcing Buyers: ${sourcingBuyers.length}`);
+  const totalVaultSuppliers = vaultFolders.reduce((sum, f) => sum + f.suppliers.length, 0);
+  console.log(`  ✅ Sourcing Suppliers: ${sourcingSuppliers.length}`);
+  console.log(`  ✅ Sourcing Vault: ${vaultFolders.length} folders, ${totalVaultSuppliers} suppliers`);
+  console.log(`  ✅ New Suppliers: ${newSuppliers.length}`);
+  console.log(`  ✅ Signed Contracts: ${signedSuppliers.length}`);
+  console.log(`  ✅ Old Suppliers: ${oldSuppliers.length}`);
+  console.log(`  ✅ Document Vault: ${vaultDocuments.length} documents`);
+  console.log(`  ✅ Email Tracker: ${emailTrackers.length}`);
 
   const today = new Date();
   const dateStr = `${String(today.getDate()).padStart(2, "0")}-${today.toLocaleString("en-IN", { month: "short" })}-${today.getFullYear()}`;
@@ -250,116 +258,58 @@ async function main() {
 
   console.log("\n📄 Generating files...");
 
-  // ── File 1: DEALS ────────────────────────────────────────────────────────
+  // ── File 1: SOURCING SUPPLIERS ────────────────────────────────────────────
   {
     const c: Paragraph[] = [
-      ...coverPara("Deals", `Total records: ${deals.length}`),
-      sectionHeading("Deals"),
+      ...coverPara("Sourcing Suppliers", `Total records: ${sourcingSuppliers.length}`),
+      sectionHeading("Sourcing Suppliers"),
     ];
-    if (deals.length === 0) {
+    if (sourcingSuppliers.length === 0) {
       c.push(noData());
     } else {
-      deals.forEach((deal, i) => {
+      sourcingSuppliers.forEach((s, i) => {
         c.push(
-          recordHeader(deal.title, i + 1),
-          field("Buyer", deal.buyer),
-          field("Supplier", deal.supplier),
-          field("Product", deal.product),
-          field("HS Code", deal.hsCode),
-          field("Stage", deal.stage),
-          field("Volume", deal.volume),
-          field("Price (USD)", deal.price?.toString()),
-          field("Expected Revenue", deal.expectedRevenue?.toString()),
-          field("Margin (%)", deal.margin?.toString()),
-          field("Probability (%)", deal.probability?.toString()),
-          field("Category", deal.category),
-          field("Risk Score", deal.riskScore),
-          field("Notes", deal.notes),
-          field("Created", formatDate(deal.createdAt))
+          recordHeader(s.company, i + 1),
+          field("Contact Person", s.contactPerson),
+          field("Designation", s.designation),
+          field("Email", s.email),
+          field("Phone", s.phone),
+          field("WhatsApp", s.whatsapp),
+          field("Country", s.country),
+          field("City", s.city),
+          field("State", s.state),
+          field("Trade Name", s.tradeName),
+          field("Supplier Type", s.supplierType),
+          field("Supplier Stage", s.supplierStage),
+          field("Status", s.status),
+          field("Deal Stage", s.dealStage),
+          field("Product Category", s.productCategory),
+          field("Product", s.product),
+          field("MOQ", s.moq),
+          field("Payment Terms", s.paymentTerms),
+          field("Incoterms Supported", s.incotermsSupported),
+          field("Ports of Export", s.portsOfExport),
+          field("Target Export Markets", s.targetExportMarkets),
+          field("Currency Preferred", s.currencyPreferred),
+          field("Certifications", s.certifications),
+          field("EEC Margin (%)", s.eecMarginPercent),
+          field("Vetting Score", s.vettingScore?.toString()),
+          field("Account Manager", s.accountManager),
+          field("Assigned Gmail", s.assignedGmailAccount),
+          field("Year Established", s.yearEstablished),
+          field("Organic Status", s.organicStatus),
+          field("Latest Quotation", s.latestQuotation),
+          field("Notes", s.notes),
+          field("Created", formatDate(s.createdAt))
         );
-        if (deal.complianceDocuments.length > 0) {
-          c.push(
-            new Paragraph({
-              children: [new TextRun({ text: "Compliance Documents:", bold: true, size: 19, color: "374151" })],
-              spacing: { before: 100, after: 60 },
-              indent: { left: 360 },
-            })
-          );
-          deal.complianceDocuments.forEach((doc) => {
-            c.push(
-              new Paragraph({
-                children: [
-                  new TextRun({ text: `  • ${doc.docType}`, size: 18 }),
-                  new TextRun({ text: `  [${doc.status}]`, bold: true, size: 18, color: doc.status === "RECEIVED" ? "16a34a" : doc.status === "PENDING" ? "d97706" : "dc2626" }),
-                  doc.dueDate ? new TextRun({ text: `  Due: ${formatDate(doc.dueDate)}`, size: 18, color: "6b7280" }) : new TextRun({ text: "" }),
-                ],
-                spacing: { after: 50 },
-                indent: { left: 540 },
-              })
-            );
-          });
-        }
-        if (i < deals.length - 1) c.push(divider());
+        if (i < sourcingSuppliers.length - 1) c.push(divider());
       });
     }
-    await saveDoc(makeDoc(c), `EEC-Deals-${dateStr}.docx`);
+    await saveDoc(makeDoc(c), `EEC-Sourcing-Suppliers-${dateStr}.docx`);
   }
 
-  // ── File 2: BUYERS DIRECTORY ──────────────────────────────────────────────
+  // ── File 2: SOURCING VAULT ────────────────────────────────────────────────
   {
-    const c: Paragraph[] = [
-      ...coverPara("Buyers Directory", `Total records: ${buyers.length}`),
-      sectionHeading("Buyers Directory"),
-    ];
-    if (buyers.length === 0) {
-      c.push(noData());
-    } else {
-      buyers.forEach((buyer, i) => {
-        c.push(
-          recordHeader(buyer.company, i + 1),
-          field("Contact Name", buyer.name),
-          field("Email", buyer.email),
-          field("Phone", buyer.phone),
-          field("WhatsApp", buyer.whatsapp),
-          field("Country", buyer.country),
-          field("City", buyer.city),
-          field("Address", buyer.address),
-          field("Website", buyer.website),
-          field("Status", buyer.status),
-          field("Buyer Type", buyer.buyerType),
-          field("Contact Role", buyer.contactRole),
-          field("Region", buyer.region),
-          field("Product Category Interest", buyer.productCategoryInterest),
-          field("Product Categories", buyer.productCategories),
-          field("MOQ Requirements", buyer.moqRequirements),
-          field("Pricing Range", buyer.pricingRange),
-          field("Payment Terms", buyer.paymentTerms),
-          field("Incoterms", buyer.incoterms),
-          field("Shipping Mode", buyer.shippingMode),
-          field("Ports of Discharge", buyer.portsOfDischarge),
-          field("Preferred Currency", buyer.preferredCurrency),
-          field("Annual Import Volume", buyer.annualImportVolume),
-          field("Annual Purchase Value", buyer.annualPurchaseValue),
-          field("Lead Source", buyer.leadSource),
-          field("Risk Rating", buyer.riskRating),
-          field("Strategic Value", buyer.strategicValue),
-          field("Relationship Tier", buyer.relationshipTier),
-          field("Reorder Likelihood", buyer.reorderLikelihood),
-          field("Initial Order Value", buyer.initialOrderValue),
-          field("Potential Annual Value", buyer.potentialAnnualValue),
-          field("Last Contact Date", formatDate(buyer.lastContactDate ?? undefined)),
-          field("Notes", buyer.notes),
-          field("Created", formatDate(buyer.createdAt))
-        );
-        if (i < buyers.length - 1) c.push(divider());
-      });
-    }
-    await saveDoc(makeDoc(c), `EEC-Buyers-Directory-${dateStr}.docx`);
-  }
-
-  // ── File 3: SOURCING VAULT ────────────────────────────────────────────────
-  {
-    const totalVaultSuppliers = vaultFolders.reduce((sum, f) => sum + f.suppliers.length, 0);
     const c: Paragraph[] = [
       ...coverPara("Sourcing Vault", `${vaultFolders.length} folders  •  ${totalVaultSuppliers} suppliers`),
       sectionHeading("Sourcing Vault"),
@@ -382,36 +332,245 @@ async function main() {
     await saveDoc(makeDoc(c), `EEC-Sourcing-Vault-${dateStr}.docx`);
   }
 
-  // ── File 4: SOURCING BUYERS ───────────────────────────────────────────────
+  // ── File 3: NEW SUPPLIERS ─────────────────────────────────────────────────
   {
     const c: Paragraph[] = [
-      ...coverPara("Sourcing Buyers", `Total records: ${sourcingBuyers.length}`),
-      sectionHeading("Sourcing Buyers"),
+      ...coverPara("New Suppliers", `Total records: ${newSuppliers.length}`),
+      sectionHeading("New Suppliers"),
     ];
-    if (sourcingBuyers.length === 0) {
+    if (newSuppliers.length === 0) {
       c.push(noData());
     } else {
-      sourcingBuyers.forEach((buyer, i) => {
+      newSuppliers.forEach((s, i) => {
         c.push(
-          recordHeader(buyer.company, i + 1),
-          field("Contact Person", buyer.contactPerson),
-          field("Email", buyer.email),
-          field("Phone", buyer.phone),
-          field("Country", buyer.country),
-          field("Product", buyer.product),
-          field("Product Category", buyer.productCategory),
-          field("Status", buyer.status),
-          field("Assigned Gmail", buyer.assignedGmailAccount),
-          field("Notes", buyer.notes),
-          field("Created", formatDate(buyer.createdAt))
+          recordHeader(s.company, i + 1),
+          field("Contact Person", s.contactPerson),
+          field("Designation", s.designation),
+          field("Email", s.email),
+          field("Phone", s.phone),
+          field("WhatsApp", s.whatsapp),
+          field("Website", s.website),
+          field("Country", s.country),
+          field("City", s.city),
+          field("State", s.state),
+          field("Trade Name", s.tradeName),
+          field("Supplier Type", s.supplierType),
+          field("Supplier Stage", s.supplierStage),
+          field("Deal Stage", s.dealStage),
+          field("Product Category", s.productCategory),
+          field("Product", s.product),
+          field("MOQ", s.moq),
+          field("Payment Terms", s.paymentTerms),
+          field("Incoterms Supported", s.incotermsSupported),
+          field("Ports of Export", s.portsOfExport),
+          field("Target Export Markets", s.targetExportMarkets),
+          field("Currency Preferred", s.currencyPreferred),
+          field("Certifications", s.certifications),
+          field("EEC Margin (%)", s.eecMarginPercent),
+          field("Vetting Score", s.vettingScore?.toString()),
+          field("Account Manager", s.accountManager),
+          field("Year Established", s.yearEstablished),
+          field("Organic Status", s.organicStatus),
+          field("Current Status", s.currentStatus),
+          field("Latest Quotation", s.latestQuotation),
+          field("Notes", s.notes),
+          field("Created", formatDate(s.createdAt))
         );
-        if (i < sourcingBuyers.length - 1) c.push(divider());
+        if (i < newSuppliers.length - 1) c.push(divider());
       });
     }
-    await saveDoc(makeDoc(c), `EEC-Sourcing-Buyers-${dateStr}.docx`);
+    await saveDoc(makeDoc(c), `EEC-New-Suppliers-${dateStr}.docx`);
   }
 
-  console.log(`\n📁 All files saved to: ${outDir}`);
+  // ── File 4: SIGNED CONTRACTS ──────────────────────────────────────────────
+  {
+    const c: Paragraph[] = [
+      ...coverPara("Signed Contracts", `Total records: ${signedSuppliers.length}`),
+      sectionHeading("Signed Contracts"),
+    ];
+    if (signedSuppliers.length === 0) {
+      c.push(noData());
+    } else {
+      signedSuppliers.forEach((s, i) => {
+        c.push(
+          recordHeader(s.company, i + 1),
+          field("Contact Person", s.contactPerson),
+          field("Designation", s.designation),
+          field("Email", s.email),
+          field("Phone", s.phone),
+          field("WhatsApp", s.whatsapp),
+          field("Website", s.website),
+          field("Country", s.country),
+          field("City", s.city),
+          field("State", s.state),
+          field("Trade Name", s.tradeName),
+          field("Supplier Type", s.supplierType),
+          field("Supplier Stage", s.supplierStage),
+          field("Deal Stage", s.dealStage),
+          field("Product Category", s.contractBuyer),
+          field("Products", s.products),
+          field("Certifications", s.certifications),
+          field("Production Capacity", s.productionCapacity),
+          field("MOQ", s.moq),
+          field("Payment Terms", s.paymentTerms),
+          field("Incoterms Supported", s.incotermsSupported),
+          field("Ports of Export", s.portsOfExport),
+          field("Target Export Markets", s.targetExportMarkets),
+          field("EEC Margin (%)", s.eecMarginPercent),
+          field("Commission (%)", s.commissionPercent),
+          field("Vetting Score", s.vettingScore?.toString()),
+          field("Account Manager", s.accountManager),
+          field("Contract Start Date", formatDate(s.contractStartDate ?? undefined)),
+          field("Contract End Date", formatDate(s.contractEndDate ?? undefined)),
+          field("Factory Visit Status", s.factoryVisitStatus),
+          field("Factory Visit Date", s.factoryVisitDate),
+          field("Exclusivity Arrangement", s.exclusivityArrangement),
+          field("Year Established", s.yearEstablished),
+          field("Organic Status", s.organicStatus),
+          field("Current Status", s.currentStatus),
+          field("Remarks", s.remarks),
+          field("Created", formatDate(s.createdAt))
+        );
+        if (i < signedSuppliers.length - 1) c.push(divider());
+      });
+    }
+    await saveDoc(makeDoc(c), `EEC-Signed-Contracts-${dateStr}.docx`);
+  }
+
+  // ── File 5: OLD SUPPLIERS (batched to save memory) ───────────────────────
+  {
+    // 5000+ records — build in batches of 500 and write one file per batch
+    const BATCH = 500;
+    const totalBatches = Math.ceil(oldSuppliers.length / BATCH);
+
+    for (let b = 0; b < totalBatches; b++) {
+      const slice = oldSuppliers.slice(b * BATCH, (b + 1) * BATCH);
+      const batchLabel = totalBatches > 1 ? ` (Part ${b + 1} of ${totalBatches})` : "";
+      const c: Paragraph[] = [
+        ...coverPara(`Old Suppliers${batchLabel}`, `Records ${b * BATCH + 1}–${b * BATCH + slice.length} of ${oldSuppliers.length}`),
+        sectionHeading(`Old Suppliers${batchLabel}`),
+      ];
+      slice.forEach((s, i) => {
+        const globalIdx = b * BATCH + i + 1;
+        c.push(
+          recordHeader(s.company, globalIdx),
+          field("Contact Person", s.contactPerson),
+          field("Email", s.email),
+          field("Phone", s.phone),
+          field("Country", s.country),
+          field("City", s.city),
+          field("Product Category", s.productCategory),
+          field("Product", s.product),
+          field("Current Status", s.currentStatus),
+          field("Supplier Stage", s.supplierStage),
+          field("Account Manager", s.accountManager),
+          field("Reason Inactive", s.reasonInactive),
+          field("Reactivation Potential", s.reactivationPotential),
+          field("Last Contact Date", s.lastContactDate),
+          field("Latest Quotation", s.latestQuotation),
+          field("Notes", s.notes),
+          field("Created", formatDate(s.createdAt))
+        );
+        if (i < slice.length - 1) c.push(divider());
+      });
+      const suffix = totalBatches > 1 ? `-Part${b + 1}` : "";
+      await saveDoc(makeDoc(c), `EEC-Old-Suppliers${suffix}-${dateStr}.docx`);
+    }
+  }
+
+  // ── File 6: DOCUMENT VAULT ────────────────────────────────────────────────
+  {
+    const c: Paragraph[] = [
+      ...coverPara("Document Vault", `Total documents: ${vaultDocuments.length}`),
+      sectionHeading("Document Vault"),
+    ];
+    if (vaultDocuments.length === 0) {
+      c.push(noData());
+    } else {
+      // Group by category
+      const byCategory = vaultDocuments.reduce<Record<string, typeof vaultDocuments>>((acc, doc) => {
+        const cat = doc.category || "Uncategorised";
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(doc);
+        return acc;
+      }, {});
+
+      Object.entries(byCategory).forEach(([category, docs], ci, arr) => {
+        c.push(subHeading(`${category}  (${docs.length} document${docs.length !== 1 ? "s" : ""})`));
+        docs.forEach((doc, i) => {
+          c.push(
+            recordHeader(doc.name, i + 1),
+            field("Category", doc.category),
+            field("Region", doc.region),
+            field("File Type", doc.fileType),
+            field("Expiry Date", formatDate(doc.expiryDate ?? undefined)),
+            field("Uploaded", formatDate(doc.createdAt))
+          );
+          if (doc.versions.length > 0) {
+            c.push(
+              new Paragraph({
+                children: [new TextRun({ text: `Versions (${doc.versions.length}):`, bold: true, size: 18, color: "374151" })],
+                spacing: { before: 80, after: 40 },
+                indent: { left: 360 },
+              })
+            );
+            doc.versions.forEach((v) => {
+              c.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: `  • v${v.versionNum}  `, bold: true, size: 17 }),
+                    new TextRun({ text: v.name, size: 17 }),
+                    new TextRun({ text: `  —  ${formatDate(v.createdAt)}`, size: 17, color: "6b7280" }),
+                  ],
+                  spacing: { after: 40 },
+                  indent: { left: 540 },
+                })
+              );
+            });
+          }
+          if (i < docs.length - 1) c.push(divider());
+        });
+        if (ci < arr.length - 1) c.push(divider());
+      });
+    }
+    await saveDoc(makeDoc(c), `EEC-Document-Vault-${dateStr}.docx`);
+  }
+
+  // ── File 7: EMAIL TRACKER ─────────────────────────────────────────────────
+  {
+    const c: Paragraph[] = [
+      ...coverPara("Email Tracker", `Total records: ${emailTrackers.length}`),
+      sectionHeading("Email Tracker"),
+    ];
+    if (emailTrackers.length === 0) {
+      c.push(noData());
+    } else {
+      emailTrackers.forEach((e, i) => {
+        c.push(
+          recordHeader(e.subject || "(No Subject)", i + 1),
+          field("From", e.senderAddress),
+          field("Date Received", formatDate(e.dateReceived)),
+          field("Subject", e.subject),
+          field("Status", e.status),
+          field("Priority", e.priority),
+          field("Product Category", e.productCategory),
+          field("Task", e.task),
+          field("Respondent", e.respondent),
+          field("Source", e.source),
+          field("Gmail Account", e.gmailAccount),
+          field("Importance", e.importance),
+          field("Is Read", e.isRead ? "Yes" : "No"),
+          field("Body Preview", e.bodyPreview),
+          field("Notes", e.notes),
+          field("Synced At", formatDate(e.syncedAt ?? undefined))
+        );
+        if (i < emailTrackers.length - 1) c.push(divider());
+      });
+    }
+    await saveDoc(makeDoc(c), `EEC-Email-Tracker-${dateStr}.docx`);
+  }
+
+  console.log(`\n📁 All 7 files saved to: ${outDir}`);
 }
 
 main()

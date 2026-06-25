@@ -683,10 +683,10 @@ model BuyerEmailCampaignTemplate {
   followup3Subject String          @map("followup3_subject")
   followup3Body    String          @map("followup3_body")
   createdBy        String?         @map("created_by")
-  signatureId      String?         @map("signature_id")
-  signature        EmailSignature? @relation(fields: [signatureId], references: [id], onDelete: SetNull)
   createdAt        DateTime        @default(now()) @map("created_at")
   updatedAt        DateTime        @updatedAt @map("updated_at")
+  signatureId      String?         @map("signature_id")
+  signature        EmailSignature? @relation(fields: [signatureId], references: [id])
 
   @@map("buyer_email_campaign_templates")
 }
