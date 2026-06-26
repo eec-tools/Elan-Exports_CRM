@@ -53,6 +53,7 @@ import QuotationDetailsPage from "@/pages/QuotationDetailsPage";
 import PublicQuotationFormPage from "@/pages/PublicQuotationFormPage";
 import GmailSettingsPage from "@/pages/GmailSettingsPage";
 import SignaturesPage from "@/pages/SignaturesPage";
+import BuyersDiscoverAgentPage from "@/pages/BuyersDiscoverAgentPage";
 import { Loader2 } from "lucide-react";
 
 const backendApiUrl = (import.meta.env.VITE_API_URL || "http://localhost:3001/api").replace(/\/+$/, "");
@@ -127,6 +128,14 @@ export default function App() {
                   element={
                     <PermissionGate permission="buyers_directory">
                       <BuyerEmailTemplatesPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="buyers/discover-agent"
+                  element={
+                    <PermissionGate permission="buyers_directory">
+                      <BuyersDiscoverAgentPage />
                     </PermissionGate>
                   }
                 />

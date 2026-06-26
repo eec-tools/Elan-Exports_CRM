@@ -1,0 +1,73 @@
+import { Router } from "express";
+import { authenticate } from "../middleware/auth.js";
+import { runAgent1 } from "../agents/agent1/agent1.js";
+import prisma from "../config/db.js";
+import type { AuthRequest } from "../types/index.js";
+
+const router = Router();
+router.use(authenticate);
+
+// POST /api/agent1/run — trigger a new discovery run
+router.post("/run", async (req: AuthRequest, res) => {
+  try {
+    const { country, productCategory } = req.body;
+    if (!country || !productCategory) {
+      res.status(400).json({ error: "country and productCategory are required." });
+      return;
+    }
+    const result = await runAgent1({
+      country,
+      productCategory,
+      triggeredBy: req.user!.id,
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/agent1/runs — list last 20 runs
+router.get("/runs", async (_req, res) => {
+  const runs = await prisma.agentRun.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+  res.json(runs);
+});
+
+// GET /api/agent1/runs/:runId — poll status of a specific run
+router.get("/runs/:runId", async (req, res) => {
+  const run = await prisma.agentRun.findUnique({
+    where: { id: req.params.runId },
+  });
+  if (!run) {
+    res.status(404).json({ error: "Run not found" });
+    return;
+  }
+  res.json(run);
+});
+
+// GET /api/agent1/runs/:runId/results — fetch ranked results (score > 30, verified email only)
+router.get("/runs/:runId/results", async (req, res) => {
+  const companies = await prisma.discoveredCompany.findMany({
+    where: {
+      agentRunId: req.params.runId,
+      fitScore: { gt: 30 },
+      contacts: {
+        some: {
+          isPrimary: true,
+          emailStatus: { in: ["valid", "deliverable"] },
+        },
+      },
+    },
+    include: {
+      contacts: {
+        where: { isPrimary: true },
+      },
+    },
+    orderBy: { fitScore: "desc" },
+  });
+  res.json(companies);
+});
+
+export default router;
