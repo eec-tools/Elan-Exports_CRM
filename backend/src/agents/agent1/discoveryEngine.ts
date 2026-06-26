@@ -1,7 +1,16 @@
 import { ScrapeGraphAI } from "scrapegraph-js";
 import type { RawCompany, EnrichedCompanyProfile } from "./types.js";
 
-const sgai = ScrapeGraphAI({ apiKey: process.env.SGAI_API_KEY! });
+let sgai: ReturnType<typeof ScrapeGraphAI> | null = null;
+
+function getScrapeGraphClient() {
+  const apiKey = process.env.SGAI_API_KEY;
+  if (!apiKey) return null;
+  if (!sgai) {
+    sgai = ScrapeGraphAI({ apiKey });
+  }
+  return sgai;
+}
 
 // Domains to skip — not real company homepages
 const SKIP_DOMAINS = new Set([
@@ -31,6 +40,12 @@ export async function searchCompanies(
   queries: string[],
   maxResults = 50
 ): Promise<RawCompany[]> {
+  const client = getScrapeGraphClient();
+  if (!client) {
+    console.warn("[Agent1] SGAI_API_KEY not configured; skipping discovery search.");
+    return [];
+  }
+
   const seen = new Set<string>();
   const companies: RawCompany[] = [];
 
@@ -39,7 +54,7 @@ export async function searchCompanies(
 
     try {
       const result = await withTimeout(
-        sgai.search({
+        client.search({
           query,
           numResults: 10,
           format: "markdown",
@@ -81,9 +96,14 @@ export async function enrichCompanyFromWebsite(
   company: RawCompany,
   targetCountry: string
 ): Promise<EnrichedCompanyProfile> {
+  const client = getScrapeGraphClient();
+  if (!client) {
+    return fallbackProfile(company, targetCountry);
+  }
+
   try {
     const result = await withTimeout(
-      sgai.scrape({
+      client.scrape({
         url: company.website,
         formats: [{ type: "markdown", mode: "reader" }],
       }),

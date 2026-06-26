@@ -1,7 +1,17 @@
 import Groq from "groq-sdk";
 import type { EnrichedCompanyProfile, FoundEmail, ScoreResult } from "./types.js";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
+let groq: Groq | null = null;
+
+function getGroqClient() {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+  if (!groq) {
+    groq = new Groq({ apiKey });
+  }
+  return groq;
+}
+
 const MODEL = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
 
 // ── PRODUCTION SWAP ──────────────────────────────────────────────────────────
@@ -25,10 +35,24 @@ export async function scoreCompany(
   productCategory: string,
   targetCountry: string
 ): Promise<ScoreResult> {
+  const client = getGroqClient();
+  if (!client) {
+    return {
+      fitScore: 0,
+      d1: 0,
+      d2: 0,
+      d3: 0,
+      d4: 0,
+      d5: 0,
+      priorityTier: "Discard",
+      rationale: "GROQ_API_KEY not configured.",
+    };
+  }
+
   const prompt = buildScoringPrompt(profile, contact, hasVerifiedEmail, productCategory, targetCountry);
 
   try {
-    const response = await groq.chat.completions.create({
+    const response = await client.chat.completions.create({
       model: MODEL,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.1,
