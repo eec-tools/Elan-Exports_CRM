@@ -1280,3 +1280,83 @@ enum LeaveStatus {
   approved
   rejected
 }
+
+// ── Agent 1: Discover & Rank ─────────────────────────────────────────────────
+
+model AgentRun {
+  id              String              @id @default(uuid())
+  triggeredBy     String              @map("triggered_by")
+  country         String
+  productCategory String              @map("product_category")
+  status          AgentRunStatus      @default(pending)
+  totalFound      Int                 @default(0) @map("total_found")
+  totalScored     Int                 @default(0) @map("total_scored")
+  totalHighPrio   Int                 @default(0) @map("total_high_prio")
+  totalMedPrio    Int                 @default(0) @map("total_med_prio")
+  errorMessage    String?             @map("error_message")
+  startedAt       DateTime?           @map("started_at")
+  completedAt     DateTime?           @map("completed_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  companies       DiscoveredCompany[]
+
+  @@map("agent_runs")
+}
+
+model DiscoveredCompany {
+  id               String         @id @default(uuid())
+  agentRunId       String         @map("agent_run_id")
+  agentRun         AgentRun       @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  name             String
+  website          String?
+  country          String
+  industry         String?
+  employeeRange    String?        @map("employee_range")
+  revenueRange     String?        @map("revenue_range")
+  description      String?
+  productsImported String?        @map("products_imported")
+  asiaConnection   Boolean        @default(false) @map("asia_connection")
+  indiaConnection  Boolean        @default(false) @map("india_connection")
+  sourceUrl        String?        @map("source_url")
+  fitScore         Int?           @map("fit_score")
+  scoreDim1        Int?           @map("score_dim1")
+  scoreDim2        Int?           @map("score_dim2")
+  scoreDim3        Int?           @map("score_dim3")
+  scoreDim4        Int?           @map("score_dim4")
+  scoreDim5        Int?           @map("score_dim5")
+  priorityTier     PriorityTier?  @map("priority_tier")
+  rationale        String?
+  discardReason    String?        @map("discard_reason")
+  contacts         AgentContact[]
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@map("discovered_companies")
+}
+
+model AgentContact {
+  id              String            @id @default(uuid())
+  companyId       String            @map("company_id")
+  company         DiscoveredCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name            String?
+  title           String?
+  email           String
+  emailStatus     String            @map("email_status")
+  emailConfidence Int?              @map("email_confidence")
+  linkedinUrl     String?           @map("linkedin_url")
+  isPrimary       Boolean           @default(false) @map("is_primary")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  @@map("agent_contacts")
+}
+
+enum AgentRunStatus {
+  pending
+  running
+  completed
+  failed
+}
+
+enum PriorityTier {
+  High
+  Medium
+  Low
+}
