@@ -71,19 +71,19 @@ async function executeRun(
 
   for (const raw of rawCompanies) {
     try {
-      const profile = await enrichCompanyFromWebsite(raw, country);
+      // Check email FIRST — if no verified email, discard immediately without
+      // wasting a Firecrawl scrape credit on enrichment.
       const { contacts, verifiedPrimary, shouldDiscard, discardReason } =
         await findAndVerifyContactForCompany(raw.website);
 
-      // Mandatory field gate: no verified email → discard, save record, skip scoring
       if (shouldDiscard) {
         await prisma.discoveredCompany.create({
           data: {
             agentRunId:   runId,
-            name:         profile.name,
-            website:      profile.website,
-            country:      profile.country,
-            sourceUrl:    profile.sourceUrl,
+            name:         raw.name,
+            website:      raw.website,
+            country,
+            sourceUrl:    raw.sourceUrl,
             discardReason,
           },
         });
@@ -91,6 +91,8 @@ async function executeRun(
         continue;
       }
 
+      // Email verified — now worth enriching the company profile
+      const profile = await enrichCompanyFromWebsite(raw, country);
       const primary = contacts[0] ?? null;
       const score = await scoreCompany(profile, primary, true, productCategory, country);
 

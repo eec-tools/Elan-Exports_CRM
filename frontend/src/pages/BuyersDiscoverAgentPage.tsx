@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bot, History, ChevronRight, RefreshCw } from "lucide-react";
+import { History, ChevronRight, RefreshCw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/api/client";
 import { TriggerForm } from "@/components/agent1/TriggerForm";
 import { RunProgress } from "@/components/agent1/RunProgress";
 import { ResultsTable, type DiscoveredCompany } from "@/components/agent1/ResultsTable";
+import BuyersTabBar from "@/components/BuyersTabBar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -28,7 +29,7 @@ interface AgentRun {
 
 type PageView = "trigger" | "progress" | "results";
 
-const TIER_BADGE: Record<string, string> = {
+const STATUS_BADGE: Record<string, string> = {
   completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
   running:   "bg-blue-50 text-blue-700 border-blue-200",
   failed:    "bg-rose-50 text-rose-700 border-rose-200",
@@ -42,28 +43,30 @@ export default function BuyersDiscoverAgentPage() {
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [pollingEnabled, setPollingEnabled] = useState(false);
 
-  // Fetch all past runs
+  // ── Fetch all past runs (always, refreshes every 30s) ──────────────────────
   const { data: runs = [], isLoading: runsLoading } = useQuery<AgentRun[]>({
     queryKey: ["agent1-runs"],
     queryFn: async () => {
       const res = await apiClient.get("/agent1/runs");
       return res.data;
     },
-    refetchInterval: pollingEnabled ? false : 30000,
+    refetchInterval: 30000,
   });
 
-  // Poll active run status every 5 seconds
+  // ── Active run status: always fetch when runId is set, poll only when running
+  // Bug fix: previously `enabled` required `pollingEnabled`, which meant clicking
+  // a completed run from history never fetched activeRun, so results never loaded.
   const { data: activeRun } = useQuery<AgentRun>({
     queryKey: ["agent1-run", activeRunId],
     queryFn: async () => {
       const res = await apiClient.get(`/agent1/runs/${activeRunId}`);
       return res.data;
     },
-    enabled: !!activeRunId && pollingEnabled,
-    refetchInterval: 5000,
+    enabled: !!activeRunId,
+    refetchInterval: pollingEnabled ? 5000 : false,
   });
 
-  // Fetch results once run is completed
+  // ── Fetch results — fires as soon as activeRun is confirmed completed ───────
   const { data: results = [] } = useQuery<DiscoveredCompany[]>({
     queryKey: ["agent1-results", activeRunId],
     queryFn: async () => {
@@ -73,7 +76,7 @@ export default function BuyersDiscoverAgentPage() {
     enabled: !!activeRunId && activeRun?.status === "completed",
   });
 
-  // Watch for completion / failure
+  // ── Watch for run completion or failure ────────────────────────────────────
   useEffect(() => {
     if (!activeRun) return;
 
@@ -89,9 +92,9 @@ export default function BuyersDiscoverAgentPage() {
       setView("trigger");
       toast.error(`Agent run failed: ${activeRun.errorMessage ?? "Unknown error"}`);
     }
-  }, [activeRun?.status]);
+  }, [activeRun?.status, queryClient]);
 
-  // Trigger new run
+  // ── Trigger a new run ──────────────────────────────────────────────────────
   const startMutation = useMutation({
     mutationFn: async ({ country, category }: { country: string; category: string }) => {
       const res = await apiClient.post("/agent1/run", { country, productCategory: category });
@@ -124,6 +127,10 @@ export default function BuyersDiscoverAgentPage() {
     } else if (run.status === "completed") {
       setPollingEnabled(false);
       setView("results");
+    } else {
+      // failed — go back to trigger
+      setPollingEnabled(false);
+      setView("trigger");
     }
   };
 
@@ -135,26 +142,25 @@ export default function BuyersDiscoverAgentPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Page header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="flex items-center justify-between max-w-6xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-brand-600 flex items-center justify-center">
-              <Bot className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="font-bold text-slate-900 text-base">Buyers Discover Agent</h1>
-              <p className="text-xs text-slate-400">AI-powered buyer discovery & ranking pipeline</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {view !== "trigger" && (
-              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={handleNewRun}>
-                <RefreshCw className="h-3.5 w-3.5" />
-                New Run
-              </Button>
-            )}
-          </div>
+      {/* Buyers tab bar — shared navigation across all buyer pages */}
+      <div className="bg-white px-6 pt-4">
+        <div className="max-w-6xl mx-auto">
+          <BuyersTabBar />
+        </div>
+      </div>
+
+      {/* Page sub-header */}
+      <div className="bg-white border-b border-slate-200 px-6 py-3">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <p className="text-xs text-slate-400">
+            AI-powered buyer discovery · Firecrawl · Hunter.io · Groq AI
+          </p>
+          {view !== "trigger" && (
+            <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={handleNewRun}>
+              <RefreshCw className="h-3 w-3" />
+              New Run
+            </Button>
+          )}
         </div>
       </div>
 
@@ -174,6 +180,13 @@ export default function BuyersDiscoverAgentPage() {
 
           {view === "results" && activeRun && (
             <ResultsTable companies={results} run={activeRun} />
+          )}
+
+          {/* Edge case: view=results but activeRun not yet loaded from cache */}
+          {view === "results" && !activeRun && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+              <p className="text-slate-400 text-sm">Loading results…</p>
+            </div>
           )}
         </div>
 
@@ -211,7 +224,7 @@ export default function BuyersDiscoverAgentPage() {
                       </div>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <Badge
-                          className={`${TIER_BADGE[run.status]} border text-[10px] font-medium py-0 px-1.5`}
+                          className={`${STATUS_BADGE[run.status]} border text-[10px] font-medium py-0 px-1.5`}
                         >
                           {run.status}
                         </Badge>

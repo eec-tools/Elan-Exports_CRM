@@ -1,15 +1,10 @@
-import { ScrapeGraphAI } from "scrapegraph-js";
+import axios from "axios";
 import type { RawCompany, EnrichedCompanyProfile } from "./types.js";
 
-let sgai: ReturnType<typeof ScrapeGraphAI> | null = null;
+const FIRECRAWL_BASE = "https://api.firecrawl.dev/v1";
 
-function getScrapeGraphClient() {
-  const apiKey = process.env.SGAI_API_KEY;
-  if (!apiKey) return null;
-  if (!sgai) {
-    sgai = ScrapeGraphAI({ apiKey });
-  }
-  return sgai;
+function getFirecrawlKey(): string | null {
+  return process.env.FIRECRAWL_API_KEY ?? null;
 }
 
 // Domains to skip — not real company homepages
@@ -26,23 +21,56 @@ const ASIA_KEYWORDS = [
 ];
 const INDIA_KEYWORDS = ["india", "indian", "subcontinent", "south asia"];
 
-// ── Timeout helper — prevents any single API call from hanging forever ──────
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`[Agent1] Timeout after ${ms}ms: ${label}`)), ms)
-    ),
-  ]);
+// ── Firecrawl search → returns [{url, title, description}, ...] ──────────────
+async function firecrawlSearch(query: string, limit = 10): Promise<any[]> {
+  const key = getFirecrawlKey();
+  if (!key) return [];
+
+  try {
+    const { data } = await axios.post(
+      `${FIRECRAWL_BASE}/search`,
+      { query, limit },
+      {
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        timeout: 30000,
+      }
+    );
+    if (!data.success) return [];
+    return Array.isArray(data.data) ? data.data : [];
+  } catch (err: any) {
+    console.error(`[Agent1] Firecrawl search error for "${query}":`, err?.response?.data ?? err?.message);
+    return [];
+  }
+}
+
+// ── Firecrawl scrape → returns markdown string ────────────────────────────────
+async function firecrawlScrape(url: string): Promise<string> {
+  const key = getFirecrawlKey();
+  if (!key) return "";
+
+  try {
+    const { data } = await axios.post(
+      `${FIRECRAWL_BASE}/scrape`,
+      { url, formats: ["markdown"], onlyMainContent: true },
+      {
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        timeout: 15000,
+      }
+    );
+    if (!data.success) return "";
+    return data.data?.markdown ?? "";
+  } catch (err: any) {
+    console.error(`[Agent1] Firecrawl scrape error for ${url}:`, err?.response?.data ?? err?.message);
+    return "";
+  }
 }
 
 export async function searchCompanies(
   queries: string[],
   maxResults = 50
 ): Promise<RawCompany[]> {
-  const client = getScrapeGraphClient();
-  if (!client) {
-    console.warn("[Agent1] SGAI_API_KEY not configured; skipping discovery search.");
+  if (!getFirecrawlKey()) {
+    console.warn("[Agent1] FIRECRAWL_API_KEY not configured; skipping discovery search.");
     return [];
   }
 
@@ -52,43 +80,28 @@ export async function searchCompanies(
   for (const query of queries) {
     if (companies.length >= maxResults) break;
 
-    try {
-      const result = await withTimeout(
-        client.search({
-          query,
-          numResults: 10,
-          format: "markdown",
-          mode: "reader",
-        }),
-        30000,
-        `search "${query}"`
-      );
+    console.log(`[Agent1] Searching: "${query}"`);
+    const results = await firecrawlSearch(query, 10);
+    console.log(`[Agent1] "${query}" → ${results.length} raw results`);
 
-      if (result.status !== "success" || !result.data) {
-        console.error(`[Agent1] ScrapeGraphAI search failed for "${query}":`, result.error);
-        continue;
+    for (const item of results) {
+      const url: string = item.url ?? item.link ?? "";
+      const domain = extractDomain(url);
+      if (!domain || seen.has(domain) || SKIP_DOMAINS.has(domain)) continue;
+      seen.add(domain);
+
+      const company = extractCompanyFromResult(item);
+      if (company) {
+        companies.push(company);
+        console.log(`[Agent1] Found: ${company.name} (${domain})`);
       }
-
-      // Parse the search results — ScrapeGraphAI returns an array of result objects
-      const searchResults = Array.isArray(result.data) ? result.data : (result.data as any)?.results ?? [];
-
-      for (const item of searchResults) {
-        const url = item.url ?? item.link ?? "";
-        const domain = extractDomain(url);
-        if (!domain || seen.has(domain) || SKIP_DOMAINS.has(domain)) continue;
-        seen.add(domain);
-
-        const company = extractCompanyFromResult(item);
-        if (company) companies.push(company);
-        if (companies.length >= maxResults) break;
-      }
-
-      await sleep(1200);
-    } catch (err) {
-      console.error(`[Agent1] ScrapeGraphAI search error: "${query}"`, err);
+      if (companies.length >= maxResults) break;
     }
+
+    await sleep(800);
   }
 
+  console.log(`[Agent1] Discovery complete — ${companies.length} unique companies`);
   return companies.slice(0, maxResults);
 }
 
@@ -96,48 +109,21 @@ export async function enrichCompanyFromWebsite(
   company: RawCompany,
   targetCountry: string
 ): Promise<EnrichedCompanyProfile> {
-  const client = getScrapeGraphClient();
-  if (!client) {
-    return fallbackProfile(company, targetCountry);
-  }
+  if (!company.website) return fallbackProfile(company, targetCountry);
 
-  try {
-    const result = await withTimeout(
-      client.scrape({
-        url: company.website,
-        formats: [{ type: "markdown", mode: "reader" }],
-      }),
-      15000,
-      `scrape ${company.website}`
-    );
+  const content = (await firecrawlScrape(company.website)).slice(0, 3000);
+  const lower = content.toLowerCase();
 
-    if (result.status !== "success" || !result.data) {
-      console.warn(`[Agent1] Scrape failed for ${company.website}:`, result.error);
-      return fallbackProfile(company, targetCountry);
-    }
-
-    // Extract markdown content from the response
-    const content = (
-      (result.data as any)?.results?.markdown?.data ??
-      (result.data as any)?.markdown ??
-      ""
-    ).slice(0, 3000);
-
-    const lower = content.toLowerCase();
-
-    return {
-      ...company,
-      description: content || company.description,
-      products: extractProductMentions(lower),
-      employeeRange: extractEmployeeRange(content),
-      revenueRange: "",
-      asiaConnection: ASIA_KEYWORDS.some((kw) => lower.includes(kw)),
-      indiaConnection: INDIA_KEYWORDS.some((kw) => lower.includes(kw)),
-      country: targetCountry,
-    };
-  } catch {
-    return fallbackProfile(company, targetCountry);
-  }
+  return {
+    ...company,
+    description: content || company.description,
+    products: extractProductMentions(lower),
+    employeeRange: extractEmployeeRange(content),
+    revenueRange: "",
+    asiaConnection: ASIA_KEYWORDS.some((kw) => lower.includes(kw)),
+    indiaConnection: INDIA_KEYWORDS.some((kw) => lower.includes(kw)),
+    country: targetCountry,
+  };
 }
 
 function fallbackProfile(company: RawCompany, targetCountry: string): EnrichedCompanyProfile {
@@ -154,19 +140,20 @@ function fallbackProfile(company: RawCompany, targetCountry: string): EnrichedCo
 }
 
 function extractCompanyFromResult(result: any): RawCompany | null {
-  const url = result.url ?? result.link ?? "";
+  const url: string = result.url ?? result.link ?? "";
   const domain = extractDomain(url);
   if (!domain) return null;
 
+  // Firecrawl search returns title directly; fall back to domain
   const name =
-    result.title?.split("|")[0]?.trim() ??
-    result.title?.split("-")[0]?.trim() ??
+    result.title?.split("|")[0]?.trim() ||
+    result.title?.split("-")[0]?.trim() ||
     domain;
 
   return {
     name: name || domain,
     website: `https://${domain}`,
-    description: result.description ?? result.snippet ?? result.content?.slice(0, 500) ?? "",
+    description: result.description ?? result.snippet ?? "",
     sourceUrl: url,
   };
 }

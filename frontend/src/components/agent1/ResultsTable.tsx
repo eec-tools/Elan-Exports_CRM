@@ -112,7 +112,7 @@ export function ResultsTable({ companies, run }: Props) {
           </Badge>
           {discarded > 0 && (
             <span className="text-slate-400 text-xs">
-              ({discarded} discarded — no verified email)
+              ({discarded} discarded — no email or score &lt; 30)
             </span>
           )}
           <div className="ml-auto">
@@ -169,7 +169,7 @@ export function ResultsTable({ companies, run }: Props) {
                           )}
                         </div>
                         {company.productsImported && (
-                          <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[200px]">
+                          <p className="text-xs text-slate-400 mt-0.5 truncate max-w-50">
                             {company.productsImported}
                           </p>
                         )}
@@ -225,9 +225,9 @@ export function ResultsTable({ companies, run }: Props) {
 
             {companies.length === 0 && (
               <div className="py-16 text-center text-slate-400">
-                <p className="text-sm">No results with score &gt; 30 and verified email.</p>
+                <p className="text-sm">No companies passed the email verification + score threshold.</p>
                 <p className="text-xs mt-1 text-slate-300">
-                  Add your Hunter.io API key to unlock email verification.
+                  All discovered companies were discarded (no verified email or score &lt; 30).
                 </p>
               </div>
             )}

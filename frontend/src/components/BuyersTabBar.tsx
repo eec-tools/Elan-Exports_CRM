@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Users, FolderOpen, UserSearch } from "lucide-react";
+import { Users, FolderOpen, UserSearch, Bot } from "lucide-react";
 
 export default function BuyersTabBar() {
   const tabClass = ({ isActive }: { isActive: boolean }) =>
@@ -22,6 +22,10 @@ export default function BuyersTabBar() {
       <NavLink to="/buyers/sourcing" className={tabClass}>
         <UserSearch className="h-4 w-4" />
         Sourcing Buyers
+      </NavLink>
+      <NavLink to="/buyers/discover-agent" className={tabClass}>
+        <Bot className="h-4 w-4" />
+        Discover Agent
       </NavLink>
     </div>
   );
