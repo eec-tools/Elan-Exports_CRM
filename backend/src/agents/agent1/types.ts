@@ -1,5 +1,49 @@
 // Shared TypeScript interfaces for Agent 1: Discover & Rank
 
+// ── Apollo-specific types ────────────────────────────────────────────────────
+
+export interface ApolloContact {
+  firstName: string;
+  lastName: string;
+  name: string;
+  title: string;
+  email: string | null;          // verified in Apollo's DB; null on basic plans
+  emailStatus: string | null;    // "verified" | "likely to engage" | "unavailable" | null
+  linkedinUrl: string | null;
+}
+
+export interface ApolloOrganization {
+  name: string;                  // MANDATORY — discard if absent
+  domain: string;
+  website: string;
+  industry: string;
+  employeeCount: number | null;
+  annualRevenue: number | null;
+  description: string;
+  keywords: string[];
+  linkedinUrl: string | null;
+}
+
+export interface ApolloLead {
+  contact: ApolloContact;
+  organization: ApolloOrganization;
+}
+
+// ── Normalized contact used for DB save (source-agnostic) ───────────────────
+
+export interface NormalizedContact {
+  email: string;                 // MANDATORY
+  emailStatus: string;           // "valid" | "deliverable" | "verified"
+  emailConfidence: number;
+  firstName: string;
+  lastName: string;
+  title: string;
+  linkedinUrl: string;
+  isPrimary: boolean;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 export interface RawCompany {
   name: string;
   website: string;

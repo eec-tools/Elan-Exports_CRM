@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { History, ChevronRight, RefreshCw } from "lucide-react";
+import { History, ChevronRight, RefreshCw, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/api/client";
@@ -140,6 +140,39 @@ export default function BuyersDiscoverAgentPage() {
     setView("trigger");
   };
 
+  // ── Delete a run with toast confirmation ───────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      await apiClient.delete(`/agent1/runs/${runId}`);
+    },
+    onSuccess: (_data, runId) => {
+      queryClient.invalidateQueries({ queryKey: ["agent1-runs"] });
+      if (activeRunId === runId) {
+        setActiveRunId(null);
+        setPollingEnabled(false);
+        setView("trigger");
+      }
+      toast.success("Run deleted");
+    },
+    onError: () => toast.error("Failed to delete run"),
+  });
+
+  const handleDeleteRun = (e: React.MouseEvent, run: AgentRun) => {
+    e.stopPropagation();
+    toast.warning(`Delete "${run.country} · ${run.productCategory}"?`, {
+      description: "This will permanently remove the run and all discovered companies.",
+      action: {
+        label: "Delete",
+        onClick: () => deleteMutation.mutate(run.id),
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => {},
+      },
+      duration: 6000,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Buyers tab bar — shared navigation across all buyer pages */}
@@ -153,7 +186,7 @@ export default function BuyersDiscoverAgentPage() {
       <div className="bg-white border-b border-slate-200 px-6 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <p className="text-xs text-slate-400">
-            AI-powered buyer discovery · Firecrawl · Hunter.io · Groq AI
+            AI-powered buyer discovery · Apollo.io · Hunter.io · Groq AI
           </p>
           {view !== "trigger" && (
             <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={handleNewRun}>
@@ -207,14 +240,17 @@ export default function BuyersDiscoverAgentPage() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {runs.map((run) => (
-                  <button
+                  <div
                     key={run.id}
-                    onClick={() => handleViewRun(run)}
-                    className={`w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-start gap-3 ${
+                    className={`group relative flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors ${
                       activeRunId === run.id ? "bg-blue-50/50" : ""
                     }`}
                   >
-                    <div className="flex-1 min-w-0">
+                    {/* Clickable area for viewing the run */}
+                    <button
+                      onClick={() => handleViewRun(run)}
+                      className="flex-1 min-w-0 text-left"
+                    >
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs font-semibold text-slate-700 truncate">
                           {run.country}
@@ -240,9 +276,18 @@ export default function BuyersDiscoverAgentPage() {
                           hour: "2-digit", minute: "2-digit",
                         })}
                       </p>
-                    </div>
-                    <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0 mt-0.5" />
-                  </button>
+                    </button>
+
+                    {/* Delete button — visible on hover */}
+                    <button
+                      onClick={(e) => handleDeleteRun(e, run)}
+                      disabled={deleteMutation.isPending}
+                      className="shrink-0 mt-0.5 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-50 hover:text-rose-500 text-slate-300"
+                      title="Delete run"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

@@ -70,4 +70,17 @@ router.get("/runs/:runId/results", async (req, res) => {
   res.json(companies);
 });
 
+// DELETE /api/agent1/runs/:runId — delete a run and all its companies/contacts
+router.delete("/runs/:runId", async (req, res) => {
+  const { runId } = req.params;
+  const run = await prisma.agentRun.findUnique({ where: { id: runId } });
+  if (!run) {
+    res.status(404).json({ error: "Run not found" });
+    return;
+  }
+  // Cascade deletes DiscoveredCompany → AgentContact via schema onDelete: Cascade
+  await prisma.agentRun.delete({ where: { id: runId } });
+  res.json({ success: true });
+});
+
 export default router;

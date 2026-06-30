@@ -126,6 +126,7 @@ async function countRegularPresentDays(
       userId,
       date: { gte: istMonthStart, lte: istMonthEnd },
       status: { in: [AttendanceStatus.Present, AttendanceStatus.HalfDay] },
+      isWeekendWork: false, // off-day check-ins are allowed but must not count as paid days
       ...(holidayDates.length > 0 && { NOT: { date: { in: holidayDates } } }),
     },
     select: { status: true },

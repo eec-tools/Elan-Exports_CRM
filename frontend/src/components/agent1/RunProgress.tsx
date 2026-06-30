@@ -32,14 +32,14 @@ const STEPS: Step[] = [
     getStatus: () => "done",
   },
   {
-    label: () => `Search queries built`,
+    label: () => `Apollo search params built`,
     getStatus: () => "done",
   },
   {
     label: (run: AgentRun) =>
       run.totalFound > 0
-        ? `Discovery complete · ${run.totalFound} companies found`
-        : "Running web discovery…",
+        ? `Apollo discovery complete · ${run.totalFound} leads found`
+        : "Querying Apollo (2 API calls)…",
     getStatus: (run: AgentRun) => (run.totalFound > 0 ? "done" : "active"),
   },
   {

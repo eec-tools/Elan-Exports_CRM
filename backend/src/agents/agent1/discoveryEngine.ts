@@ -44,7 +44,7 @@ async function firecrawlSearch(query: string, limit = 10): Promise<any[]> {
 }
 
 // ── Firecrawl scrape → returns markdown string ────────────────────────────────
-async function firecrawlScrape(url: string): Promise<string> {
+export async function firecrawlScrape(url: string): Promise<string> {
   const key = getFirecrawlKey();
   if (!key) return "";
 
