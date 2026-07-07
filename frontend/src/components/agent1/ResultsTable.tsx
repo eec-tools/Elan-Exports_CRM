@@ -112,7 +112,7 @@ export function ResultsTable({ companies, run }: Props) {
           </Badge>
           {discarded > 0 && (
             <span className="text-slate-400 text-xs">
-              ({discarded} discarded — no email or score &lt; 30)
+              ({discarded} discarded — domain invalid, no email found, or score &lt; 30)
             </span>
           )}
           <div className="ml-auto">
@@ -138,7 +138,7 @@ export function ResultsTable({ companies, run }: Props) {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Company</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Country</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Email (verified)</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Best Email</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-20">Score</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-24">Tier</th>
                 </tr>
@@ -178,9 +178,15 @@ export function ResultsTable({ companies, run }: Props) {
                       <td className="px-4 py-3.5">
                         {primary ? (
                           <div>
-                            <p className="text-slate-700 font-medium">{primary.name || "—"}</p>
+                            {primary.name ? (
+                              <p className="text-slate-700 font-medium">{primary.name}</p>
+                            ) : (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border text-violet-600 bg-violet-50 border-violet-100">
+                                dept.
+                              </span>
+                            )}
                             {primary.title && (
-                              <p className="text-xs text-slate-400">{primary.title}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">{primary.title}</p>
                             )}
                           </div>
                         ) : (
@@ -195,8 +201,14 @@ export function ResultsTable({ companies, run }: Props) {
                                 ? primary.email.slice(0, 26) + "…"
                                 : primary.email}
                             </span>
-                            <span className="text-[10px] text-emerald-600 font-medium bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
-                              {primary.emailStatus}
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                              primary.emailStatus === "valid" || primary.emailStatus === "deliverable"
+                                ? "text-emerald-600 bg-emerald-50 border-emerald-100"
+                                : "text-slate-500 bg-slate-50 border-slate-200"
+                            }`}>
+                              {primary.emailStatus === "valid" || primary.emailStatus === "deliverable"
+                                ? primary.emailStatus
+                                : "found"}
                             </span>
                           </div>
                         ) : (
@@ -225,18 +237,22 @@ export function ResultsTable({ companies, run }: Props) {
 
             {companies.length === 0 && (
               <div className="py-16 text-center text-slate-400">
-                <p className="text-sm">No companies passed the email verification + score threshold.</p>
-                <p className="text-xs mt-1 text-slate-300">
-                  All discovered companies were discarded (no verified email or score &lt; 30).
+                <p className="text-sm font-medium">No results — no reachable procurement contact found.</p>
+                <p className="text-xs mt-1 text-slate-300 max-w-sm mx-auto">
+                  We search Snov.io, Hunter, and the company website for a named person
+                  (e.g. john@company.com) or a procurement dept. email (procurement@, buying@).
+                  Generic mailboxes like info@ or contact@ are excluded.
                 </p>
               </div>
             )}
           </div>
         </div>
 
-        <p className="text-xs text-slate-400 text-center">
-          All rows have a verified email · Click any row to open detail drawer →
-        </p>
+        {companies.length > 0 && (
+          <p className="text-xs text-slate-400 text-center">
+            All rows have a reachable procurement email (named person or buying dept.) · Click any row →
+          </p>
+        )}
       </div>
 
       <CompanyDrawer

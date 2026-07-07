@@ -115,6 +115,7 @@ async function countRegularPresentDays(
   userId: string,
   month: number,
   year: number,
+  saturdaySchedule: string,
   holidayDates: Date[] = [],
 ): Promise<number> {
   // IST month boundaries expressed as UTC midnight of the IST date
@@ -126,13 +127,15 @@ async function countRegularPresentDays(
       userId,
       date: { gte: istMonthStart, lte: istMonthEnd },
       status: { in: [AttendanceStatus.Present, AttendanceStatus.HalfDay] },
-      isWeekendWork: false, // off-day check-ins are allowed but must not count as paid days
       ...(holidayDates.length > 0 && { NOT: { date: { in: holidayDates } } }),
     },
-    select: { status: true },
+    select: { status: true, date: true },
   });
 
   return records.reduce((sum, r) => {
+    const dow = r.date.getUTCDay(); // date stored as UTC midnight, so getUTCDay is correct
+    if (dow === 0) return sum; // Sunday: already counted in sundayPaidDays, never here
+    if (dow === 6 && saturdaySchedule === "off") return sum; // off-day check-in, not paid
     return sum + (r.status === AttendanceStatus.HalfDay ? 0.5 : 1);
   }, 0);
 }
@@ -255,7 +258,7 @@ export async function generatePayroll(
     await countHolidaysInMonth(month, year, user.saturdaySchedule);
 
   // Step 4: Attendance counts (holidays excluded from regularPresentDays to avoid double-counting)
-  const weekdayPresentDays = await countRegularPresentDays(userId, month, year, scheduledHolidayDates);
+  const weekdayPresentDays = await countRegularPresentDays(userId, month, year, user.saturdaySchedule, scheduledHolidayDates);
 
   // Step 5: Leave counts
   const approvedLeavesMonth = await countApprovedLeavesInMonth(userId, month, year);

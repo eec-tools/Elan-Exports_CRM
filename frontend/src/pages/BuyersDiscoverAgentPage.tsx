@@ -186,7 +186,7 @@ export default function BuyersDiscoverAgentPage() {
       <div className="bg-white border-b border-slate-200 px-6 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <p className="text-xs text-slate-400">
-            AI-powered buyer discovery · Apollo.io · Hunter.io · Groq AI
+            AI-powered buyer discovery · Snov.io · Groq AI · Firecrawl
           </p>
           {view !== "trigger" && (
             <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={handleNewRun}>

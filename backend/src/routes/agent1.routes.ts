@@ -47,18 +47,17 @@ router.get("/runs/:runId", async (req, res) => {
   res.json(run);
 });
 
-// GET /api/agent1/runs/:runId/results — fetch ranked results (score > 30, verified email only)
+// GET /api/agent1/runs/:runId/results — fetch ranked results
+// Shows all companies that passed the email gate (priorityTier not null) and scored > 0.
+// We do NOT re-filter on emailStatus here — the pipeline's email gate already decided what passes.
+// Scraped emails get status "unknown" from Hunter (they come from website pages, not Hunter DB),
+// so filtering on ["valid","deliverable"] would incorrectly exclude them.
 router.get("/runs/:runId/results", async (req, res) => {
   const companies = await prisma.discoveredCompany.findMany({
     where: {
       agentRunId: req.params.runId,
-      fitScore: { gt: 30 },
-      contacts: {
-        some: {
-          isPrimary: true,
-          emailStatus: { in: ["valid", "deliverable"] },
-        },
-      },
+      priorityTier: { not: null },   // passed the email gate AND scored ≥ 30
+      discardReason: null,
     },
     include: {
       contacts: {

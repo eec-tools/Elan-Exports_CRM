@@ -28,25 +28,22 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    label: "Inputs validated",
-    getStatus: () => "done",
-  },
-  {
-    label: () => `Apollo search params built`,
+    label: "Run initialised · inputs valid",
     getStatus: () => "done",
   },
   {
     label: (run: AgentRun) =>
       run.totalFound > 0
-        ? `Apollo discovery complete · ${run.totalFound} leads found`
-        : "Querying Apollo (2 API calls)…",
+        ? `AI research complete · ${run.totalFound} companies discovered`
+        : "AI researching importers & buyers…",
     getStatus: (run: AgentRun) => (run.totalFound > 0 ? "done" : "active"),
   },
   {
-    label: (run: AgentRun) =>
-      run.totalScored > 0
-        ? `Email verification & scoring (${run.totalScored} / ${run.totalFound || "?"})`
-        : "Verifying emails & scoring…",
+    label: (run: AgentRun) => {
+      if (run.status === "completed") return "All emails found & verified";
+      if (run.totalFound > 0) return "Finding emails via Snov.io + website scraping…";
+      return "Email discovery (pending)";
+    },
     getStatus: (run: AgentRun) => {
       if (run.status === "completed") return "done";
       if (run.totalFound > 0) return "active";
@@ -54,7 +51,18 @@ const STEPS: Step[] = [
     },
   },
   {
-    label: "Final ranking complete",
+    label: (run: AgentRun) =>
+      run.totalScored > 0
+        ? `Groq AI scored ${run.totalScored} of ${run.totalFound || "?"} companies`
+        : "Scoring & ranking leads with Groq AI…",
+    getStatus: (run: AgentRun) => {
+      if (run.status === "completed") return "done";
+      if (run.totalFound > 0) return "active";
+      return "pending";
+    },
+  },
+  {
+    label: "Final ranking ready",
     getStatus: (run: AgentRun) => (run.status === "completed" ? "done" : "pending"),
   },
 ];

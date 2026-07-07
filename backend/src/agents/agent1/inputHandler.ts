@@ -65,50 +65,94 @@ export const APOLLO_INDUSTRY_KEYWORDS: Record<string, string[]> = {
   ],
 };
 
+// ── Snov.io industry filter codes per category (LinkedIn industry names) ─────
+
+export const SNOV_INDUSTRIES: Record<string, string[]> = {
+  "Textiles": [
+    "Apparel & Fashion",
+    "Textiles",
+    "Wholesale",
+    "Import and Export",
+    "Retail",
+  ],
+  "Organic Food": [
+    "Food & Beverages",
+    "Wholesale",
+    "Import and Export",
+    "Farming",
+    "Consumer Goods",
+  ],
+  "Seafood": [
+    "Food & Beverages",
+    "Wholesale",
+    "Import and Export",
+    "Fishery",
+  ],
+  "Rice & Grains": [
+    "Food & Beverages",
+    "Wholesale",
+    "Import and Export",
+    "Farming",
+    "Consumer Goods",
+  ],
+  "Spices & Herbs": [
+    "Food & Beverages",
+    "Wholesale",
+    "Import and Export",
+    "Consumer Goods",
+  ],
+  "Pulses & Lentils": [
+    "Food & Beverages",
+    "Wholesale",
+    "Import and Export",
+    "Farming",
+  ],
+};
+
 // ── Firecrawl fallback search queries (used when Apollo plan doesn't allow search) ──
 
 const CATEGORY_SEARCH_MAP: Record<string, string[]> = {
   "Organic Food": [
-    "organic food importer wholesale",
-    "organic produce distributor import",
-    "certified organic food buyer sourcing Asia",
-    "bio food import wholesaler",
-    "natural organic food trading company",
+    "organic food importer wholesale company",
+    "bio food import wholesaler distributor",
+    "organic produce distributor sourcing Asia",
+    "certified organic food import trading company",
+    "natural food wholesale importer B2B",
   ],
   "Textiles": [
-    "textile fabric importer wholesale",
-    "garment clothing importer sourcing India",
-    "textile buyer manufacturer India supplier",
-    "fabric wholesale importer trading",
-    "apparel sourcing company importer",
+    "textile fabric importer wholesale company",
+    "fabric wholesale trading importer B2B",
+    "garment fabric sourcing import company",
+    "yarn fabric lining importer wholesale",
+    "textile material trading company importer",
   ],
   "Seafood": [
-    "seafood importer wholesale distributor",
-    "frozen fish seafood trading company",
-    "seafood buyer India supplier",
-    "shrimp prawn importer wholesale",
+    "seafood importer wholesale distributor company",
+    "frozen shrimp seafood trading company importer",
+    "fish seafood import wholesale B2B",
+    "prawn shrimp importer wholesale company",
   ],
   "Rice & Grains": [
-    "rice importer wholesale basmati",
-    "grain commodity importer trading",
-    "basmati rice buyer India export",
+    "basmati rice importer wholesale company",
+    "grain commodity import trading company",
+    "rice wholesale importer distributor B2B",
     "cereal grain import wholesale company",
   ],
   "Spices & Herbs": [
-    "spice importer wholesale distributor",
-    "herbs spices trading company importer",
-    "spice buyer India origin supplier",
-    "dried spices wholesale import",
+    "spice importer wholesale distributor company",
+    "herbs dried spices trading company importer",
+    "spice ingredient wholesale import B2B",
+    "dried spices wholesale import company",
   ],
   "Pulses & Lentils": [
-    "pulse lentil importer wholesale",
-    "chickpea lentil bean importer trading",
-    "legume pulse food importer company",
-    "dal lentil importer India sourcing",
+    "lentil pulse importer wholesale company",
+    "chickpea bean lentil import trading company",
+    "legume pulse importer wholesale B2B",
+    "dal lentil import wholesale company",
   ],
 };
 
-const DIRECTORY_SITES = ["europages.co.uk", "kompass.com", "tradekey.com"];
+const DIRECTORY_SITES = ["kompass.com", "europages.eu", "tradekey.com", "exportersindia.com"];
 
 export const SUPPORTED_CATEGORIES = Object.keys(APOLLO_BUYER_TITLES);
 
@@ -125,6 +169,7 @@ export interface InputValidationResult {
   error?: string;
   apolloBuyerTitles: string[];
   apolloKeywords: string[];
+  snovIndustries: string[];     // Snov.io LinkedIn industry codes
   searchQueries: string[];      // Firecrawl fallback queries
   directoryQueries: string[];   // Firecrawl directory site queries
 }
@@ -133,6 +178,7 @@ const EMPTY: InputValidationResult = {
   valid: false,
   apolloBuyerTitles: [],
   apolloKeywords: [],
+  snovIndustries: [],
   searchQueries: [],
   directoryQueries: [],
 };
@@ -151,6 +197,7 @@ export function validateInputs(country: string, category: string): InputValidati
     valid: true,
     apolloBuyerTitles:  APOLLO_BUYER_TITLES[category],
     apolloKeywords:     APOLLO_INDUSTRY_KEYWORDS[category] ?? [],
+    snovIndustries:     SNOV_INDUSTRIES[category] ?? [],
     searchQueries:      baseQueries.map((q) => `${q} ${country}`),
     directoryQueries:   DIRECTORY_SITES.map((site) => `site:${site} ${baseQueries[0]} ${country}`),
   };

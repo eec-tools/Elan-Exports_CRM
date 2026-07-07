@@ -1,8 +1,10 @@
 import prisma from "../../config/db.js";
 import { validateInputs } from "./inputHandler.js";
 import { searchApolloLeads, employeeCountToRange, revenueToRange } from "./apolloEngine.js";
-import { searchCompanies, enrichCompanyFromWebsite, firecrawlScrape } from "./discoveryEngine.js";
+import { searchCompanies, enrichCompanyFromWebsite, firecrawlScrape, extractDomain } from "./discoveryEngine.js";
+import { discoverCompaniesWithLLM } from "./llmDiscoveryEngine.js";
 import { verifyEmail, findAndVerifyContactForCompany } from "./emailEngine.js";
+import { snovProspectSearch, snovConfigured, resetSnovCredits, type SnovProspect } from "./snovEngine.js";
 import { scoreCompany } from "./scoringEngine.js";
 import type {
   ApolloLead,
@@ -37,6 +39,7 @@ export async function runAgent1(params: {
     productCategory,
     validation.apolloBuyerTitles,
     validation.apolloKeywords,
+    validation.snovIndustries,
     validation.searchQueries,
     validation.directoryQueries,
   ).catch(async (err) => {
@@ -65,21 +68,23 @@ async function executeRun(
   productCategory: string,
   apolloBuyerTitles: string[],
   apolloKeywords: string[],
+  snovIndustries: string[],
   searchQueries: string[],
   directoryQueries: string[],
 ): Promise<void> {
+  resetSnovCredits(); // clear any exhaustion flag from a previous run
+
   let highCount = 0;
   let medCount  = 0;
   let scored    = 0;
 
-  // ── Step 1: Apollo search (2 API calls) ───────────────────────────────────
-  console.log(`[Agent1] Run ${runId} — Apollo discovery start (${country} · ${productCategory})`);
+  // ── Step 1: Apollo search ─────────────────────────────────────────────────
+  console.log(`[Agent1] Run ${runId} — Apollo discovery (${country} · ${productCategory})`);
   const apolloLeads = await searchApolloLeads(
     country, productCategory, apolloBuyerTitles, apolloKeywords
   );
 
   if (apolloLeads.length > 0) {
-    // ── Apollo path: structured leads with company + contact data ─────────
     console.log(`[Agent1] Apollo path — ${apolloLeads.length} leads`);
     await prisma.agentRun.update({ where: { id: runId }, data: { totalFound: apolloLeads.length } });
 
@@ -98,25 +103,78 @@ async function executeRun(
       }
       await sleep(300);
     }
+    // Apollo returned results — skip other discovery paths
   } else {
-    // ── Firecrawl fallback: Apollo plan doesn't allow search ──────────────
-    console.log(`[Agent1] Apollo returned 0 — falling back to Firecrawl search`);
-    const allQueries = [...searchQueries, ...directoryQueries];
-    const rawCompanies = await searchCompanies(allQueries, 50);
-    console.log(`[Agent1] Firecrawl found ${rawCompanies.length} companies`);
+    // ── Step 2: Snov.io prospect search (finds named procurement contacts) ──
+    let snovProspects: SnovProspect[] = [];
+    if (snovConfigured()) {
+      console.log(`[Agent1] Snov.io prospect search — ${country} · ${productCategory}`);
+      snovProspects = await snovProspectSearch(country, apolloBuyerTitles, snovIndustries, 20);
+      console.log(`[Agent1] Snov.io returned ${snovProspects.length} prospects`);
+    }
 
-    await prisma.agentRun.update({ where: { id: runId }, data: { totalFound: rawCompanies.length } });
+    if (snovProspects.length > 0) {
+      // Deduplicate by company domain
+      const seenDomains = new Set<string>();
+      const unique = snovProspects.filter((p) => {
+        if (!p.companyDomain || seenDomains.has(p.companyDomain)) return false;
+        seenDomains.add(p.companyDomain);
+        return true;
+      });
 
-    for (const raw of rawCompanies) {
-      try {
-        const tier = await processFirecrawlCompany(raw, runId, country, productCategory);
-        if (tier === "High")   highCount++;
-        if (tier === "Medium") medCount++;
-        if (tier)              scored++;
-      } catch (err) {
-        console.error(`[Agent1] Firecrawl company failed "${raw.name}":`, err);
+      console.log(`[Agent1] Processing ${unique.length} unique Snov.io companies`);
+      await prisma.agentRun.update({ where: { id: runId }, data: { totalFound: unique.length } });
+
+      for (const prospect of unique) {
+        try {
+          const tier = await processSnovProspect(prospect, runId, country, productCategory);
+          if (tier === "High")   highCount++;
+          if (tier === "Medium") medCount++;
+          if (tier)              scored++;
+        } catch (err) {
+          console.error(`[Agent1] Snov prospect failed "${prospect.companyName}":`, err);
+        }
+        await sleep(300);
       }
-      await sleep(300);
+    } else {
+      // ── Step 3: Firecrawl web search (real Google results = real domains) ─
+      // Runs BEFORE the LLM so we process real verified companies first.
+      // LLM is hallucination-prone — DNS validation in emailEngine filters fakes,
+      // but starting from real URLs avoids wasting credits entirely.
+      console.log(`[Agent1] Firecrawl web search — ${country} · ${productCategory}`);
+      let rawCompanies = await searchCompanies([...searchQueries, ...directoryQueries], 40);
+      console.log(`[Agent1] Firecrawl found ${rawCompanies.length} companies`);
+
+      // ── Step 4: Groq LLM — supplement if Firecrawl found fewer than 10 ───
+      // DNS validation in emailEngine.ts will filter out any hallucinated domains.
+      if (rawCompanies.length < 10) {
+        console.log(`[Agent1] Supplementing with Groq LLM (${rawCompanies.length} from Firecrawl)`);
+        const llmResults  = await discoverCompaniesWithLLM(country, productCategory);
+        const seenDomains = new Set(rawCompanies.map((c) => extractDomain(c.website)));
+        for (const c of llmResults) {
+          const d = extractDomain(c.website);
+          if (d && !seenDomains.has(d)) {
+            rawCompanies.push(c);
+            seenDomains.add(d);
+          }
+        }
+        console.log(`[Agent1] After LLM supplement: ${rawCompanies.length} companies total`);
+      }
+
+      console.log(`[Agent1] ${rawCompanies.length} companies to process (web search + LLM)`);
+      await prisma.agentRun.update({ where: { id: runId }, data: { totalFound: rawCompanies.length } });
+
+      for (const raw of rawCompanies) {
+        try {
+          const tier = await processFirecrawlCompany(raw, runId, country, productCategory);
+          if (tier === "High")   highCount++;
+          if (tier === "Medium") medCount++;
+          if (tier)              scored++;
+        } catch (err) {
+          console.error(`[Agent1] Failed to process "${raw.name}":`, err);
+        }
+        await sleep(300);
+      }
     }
   }
 
@@ -269,10 +327,112 @@ async function processApolloLead(
   );
 }
 
-// ── Firecrawl fallback processor ─────────────────────────────────────────────
-// Returns the priorityTier string ("High" | "Medium" | "Low" | null) for counters.
+// ── Snov.io prospect processor ───────────────────────────────────────────────
+// Snov.io already gives us named contacts with emails — no separate email gate
+// needed. We enrich from the company website (if description is thin) then score.
 
 import type { RawCompany } from "./types.js";
+
+async function processSnovProspect(
+  prospect: SnovProspect,
+  runId: string,
+  country: string,
+  productCategory: string,
+): Promise<string | null> {
+  // If Snov.io didn't return an email, run the normal email-finding pipeline
+  let email       = prospect.email;
+  let emailStatus = "unknown";
+  let emailConf   = prospect.emailConfidence;
+
+  if (!email) {
+    const emailResult = await findAndVerifyContactForCompany(prospect.companyWebsite);
+    if (emailResult.shouldDiscard) {
+      await prisma.discoveredCompany.create({
+        data: {
+          agentRunId:    runId,
+          name:          prospect.companyName,
+          website:       prospect.companyWebsite,
+          country,
+          sourceUrl:     "Snov.io",
+          discardReason: emailResult.discardReason,
+        },
+      });
+      console.log(`[Agent1] Discarded Snov "${prospect.companyName}" — no email`);
+      return null;
+    }
+    const primary = emailResult.contacts[0];
+    email       = primary.email;
+    emailStatus = emailResult.verifiedPrimary?.status ?? "unknown";
+    emailConf   = primary.confidence;
+  } else {
+    // Snov.io confidence ≥ 70 → treat as valid without a separate verify call
+    emailStatus = emailConf >= 70 ? "valid" : "unknown";
+  }
+
+  // Build raw company for enrichment
+  const raw: RawCompany = {
+    name:        prospect.companyName,
+    website:     prospect.companyWebsite,
+    description: prospect.industry ? `Industry: ${prospect.industry}` : "",
+    sourceUrl:   "Snov.io",
+  };
+
+  const profile = await enrichCompanyFromWebsite(raw, country);
+
+  const contactForScoring: FoundEmail = {
+    email:       email!,
+    firstName:   prospect.firstName,
+    lastName:    prospect.lastName,
+    title:       prospect.title,
+    confidence:  emailConf,
+    linkedinUrl: prospect.linkedinUrl,
+  };
+
+  const score = await scoreCompany(profile, contactForScoring, true, productCategory, country);
+
+  const company = await prisma.discoveredCompany.create({
+    data: {
+      agentRunId:       runId,
+      name:             profile.name,
+      website:          profile.website,
+      country:          profile.country,
+      description:      profile.description.slice(0, 2000),
+      productsImported: profile.products || null,
+      employeeRange:    profile.employeeRange || null,
+      asiaConnection:   profile.asiaConnection,
+      indiaConnection:  profile.indiaConnection,
+      sourceUrl:        "Snov.io",
+      fitScore:         score.fitScore,
+      scoreDim1:        score.d1,
+      scoreDim2:        score.d2,
+      scoreDim3:        score.d3,
+      scoreDim4:        score.d4,
+      scoreDim5:        score.d5,
+      priorityTier:     score.priorityTier === "Discard" ? null : (score.priorityTier as any),
+      rationale:        score.rationale,
+      discardReason:    score.priorityTier === "Discard" ? "Score below 30" : null,
+    },
+  });
+
+  await prisma.agentContact.create({
+    data: {
+      companyId:       company.id,
+      name:            `${prospect.firstName} ${prospect.lastName}`.trim() || null,
+      title:           prospect.title || null,
+      email:           email!,
+      emailStatus,
+      emailConfidence: emailConf,
+      linkedinUrl:     prospect.linkedinUrl || null,
+      isPrimary:       true,
+    },
+  });
+
+  const tier = score.priorityTier === "Discard" ? null : score.priorityTier;
+  console.log(`[Agent1] ✓ Snov "${prospect.companyName}" → score ${score.fitScore} (${score.priorityTier}) | ${email}`);
+  return tier;
+}
+
+// ── Firecrawl fallback processor ─────────────────────────────────────────────
 
 async function processFirecrawlCompany(
   raw: RawCompany,
