@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Bot,
@@ -8,18 +8,15 @@ import {
   RefreshCw,
   Building2,
   Mail,
-  Clock,
   MessageSquare,
   ChevronRight,
   AlertCircle,
   Loader2,
-  X,
   User,
   Globe,
   Package,
   CheckCircle2,
   ArrowLeft,
-  Plus,
 } from "lucide-react";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
@@ -240,8 +237,6 @@ function DraftPanel({
     generateDraft();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const latestReceived = item.latestReply;
 
   return (
     <div className="flex flex-col h-full">
@@ -562,7 +557,6 @@ export default function AiCommsAgentPage() {
       {/* Tab bar */}
       <div className="flex items-center gap-1 px-4 pt-3 pb-0 border-b border-border bg-background flex-shrink-0 overflow-x-auto">
         {TABS.map((tab, i) => {
-          const tabInbox = i === activeTab ? inbox : [];
           const count = i === activeTab ? unreplied.length : 0;
           return (
             <button
