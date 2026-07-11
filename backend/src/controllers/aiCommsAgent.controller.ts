@@ -23,7 +23,7 @@ function getGroq(): Groq {
   }
   return groqClient;
 }
-const GROQ_MODEL = "openai/gpt-oss-120b";
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 // ── HTML helpers ──────────────────────────────────────────────────────────────
 function buildReplyHtml(bodyText: string, sig: { name: string; role: string; company: string; tagline: string; links: Array<{ label: string; url: string }> } | null, fromEmail: string): string {
@@ -132,14 +132,10 @@ BODY:
 [email body in plain text — professional paragraphs, no markdown symbols, no "---"]`;
 
   const groq = getGroq();
-  const response = await (groq.chat.completions.create as Function)({
+  const response = await groq.chat.completions.create({
     model: GROQ_MODEL,
-    max_completion_tokens: 8192,
-    temperature: 1,
-    top_p: 1,
-    reasoning_effort: "medium",
-    stream: false,
-    stop: null,
+    max_tokens: 2048,
+    temperature: 0.7,
     messages: [{ role: "user", content: prompt }],
   });
 
