@@ -117,6 +117,7 @@ const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
 
 // Deduplicated status options for the filter dropdown
 const STATUS_FILTER_OPTIONS = [
+  { value: "pending_reply", label: "Reply Pending" },
   { value: "pending", label: "Pending" },
   { value: "intro_sent", label: "Intro Sent" },
   { value: "followup1_sent", label: "Follow-up 1 Sent" },
@@ -242,6 +243,8 @@ export default function SourcingSupplierPage() {
       return res.data as {
         data: SourcingSupplier[];
         pagination: { total: number; pages: number };
+        pendingReplyIds: string[];
+        pendingReplyInfo: { id: string; respondedAt: string }[];
       };
     },
   });
@@ -459,6 +462,11 @@ export default function SourcingSupplierPage() {
 
   const suppliers = data?.data ?? [];
   const pagination = data?.pagination;
+  const pendingReplySet = new Set(data?.pendingReplyIds ?? []);
+  const pendingReplyMap = new Map((data?.pendingReplyInfo ?? []).map((r) => [r.id, r.respondedAt]));
+
+  const daysAgo = (dateStr?: string | null): number =>
+    dateStr ? Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -713,11 +721,14 @@ export default function SourcingSupplierPage() {
                   const campaign = s.emailCampaign;
                   const due = campaign?.nextFollowupDue;
                   const overdue = isOverdue(due);
+                  const replyPending = pendingReplySet.has(s.id);
+                  const respondedAt = pendingReplyMap.get(s.id);
+                  const daysSinceReply = daysAgo(respondedAt);
 
                   return (
                     <tr
                       key={s.id}
-                      className="hover:bg-slate-50 transition-colors group"
+                      className={`transition-colors group ${replyPending && daysSinceReply >= 1 ? "bg-red-50 hover:bg-red-100" : replyPending ? "bg-amber-50 hover:bg-amber-100" : "hover:bg-slate-50"}`}
                     >
                       {/* Company */}
                       <td className="px-4 py-3">
@@ -787,11 +798,18 @@ export default function SourcingSupplierPage() {
 
                       {/* Status */}
                       <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCfg.class}`}
-                        >
-                          {statusCfg.label}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCfg.class}`}
+                          >
+                            {statusCfg.label}
+                          </span>
+                          {replyPending && (
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${daysSinceReply >= 1 ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>
+                              {daysSinceReply === 0 ? "Reply Pending · Today" : `Reply Pending · ${daysSinceReply}d`}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Next follow-up */}

@@ -157,11 +157,16 @@ export async function addToList(
     const { suppliers } = req.body as {
       suppliers: Array<{
         company: string;
+        website?: string;
         email?: string;
         phone?: string;
         contactPerson?: string;
+        linkedin?: string;
         country?: string;
         product?: string;
+        keyPainPoints?: string;
+        emailTemplate?: string;
+        personalizationQuality?: string;
         notes?: string;
       }>;
     };
@@ -188,11 +193,16 @@ export async function addToList(
     const data = validRows.map((s) => ({
       folderId,
       company: s.company.trim(),
+      website: s.website?.trim() || null,
       email: sanitizeEmail(s.email?.trim() || null),
       phone: s.phone?.trim() || null,
       contactPerson: s.contactPerson?.trim() || null,
+      linkedin: s.linkedin?.trim() || null,
       country: s.country?.trim() || null,
       product: s.product?.trim() || null,
+      keyPainPoints: s.keyPainPoints?.trim() || null,
+      emailTemplate: s.emailTemplate?.trim() || null,
+      personalizationQuality: s.personalizationQuality?.trim() || null,
       notes: s.notes?.trim() || null,
       emailStatus: "Not Sent",
       createdBy: req.user!.id,
@@ -218,17 +228,22 @@ export async function sendBulkEmail(
 ): Promise<void> {
   try {
     const { folderId } = req.params as { folderId: string };
-    const { suppliers, emailTemplateId } = req.body as {
+    const { suppliers, assignedGmailAccount } = req.body as {
       suppliers: Array<{
         company: string;
+        website?: string;
         email?: string;
         phone?: string;
         contactPerson?: string;
+        linkedin?: string;
         country?: string;
         product?: string;
+        keyPainPoints?: string;
+        emailTemplate?: string;
+        personalizationQuality?: string;
         notes?: string;
       }>;
-      emailTemplateId?: string;
+      assignedGmailAccount?: string;
     };
 
     const folder = await (prisma as any).buyerVaultFolder.findUnique({
@@ -253,17 +268,24 @@ export async function sendBulkEmail(
     // Create vault contacts + SourcingBuyer records in one transaction
     const createdPairs: Array<{ vaultId: string; sourcingBuyerId: string; hasEmail: boolean }> = [];
 
+    const fromEmail = assignedGmailAccount?.trim() || BUYER_GMAIL_ACCOUNT;
+
     await (prisma as any).$transaction(async (tx: any) => {
       for (const s of validRows) {
         const contact = await tx.buyerVaultContact.create({
           data: {
             folderId,
             company: s.company.trim(),
+            website: s.website?.trim() || null,
             email: sanitizeEmail(s.email?.trim() || null),
             phone: s.phone?.trim() || null,
             contactPerson: s.contactPerson?.trim() || null,
+            linkedin: s.linkedin?.trim() || null,
             country: s.country?.trim() || null,
             product: s.product?.trim() || null,
+            keyPainPoints: s.keyPainPoints?.trim() || null,
+            emailTemplate: s.emailTemplate?.trim() || null,
+            personalizationQuality: s.personalizationQuality?.trim() || null,
             notes: s.notes?.trim() || null,
             emailStatus: "Not Sent",
             createdBy: req.user!.id,
@@ -279,8 +301,8 @@ export async function sendBulkEmail(
             product: s.product?.trim() || null,
             notes: s.notes?.trim() || null,
             status: "pending",
-            assignedGmailAccount: BUYER_GMAIL_ACCOUNT,
-            emailTemplateId: emailTemplateId || null,
+            assignedGmailAccount: fromEmail,
+            customEmailBody: s.emailTemplate?.trim() || null,
             buyerVaultContactId: contact.id,
             createdBy: req.user!.id,
           },
@@ -331,7 +353,10 @@ export async function updateVaultSupplier(
 ): Promise<void> {
   try {
     const { folderId, supplierId } = req.params as { folderId: string; supplierId: string };
-    const { company, email, phone, contactPerson, country, product, notes } = req.body;
+    const {
+      company, website, email, phone, contactPerson, linkedin,
+      country, product, keyPainPoints, emailTemplate, personalizationQuality, notes,
+    } = req.body;
 
     const contact = await (prisma as any).buyerVaultContact.findUnique({
       where: { id: supplierId },
@@ -350,11 +375,16 @@ export async function updateVaultSupplier(
       where: { id: supplierId },
       data: {
         company: company?.trim() || contact.company,
+        website: website?.trim() || null,
         email: sanitizeEmail(email?.trim() || null),
         phone: phone?.trim() || null,
         contactPerson: contactPerson?.trim() || null,
+        linkedin: linkedin?.trim() || null,
         country: country?.trim() || null,
         product: product?.trim() || null,
+        keyPainPoints: keyPainPoints?.trim() || null,
+        emailTemplate: emailTemplate?.trim() || null,
+        personalizationQuality: personalizationQuality?.trim() || null,
         notes: notes?.trim() || null,
       },
     });

@@ -73,11 +73,16 @@ interface BuyerVaultContactItem {
   id: string;
   folderId: string;
   company: string;
+  website?: string;
   email?: string;
   phone?: string;
   contactPerson?: string;
+  linkedin?: string;
   country?: string;
   product?: string;
+  keyPainPoints?: string;
+  emailTemplate?: string;
+  personalizationQuality?: string;
   notes?: string;
   emailStatus: string;
   createdAt: string;
@@ -92,11 +97,15 @@ interface GmailAccount {
 }
 
 interface BulkRow {
-  name: string;
   company: string;
-  products: string;
-  certifications: string;
+  website: string;
+  contactPerson: string;
   email: string;
+  linkedin: string;
+  keyPainPoints: string;
+  country: string;
+  emailTemplate: string;
+  personalizationQuality: string;
 }
 
 // ─── Folder icon palette ──────────────────────────────
@@ -135,11 +144,15 @@ function folderStyle(name: string) {
 
 function emptyBulkRow(): BulkRow {
   return {
-    name: "",
     company: "",
-    products: "",
-    certifications: "",
+    website: "",
+    contactPerson: "",
     email: "",
+    linkedin: "",
+    keyPainPoints: "",
+    country: "",
+    emailTemplate: "",
+    personalizationQuality: "",
   };
 }
 
@@ -149,11 +162,15 @@ const BULK_COLS: {
   required?: boolean;
   width: string;
 }[] = [
-  { key: "name", label: "Name *", required: true, width: "160px" },
-  { key: "company", label: "Company *", required: true, width: "180px" },
-  { key: "products", label: "Products", width: "180px" },
-  { key: "certifications", label: "Certifications", width: "180px" },
-  { key: "email", label: "Email *", required: true, width: "260px" },
+  { key: "company",               label: "Company Name *",         required: true, width: "180px" },
+  { key: "website",               label: "Website",                              width: "160px" },
+  { key: "contactPerson",         label: "Contact Person",                       width: "160px" },
+  { key: "email",                 label: "Email *",                required: true, width: "240px" },
+  { key: "linkedin",              label: "LinkedIn",                             width: "180px" },
+  { key: "keyPainPoints",         label: "Key Pain Points",                      width: "200px" },
+  { key: "country",               label: "Country",                              width: "130px" },
+  { key: "emailTemplate",         label: "Email Template",                       width: "300px" },
+  { key: "personalizationQuality",label: "Personalization Quality",              width: "180px" },
 ];
 
 // ─── Main Page ────────────────────────────────────────
@@ -188,8 +205,9 @@ export default function BuyersSourcingVaultPage() {
   const [editVaultContactTarget, setEditVaultContactTarget] =
     useState<BuyerVaultContactItem | null>(null);
   const [editForm, setEditForm] = useState({
-    company: "", email: "", phone: "", contactPerson: "",
-    country: "", product: "", notes: "",
+    company: "", website: "", email: "", phone: "", contactPerson: "",
+    linkedin: "", country: "", product: "", keyPainPoints: "",
+    emailTemplate: "", personalizationQuality: "", notes: "",
   });
 
   // ─── Root: folders query ───────────────────────────
@@ -746,11 +764,16 @@ export default function BuyersSourcingVaultPage() {
                                   setEditVaultContactTarget(s);
                                   setEditForm({
                                     company: s.company,
+                                    website: s.website ?? "",
                                     email: s.email ?? "",
                                     phone: s.phone ?? "",
                                     contactPerson: s.contactPerson ?? "",
+                                    linkedin: s.linkedin ?? "",
                                     country: s.country ?? "",
                                     product: s.product ?? "",
+                                    keyPainPoints: s.keyPainPoints ?? "",
+                                    emailTemplate: s.emailTemplate ?? "",
+                                    personalizationQuality: s.personalizationQuality ?? "",
                                     notes: s.notes ?? "",
                                   });
                                 }}
@@ -845,26 +868,48 @@ export default function BuyersSourcingVaultPage() {
         open={!!editVaultContactTarget}
         onOpenChange={(v) => !v && setEditVaultContactTarget(null)}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Contact</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-1">
-            {(["company", "email", "phone", "contactPerson", "country", "product", "notes"] as const).map((field) => (
-              <div key={field}>
-                <Label className="capitalize text-xs">
-                  {field === "contactPerson" ? "Contact Person" : field}
-                  {field === "company" ? " *" : ""}
-                </Label>
+            {(
+              [
+                { key: "company",               label: "Company Name *" },
+                { key: "website",               label: "Website" },
+                { key: "contactPerson",         label: "Contact Person" },
+                { key: "email",                 label: "Email" },
+                { key: "linkedin",              label: "LinkedIn" },
+                { key: "country",               label: "Country" },
+                { key: "product",               label: "Product" },
+                { key: "keyPainPoints",         label: "Key Pain Points" },
+                { key: "personalizationQuality",label: "Personalization Quality" },
+                { key: "phone",                 label: "Phone" },
+                { key: "notes",                 label: "Notes" },
+              ] as { key: keyof typeof editForm; label: string }[]
+            ).map(({ key, label }) => (
+              <div key={key}>
+                <Label className="text-xs">{label}</Label>
                 <Input
                   className="mt-1 h-8 text-sm"
-                  value={editForm[field]}
+                  value={editForm[key]}
                   onChange={(e) =>
-                    setEditForm((prev) => ({ ...prev, [field]: e.target.value }))
+                    setEditForm((prev) => ({ ...prev, [key]: e.target.value }))
                   }
                 />
               </div>
             ))}
+            <div>
+              <Label className="text-xs">Email Template</Label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-y min-h-30"
+                value={editForm.emailTemplate}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, emailTemplate: e.target.value }))
+                }
+                placeholder="Email body for this contact…"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -1013,7 +1058,6 @@ function BulkAddDialog({
     Array.from({ length: 5 }, emptyBulkRow),
   );
   const [sharedGmail, setSharedGmail] = useState("");
-  const [sharedEmailTemplateId, setSharedEmailTemplateId] = useState("");
   const [errors, setErrors] = useState<Set<number>>(new Set());
   const [sendingEmail, setSendingEmail] = useState(false);
   const [addingToList, setAddingToList] = useState(false);
@@ -1021,10 +1065,16 @@ function BulkAddDialog({
 
   function handleDownloadTemplate() {
     const ws = XLSX.utils.aoa_to_sheet([
-      ["Name", "Company", "Products", "Certifications", "Email"],
+      [
+        "Company Name", "Website", "Contact Person", "Email",
+        "LinkedIn", "Key Pain Points", "Country",
+        "Email Template", "Personalization Quality",
+      ],
     ]);
     ws["!cols"] = [
-      { wch: 20 }, { wch: 25 }, { wch: 25 }, { wch: 25 }, { wch: 25 },
+      { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 28 },
+      { wch: 22 }, { wch: 25 }, { wch: 15 },
+      { wch: 50 }, { wch: 22 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Buyers");
@@ -1045,11 +1095,15 @@ function BulkAddDialog({
         const headers = (raw[0] as string[]).map((h) => String(h ?? "").toLowerCase().trim());
         const colMap: Record<number, keyof BulkRow> = {};
         headers.forEach((h, i) => {
-          if (h.includes("name"))                                    colMap[i] = "name";
-          else if (h.includes("company"))                            colMap[i] = "company";
-          else if (h.includes("product"))                            colMap[i] = "products";
-          else if (h.includes("certif"))                             colMap[i] = "certifications";
-          else if (h.includes("email"))                              colMap[i] = "email";
+          if (h.includes("company"))                                   colMap[i] = "company";
+          else if (h.includes("website"))                              colMap[i] = "website";
+          else if (h.includes("contact"))                              colMap[i] = "contactPerson";
+          else if (h.includes("email") && !h.includes("template"))    colMap[i] = "email";
+          else if (h.includes("linkedin"))                             colMap[i] = "linkedin";
+          else if (h.includes("pain") || h.includes("key pain"))      colMap[i] = "keyPainPoints";
+          else if (h.includes("country"))                              colMap[i] = "country";
+          else if (h.includes("template") || h.includes("email template")) colMap[i] = "emailTemplate";
+          else if (h.includes("personal"))                             colMap[i] = "personalizationQuality";
         });
 
         const parsed: BulkRow[] = raw
@@ -1094,16 +1148,6 @@ function BulkAddDialog({
     (a) => a.connected && !/procurement[12]/i.test(a.email),
   );
 
-  const { data: emailTemplates = [] } = useQuery<
-    { id: string; name: string; isDefault: boolean }[]
-  >({
-    queryKey: ["buyer-email-campaign-templates"],
-    queryFn: async () => {
-      const res = await api.get("/buyer-email-templates");
-      return res.data;
-    },
-    enabled: open,
-  });
 
   const updateCell = useCallback(
     (rowIdx: number, col: keyof BulkRow, value: string) => {
@@ -1176,7 +1220,6 @@ function BulkAddDialog({
   const handleClose = () => {
     setRows(Array.from({ length: 5 }, emptyBulkRow));
     setSharedGmail("");
-    setSharedEmailTemplateId("");
     setErrors(new Set());
     onClose();
   };
@@ -1185,31 +1228,31 @@ function BulkAddDialog({
     const newErrors = new Set<number>();
     rows.forEach((r, i) => {
       const hasAnyData = Object.values(r).some((v) => v.trim());
-      if (hasAnyData && (!r.name.trim() || !r.company.trim() || !r.email.trim()))
+      if (hasAnyData && (!r.company.trim() || !r.email.trim()))
         newErrors.add(i);
     });
 
     if (newErrors.size > 0) {
       setErrors(newErrors);
-      toast.error("Highlighted rows are missing Name, Company, or Email");
+      toast.error("Highlighted rows are missing Company Name or Email");
       return null;
     }
 
-    const validRows = rows.filter((r) => r.name.trim() || r.company.trim());
+    const validRows = rows.filter((r) => r.company.trim());
     if (validRows.length === 0) {
       toast.error("Please fill in at least one contact");
       return null;
     }
 
-    const missingRequired = validRows.some((r) => !r.name.trim() || !r.company.trim() || !r.email.trim());
+    const missingRequired = validRows.some((r) => !r.company.trim() || !r.email.trim());
     if (missingRequired) {
       const newErr = new Set<number>();
       rows.forEach((r, i) => {
-        if ((r.name.trim() || r.company.trim()) && (!r.name.trim() || !r.company.trim() || !r.email.trim()))
+        if (r.company.trim() && (!r.company.trim() || !r.email.trim()))
           newErr.add(i);
       });
       setErrors(newErr);
-      toast.error("All contacts must have a Name, Company, and Email");
+      toast.error("All contacts must have a Company Name and Email");
       return null;
     }
 
@@ -1237,11 +1280,15 @@ function BulkAddDialog({
     try {
       const res = await api.post(`/buyers-vault/${folder.id}/suppliers`, {
         suppliers: validRows.map((r) => ({
-          contactPerson: r.name.trim() || undefined,
           company: r.company.trim(),
-          product: r.products.trim() || undefined,
-          notes: r.certifications.trim() || undefined,
+          website: r.website.trim() || undefined,
+          contactPerson: r.contactPerson.trim() || undefined,
           email: r.email.trim() || undefined,
+          linkedin: r.linkedin.trim() || undefined,
+          keyPainPoints: r.keyPainPoints.trim() || undefined,
+          country: r.country.trim() || undefined,
+          emailTemplate: r.emailTemplate.trim() || undefined,
+          personalizationQuality: r.personalizationQuality.trim() || undefined,
         })),
       });
       toast.success(
@@ -1273,14 +1320,17 @@ function BulkAddDialog({
         `/buyers-vault/${folder.id}/suppliers/send`,
         {
           suppliers: pendingRows.map((r) => ({
-            contactPerson: r.name.trim() || undefined,
             company: r.company.trim(),
-            product: r.products.trim() || undefined,
-            notes: r.certifications.trim() || undefined,
+            website: r.website.trim() || undefined,
+            contactPerson: r.contactPerson.trim() || undefined,
             email: r.email.trim() || undefined,
+            linkedin: r.linkedin.trim() || undefined,
+            keyPainPoints: r.keyPainPoints.trim() || undefined,
+            country: r.country.trim() || undefined,
+            emailTemplate: r.emailTemplate.trim() || undefined,
+            personalizationQuality: r.personalizationQuality.trim() || undefined,
           })),
           assignedGmailAccount: sharedGmail || undefined,
-          emailTemplateId: sharedEmailTemplateId || undefined,
         },
       );
       const { added } = res.data;
@@ -1296,7 +1346,7 @@ function BulkAddDialog({
     }
   }
 
-  const filledCount = rows.filter((r) => r.name.trim() || r.company.trim()).length;
+  const filledCount = rows.filter((r) => r.company.trim()).length;
   const isWorking = sendingEmail || addingToList;
 
   return (
@@ -1339,27 +1389,8 @@ function BulkAddDialog({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium whitespace-nowrap">
-              Email Template
-            </Label>
-            <select
-              value={sharedEmailTemplateId}
-              onChange={(e) => setSharedEmailTemplateId(e.target.value)}
-              className="border border-border rounded-md text-sm px-3 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">System default</option>
-              {emailTemplates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                  {t.isDefault ? " (Default)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <span className="text-xs text-muted-foreground ml-auto">
-            Used only when sending emails
+            Email template &amp; signature per row from import · Gmail account used when sending
           </span>
         </div>
 
@@ -1504,12 +1535,10 @@ function BulkAddDialog({
             </Button>
             <Button
               onClick={handleSendBulkEmailClick}
-              disabled={isWorking || filledCount === 0 || !sharedGmail || !sharedEmailTemplateId}
+              disabled={isWorking || filledCount === 0 || !sharedGmail}
               title={
                 !sharedGmail
                   ? "Select a campaign email account first"
-                  : !sharedEmailTemplateId
-                  ? "Select an email template first"
                   : undefined
               }
             >

@@ -32,6 +32,7 @@ import {
   History,
   UserSearch,
   Bot,
+  MessageSquare,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState } from "react";
@@ -64,6 +65,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: "/buyers", label: "Buyers Directory", icon: Users, perms: "buyers_directory", end: true },
       { to: "/buyers/discover-agent", label: "Discover Agent", icon: Bot, perms: "buyers_directory" },
+      { to: "/buyers/ai-comms", label: "AI Comms Agent", icon: MessageSquare, perms: "sourcing_buyers" },
       { to: "/buyers/sourcing-vault", label: "Sourcing Vault", icon: Database, perms: "sourcing_buyers" },
       { to: "/buyers/sourcing", label: "Sourcing Buyers", icon: UserSearch, perms: "sourcing_buyers" },
     ],

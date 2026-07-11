@@ -1143,21 +1143,26 @@ model BuyerVaultFolder {
 }
 
 model BuyerVaultContact {
-  id            String           @id @default(uuid())
-  folderId      String           @map("folder_id")
-  company       String
-  email         String?
-  phone         String?
-  contactPerson String?          @map("contact_person")
-  country       String?
-  product       String?
-  notes         String?
-  emailStatus   String           @default("Not Sent") @map("email_status")
-  createdBy     String?          @map("created_by")
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
-  creator       User?            @relation(fields: [createdBy], references: [id])
-  folder        BuyerVaultFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  id                     String           @id @default(uuid())
+  folderId               String           @map("folder_id")
+  company                String
+  website                String?
+  email                  String?
+  phone                  String?
+  contactPerson          String?          @map("contact_person")
+  linkedin               String?
+  country                String?
+  product                String?
+  keyPainPoints          String?          @map("key_pain_points")
+  emailTemplate          String?          @map("email_template")
+  personalizationQuality String?          @map("personalization_quality")
+  notes                  String?
+  emailStatus            String           @default("Not Sent") @map("email_status")
+  createdBy              String?          @map("created_by")
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
+  creator                User?            @relation(fields: [createdBy], references: [id])
+  folder                 BuyerVaultFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
 
   @@map("buyer_vault_contacts")
 }
@@ -1175,6 +1180,7 @@ model SourcingBuyer {
   status               String                      @default("pending")
   assignedGmailAccount String?                     @map("assigned_gmail_account")
   emailTemplateId      String?                     @map("email_template_id")
+  customEmailBody      String?                     @map("custom_email_body")
   createdBy            String?                     @map("created_by")
   createdAt            DateTime                    @default(now()) @map("created_at")
   updatedAt            DateTime                    @updatedAt @map("updated_at")

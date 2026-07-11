@@ -358,6 +358,141 @@ export async function sendSupplierThankYouEmail(params: {
   });
 }
 
+export async function sendImmediateReplyAlert(params: {
+  to: string;
+  company: string;
+  contactPerson?: string | null;
+  companyEmail?: string | null;
+  entityType: "buyer" | "supplier";
+  crmLink: string;
+}): Promise<void> {
+  const { to, company, contactPerson, companyEmail, entityType, crmLink } = params;
+  const label = entityType === "buyer" ? "Buyer" : "Supplier";
+  const subject = `⚡ [Reply Now] ${company} has responded`;
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;">
+      <div style="background:#f59e0b;color:#fff;padding:12px 20px;border-radius:6px;margin-bottom:20px;">
+        <strong style="font-size:16px;">⚡ Immediate Reply Required</strong>
+      </div>
+      <p style="color:#111827;font-size:15px;margin:0 0 16px;">
+        <strong>${company}</strong> (${label}) has replied to your email and is awaiting your response.
+      </p>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px;">
+        <tr><td style="padding:8px;background:#f9fafb;color:#6b7280;width:140px;border:1px solid #e5e7eb;">Company</td><td style="padding:8px;border:1px solid #e5e7eb;">${company}</td></tr>
+        ${contactPerson ? `<tr><td style="padding:8px;background:#f9fafb;color:#6b7280;border:1px solid #e5e7eb;">Contact</td><td style="padding:8px;border:1px solid #e5e7eb;">${contactPerson}</td></tr>` : ""}
+        ${companyEmail ? `<tr><td style="padding:8px;background:#f9fafb;color:#6b7280;border:1px solid #e5e7eb;">Email</td><td style="padding:8px;border:1px solid #e5e7eb;">${companyEmail}</td></tr>` : ""}
+        <tr><td style="padding:8px;background:#f9fafb;color:#6b7280;border:1px solid #e5e7eb;">Type</td><td style="padding:8px;border:1px solid #e5e7eb;">${label}</td></tr>
+      </table>
+      <a href="${crmLink}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Open in CRM →</a>
+      <p style="color:#9ca3af;font-size:12px;margin-top:24px;">Elan Exports CRM — Reply to this ${label.toLowerCase()} promptly to keep the conversation warm.</p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM ?? "noreply@eectrade.com",
+    to,
+    subject,
+    html,
+  });
+}
+
+export async function sendReplyPendingReminderEmail(params: {
+  to: string;
+  pendingBuyers: Array<{ company: string; email: string | null; contactPerson: string | null; respondedAt?: string | null }>;
+  pendingSuppliers: Array<{ company: string; email: string | null; contactPerson: string | null; respondedAt?: string | null }>;
+}): Promise<void> {
+  const { to, pendingBuyers, pendingSuppliers } = params;
+  const totalCount = pendingBuyers.length + pendingSuppliers.length;
+  if (totalCount === 0) return;
+
+  const daysAgo = (dateStr?: string | null): string => {
+    if (!dateStr) return "—";
+    const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+    if (days === 0) return "Today";
+    if (days === 1) return "1 day ago";
+    return `${days} days ago`;
+  };
+
+  const rowColor = (dateStr?: string | null): string => {
+    const days = dateStr ? Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+    if (days >= 3) return "#fff5f5";
+    if (days >= 1) return "#fffbeb";
+    return "#ffffff";
+  };
+
+  const buildRows = (items: typeof pendingBuyers) =>
+    items
+      .map(
+        (item) => `
+      <tr style="background:${rowColor(item.respondedAt)}">
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">${item.company}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${item.contactPerson ?? "—"}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${item.email ?? "—"}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;color:${(item.respondedAt && Math.floor((Date.now() - new Date(item.respondedAt).getTime()) / 86400000) >= 1) ? "#dc2626" : "#374151"};font-weight:600;">${daysAgo(item.respondedAt)}</td>
+      </tr>`,
+      )
+      .join("");
+
+  const tableHeader = `
+    <tr style="background:#f5f5f5;">
+      <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #ddd;">Company</th>
+      <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #ddd;">Contact Person</th>
+      <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #ddd;">Email</th>
+      <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #ddd;">Responded</th>
+    </tr>`;
+
+  const buyersSection =
+    pendingBuyers.length > 0
+      ? `
+    <h3 style="color:#1a1a2e;font-size:15px;margin:24px 0 8px;">Buyers (${pendingBuyers.length})</h3>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>${tableHeader}</thead>
+      <tbody>${buildRows(pendingBuyers)}</tbody>
+    </table>`
+      : "";
+
+  const suppliersSection =
+    pendingSuppliers.length > 0
+      ? `
+    <h3 style="color:#1a1a2e;font-size:15px;margin:24px 0 8px;">Suppliers (${pendingSuppliers.length})</h3>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>${tableHeader}</thead>
+      <tbody>${buildRows(pendingSuppliers)}</tbody>
+    </table>`
+      : "";
+
+  await transporter.sendMail({
+    from: `"Élan Exports CRM" <${process.env.SMTP_EMAIL}>`,
+    to,
+    subject: `[Reply Needed] ${totalCount} company response${totalCount > 1 ? "s" : ""} awaiting your reply`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;">
+        <div style="background:#1a1a2e;padding:20px 28px;">
+          <p style="margin:0;color:#fff;font-size:18px;font-weight:bold;">Élan Exports</p>
+          <p style="margin:4px 0 0;color:#9ca3af;font-size:12px;">Pending Reply Reminder</p>
+        </div>
+        <div style="background:#fef3c7;border-bottom:2px solid #f59e0b;padding:14px 28px;">
+          <p style="margin:0;color:#92400e;font-weight:bold;">
+            ⚠️ ${totalCount} contact${totalCount > 1 ? "s have" : " has"} replied to your outreach — you haven't replied back yet.
+          </p>
+        </div>
+        <div style="padding:24px 28px;">
+          <p style="color:#374151;font-size:14px;margin:0 0 8px;">
+            Please log in to the CRM and reply to the following ${totalCount > 1 ? "companies" : "company"}:
+          </p>
+          ${buyersSection}
+          ${suppliersSection}
+          <p style="margin-top:28px;color:#9ca3af;font-size:12px;">
+            This is an automated daily reminder from Élan Exports CRM (9:05 AM IST).
+            Once you reply, this contact will no longer appear in tomorrow's reminder.
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 export async function sendAttendanceCheckoutWarningEmail(params: {
   to: string;
   fullName: string;

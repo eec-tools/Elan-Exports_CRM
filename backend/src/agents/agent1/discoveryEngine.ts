@@ -127,6 +127,14 @@ export async function searchCompanies(
       const url: string = item.url ?? item.link ?? "";
       const domain = extractDomain(url);
       if (!domain || seen.has(domain) || shouldSkipDomain(domain)) continue;
+      if (isArticleOrListPage(item)) {
+        console.log(`[Agent1] Skipped (article/list): "${item.title?.slice(0, 60)}"`);
+        continue;
+      }
+      if (isSourcingCompetitor(item)) {
+        console.log(`[Agent1] Skipped (sourcing competitor): "${item.title?.slice(0, 60)}"`);
+        continue;
+      }
       seen.add(domain);
 
       const company = extractCompanyFromResult(item);
@@ -178,19 +186,66 @@ function fallbackProfile(company: RawCompany, targetCountry: string): EnrichedCo
   };
 }
 
+// Signals that identify a SOURCING INTERMEDIARY — a company whose business is
+// sourcing from India/Asia ON BEHALF OF brands. This makes them EEC's competitors,
+// not buyers. e.g. ryzealsourcing.com — "Apparel Manufacturer UK Trusted Clothing
+// Production Partner" sources garments from Asia for UK brands, exactly like EEC does.
+const COMPETITOR_SIGNALS = [
+  "sourcing partner", "production partner", "sourcing agent",
+  "sourcing consultancy", "sourcing consultants", "sourcing service",
+  "garment sourcing", "apparel sourcing", "textile sourcing agent",
+  "clothing production partner", "manufacturing partner",
+  "we source for", "source on behalf", "sourcing solutions",
+  "ethical sourcing partner", "sourcing intermediary",
+  "supply chain partner", "factory sourcing", "product sourcing agent",
+];
+
+function isSourcingCompetitor(result: any): boolean {
+  const title = (result.title ?? "").toLowerCase();
+  const desc  = (result.description ?? result.snippet ?? "").toLowerCase();
+  return COMPETITOR_SIGNALS.some((sig) => title.includes(sig) || desc.includes(sig));
+}
+
+// Detects article/guide/list pages that Google ranks for commercial queries
+// but are NOT actual company websites — e.g. "Top 10 fabric importers",
+// "How to source fabric", "Industry analysis 2026".
+const ARTICLE_TITLE_SIGNALS = [
+  "top 10", "top 5", "top 15", "top 20",
+  "how to", "how do", "guide to", "a guide",
+  "what is", "what are", "why ",
+  "industry analysis", "industry report", "market report", "market size",
+  "best practices", "tips for", "strategies for",
+  "2024 report", "2025 report", "2026 report", "2027 report",
+  "directory of", "list of", "companies list", "companies in",
+  "buyers & importers", "buyers and importers",
+  "vs ", " vs.", "comparison",
+  "manufacturing in", "manufacturers in",
+  " explained", " overview",
+];
+
+function isArticleOrListPage(result: any): boolean {
+  const title = (result.title ?? "").toLowerCase();
+  const desc  = (result.description ?? result.snippet ?? "").toLowerCase();
+  return ARTICLE_TITLE_SIGNALS.some((sig) => title.includes(sig) || desc.startsWith(sig));
+}
+
 function extractCompanyFromResult(result: any): RawCompany | null {
   const url: string = result.url ?? result.link ?? "";
   const domain = extractDomain(url);
   if (!domain) return null;
 
-  // Firecrawl search returns title directly; fall back to domain
-  const name =
-    result.title?.split("|")[0]?.trim() ||
-    result.title?.split("-")[0]?.trim() ||
-    domain;
+  // Clean up the page title → company name.
+  // Titles often look like "Whaleys Bradford – Wholesale Fabric UK | Since 1891"
+  // We want just "Whaleys Bradford".
+  const raw = result.title ?? "";
+  const name = raw
+    .split(/[|–—]/)[0]          // take text before first pipe / dash
+    .replace(/\s*-\s*.*$/, "")  // remove "- subtitle" suffixes
+    .replace(/\b(wholesale|supplier|suppliers|company|ltd|limited|inc|llc|gmbh|bv|sas|srl)\b/gi, "")
+    .trim() || domain;
 
   return {
-    name: name || domain,
+    name,
     website: `https://${domain}`,
     description: result.description ?? result.snippet ?? "",
     sourceUrl: url,

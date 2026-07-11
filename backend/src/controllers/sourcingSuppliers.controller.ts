@@ -152,8 +152,34 @@ export async function listSourcingSuppliers(
         { contactPerson: { contains: search, mode: "insensitive" } },
       ];
     }
+    // Suppliers where they replied but we haven't replied back yet; exclude invalid emails
+    const pendingReplyRows = await (prisma as any).$queryRaw`
+      SELECT ser.sourcing_id AS id, MAX(ser.received_at) AS responded_at
+      FROM supplier_email_replies ser
+      JOIN sourcing_suppliers ss ON ss.id = ser.sourcing_id
+      WHERE ser.direction = 'received'
+        AND ser.sourcing_id IS NOT NULL
+        AND ss.status != 'invalid'
+        AND NOT EXISTS (
+          SELECT 1 FROM supplier_email_replies s2
+          WHERE s2.sourcing_id = ser.sourcing_id
+            AND s2.direction = 'sent'
+            AND s2.received_at > ser.received_at
+        )
+      GROUP BY ser.sourcing_id
+    ` as { id: string; responded_at: Date }[];
+    const pendingReplyIds = pendingReplyRows.map((r: any) => r.id as string);
+    const pendingReplyInfo = pendingReplyRows.map((r: any) => ({
+      id: r.id as string,
+      respondedAt: (r.responded_at as Date).toISOString(),
+    }));
+
     if (status && status !== "all") {
-      where.status = status;
+      if (status === "pending_reply") {
+        where.id = { in: pendingReplyIds };
+      } else {
+        where.status = status;
+      }
     }
     if (country && country !== "all") {
       where.country = { equals: country, mode: "insensitive" };
@@ -199,6 +225,8 @@ export async function listSourcingSuppliers(
         total,
         pages: Math.ceil(total / limitNum),
       },
+      pendingReplyIds,
+      pendingReplyInfo,
     });
   } catch (err) {
     console.error("List sourcing suppliers error:", err);

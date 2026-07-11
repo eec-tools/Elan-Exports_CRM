@@ -30,6 +30,28 @@ export async function listSourcingBuyers(req: AuthRequest, res: Response): Promi
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
+    // Buyers where they replied but we haven't replied back yet; exclude invalid emails
+    const pendingReplyRows = await (prisma as any).$queryRaw`
+      SELECT ber.sourcing_buyer_id AS id, MAX(ber.received_at) AS responded_at
+      FROM buyer_email_replies ber
+      JOIN sourcing_buyers sb ON sb.id = ber.sourcing_buyer_id
+      WHERE ber.direction = 'received'
+        AND ber.sourcing_buyer_id IS NOT NULL
+        AND sb.status != 'invalid'
+        AND NOT EXISTS (
+          SELECT 1 FROM buyer_email_replies b2
+          WHERE b2.sourcing_buyer_id = ber.sourcing_buyer_id
+            AND b2.direction = 'sent'
+            AND b2.received_at > ber.received_at
+        )
+      GROUP BY ber.sourcing_buyer_id
+    ` as { id: string; responded_at: Date }[];
+    const pendingReplyIds = pendingReplyRows.map((r: any) => r.id as string);
+    const pendingReplyInfo = pendingReplyRows.map((r: any) => ({
+      id: r.id as string,
+      respondedAt: (r.responded_at as Date).toISOString(),
+    }));
+
     const where: any = {};
 
     if (search) {
@@ -41,7 +63,13 @@ export async function listSourcingBuyers(req: AuthRequest, res: Response): Promi
         { country: { contains: search, mode: "insensitive" } },
       ];
     }
-    if (status && status !== "all") where.status = status;
+    if (status && status !== "all") {
+      if (status === "pending_reply") {
+        where.id = { in: pendingReplyIds };
+      } else {
+        where.status = status;
+      }
+    }
     if (company && company !== "all") where.company = { equals: company, mode: "insensitive" };
     if (contactPerson && contactPerson !== "all") where.contactPerson = { equals: contactPerson, mode: "insensitive" };
     if (country && country !== "all") where.country = { equals: country, mode: "insensitive" };
@@ -68,6 +96,8 @@ export async function listSourcingBuyers(req: AuthRequest, res: Response): Promi
     res.json({
       data: buyers,
       pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
+      pendingReplyIds,
+      pendingReplyInfo,
     });
   } catch (err) {
     console.error("List sourcing buyers error:", err);

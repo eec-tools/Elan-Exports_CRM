@@ -20,63 +20,63 @@ const CATEGORY_CONFIG: Record<string, {
 }> = {
   "Textiles": {
     whatWeWant:
-      "WHOLESALE FABRIC MERCHANTS and TEXTILE MATERIAL IMPORTERS — companies that buy raw fabrics, yarns, lining, or textile materials from Asian mills and resell them to clothing manufacturers",
+      "RETAIL CHAINS, HOME FURNISHING BRANDS, HOTEL PROCUREMENT COMPANIES, BEDDING BRANDS, DEPARTMENT STORES, TEXTILE IMPORTERS, PROMOTIONAL TEXTILE COMPANIES, CORPORATE UNIFORM COMPANIES, HOSPITALITY SUPPLIERS, and APPAREL STORES — companies that buy finished or semi-finished textile products (garments, home textiles, hotel linen, uniforms, bedding, furnishing fabric) and source from India or Asia",
     whatWeAvoid:
-      "fashion brands, luxury houses, garment retailers, clothing chains — they design clothes but do NOT import raw fabric from India",
+      "SOURCING INTERMEDIARIES AND SOURCING AGENTS — companies whose core business is sourcing garments or textiles from India/Asia ON BEHALF OF brands. These are EEC's direct competitors, not buyers. Identifiable by: 'sourcing partner', 'production partner', 'clothing production partner', 'apparel sourcing', 'garment sourcing', 'sourcing agent', 'manufacturing partner'. Example to avoid: ryzealsourcing.com ('Trusted Clothing Production Partner'). Also avoid: raw yarn traders, textile testing labs, sewing machine sellers, cotton commodity traders",
     goodExamples:
-      "regional fabric merchants, yarn importers, technical textile wholesalers, lining/interlining importers, denim fabric distributors",
+      "retail chains with a clothing or home section (Next, New Look, C&A), home furnishing brands (Dunelm, Linen House), hotel linen and bedding suppliers, corporate workwear and uniform companies, promotional merchandise firms, department stores with Asian buying offices, hospitality linen suppliers, apparel store chains that source from India/Bangladesh",
     badExamples:
-      "Balmain, Sonia Rykiel, Ba&sh, SMCP, Cacharel, Jules, Agnes B, Comptoir des Cotonniers — these are fashion labels, not fabric importers",
+      "ryzealsourcing.com (sourcing partner for brands — EEC competitor), yarn spinners, raw cotton traders, textile machinery distributors, fabric testing laboratories",
   },
   "Organic Food": {
     whatWeWant:
-      "ORGANIC FOOD IMPORTERS and WHOLESALE DISTRIBUTORS — companies that buy organic produce, bio food, or natural food products from Asian/Indian farms and distribute to retailers or restaurants",
+      "RETAILERS, SUPERMARKET CHAINS, PRIVATE LABEL FOOD BUYERS, HOSPITALITY GROUPS, DISTRIBUTORS, and BUYING OFFICES — companies that buy, retail, or distribute organic food, bio produce, or natural food products and source from India or Asia. This includes supermarkets with own-brand organic ranges, hotel and restaurant groups buying organic ingredients, health food retail chains, private label organic brands, and food buying offices",
     whatWeAvoid:
-      "supermarket chains (Carrefour, Leclerc, Rewe) — they buy from local distributors, not directly from Asian suppliers",
+      "pure logistics brokers with no buying decisions, small local organic farms that grow their own produce, food testing laboratories",
     goodExamples:
-      "organic food wholesalers, bio food importers, health food distributors, specialty organic ingredient suppliers",
+      "supermarket chains with organic own-brand ranges (Waitrose, Aldi Bio, Leclerc Bio, Rewe Bio), health food retail chains, hotel groups sourcing organic ingredients, restaurant chains buying organic produce, private label organic food brands, food distributors supplying supermarkets, ethnic food retail chains",
     badExamples:
-      "Carrefour Bio, Leclerc, Metro, Rewe Bio, large supermarket chains",
+      "small local organic farms, food processing test labs, pure freight and logistics companies",
   },
   "Seafood": {
     whatWeWant:
-      "SEAFOOD IMPORTERS and FROZEN FISH WHOLESALERS — companies that import frozen seafood, shrimp, or fish from India/Asia and distribute to restaurants, retailers, or food service",
+      "RETAILERS, SUPERMARKET CHAINS, PRIVATE LABEL SEAFOOD BUYERS, HOSPITALITY GROUPS, DISTRIBUTORS, and BUYING OFFICES — companies that import, retail, or distribute frozen seafood, shrimp, or fish from India/Asia. Includes supermarkets with seafood departments or own-brand frozen fish, hotel and restaurant groups buying seafood, private label frozen seafood brands, and seafood distributors supplying retail",
     whatWeAvoid:
-      "restaurant chains, fish processing plants that only process local catch, large retail chains",
+      "local fish farms and fish processing plants that process only local catch, pure fishing vessels, seafood testing laboratories",
     goodExamples:
-      "frozen seafood importers, shrimp wholesalers, fish import-export companies, seafood distributors",
+      "supermarket chains with seafood private label ranges, hotel chains buying frozen seafood, restaurant groups sourcing shrimp from India, private label frozen seafood brands, seafood distributors supplying retail chains, buying offices for supermarket seafood categories",
     badExamples:
-      "McDonald's fish suppliers, large supermarket seafood sections, local fish processors",
+      "local fish farms, aquaculture-only businesses, seafood testing labs, fishing vessels",
   },
   "Rice & Grains": {
     whatWeWant:
-      "COMMODITY GRAIN IMPORTERS and RICE WHOLESALERS — companies that import basmati rice, wheat, or commodity grains from India/Asia and distribute to food manufacturers or retailers",
+      "RETAILERS, SUPERMARKET CHAINS, PRIVATE LABEL RICE BRANDS, HOSPITALITY GROUPS, DISTRIBUTORS, and BUYING OFFICES — companies that buy, retail, or distribute basmati rice, specialty grains, or commodity grains from India/Asia. Includes supermarkets with own-brand rice ranges, ethnic food retail chains, hotel and restaurant procurement groups, private label rice brands, and grain distributors",
     whatWeAvoid:
-      "large commodity trading houses (Louis Dreyfus, Cargill) — too large and have protected procurement",
+      "mega commodity trading houses (Cargill, Louis Dreyfus, ADM, Bunge) — too large and vertically integrated with closed procurement, pure grain processing plants with no import buying",
     goodExamples:
-      "rice importers, basmati rice distributors, grain trading companies, cereal import houses",
+      "supermarket chains with own-brand basmati range, ethnic food retail chains, hotel and restaurant buying groups, private label rice and grain brands, rice distributors supplying supermarkets, South Asian grocery retail chains",
     badExamples:
-      "Cargill, Louis Dreyfus, Nestle, major FMCG brands",
+      "Cargill, Louis Dreyfus, ADM, Bunge — mega commodity houses with closed procurement chains",
   },
   "Spices & Herbs": {
     whatWeWant:
-      "SPICE IMPORTERS and HERB WHOLESALERS — companies that import dried spices, herbs, or seasonings from India/Asia and distribute to food manufacturers or specialty retailers",
+      "RETAILERS, SUPERMARKET CHAINS, PRIVATE LABEL SPICE BRANDS, HOSPITALITY GROUPS, DISTRIBUTORS, and BUYING OFFICES — companies that buy, retail, or distribute dried spices, herbs, or seasonings from India/Asia. Includes supermarkets with own-brand spice ranges, ethnic grocery retail chains, hotel and restaurant procurement, private label spice brands, and spice distributors",
     whatWeAvoid:
-      "spice brand owners that outsource sourcing (McCormick, etc.), large supermarket private label buyers",
+      "major consumer spice brands with their own locked global sourcing chains (McCormick, Schwartz, Ducros) — they do not open procurement to new suppliers easily",
     goodExamples:
-      "spice importers, herb wholesalers, ethnic food importers, food ingredient distributors",
+      "supermarkets with own-brand spice ranges, ethnic grocery retail chains, hotel and restaurant buying groups, private label spice brands, spice and herb distributors sourcing from India, food service spice suppliers",
     badExamples:
-      "McCormick, Schwartz, Ducros, major spice consumer brands",
+      "McCormick, Schwartz, Ducros, Verstegen — major consumer brands with closed procurement",
   },
   "Pulses & Lentils": {
     whatWeWant:
-      "PULSE AND LEGUME IMPORTERS — companies that import lentils, chickpeas, or dried beans from India/Canada and distribute to food manufacturers or specialty food retailers",
+      "RETAILERS, SUPERMARKET CHAINS, PRIVATE LABEL PULSE BRANDS, HOSPITALITY GROUPS, DISTRIBUTORS, and BUYING OFFICES — companies that buy, retail, or distribute lentils, chickpeas, or dried beans from India/Asia. Includes supermarkets with own-brand pulse ranges, ethnic food retail chains, health food retail chains, hotel and restaurant procurement, and private label pulse brands",
     whatWeAvoid:
-      "large commodity traders, supermarket private label buyers",
+      "mega commodity traders (Cargill, ADM, Bunge) — too large and vertically integrated, pure grain trading desks with no branded or retail output",
     goodExamples:
-      "pulse importers, legume wholesalers, health food ingredient importers, dried bean distributors",
+      "supermarkets with own-brand lentil and pulse ranges, ethnic food retail chains, health food retail chains, South Asian grocery chains, hotel and restaurant groups buying dried pulses, private label pulse and lentil brands, distributors supplying retail",
     badExamples:
-      "Bonduelle, major canned food brands, large commodity traders",
+      "Cargill, ADM, Bunge, Bonduelle — mega commodity houses or large canned food brands with closed procurement",
   },
 };
 
@@ -123,8 +123,8 @@ async function queryGroqBatch(
   batchId: string
 ): Promise<RawCompany[]> {
   const focusExtra = batchId === "batch-a"
-    ? "Focus on companies that import raw materials, components, or finished goods from Asia / South Asia / India."
-    : "Focus on regional distributors, independent wholesalers, and niche trading companies in the country.";
+    ? "Focus on RETAILERS, SUPERMARKET CHAINS, and HOSPITALITY GROUPS (hotel chains, restaurant groups) that buy this product from India / South Asia / Asia — either directly or via a buying office."
+    : "Focus on DISTRIBUTORS, BUYING OFFICES, PRIVATE LABEL BRANDS, and IMPORTERS that source this product from India / Asia and supply it to retailers or food service companies.";
 
   const prompt = `You are a global B2B trade expert. A sourcing company in India is looking for buyers.
 
@@ -139,11 +139,12 @@ ${cfg.whatWeAvoid}
 Bad examples: ${cfg.badExamples}
 
 ━━━ SIZE & REACHABILITY RULES ━━━
-✅ 30–500 employees, €1M–€150M revenue — small enough to have a reachable procurement email
-✅ Companies likely to have a contact like: procurement@, sourcing@, buying@, import@, einkauf@, info@
-❌ NO household-name mega-brands — they hide behind enterprise firewalls
+✅ 30–2000 employees — includes regional retail chains, hotel groups, and department stores
+✅ Companies likely to have a contact like: procurement@, sourcing@, buying@, import@, einkauf@, purchasing@
+✅ Prefer companies with a buying office, procurement team, or sourcing department
 ❌ NO freight forwarders, logistics firms, customs agents
 ❌ NO companies that EXPORT the product instead of importing it
+❌ NO sourcing agents or sourcing intermediaries — companies whose business is sourcing FROM India/Asia on behalf of Western brands. These are our competitors. Signs: "sourcing partner", "production partner", "apparel sourcing", "garment sourcing", "manufacturing partner", "sourcing agent". They are NOT buyers — they compete with us.
 ❌ Do not include any company you are less than 75% confident is real and based in ${country}
 
 ${focusExtra}

@@ -59,8 +59,10 @@ type SignatureData = {
 async function resolveSignatureForBuyer(buyer: {
     assignedGmailAccount: string | null;
     emailTemplateId: string | null;
+    customEmailBody?: string | null;
 }): Promise<SignatureData | null> {
-    if (buyer.emailTemplateId) {
+    // Custom-body imports always use the default account signature
+    if (!buyer.customEmailBody && buyer.emailTemplateId) {
         const tpl = await prisma.buyerEmailCampaignTemplate.findUnique({
             where: { id: buyer.emailTemplateId },
             include: { signature: true },
@@ -101,7 +103,22 @@ export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?:
         let subject: string;
         let html: string;
 
-        if (buyer.emailTemplateId) {
+        if (buyer.customEmailBody) {
+            // Per-buyer template from Excel import — use its body with default signature
+            const inlineTemplate: CustomEmailTemplate = {
+                introSubject: `Sourcing Partnership Inquiry | Élan Exports`,
+                introBody: buyer.customEmailBody,
+                followup1Subject: `Follow-Up | Élan Exports`,
+                followup1Body: buyer.customEmailBody,
+                followup2Subject: `Follow-Up | Élan Exports`,
+                followup2Body: buyer.customEmailBody,
+                followup3Subject: `Follow-Up | Élan Exports`,
+                followup3Body: buyer.customEmailBody,
+            };
+            const result = getCustomBuyerTemplate(1, inlineTemplate, templateData);
+            subject = result.subject;
+            html = result.html;
+        } else if (buyer.emailTemplateId) {
             const customTpl = await (prisma as any).buyerEmailCampaignTemplate.findUnique({ where: { id: buyer.emailTemplateId } }) as CustomEmailTemplate | null;
             if (customTpl) {
                 const result = getCustomBuyerTemplate(1, customTpl, templateData);
@@ -185,7 +202,7 @@ export async function executeSendStep(sourcingBuyerId: string, createdBy?: strin
                 select: {
                     id: true, company: true, email: true, contactPerson: true,
                     assignedGmailAccount: true, status: true, product: true,
-                    productCategory: true, emailTemplateId: true,
+                    productCategory: true, emailTemplateId: true, customEmailBody: true,
                 },
             },
         },
@@ -211,7 +228,20 @@ export async function executeSendStep(sourcingBuyerId: string, createdBy?: strin
     let subject: string;
     let html: string;
 
-    if (buyer.emailTemplateId) {
+    if (buyer.customEmailBody) {
+        const inlineTemplate: CustomEmailTemplate = {
+            introSubject: `Sourcing Partnership Inquiry | Élan Exports`,
+            introBody: buyer.customEmailBody,
+            followup1Subject: `Follow-Up | Élan Exports`,
+            followup1Body: buyer.customEmailBody,
+            followup2Subject: `Follow-Up | Élan Exports`,
+            followup2Body: buyer.customEmailBody,
+            followup3Subject: `Follow-Up | Élan Exports`,
+            followup3Body: buyer.customEmailBody,
+        };
+        const r = getCustomBuyerTemplate(nextStep, inlineTemplate, templateData);
+        subject = r.subject; html = r.html;
+    } else if (buyer.emailTemplateId) {
         const customTpl = await (prisma as any).buyerEmailCampaignTemplate.findUnique({ where: { id: buyer.emailTemplateId } }) as CustomEmailTemplate | null;
         if (customTpl) {
             const r = getCustomBuyerTemplate(nextStep, customTpl, templateData);

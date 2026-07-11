@@ -4,6 +4,9 @@ import { fetchThreadReplies } from "./gmailService.js";
 import { autoMoveToOldSupplier } from "../controllers/sourcingEmailCampaign.controller.js";
 import { createNotification } from "./notificationService.js";
 import { BUYER_GMAIL_ACCOUNT } from "../controllers/sourcingBuyers.controller.js";
+import { sendImmediateReplyAlert } from "./mailer.js";
+
+const CRM_BASE_URL = "https://crm.eectrade.com";
 
 /**
  * Fetch all messages in a thread and persist any that aren't already stored.
@@ -44,7 +47,7 @@ async function syncThreadMessages(
     return { hasReply, hasBounce };
 }
 
-async function flagReplyReceived(sourcingId: string, company: string): Promise<void> {
+async function flagReplyReceived(sourcingId: string, company: string, assignedGmailAccount: string, supplierEmail?: string | null, contactPerson?: string | null): Promise<void> {
     await (prisma as any).$transaction([
         (prisma as any).sourcingEmailCampaign.update({
             where: { sourcingId },
@@ -69,6 +72,16 @@ async function flagReplyReceived(sourcingId: string, company: string): Promise<v
         entityName: company,
         entityLink: `/suppliers/sourcing/${sourcingId}`,
     });
+
+    // Instant email alert to the sender account
+    sendImmediateReplyAlert({
+        to: assignedGmailAccount,
+        company,
+        contactPerson: contactPerson ?? null,
+        companyEmail: supplierEmail ?? null,
+        entityType: "supplier",
+        crmLink: `${CRM_BASE_URL}/suppliers/sourcing/${sourcingId}`,
+    }).catch((err: unknown) => console.error(`[ReplyDetector] Failed to send instant alert for ${company}:`, err));
 }
 
 async function flagDeliveryFailure(sourcingId: string, company: string): Promise<void> {
@@ -119,7 +132,7 @@ async function checkCampaignReplies() {
             },
             include: {
                 sourcingSupplier: {
-                    select: { id: true, company: true, assignedGmailAccount: true, status: true },
+                    select: { id: true, company: true, email: true, contactPerson: true, assignedGmailAccount: true, status: true },
                 },
             },
         });
@@ -148,7 +161,7 @@ async function checkCampaignReplies() {
                 } else if (hasReply && campaign.status === "active") {
                     repliesFound++;
                     console.log(`[ReplyDetector] Reply detected from ${supplier.company} — flagging`);
-                    await flagReplyReceived(campaign.sourcingId, supplier.company);
+                    await flagReplyReceived(campaign.sourcingId, supplier.company, supplier.assignedGmailAccount, supplier.email, supplier.contactPerson);
                 } else if (!hasReply && !hasBounce && campaign.status === "active") {
                     await (prisma as any).sourcingEmailCampaign.update({
                         where: { sourcingId: campaign.sourcingId },
@@ -222,7 +235,7 @@ async function checkBuyerCampaignReplies() {
                 gmailThreadId: { not: null },
             },
             include: {
-                sourcingBuyer: { select: { id: true, company: true, email: true, buyerVaultContactId: true } },
+                sourcingBuyer: { select: { id: true, company: true, email: true, contactPerson: true, assignedGmailAccount: true, buyerVaultContactId: true } },
             },
         });
 
@@ -299,6 +312,17 @@ async function checkBuyerCampaignReplies() {
                         entityName: buyer.company,
                         entityLink: `/buyers/sourcing/${buyer.id}`,
                     });
+
+                    // Instant email alert to the assigned sender account
+                    const alertTo = buyer.assignedGmailAccount ?? BUYER_GMAIL_ACCOUNT;
+                    sendImmediateReplyAlert({
+                        to: alertTo,
+                        company: buyer.company,
+                        contactPerson: buyer.contactPerson ?? null,
+                        companyEmail: buyer.email ?? null,
+                        entityType: "buyer",
+                        crmLink: `${CRM_BASE_URL}/buyers/sourcing/${buyer.id}`,
+                    }).catch((err: unknown) => console.error(`[ReplyDetector] Failed to send buyer alert for ${buyer.company}:`, err));
                 } else if (!hasReply && !hasBounce && campaign.status === "active") {
                     // FU3 sent + 3-day grace period passed + still no reply → mark completed
                     if (

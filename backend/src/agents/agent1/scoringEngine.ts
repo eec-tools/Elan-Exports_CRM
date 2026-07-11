@@ -96,13 +96,32 @@ function buildScoringPrompt(
 EEC is an India-based commodity and textile sourcing intermediary.
 
 EEC's Ideal Customer Profile (ICP):
-- Imports: food / organic produce / textiles / seafood / spices / rice / pulses
+- Buys / retails / distributes: food / organic produce / textiles / seafood / spices / rice / pulses
 - Geography: Europe, Middle East, or Asia
-- Size: $10M–$200M revenue OR 50–500 employees
+- Size: $10M–$500M revenue OR 50–2000 employees
 - Signal: sources or is open to sourcing from India / South Asia
-- Contact: reachable procurement or buying decision-maker
+- Contact: reachable procurement, buying, or category decision-maker
 
-CURRENT SEARCH TARGET: ${productCategory} importers in ${targetCountry}
+IDEAL BUYER TYPES ACROSS ALL CATEGORIES (score these HIGH):
+  ✅ Retailers and retail chains — buy to sell in stores
+  ✅ Supermarket chains — including own-brand / private label buyers
+  ✅ Private label buyers — brands that source product and sell under their own label
+  ✅ Hospitality groups — hotel chains, restaurant groups buying for food service
+  ✅ Distributors — companies that import and supply to retailers or food service
+  ✅ Buying offices — procurement arms that source from India/Asia for parent companies
+  ✅ Brands who have sourced from India before — proven India supply chain history
+
+DO NOT penalise a company for being a retailer, supermarket, or large chain.
+If they buy the product category and operate in EEC's target geography, they are a strong lead.
+
+⛔ AUTOMATIC DISCARD — score 0 across all dimensions if the company is a SOURCING INTERMEDIARY:
+  A sourcing agent, sourcing partner, or production partner whose core business is sourcing
+  goods FROM India/Asia on behalf of Western brands. These are EEC's direct competitors, not buyers.
+  Signals: "sourcing partner", "production partner", "apparel sourcing company", "garment sourcing",
+  "manufacturing partner", "sourcing agent", "trusted sourcing", "sourcing consultancy",
+  "we source from India for our clients". Example: ryzealsourcing.com — discard immediately.
+
+CURRENT SEARCH TARGET: ${productCategory} buyers in ${targetCountry}
 
 COMPANY PROFILE:
   Name:                ${profile.name}
@@ -120,7 +139,10 @@ COMPANY PROFILE:
 Score on EXACTLY 5 dimensions, 0–20 points each:
 
 D1 Product Category Match (0-20)
-  Does this company import ${productCategory} or closely related products?
+  Does this company buy, import, or retail ${productCategory} or closely related products?
+  For Textiles: retail chains, home furnishing brands, hotel/hospitality linen buyers,
+  bedding brands, department stores, uniform companies, promotional textile firms, apparel
+  stores — ALL score 20. Raw yarn traders or fabric-only merchants score 5.
   20=perfect match  10=adjacent/partial  5=possible/unclear  0=no match
 
 D2 Asia/India Sourcing Signal (0-20)
