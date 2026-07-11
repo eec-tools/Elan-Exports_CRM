@@ -29,9 +29,7 @@ import { Label } from "@/components/ui/label";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { label: "partners@eectrade.com",      account: "partners@eectrade.com" },
-  { label: "procurement1@eectrade.com",  account: "procurement1@eectrade.com" },
-  { label: "procurement2@eectrade.com",  account: "procurement2@eectrade.com" },
+  { label: "partners@eectrade.com", account: "partners@eectrade.com" },
 ];
 
 interface VaultContact {

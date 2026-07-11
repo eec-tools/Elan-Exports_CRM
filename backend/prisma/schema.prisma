@@ -1186,6 +1186,7 @@ model SourcingBuyer {
   updatedAt            DateTime                    @updatedAt @map("updated_at")
   buyerVaultContactId  String?                     @map("buyer_vault_contact_id")
   emailCampaign        SourcingBuyerEmailCampaign?
+  emailReplies         BuyerEmailReply[]
   creator              User?                       @relation(fields: [createdBy], references: [id])
 
   @@map("sourcing_buyers")
@@ -1213,17 +1214,18 @@ model SourcingBuyerEmailCampaign {
 }
 
 model BuyerEmailReply {
-  id              String    @id @default(uuid())
-  sourcingBuyerId String?   @map("sourcing_buyer_id")
-  gmailMessageId  String?   @map("gmail_message_id")
-  direction       String    @default("received") @map("direction")
-  fromEmail       String    @map("from_email")
-  fromName        String?   @map("from_name")
+  id              String         @id @default(uuid())
+  sourcingBuyerId String?        @map("sourcing_buyer_id")
+  gmailMessageId  String?        @map("gmail_message_id")
+  direction       String         @default("received") @map("direction")
+  fromEmail       String         @map("from_email")
+  fromName        String?        @map("from_name")
   subject         String?
   body            String
-  receivedAt      DateTime  @map("received_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  repliedAt       DateTime? @map("replied_at")
+  receivedAt      DateTime       @map("received_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  repliedAt       DateTime?      @map("replied_at")
+  sourcingBuyer   SourcingBuyer? @relation(fields: [sourcingBuyerId], references: [id], onDelete: SetNull)
 
   @@map("buyer_email_replies")
 }

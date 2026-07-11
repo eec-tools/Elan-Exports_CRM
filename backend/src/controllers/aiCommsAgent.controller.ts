@@ -150,7 +150,7 @@ BODY:
     const lines = raw
       .replace("CLARIFICATION_NEEDED:", "")
       .split("\n")
-      .map((l) => l.replace(/^[-•*]\s*/, "").trim())
+      .map((l: string) => l.replace(/^[-•*]\s*/, "").trim())
       .filter(Boolean);
     return { clarificationsNeeded: lines };
   }
@@ -167,6 +167,43 @@ BODY:
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Prisma filter that excludes bounce, NDR, and auto-reply messages
+const BOUNCE_EXCLUSION = {
+  NOT: {
+    OR: [
+      // Delivery-failure subjects
+      { subject: { contains: "delivery status notification", mode: "insensitive" as const } },
+      { subject: { contains: "delivery failed",              mode: "insensitive" as const } },
+      { subject: { contains: "delivery failure",             mode: "insensitive" as const } },
+      { subject: { contains: "undeliverable",                mode: "insensitive" as const } },
+      { subject: { contains: "mail delivery failed",         mode: "insensitive" as const } },
+      { subject: { contains: "failure notice",               mode: "insensitive" as const } },
+      { subject: { contains: "returned mail",                mode: "insensitive" as const } },
+      { subject: { contains: "address not found",            mode: "insensitive" as const } },
+      { subject: { contains: "message not delivered",        mode: "insensitive" as const } },
+      // Auto-reply subjects
+      { subject: { contains: "out of office",    mode: "insensitive" as const } },
+      { subject: { contains: "automatic reply",  mode: "insensitive" as const } },
+      { subject: { contains: "auto-reply",       mode: "insensitive" as const } },
+      { subject: { contains: "auto reply",       mode: "insensitive" as const } },
+      // System senders
+      { fromEmail: { contains: "mailer-daemon",  mode: "insensitive" as const } },
+      { fromEmail: { contains: "postmaster",     mode: "insensitive" as const } },
+      { fromEmail: { contains: "bounce",         mode: "insensitive" as const } },
+      { fromEmail: { contains: "noreply",        mode: "insensitive" as const } },
+      { fromEmail: { contains: "no-reply",       mode: "insensitive" as const } },
+      { fromEmail: { contains: "donotreply",     mode: "insensitive" as const } },
+      // Body tells (NDR body text)
+      { body: { contains: "address not found",             mode: "insensitive" as const } },
+      { body: { contains: "address couldn't be found",     mode: "insensitive" as const } },
+      { body: { contains: "message wasn't delivered",      mode: "insensitive" as const } },
+      { body: { contains: "couldn't be found or is unable to receive", mode: "insensitive" as const } },
+    ],
+  },
+};
+
+const HUMAN_REPLY_FILTER = { direction: "received", ...BOUNCE_EXCLUSION };
+
 /**
  * GET /api/ai-comms/inbox?account=<email>
  * Returns received messages grouped — each item includes buyer + latest received reply.
@@ -175,7 +212,6 @@ export async function getInbox(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { account } = req.query as { account?: string };
 
-    // Build WHERE clause for account filter
     const buyerWhere: any = {};
     if (account && account !== "all") {
       buyerWhere.assignedGmailAccount = account;
@@ -183,17 +219,15 @@ export async function getInbox(req: AuthRequest, res: Response): Promise<void> {
       buyerWhere.assignedGmailAccount = { in: COMMS_ACCOUNTS };
     }
 
-    // Find all sourcing buyers with received replies that haven't been replied to
+    // Only include buyers that have at least one genuine human reply
     const buyers = await (prisma as any).sourcingBuyer.findMany({
       where: {
         ...buyerWhere,
-        emailReplies: {
-          some: { direction: "received" },
-        },
+        emailReplies: { some: HUMAN_REPLY_FILTER },
       },
       include: {
         emailReplies: {
-          where: { direction: "received" },
+          where: HUMAN_REPLY_FILTER,
           orderBy: { receivedAt: "desc" },
         },
         emailCampaign: true,
