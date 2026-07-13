@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Loader2,
   User,
+  PhoneCall,
   Globe,
   Package,
   CheckCircle2,
@@ -56,6 +57,7 @@ interface InboxItem {
   country?: string | null;
   product?: string | null;
   assignedGmailAccount: string;
+  alreadyContacted: boolean;
   campaignStatus: string;
   latestReply: LatestReply;
   unrepliedCount: number;
@@ -151,6 +153,23 @@ function DraftPanel({
   onSent: () => void;
 }) {
   const queryClient = useQueryClient();
+
+  const [contacted, setContacted] = useState(item.alreadyContacted);
+  const [togglingContacted, setTogglingContacted] = useState(false);
+
+  async function handleToggleContacted() {
+    setTogglingContacted(true);
+    try {
+      await api.patch(`/ai-comms/${item.id}/contacted`, { alreadyContacted: !contacted });
+      setContacted((v) => !v);
+      queryClient.invalidateQueries({ queryKey: ["ai-comms-inbox"] });
+      toast.success(!contacted ? "Marked as already contacted" : "Marked as pending reply");
+    } catch {
+      toast.error("Failed to update contacted status");
+    } finally {
+      setTogglingContacted(false);
+    }
+  }
 
   const [draftSubject, setDraftSubject] = useState("");
   const [draftBody, setDraftBody] = useState("");
@@ -256,6 +275,23 @@ function DraftPanel({
             </div>
           </div>
         </div>
+        <button
+          onClick={handleToggleContacted}
+          disabled={togglingContacted}
+          title={contacted ? "Click to mark as pending reply" : "Click if already contacted via call/other channel"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+            contacted
+              ? "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200"
+              : "bg-muted border-border text-muted-foreground hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700"
+          }`}
+        >
+          {togglingContacted ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <PhoneCall className="h-3 w-3" />
+          )}
+          {contacted ? "Already Contacted" : "Mark Contacted"}
+        </button>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
           <Mail className="h-3 w-3" />
           {item.assignedGmailAccount.split("@")[0]}
@@ -532,8 +568,9 @@ export default function AiCommsAgentPage() {
     setSelectedItem(null);
   }, [activeTab]);
 
-  const unreplied = inbox.filter((i) => !i.latestReply.repliedAt);
-  const replied = inbox.filter((i) => !!i.latestReply.repliedAt);
+  const unreplied = inbox.filter((i) => !i.latestReply.repliedAt && !i.alreadyContacted);
+  const alreadyContacted = inbox.filter((i) => i.alreadyContacted);
+  const replied = inbox.filter((i) => !!i.latestReply.repliedAt && !i.alreadyContacted);
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
@@ -613,7 +650,26 @@ export default function AiCommsAgentPage() {
                   </div>
                 )}
 
-                {/* Already replied */}
+                {/* Already contacted via other channel */}
+                {alreadyContacted.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 px-1">
+                      <PhoneCall className="h-3 w-3 text-emerald-600" />
+                      <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">
+                        Already Contacted · {alreadyContacted.length}
+                      </p>
+                    </div>
+                    {alreadyContacted.map((item) => (
+                      <InboxCard
+                        key={item.id}
+                        item={item}
+                        onSelect={() => setSelectedItem(item)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Already replied by email */}
                 {replied.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">

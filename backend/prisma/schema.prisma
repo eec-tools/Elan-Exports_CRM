@@ -1185,6 +1185,7 @@ model SourcingBuyer {
   createdAt            DateTime                    @default(now()) @map("created_at")
   updatedAt            DateTime                    @updatedAt @map("updated_at")
   buyerVaultContactId  String?                     @map("buyer_vault_contact_id")
+  alreadyContacted     Boolean                     @default(false) @map("already_contacted")
   emailCampaign        SourcingBuyerEmailCampaign?
   emailReplies         BuyerEmailReply[]
   creator              User?                       @relation(fields: [createdBy], references: [id])

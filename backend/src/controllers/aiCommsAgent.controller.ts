@@ -261,6 +261,7 @@ export async function getInbox(req: AuthRequest, res: Response): Promise<void> {
           country: b.country ?? vaultContact?.country,
           product: b.product ?? vaultContact?.product,
           assignedGmailAccount: b.assignedGmailAccount ?? BUYER_GMAIL_ACCOUNT,
+          alreadyContacted: b.alreadyContacted ?? false,
           campaignStatus: b.emailCampaign?.status ?? "pending",
           latestReply: latestReply
             ? {
@@ -283,6 +284,26 @@ export async function getInbox(req: AuthRequest, res: Response): Promise<void> {
   } catch (err) {
     console.error("[aiComms] getInbox error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * PATCH /api/ai-comms/:sourcingBuyerId/contacted
+ * Toggles the alreadyContacted flag on a sourcing buyer.
+ */
+export async function toggleContacted(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { sourcingBuyerId } = req.params as { sourcingBuyerId: string };
+    const { alreadyContacted } = req.body as { alreadyContacted: boolean };
+    const updated = await (prisma as any).sourcingBuyer.update({
+      where: { id: sourcingBuyerId },
+      data: { alreadyContacted: Boolean(alreadyContacted) },
+      select: { id: true, alreadyContacted: true },
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error("[aiComms] toggleContacted error:", err);
+    res.status(500).json({ error: "Failed to update contacted status" });
   }
 }
 

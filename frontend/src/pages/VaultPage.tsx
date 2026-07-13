@@ -1215,7 +1215,7 @@ export default function VaultPage() {
                 /* ── Block View (cards grid) ── */
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                   {files.map((doc) => {
-                    const { color, bg, gradient } = getCategoryMeta(doc.category);
+                    const { color, gradient } = getCategoryMeta(doc.category);
                     const fileCanEdit = doc.canEdit !== undefined ? doc.canEdit : canEdit;
                     const isDragging = draggedItem?.id === doc.id;
                     const isCut = clipboard?.item.id === doc.id && clipboard.mode === "cut";
