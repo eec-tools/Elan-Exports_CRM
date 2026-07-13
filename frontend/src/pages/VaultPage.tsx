@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -35,6 +35,11 @@ import {
   Lock,
   CalendarClock,
   Download,
+  LayoutList,
+  LayoutGrid,
+  Copy,
+  Scissors,
+  ClipboardPaste,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/client";
@@ -277,6 +282,20 @@ export default function VaultPage() {
   // Delete dialog
   const [deleteDoc, setDeleteDoc] = useState<VaultDocument | null>(null);
 
+  // View mode: list or block
+  const [viewMode, setViewMode] = useState<"list" | "block">("list");
+
+  // Drag & drop
+  const [draggedItem, setDraggedItem] = useState<VaultDocument | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+
+  // Clipboard (copy / cut / paste)
+  const [clipboard, setClipboard] = useState<{ item: VaultDocument; mode: "copy" | "cut" } | null>(null);
+
+  // Context menu
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; doc: VaultDocument } | null>(null);
+
   // ─── Queries ────────────────────────────────────────
 
   const { data: documents = [], isLoading: docsLoading } = useQuery<
@@ -377,7 +396,6 @@ export default function VaultPage() {
     const isSingle = uploadFiles.length === 1;
     setUploadStatus("uploading");
 
-    // Initialise per-file progress
     setUploadProgress(uploadFiles.map((f) => ({ file: f, status: "pending" })));
 
     try {
@@ -537,6 +555,43 @@ export default function VaultPage() {
     },
   });
 
+  // ─── Move mutation ───────────────────────────────────
+
+  const moveMutation = useMutation({
+    mutationFn: async ({ id, targetParentId }: { id: string; targetParentId: string | null }) => {
+      const res = await api.put(`/vault/${id}/move`, { targetParentId });
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Moved successfully");
+      queryClient.invalidateQueries({ queryKey: ["vault-documents"] });
+      setDraggedItem(null);
+      setDragOverFolderId(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error ?? "Move failed");
+      setDraggedItem(null);
+      setDragOverFolderId(null);
+    },
+  });
+
+  // ─── Copy mutation ───────────────────────────────────
+
+  const copyMutation = useMutation({
+    mutationFn: async ({ id, targetParentId }: { id: string; targetParentId: string | null }) => {
+      const res = await api.post(`/vault/${id}/copy`, { targetParentId });
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Copied successfully");
+      queryClient.invalidateQueries({ queryKey: ["vault-documents"] });
+      setClipboard(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error ?? "Copy failed");
+    },
+  });
+
   // ─── Handlers ────────────────────────────────────────
 
   function navigateToFolder(folderId: string | null) {
@@ -548,7 +603,6 @@ export default function VaultPage() {
     if (!newFiles || newFiles.length === 0) return;
     const arr = Array.from(newFiles);
     setUploadFiles(arr);
-    // Auto-fill name only for single file
     if (arr.length === 1) {
       const nameWithoutExt = arr[0].name.replace(/\.[^/.]+$/, "") || arr[0].name;
       setUploadForm((prev) => ({ ...prev, name: prev.name || nameWithoutExt }));
@@ -585,6 +639,67 @@ export default function VaultPage() {
     }
     editMutation.mutate({ id: editDoc.id, data });
   }
+
+  // ─── Drag & Drop ─────────────────────────────────────
+
+  function handleDragStart(e: React.DragEvent, item: VaultDocument) {
+    setDraggedItem(item);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", item.id);
+  }
+
+  function handleDragEnd() {
+    setDraggedItem(null);
+    setDragOverFolderId(null);
+  }
+
+  function handleFolderDragOver(e: React.DragEvent, folderId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverFolderId !== folderId) setDragOverFolderId(folderId);
+  }
+
+  function handleFolderDragLeave(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverFolderId(null);
+    }
+  }
+
+  function handleFolderDrop(e: React.DragEvent, targetFolderId: string) {
+    e.preventDefault();
+    setDragOverFolderId(null);
+    if (!draggedItem) return;
+    if (draggedItem.id === targetFolderId) return;
+    moveMutation.mutate({ id: draggedItem.id, targetParentId: targetFolderId });
+  }
+
+  // ─── Clipboard ───────────────────────────────────────
+
+  function handlePaste() {
+    if (!clipboard) return;
+    if (clipboard.mode === "copy") {
+      copyMutation.mutate({ id: clipboard.item.id, targetParentId: currentFolderId });
+    } else {
+      moveMutation.mutate({ id: clipboard.item.id, targetParentId: currentFolderId });
+      setClipboard(null);
+    }
+  }
+
+  // ─── Context Menu ────────────────────────────────────
+
+  function handleContextMenu(e: React.MouseEvent, doc: VaultDocument) {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, doc });
+  }
+
+  useEffect(() => {
+    function closeMenu() { setContextMenu(null); }
+    window.addEventListener("click", closeMenu);
+    return () => window.removeEventListener("click", closeMenu);
+  }, []);
+
+  // ─── Formatting helpers ──────────────────────────────
 
   function formatDate(iso: string) {
     return new Date(iso).toLocaleString("en-IN", {
@@ -699,8 +814,8 @@ export default function VaultPage() {
         ))}
       </div>
 
-      {/* Search + Back bar */}
-      <div className="flex items-center gap-3">
+      {/* Search + Back bar + View Toggle */}
+      <div className="flex items-center gap-3 flex-wrap">
         {!isAtRoot && !search && (
           <Button
             variant="ghost"
@@ -738,6 +853,28 @@ export default function VaultPage() {
             </button>
           )}
         </div>
+
+        {/* Clipboard indicator */}
+        {clipboard && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-xs text-primary">
+            {clipboard.mode === "cut" ? <Scissors className="h-3 w-3 shrink-0" /> : <Copy className="h-3 w-3 shrink-0" />}
+            <span className="truncate max-w-[100px] font-medium">{clipboard.item.name}</span>
+            <button
+              onClick={handlePaste}
+              className="font-semibold hover:underline whitespace-nowrap"
+            >
+              Paste here
+            </button>
+            <button
+              onClick={() => setClipboard(null)}
+              className="text-muted-foreground hover:text-foreground"
+              title="Clear clipboard"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+
         <span className="text-sm text-muted-foreground ml-auto">
           {folders.length > 0 && (
             <span>
@@ -752,6 +889,28 @@ export default function VaultPage() {
           )}
           {folders.length === 0 && files.length === 0 && !docsLoading && "Empty"}
         </span>
+
+        {/* View toggle */}
+        <div className="flex gap-0.5 border border-border rounded-lg p-0.5">
+          <Button
+            variant={viewMode === "list" ? "secondary" : "ghost"}
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setViewMode("list")}
+            title="List view"
+          >
+            <LayoutList className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant={viewMode === "block" ? "secondary" : "ghost"}
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setViewMode("block")}
+            title="Block view"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
 
       {/* Content area */}
@@ -792,12 +951,19 @@ export default function VaultPage() {
                   </Button>
                 </div>
               )}
+              {/* Paste target when clipboard has content */}
+              {clipboard && (
+                <Button size="sm" variant="outline" onClick={handlePaste} className="gap-1 border-primary/40 text-primary">
+                  <ClipboardPaste className="h-3.5 w-3.5" />
+                  Paste "{clipboard.item.name}" here
+                </Button>
+              )}
             </>
           )}
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Folders Grid */}
+          {/* Folders Grid — always shown as blocks, draggable + drop targets */}
           {folders.length > 0 && (
             <div>
               {!search && (
@@ -807,21 +973,33 @@ export default function VaultPage() {
               )}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {folders.map((folder) => {
-                  const { gradient, Icon } = getCategoryMeta(
-                    folder.category
-                  );
+                  const { gradient, Icon } = getCategoryMeta(folder.category);
                   const childCount = folder._count?.children ?? 0;
+                  const isOver = dragOverFolderId === folder.id;
+                  const isDragging = draggedItem?.id === folder.id;
+                  const isCut = clipboard?.item.id === folder.id && clipboard.mode === "cut";
                   return (
                     <div
                       key={folder.id}
                       className="group relative"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, folder)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={(e) => handleFolderDragOver(e, folder.id)}
+                      onDragLeave={handleFolderDragLeave}
+                      onDrop={(e) => handleFolderDrop(e, folder.id)}
+                      onContextMenu={(e) => handleContextMenu(e, folder)}
                     >
                       <button
                         onClick={() => navigateToFolder(folder.id)}
-                        className="w-full flex flex-col items-center gap-2.5 rounded-xl border border-border bg-card p-4 text-center transition-all hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5 active:translate-y-0"
+                        className={`w-full flex flex-col items-center gap-2.5 rounded-xl border bg-card p-4 text-center transition-all hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 ${
+                          isOver
+                            ? "border-primary shadow-lg scale-105 bg-primary/5"
+                            : "border-border hover:border-primary/30"
+                        } ${isDragging ? "opacity-30" : ""} ${isCut ? "opacity-50 border-dashed" : ""}`}
                       >
                         <div
-                          className={`rounded-xl p-3 bg-gradient-to-br ${gradient} shadow-sm`}
+                          className={`rounded-xl p-3 bg-gradient-to-br ${gradient} shadow-sm ${isOver ? "scale-110" : ""} transition-transform`}
                         >
                           <Icon className="h-6 w-6 text-white" />
                         </div>
@@ -836,6 +1014,9 @@ export default function VaultPage() {
                             {childCount} item{childCount !== 1 ? "s" : ""}
                           </p>
                         </div>
+                        {isOver && (
+                          <span className="text-[10px] text-primary font-medium">Drop to move here</span>
+                        )}
                       </button>
                       {/* Folder actions (hover) */}
                       {canEdit && (
@@ -873,7 +1054,7 @@ export default function VaultPage() {
             </div>
           )}
 
-          {/* Files Table */}
+          {/* Files — List or Block view */}
           {files.length > 0 && (
             <div>
               {!search && folders.length > 0 && (
@@ -881,138 +1062,261 @@ export default function VaultPage() {
                   Files
                 </p>
               )}
-              <div className="rounded-xl border border-border bg-card overflow-hidden">
-                {/* Table header */}
-                <div className="grid grid-cols-[minmax(0,1fr)_140px_120px_170px_170px_180px] items-stretch border-b bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <span className="px-4 py-2.5 border-r border-border">File</span>
-                  <span className="px-4 py-2.5 border-r border-border">Category</span>
-                  <span className="px-4 py-2.5 border-r border-border">Region</span>
-                  <span className="px-4 py-2.5 border-r border-border">Uploaded</span>
-                  <span className="px-4 py-2.5 border-r border-border">Modified</span>
-                  <span className="px-4 py-2.5 text-right">Actions</span>
-                </div>
 
-                <div className="divide-y divide-border">
+              {viewMode === "list" ? (
+                /* ── List View (table) ── */
+                <div className="rounded-xl border border-border bg-card overflow-hidden">
+                  {/* Table header */}
+                  <div className="grid grid-cols-[minmax(0,1fr)_140px_120px_170px_170px_180px] items-stretch border-b bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <span className="px-4 py-2.5 border-r border-border">File</span>
+                    <span className="px-4 py-2.5 border-r border-border">Category</span>
+                    <span className="px-4 py-2.5 border-r border-border">Region</span>
+                    <span className="px-4 py-2.5 border-r border-border">Uploaded</span>
+                    <span className="px-4 py-2.5 border-r border-border">Modified</span>
+                    <span className="px-4 py-2.5 text-right">Actions</span>
+                  </div>
+
+                  <div className="divide-y divide-border">
+                    {files.map((doc) => {
+                      const { color, bg, Icon: CatIcon } = getCategoryMeta(doc.category);
+                      const fileCanEdit = doc.canEdit !== undefined ? doc.canEdit : canEdit;
+                      const isDragging = draggedItem?.id === doc.id;
+                      const isCut = clipboard?.item.id === doc.id && clipboard.mode === "cut";
+                      return (
+                        <div
+                          key={doc.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, doc)}
+                          onDragEnd={handleDragEnd}
+                          onContextMenu={(e) => handleContextMenu(e, doc)}
+                          className={`grid grid-cols-[minmax(0,1fr)_140px_120px_170px_170px_180px] items-stretch hover:bg-muted/30 transition-colors group last:border-0 cursor-grab active:cursor-grabbing ${isDragging ? "opacity-30" : ""} ${isCut ? "opacity-50 bg-muted/20" : ""}`}
+                        >
+                          {/* Name + type icon + expiry badge */}
+                          <div className="flex items-center gap-3 min-w-0 px-4 py-3 border-r border-border">
+                            <div className={`shrink-0 rounded-lg p-2 ${bg}`}>
+                              <FileTypeIcon fileType={doc.fileType} className={`h-4 w-4 ${color}`} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {doc.fileUrl ? (
+                                  <button
+                                    onClick={() => setPreviewDoc(doc)}
+                                    className="font-medium text-sm truncate hover:underline text-left"
+                                    title={doc.name}
+                                  >
+                                    {doc.name}
+                                  </button>
+                                ) : (
+                                  <span className="font-medium text-sm truncate">{doc.name}</span>
+                                )}
+                                {doc.fileUrl && (
+                                  <a
+                                    href={doc.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Open in new tab"
+                                    className="shrink-0 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                                {getExpiryBadge(doc.expiryDate)}
+                              </div>
+                              {doc.uploader && (
+                                <p className="text-xs text-muted-foreground truncate">{doc.uploader.fullName}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Category */}
+                          <div className="flex items-center gap-1.5 px-4 py-3 border-r border-border">
+                            <CatIcon className={`h-3.5 w-3.5 shrink-0 ${color}`} />
+                            <span className={`text-xs font-medium ${color} truncate`}>{doc.category}</span>
+                          </div>
+
+                          {/* Region */}
+                          <span className="flex items-center px-4 py-3 text-sm text-muted-foreground border-r border-border truncate">
+                            {doc.region}
+                          </span>
+
+                          {/* Uploaded */}
+                          <span className="flex items-center px-4 py-3 text-xs text-muted-foreground border-r border-border">
+                            {formatDate(doc.createdAt)}
+                          </span>
+
+                          {/* Modified */}
+                          <span className="flex items-center px-4 py-3 text-xs text-muted-foreground border-r border-border">
+                            {formatDate(doc.updatedAt)}
+                          </span>
+
+                          {/* Actions */}
+                          <div className="flex items-center justify-end gap-0.5 px-2 py-3">
+                            {doc.fileUrl && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Preview"
+                                onClick={() => setPreviewDoc(doc)}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {fileCanEdit && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Edit metadata"
+                                  onClick={() => openEdit(doc)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                {doc.fileUrl && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Replace file"
+                                    onClick={() => { setReplaceDoc(doc); setReplaceFile(null); setReplaceStatus("idle"); }}
+                                  >
+                                    <RefreshCw className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Version history"
+                                  onClick={() => setHistoryDoc(doc)}
+                                >
+                                  <History className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                                  title="Delete"
+                                  onClick={() => setDeleteDoc(doc)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* ── Block View (cards grid) ── */
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                   {files.map((doc) => {
-                    const { color, bg, Icon: CatIcon } = getCategoryMeta(doc.category);
+                    const { color, bg, gradient } = getCategoryMeta(doc.category);
                     const fileCanEdit = doc.canEdit !== undefined ? doc.canEdit : canEdit;
+                    const isDragging = draggedItem?.id === doc.id;
+                    const isCut = clipboard?.item.id === doc.id && clipboard.mode === "cut";
                     return (
                       <div
                         key={doc.id}
-                        className="grid grid-cols-[minmax(0,1fr)_140px_120px_170px_170px_180px] items-stretch hover:bg-muted/30 transition-colors group last:border-0"
+                        className="group relative"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, doc)}
+                        onDragEnd={handleDragEnd}
+                        onContextMenu={(e) => handleContextMenu(e, doc)}
                       >
-                        {/* Name + type icon + expiry badge */}
-                        <div className="flex items-center gap-3 min-w-0 px-4 py-3 border-r border-border">
-                          <div className={`shrink-0 rounded-lg p-2 ${bg}`}>
-                            <FileTypeIcon fileType={doc.fileType} className={`h-4 w-4 ${color}`} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 min-w-0">
+                        <div
+                          className={`rounded-xl border bg-card p-4 transition-all hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5 cursor-grab active:cursor-grabbing ${
+                            isDragging ? "opacity-30" : ""
+                          } ${isCut ? "opacity-50 border-dashed border-primary/40" : "border-border"}`}
+                        >
+                          {/* Icon */}
+                          <div className="flex flex-col items-center gap-2.5 text-center">
+                            <div
+                              className={`rounded-xl p-3 bg-gradient-to-br ${gradient} shadow-sm`}
+                              onClick={() => doc.fileUrl && setPreviewDoc(doc)}
+                            >
+                              <FileTypeIcon fileType={doc.fileType} className="h-6 w-6 text-white" />
+                            </div>
+                            <div className="min-w-0 w-full">
                               {doc.fileUrl ? (
                                 <button
                                   onClick={() => setPreviewDoc(doc)}
-                                  className="font-medium text-sm truncate hover:underline text-left"
+                                  className="text-sm font-semibold truncate w-full text-center hover:underline leading-tight"
                                   title={doc.name}
                                 >
                                   {doc.name}
                                 </button>
                               ) : (
-                                <span className="font-medium text-sm truncate">{doc.name}</span>
+                                <p className="text-sm font-semibold truncate leading-tight" title={doc.name}>
+                                  {doc.name}
+                                </p>
                               )}
-                              {doc.fileUrl && (
-                                <a
-                                  href={doc.fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  title="Open in new tab"
-                                  className="shrink-0 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
+                              <span className={`text-xs font-medium ${color}`}>{doc.category}</span>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {new Date(doc.updatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                              </p>
+                              {getExpiryBadge(doc.expiryDate) && (
+                                <div className="mt-1 flex justify-center">
+                                  {getExpiryBadge(doc.expiryDate)}
+                                </div>
                               )}
-                              {getExpiryBadge(doc.expiryDate)}
                             </div>
-                            {doc.uploader && (
-                              <p className="text-xs text-muted-foreground truncate">{doc.uploader.fullName}</p>
-                            )}
                           </div>
                         </div>
 
-                        {/* Category */}
-                        <div className="flex items-center gap-1.5 px-4 py-3 border-r border-border">
-                          <CatIcon className={`h-3.5 w-3.5 shrink-0 ${color}`} />
-                          <span className={`text-xs font-medium ${color} truncate`}>{doc.category}</span>
-                        </div>
-
-                        {/* Region */}
-                        <span className="flex items-center px-4 py-3 text-sm text-muted-foreground border-r border-border truncate">
-                          {doc.region}
-                        </span>
-
-                        {/* Uploaded */}
-                        <span className="flex items-center px-4 py-3 text-xs text-muted-foreground border-r border-border">
-                          {formatDate(doc.createdAt)}
-                        </span>
-
-                        {/* Modified */}
-                        <span className="flex items-center px-4 py-3 text-xs text-muted-foreground border-r border-border">
-                          {formatDate(doc.updatedAt)}
-                        </span>
-
-                        {/* Actions */}
-                        <div className="flex items-center justify-end gap-0.5 px-2 py-3">
-                          {/* Preview */}
+                        {/* Hover actions */}
+                        <div className="absolute top-1.5 right-1.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           {doc.fileUrl && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="h-6 w-6 bg-card/90 backdrop-blur-sm shadow-sm"
                               title="Preview"
                               onClick={() => setPreviewDoc(doc)}
                             >
-                              <Eye className="h-3.5 w-3.5" />
+                              <Eye className="h-3 w-3" />
                             </Button>
+                          )}
+                          {doc.fileUrl && (
+                            <a
+                              href={doc.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Open in new tab"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 bg-card/90 backdrop-blur-sm shadow-sm"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            </a>
                           )}
                           {fileCanEdit && (
                             <>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="h-6 w-6 bg-card/90 backdrop-blur-sm shadow-sm"
                                 title="Edit metadata"
                                 onClick={() => openEdit(doc)}
                               >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              {doc.fileUrl && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Replace file"
-                                  onClick={() => { setReplaceDoc(doc); setReplaceFile(null); setReplaceStatus("idle"); }}
-                                >
-                                  <RefreshCw className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="Version history"
-                                onClick={() => setHistoryDoc(doc)}
-                              >
-                                <History className="h-3.5 w-3.5" />
+                                <Pencil className="h-3 w-3" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                                className="h-6 w-6 bg-card/90 backdrop-blur-sm shadow-sm text-destructive hover:text-destructive"
                                 title="Delete"
                                 onClick={() => setDeleteDoc(doc)}
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </>
                           )}
@@ -1021,8 +1325,96 @@ export default function VaultPage() {
                     );
                   })}
                 </div>
-              </div>
+              )}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── Context Menu ──────────────────────────────── */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          style={{
+            position: "fixed",
+            top: Math.min(contextMenu.y, window.innerHeight - 240),
+            left: Math.min(contextMenu.x, window.innerWidth - 200),
+            zIndex: 1000,
+          }}
+          className="bg-card border border-border rounded-xl shadow-2xl py-1 min-w-[188px] text-sm"
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground truncate border-b border-border mb-1 max-w-[188px]">
+            {contextMenu.doc.name}
+          </div>
+          <button
+            className="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2.5 transition-colors"
+            onClick={() => {
+              setClipboard({ item: contextMenu.doc, mode: "copy" });
+              setContextMenu(null);
+              toast.success(`"${contextMenu.doc.name}" copied`);
+            }}
+          >
+            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+            Copy
+          </button>
+          <button
+            className="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2.5 transition-colors"
+            onClick={() => {
+              setClipboard({ item: contextMenu.doc, mode: "cut" });
+              setContextMenu(null);
+              toast.success(`"${contextMenu.doc.name}" cut`);
+            }}
+          >
+            <Scissors className="h-3.5 w-3.5 text-muted-foreground" />
+            Cut
+          </button>
+          {clipboard && (
+            <button
+              className="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2.5 transition-colors"
+              onClick={() => { handlePaste(); setContextMenu(null); }}
+            >
+              <ClipboardPaste className="h-3.5 w-3.5 text-muted-foreground" />
+              Paste
+            </button>
+          )}
+          <div className="border-t border-border my-1" />
+          {!contextMenu.doc.isFolder && contextMenu.doc.fileUrl && (
+            <button
+              className="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2.5 transition-colors"
+              onClick={() => { setPreviewDoc(contextMenu.doc); setContextMenu(null); }}
+            >
+              <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+              Preview
+            </button>
+          )}
+          {contextMenu.doc.isFolder && (
+            <button
+              className="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2.5 transition-colors"
+              onClick={() => { navigateToFolder(contextMenu.doc.id); setContextMenu(null); }}
+            >
+              <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+              Open
+            </button>
+          )}
+          {(canEdit || contextMenu.doc.canEdit) && (
+            <>
+              <button
+                className="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2.5 transition-colors"
+                onClick={() => { openEdit(contextMenu.doc); setContextMenu(null); }}
+              >
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                Rename / Edit
+              </button>
+              <button
+                className="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2.5 text-destructive transition-colors"
+                onClick={() => { setDeleteDoc(contextMenu.doc); setContextMenu(null); }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </>
           )}
         </div>
       )}

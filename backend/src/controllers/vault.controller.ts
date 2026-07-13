@@ -457,6 +457,121 @@ export async function getFolderPolicy(
   }
 }
 
+/** PUT /api/vault/:id/move - move item to a different parent folder */
+export async function moveDocument(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { targetParentId } = req.body;
+
+    const existing = await prisma.vaultDocument.findUnique({ where: { id: id as string } });
+    if (!existing) {
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
+
+    // Prevent moving a folder into itself or its descendants
+    if (existing.isFolder && targetParentId) {
+      let checkId: string | null = targetParentId;
+      let safety = 20;
+      while (checkId && safety-- > 0) {
+        if (checkId === id) {
+          res.status(400).json({ error: "Cannot move a folder into itself or its descendants" });
+          return;
+        }
+        const parent = await prisma.vaultDocument.findUnique({
+          where: { id: checkId },
+          select: { parentId: true },
+        });
+        checkId = parent?.parentId ?? null;
+      }
+    }
+
+    const user = (req as any).user;
+    const isAdmin = user?.roles?.includes("admin") ?? false;
+    const hasVaultEdit = user?.permissions?.some((p: any) => p.permission === "vault" && p.accessLevel === "edit") ?? false;
+
+    const srcPolicy = await resolveFolderPolicy(existing.parentId);
+    const dstPolicy = await resolveFolderPolicy(targetParentId ?? null);
+    if (!(isAdmin || ((srcPolicy.edit === "all" && dstPolicy.edit === "all") && hasVaultEdit))) {
+      res.status(403).json({ error: "You do not have permission to move this item" });
+      return;
+    }
+
+    const updated = await prisma.vaultDocument.update({
+      where: { id: id as string },
+      data: { parentId: targetParentId ?? null },
+      include: {
+        uploader: { select: { fullName: true, email: true } },
+        _count: { select: { children: true } },
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /api/vault/:id/copy - copy a file to a different folder */
+export async function copyDocument(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { targetParentId } = req.body;
+
+    const existing = await prisma.vaultDocument.findUnique({ where: { id: id as string } });
+    if (!existing) {
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
+    if (existing.isFolder) {
+      res.status(400).json({ error: "Folder copy is not supported — copy individual files instead" });
+      return;
+    }
+
+    const user = (req as any).user;
+    const isAdmin = user?.roles?.includes("admin") ?? false;
+    const hasVaultEdit = user?.permissions?.some((p: any) => p.permission === "vault" && p.accessLevel === "edit") ?? false;
+    const userId = user?.id;
+
+    const dstPolicy = await resolveFolderPolicy(targetParentId ?? null);
+    if (!(isAdmin || (dstPolicy.edit === "all" && hasVaultEdit))) {
+      res.status(403).json({ error: "You do not have permission to paste to this folder" });
+      return;
+    }
+
+    const copy = await prisma.vaultDocument.create({
+      data: {
+        name: `${existing.name} (copy)`,
+        category: existing.category,
+        region: existing.region,
+        fileUrl: existing.fileUrl,
+        publicId: existing.publicId,
+        fileType: existing.fileType,
+        isFolder: false,
+        parentId: targetParentId ?? null,
+        uploadedBy: userId ?? null,
+        expiryDate: existing.expiryDate,
+      },
+      include: {
+        uploader: { select: { fullName: true, email: true } },
+        _count: { select: { children: true } },
+      },
+    });
+
+    res.status(201).json(copy);
+  } catch (err) {
+    next(err);
+  }
+}
+
 /** DELETE /api/vault/:id - delete a document/folder and its S3 file */
 export async function deleteDocument(
   req: Request,

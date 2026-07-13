@@ -7,6 +7,8 @@ import {
   uploadDocument,
   editDocument,
   deleteDocument,
+  moveDocument,
+  copyDocument,
   getVaultUploadSignature,
   replaceDocument,
   getDocumentVersions,
@@ -36,6 +38,8 @@ router.get("/upload-signature", requireEdit("vault"), getVaultUploadSignature);
 router.post("/folder", requireEdit("vault"), createFolder);
 router.post("/upload", requireEdit("vault"), uploadDocument);
 router.post("/:id/replace", requireEdit("vault"), replaceDocument);
+router.put("/:id/move", requireEdit("vault"), moveDocument);
+router.post("/:id/copy", requireEdit("vault"), copyDocument);
 router.put("/:id", requireEdit("vault"), editDocument);
 router.delete("/:id", requireEdit("vault"), deleteDocument);
 
