@@ -516,6 +516,7 @@ model SourcingSupplier {
   phone                      String?
   supplierStage              String                 @default("Sourcing") @map("supplier_stage")
   status                     String                 @default("pending") @map("status")
+  alreadyContacted           Boolean                @default(false) @map("already_contacted")
   formToken                  String?                @unique @map("form_token")
   tradeName                  String?                @map("trade_name")
   yearEstablished            String?                @map("year_established")

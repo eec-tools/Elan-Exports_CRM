@@ -26,6 +26,7 @@ import {
   Circle,
   AlertCircle,
   MessageSquare,
+  PhoneCall,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -124,6 +125,7 @@ interface SourcingSupplier {
   factoryVisitDate?: string;
   factoryVisitOutcome?: string;
   referralSource?: string;
+  alreadyContacted?: boolean;
   emailTemplateId?: string | null;
   assignedGmailAccount?: string | null;
   emailCampaign?: {
@@ -237,6 +239,7 @@ export default function SourcingSupplierDetailsPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [formLinkOpen, setFormLinkOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [alreadyContacted, setAlreadyContacted] = useState(false);
 
   const set = (key: string) => (value: string) => {
     setFields((f) => ({ ...f, [key]: value }));
@@ -293,10 +296,20 @@ export default function SourcingSupplierDetailsPage() {
     if (supplier) {
       setFields(supplier);
       setIsDirty(false);
+      setAlreadyContacted(supplier.alreadyContacted ?? false);
     }
   }, [supplier]);
 
   // ─── Mutations ──────────────────────────────────────
+  const contactedMutation = useMutation({
+    mutationFn: (val: boolean) => api.patch(`/sourcing-suppliers/${id}/contacted`, { alreadyContacted: val }),
+    onSuccess: (_data, val) => {
+      setAlreadyContacted(val);
+      toast.success(val ? "Marked as already contacted" : "Marked as pending reply");
+    },
+    onError: () => toast.error("Failed to update contacted status"),
+  });
+
   const saveMutation = useMutation({
     mutationFn: (data: Partial<SourcingSupplier>) => api.put(`/sourcing-suppliers/${id}`, data),
     onSuccess: () => {
@@ -395,7 +408,23 @@ export default function SourcingSupplierDetailsPage() {
             <p className="text-sm text-slate-500">{supplier.country ?? "—"} · {supplier.product ?? "—"}</p>
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          {campaign?.status === "response_received" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => contactedMutation.mutate(!alreadyContacted)}
+              disabled={contactedMutation.isPending}
+              className={alreadyContacted
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                : "border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50"}
+            >
+              {contactedMutation.isPending
+                ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                : <PhoneCall className="h-4 w-4 mr-1.5" />}
+              {alreadyContacted ? "Already Contacted" : "Mark as Contacted"}
+            </Button>
+          )}
           {supplier.formToken && (
             <Button variant="outline" size="sm" onClick={() => setFormLinkOpen(true)}>
               <LayoutTemplate className="h-4 w-4 mr-1.5" />

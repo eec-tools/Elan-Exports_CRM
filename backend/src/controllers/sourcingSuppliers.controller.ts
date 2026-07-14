@@ -276,6 +276,24 @@ export async function getSourcingSupplierStats(
 }
 
 /**
+ * PATCH /api/sourcing-suppliers/:id/contacted
+ */
+export async function toggleContactedSupplier(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { alreadyContacted } = req.body as { alreadyContacted: boolean };
+    const updated = await (prisma as any).sourcingSupplier.update({
+      where: { id: req.params.id },
+      data: { alreadyContacted: Boolean(alreadyContacted) },
+      select: { id: true, alreadyContacted: true },
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error("toggleContactedSupplier error:", err);
+    res.status(500).json({ error: "Failed to update contacted status" });
+  }
+}
+
+/**
  * GET /api/sourcing-suppliers/:id
  */
 export async function getSourcingSupplier(
@@ -776,9 +794,13 @@ export async function addFromVaultFolder(
     });
 
     // Respond immediately so the UI is not blocked — emails are sent in the background
+    const emailsQueued = assignedGmailAccount
+      ? createdSuppliers.filter((s: any) => !!s.email).length
+      : 0;
     res.status(201).json({
       added: createdSuppliers.length,
-      sending: true,
+      sending: emailsQueued > 0,
+      emailsSent: emailsQueued,
       suppliers: createdSuppliers.map((s: any) => ({ company: s.company, formToken: s.formToken })),
     });
 

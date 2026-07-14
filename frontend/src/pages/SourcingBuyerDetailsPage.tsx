@@ -23,6 +23,7 @@ import {
   AlertCircle,
   MessageSquare,
   UserCheck,
+  PhoneCall,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import BuyersTabBar from "@/components/BuyersTabBar";
@@ -40,6 +41,7 @@ interface SourcingBuyer {
   productCategory?: string;
   notes?: string;
   status: string;
+  alreadyContacted?: boolean;
   assignedGmailAccount?: string | null;
   emailTemplateId?: string | null;
   emailCampaign?: {
@@ -119,6 +121,7 @@ export default function SourcingBuyerDetailsPage() {
   const [fields, setFields] = useState<Partial<SourcingBuyer>>({});
   const [isDirty, setIsDirty] = useState(false);
   const [convertConfirmOpen, setConvertConfirmOpen] = useState(false);
+  const [alreadyContacted, setAlreadyContacted] = useState(false);
 
   const set = (key: string) => (value: string) => {
     setFields((f) => ({ ...f, [key]: value }));
@@ -154,8 +157,22 @@ export default function SourcingBuyerDetailsPage() {
   });
 
   useEffect(() => {
-    if (buyer) { setFields(buyer); setIsDirty(false); }
+    if (buyer) {
+      setFields(buyer);
+      setIsDirty(false);
+      setAlreadyContacted(buyer.alreadyContacted ?? false);
+    }
   }, [buyer]);
+
+  const contactedMutation = useMutation({
+    mutationFn: (val: boolean) => api.patch(`/ai-comms/${id}/contacted`, { alreadyContacted: val }),
+    onSuccess: (_data, val) => {
+      setAlreadyContacted(val);
+      queryClient.invalidateQueries({ queryKey: ["ai-comms-inbox"] });
+      toast.success(val ? "Marked as already contacted" : "Marked as pending reply");
+    },
+    onError: () => toast.error("Failed to update contacted status"),
+  });
 
   const saveMutation = useMutation({
     mutationFn: (data: Partial<SourcingBuyer>) => api.put(`/sourcing-buyers/${id}`, data),
@@ -253,7 +270,23 @@ export default function SourcingBuyerDetailsPage() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          {campaign?.status === "response_received" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => contactedMutation.mutate(!alreadyContacted)}
+              disabled={contactedMutation.isPending}
+              className={alreadyContacted
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                : "border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50"}
+            >
+              {contactedMutation.isPending
+                ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                : <PhoneCall className="h-4 w-4 mr-1.5" />}
+              {alreadyContacted ? "Already Contacted" : "Mark as Contacted"}
+            </Button>
+          )}
           {isDirty && canEdit && (
             <Button size="sm" onClick={() => saveMutation.mutate(fields)} disabled={saveMutation.isPending}>
               {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}

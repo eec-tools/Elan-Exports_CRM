@@ -156,11 +156,11 @@ export default function SourcingSupplierPage() {
     setRetryingPending(true);
     try {
       const res = await api.post("/sourcing-campaigns/admin/retry-pending");
-      const { total, started } = res.data as { total: number; started: number };
+      const { total } = res.data as { total: number };
       if (total === 0) {
         toast.info("No pending suppliers found with a Gmail account assigned.");
       } else {
-        toast.success(`Sent intro emails to ${started} of ${total} pending suppliers.`);
+        toast.success(`Sending intro emails to ${total} pending supplier${total !== 1 ? "s" : ""} in the background.`);
         setTimeout(() => queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] }), 3000);
       }
     } catch {
@@ -1310,7 +1310,7 @@ export default function SourcingSupplierPage() {
             <>
               <DialogTitle>Suppliers Added</DialogTitle>
               <DialogDescription>
-                {formLinkDialog.suppliers.length} supplier{formLinkDialog.suppliers.length !== 1 ? "s" : ""} added to the pipeline{formLinkDialog.emailsSent > 0 ? `, ${formLinkDialog.emailsSent} intro email${formLinkDialog.emailsSent !== 1 ? "s" : ""} sent automatically` : ""}. Copy each form link to share with the respective supplier.
+                {formLinkDialog.suppliers.length} supplier{formLinkDialog.suppliers.length !== 1 ? "s" : ""} added to the pipeline{formLinkDialog.emailsSent > 0 ? `. Intro emails are being sent in the background — ${formLinkDialog.emailsSent} queued` : ""}. Copy each form link to share with the respective supplier.
               </DialogDescription>
               <div className="mt-3 max-h-72 overflow-y-auto space-y-2">
                 {formLinkDialog.suppliers.map((s) => (
