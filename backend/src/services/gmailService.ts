@@ -206,12 +206,17 @@ export async function sendGmailEmail(params: {
       messageId: res.data.id ?? "",
       threadId: res.data.threadId ?? "",
     };
-  } catch (err) {
+  } catch (err: any) {
     if (isRateLimitError(err)) {
       const until = extractRetryAfter(err);
       await setSendCooldown(fromEmail, until);
       console.warn(`[gmailService] Rate limit hit for ${fromEmail} — cooldown set until ${until.toISOString()}`);
       throw new Error(`Gmail rate limit exceeded for ${fromEmail}. Retry after ${until.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })} IST.`);
+    }
+    const errMsg: string = err?.message ?? "";
+    const errCode: string = err?.response?.data?.error ?? "";
+    if (errMsg.includes("invalid_grant") || errCode === "invalid_grant") {
+      throw new Error(`Gmail token expired for ${fromEmail}. Go to Settings → Gmail and click "Reconnect" for this account.`);
     }
     throw err;
   }

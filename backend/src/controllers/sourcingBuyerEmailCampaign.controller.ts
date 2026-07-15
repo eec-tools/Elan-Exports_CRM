@@ -84,7 +84,7 @@ async function resolveSignatureForBuyer(buyer: {
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
-export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?: string): Promise<boolean> {
+export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?: string, throwOnError = false): Promise<boolean> {
     try {
         const buyer = await (prisma as any).sourcingBuyer.findUnique({ where: { id: sourcingBuyerId } });
         if (!buyer || !buyer.email) return false;
@@ -190,6 +190,7 @@ export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?:
         return true;
     } catch (err) {
         console.error(`[startCampaignForBuyer] Error for ${sourcingBuyerId}:`, err);
+        if (throwOnError) throw err;
         return false;
     }
 }
@@ -412,13 +413,12 @@ export async function startCampaign(req: AuthRequest, res: Response): Promise<vo
         const existing = await (prisma as any).sourcingBuyerEmailCampaign.findUnique({ where: { sourcingBuyerId: id } });
         if (existing) { res.status(400).json({ error: "Campaign already started" }); return; }
 
-        const started = await startCampaignForBuyer(id, req.user?.id);
-        if (!started) { res.status(500).json({ error: "Failed to start campaign - check Gmail connection" }); return; }
-
+        await startCampaignForBuyer(id, req.user?.id, true);
         res.json({ success: true });
     } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to start campaign";
         console.error("Start buyer campaign error:", err);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json({ error: msg });
     }
 }
 

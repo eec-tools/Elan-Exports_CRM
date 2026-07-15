@@ -321,7 +321,10 @@ export default function SourcingBuyersPage() {
       const buyer = data?.data.find((b) => b.id === id);
       toast.success(`Intro email sent to ${buyer?.company ?? "buyer"}`);
     },
-    onError: () => toast.error("Failed to start campaign"),
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error ?? "Failed to start campaign";
+      toast.error(msg);
+    },
   });
 
   const sendFollowupMutation = useMutation({

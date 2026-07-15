@@ -416,7 +416,10 @@ export default function SourcingSupplierPage() {
       const supplier = data?.data.find((s) => s.id === id);
       toast.success(`Intro email sent to ${supplier?.company ?? "supplier"}`);
     },
-    onError: () => toast.error("Failed to start campaign"),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to start campaign";
+      toast.error(msg);
+    },
   });
 
   const markSentMutation = useMutation({
