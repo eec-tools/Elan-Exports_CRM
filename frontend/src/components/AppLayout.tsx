@@ -73,6 +73,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "SUPPLIERS",
     items: [
+      { to: "/suppliers/ai-comms", label: "AI Comms Agent", icon: MessageSquare, perms: ["suppliers", "sourcing_suppliers"] },
       { to: "/suppliers/sourcing", label: "Sourcing", icon: Search, perms: ["suppliers", "sourcing_suppliers"] },
       { to: "/suppliers/sourcing-vault", label: "Vault", icon: Database, perms: ["suppliers", "sourcing_suppliers"] },
       { to: "/suppliers/new", label: "New Suppliers", icon: Factory, perms: ["suppliers", "new_suppliers"] },

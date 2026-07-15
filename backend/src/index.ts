@@ -58,6 +58,7 @@ import holidayRoutes from "./routes/holiday.routes.js";
 import cronReportsRoutes from "./routes/cronReports.routes.js";
 import agent1Routes from "./routes/agent1.routes.js";
 import aiCommsAgentRoutes from "./routes/aiCommsAgent.routes.js";
+import aiSupplierCommsRoutes from "./routes/aiSupplierComms.routes.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -198,6 +199,7 @@ app.use("/api/holidays", holidayRoutes);
 app.use("/api/cron-reports", cronReportsRoutes);
 app.use("/api/agent1", agent1Routes);
 app.use("/api/ai-comms", aiCommsAgentRoutes);
+app.use("/api/ai-supplier-comms", aiSupplierCommsRoutes);
 
 // Health check with detailed status
 app.get("/api/health", async (_req, res) => {

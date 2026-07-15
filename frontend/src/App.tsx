@@ -55,6 +55,7 @@ import GmailSettingsPage from "@/pages/GmailSettingsPage";
 import SignaturesPage from "@/pages/SignaturesPage";
 import BuyersDiscoverAgentPage from "@/pages/BuyersDiscoverAgentPage";
 import AiCommsAgentPage from "@/pages/AiCommsAgentPage";
+import AiSupplierCommsAgentPage from "@/pages/AiSupplierCommsAgentPage";
 import { Loader2 } from "lucide-react";
 
 const backendApiUrl = (import.meta.env.VITE_API_URL || "http://localhost:3001/api").replace(/\/+$/, "");
@@ -197,6 +198,14 @@ export default function App() {
                   element={
                     <PermissionGate permission="old_suppliers">
                       <OldSuppliersPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
+                  path="suppliers/ai-comms"
+                  element={
+                    <PermissionGate permission={["suppliers", "sourcing_suppliers"]}>
+                      <AiSupplierCommsAgentPage />
                     </PermissionGate>
                   }
                 />

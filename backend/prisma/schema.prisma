@@ -517,6 +517,7 @@ model SourcingSupplier {
   supplierStage              String                 @default("Sourcing") @map("supplier_stage")
   status                     String                 @default("pending") @map("status")
   alreadyContacted           Boolean                @default(false) @map("already_contacted")
+  emailReplies               SupplierEmailReply[]
   formToken                  String?                @unique @map("form_token")
   tradeName                  String?                @map("trade_name")
   yearEstablished            String?                @map("year_established")
@@ -637,17 +638,18 @@ model SourcingEmailCampaign {
 }
 
 model SupplierEmailReply {
-  id             String    @id @default(uuid())
-  sourcingId     String?   @map("sourcing_id")
-  gmailMessageId String?   @map("gmail_message_id")
-  fromEmail      String    @map("from_email")
-  fromName       String?   @map("from_name")
-  subject        String?
-  body           String
-  receivedAt     DateTime  @map("received_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  direction      String    @default("received") @map("direction")
-  repliedAt      DateTime? @map("replied_at")
+  id               String            @id @default(uuid())
+  sourcingId       String?           @map("sourcing_id")
+  gmailMessageId   String?           @map("gmail_message_id")
+  fromEmail        String            @map("from_email")
+  fromName         String?           @map("from_name")
+  subject          String?
+  body             String
+  receivedAt       DateTime          @map("received_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  direction        String            @default("received") @map("direction")
+  repliedAt        DateTime?         @map("replied_at")
+  sourcingSupplier SourcingSupplier? @relation(fields: [sourcingId], references: [id], onDelete: SetNull)
 
   @@map("supplier_email_replies")
 }
