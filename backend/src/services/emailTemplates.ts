@@ -26,6 +26,13 @@ function displayUrl(url: string): string {
   return url.replace(/^https?:\/\/(www\.)?/, "");
 }
 
+function normalizeLinkUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith("mailto:") || url.startsWith("tel:") || url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.includes("@")) return `mailto:${url}`;
+  return `https://${url}`;
+}
+
 function buildSignatureHtml(sig: SignatureData | null | undefined, salutation: string, _fallbackEmail: string): string {
   if (!sig) {
     return `<p style="margin:24px 0 0;color:#374151;font-size:15px;">${salutation},</p>`;
@@ -35,7 +42,7 @@ function buildSignatureHtml(sig: SignatureData | null | undefined, salutation: s
     .map((l) => `
       <p style="margin:0 0 2px;">
         <span style="color:#6b7280;font-size:12px;">${l.label}: </span>
-        <a href="${l.url}" style="color:#1a1a2e;font-size:12px;text-decoration:none;">${displayUrl(l.url)}</a>
+        <a href="${normalizeLinkUrl(l.url)}" style="color:#1a1a2e;font-size:12px;text-decoration:none;">${displayUrl(l.url)}</a>
       </p>`)
     .join("");
 

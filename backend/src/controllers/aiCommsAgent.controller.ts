@@ -26,6 +26,13 @@ function getGroq(): Groq {
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 // ── HTML helpers ──────────────────────────────────────────────────────────────
+function normalizeLinkUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith("mailto:") || url.startsWith("tel:") || url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.includes("@")) return `mailto:${url}`;
+  return `https://${url}`;
+}
+
 function buildReplyHtml(bodyText: string, sig: { name: string; role: string; company: string; tagline: string; links: Array<{ label: string; url: string }> } | null, fromEmail: string): string {
   const paragraphs = bodyText
     .split(/\n\n+/)
@@ -37,7 +44,7 @@ function buildReplyHtml(bodyText: string, sig: { name: string; role: string; com
   let sigHtml = "";
   if (sig) {
     const linksHtml = sig.links
-      .map((l) => `<a href="${l.url}" style="color:#2563eb;text-decoration:none;margin-right:12px;">${l.label}</a>`)
+      .map((l) => `<a href="${normalizeLinkUrl(l.url)}" style="color:#2563eb;text-decoration:none;margin-right:12px;">${l.label}</a>`)
       .join("");
     sigHtml = `
 <p style="margin:24px 0 4px;color:#374151;font-size:15px;">Warm regards,</p>
