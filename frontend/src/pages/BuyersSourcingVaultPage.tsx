@@ -33,7 +33,9 @@ import {
   Box,
   FileDown,
   Upload,
+  Paperclip,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
@@ -104,6 +106,7 @@ interface BulkRow {
   linkedin: string;
   keyPainPoints: string;
   country: string;
+  product: string;
   emailTemplate: string;
   personalizationQuality: string;
 }
@@ -151,6 +154,7 @@ function emptyBulkRow(): BulkRow {
     linkedin: "",
     keyPainPoints: "",
     country: "",
+    product: "",
     emailTemplate: "",
     personalizationQuality: "",
   };
@@ -169,6 +173,7 @@ const BULK_COLS: {
   { key: "linkedin",              label: "LinkedIn",                             width: "180px" },
   { key: "keyPainPoints",         label: "Key Pain Points",                      width: "200px" },
   { key: "country",               label: "Country",                              width: "130px" },
+  { key: "product",               label: "Product / Category",                   width: "180px" },
   { key: "emailTemplate",         label: "Email Template",                       width: "300px" },
   { key: "personalizationQuality",label: "Personalization Quality",              width: "180px" },
 ];
@@ -1058,22 +1063,33 @@ function BulkAddDialog({
     Array.from({ length: 5 }, emptyBulkRow),
   );
   const [sharedGmail, setSharedGmail] = useState("");
+  const [sharedEmailTemplateId, setSharedEmailTemplateId] = useState("");
+  const [includeAttachment, setIncludeAttachment] = useState(true);
   const [errors, setErrors] = useState<Set<number>>(new Set());
   const [sendingEmail, setSendingEmail] = useState(false);
   const [addingToList, setAddingToList] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { data: attachmentInfo } = useQuery<{ attachment: { url: string; filename: string } | null }>({
+    queryKey: ["email-campaign-attachment"],
+    queryFn: async () => {
+      const res = await api.get("/email-settings/attachment");
+      return res.data;
+    },
+    enabled: open,
+  });
+
   function handleDownloadTemplate() {
     const ws = XLSX.utils.aoa_to_sheet([
       [
         "Company Name", "Website", "Contact Person", "Email",
-        "LinkedIn", "Key Pain Points", "Country",
+        "LinkedIn", "Key Pain Points", "Country", "Product / Category",
         "Email Template", "Personalization Quality",
       ],
     ]);
     ws["!cols"] = [
       { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 28 },
-      { wch: 22 }, { wch: 25 }, { wch: 15 },
+      { wch: 22 }, { wch: 25 }, { wch: 15 }, { wch: 22 },
       { wch: 50 }, { wch: 22 },
     ];
     const wb = XLSX.utils.book_new();
@@ -1102,6 +1118,7 @@ function BulkAddDialog({
           else if (h.includes("linkedin"))                             colMap[i] = "linkedin";
           else if (h.includes("pain") || h.includes("key pain"))      colMap[i] = "keyPainPoints";
           else if (h.includes("country"))                              colMap[i] = "country";
+          else if (h.includes("product") || h.includes("category"))   colMap[i] = "product";
           else if (h.includes("template") || h.includes("email template")) colMap[i] = "emailTemplate";
           else if (h.includes("personal"))                             colMap[i] = "personalizationQuality";
         });
@@ -1147,6 +1164,15 @@ function BulkAddDialog({
   const connectedAccounts = gmailAccounts.filter(
     (a) => a.connected && !/procurement[12]/i.test(a.email),
   );
+
+  const { data: emailTemplates = [] } = useQuery<{ id: string; name: string; isDefault: boolean }[]>({
+    queryKey: ["buyer-email-campaign-templates"],
+    queryFn: async () => {
+      const res = await api.get("/buyer-email-templates");
+      return res.data;
+    },
+    enabled: open,
+  });
 
 
   const updateCell = useCallback(
@@ -1220,6 +1246,8 @@ function BulkAddDialog({
   const handleClose = () => {
     setRows(Array.from({ length: 5 }, emptyBulkRow));
     setSharedGmail("");
+    setSharedEmailTemplateId("");
+    setIncludeAttachment(true);
     setErrors(new Set());
     onClose();
   };
@@ -1287,6 +1315,7 @@ function BulkAddDialog({
           linkedin: r.linkedin.trim() || undefined,
           keyPainPoints: r.keyPainPoints.trim() || undefined,
           country: r.country.trim() || undefined,
+          product: r.product.trim() || undefined,
           emailTemplate: r.emailTemplate.trim() || undefined,
           personalizationQuality: r.personalizationQuality.trim() || undefined,
         })),
@@ -1327,10 +1356,13 @@ function BulkAddDialog({
             linkedin: r.linkedin.trim() || undefined,
             keyPainPoints: r.keyPainPoints.trim() || undefined,
             country: r.country.trim() || undefined,
+            product: r.product.trim() || undefined,
             emailTemplate: r.emailTemplate.trim() || undefined,
             personalizationQuality: r.personalizationQuality.trim() || undefined,
           })),
           assignedGmailAccount: sharedGmail || undefined,
+          emailTemplateId: sharedEmailTemplateId || undefined,
+          includeAttachment,
         },
       );
       const { added } = res.data;
@@ -1360,7 +1392,7 @@ function BulkAddDialog({
           </p>
         </DialogHeader>
 
-        {/* Shared settings: Gmail + Email Template */}
+        {/* Shared settings: Gmail + Attachment toggle */}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 py-2 border-b border-border">
           <div className="flex items-center gap-2">
             <Label className="text-sm font-medium whitespace-nowrap">
@@ -1388,6 +1420,41 @@ function BulkAddDialog({
               </select>
             )}
           </div>
+
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium whitespace-nowrap">
+              Email Template
+            </Label>
+            <select
+              value={sharedEmailTemplateId}
+              onChange={(e) => setSharedEmailTemplateId(e.target.value)}
+              className="border border-border rounded-md text-sm px-3 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Default buyer outreach</option>
+              {emailTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}{t.isDefault ? " (Default)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {attachmentInfo !== undefined && (
+            <div className="flex items-center gap-2">
+              <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <Label className="text-sm font-medium whitespace-nowrap cursor-pointer" htmlFor="vault-attach-toggle">
+                {attachmentInfo?.attachment?.filename ?? "Campaign Brochure"}
+              </Label>
+              <Switch
+                id="vault-attach-toggle"
+                checked={includeAttachment}
+                onCheckedChange={setIncludeAttachment}
+              />
+              <span className="text-xs text-muted-foreground">
+                {includeAttachment ? "Attached" : "Not attached"}
+              </span>
+            </div>
+          )}
 
           <span className="text-xs text-muted-foreground ml-auto">
             Email template &amp; signature per row from import · Gmail account used when sending
@@ -1587,8 +1654,23 @@ function BulkAddDialog({
                     <span>
                       Send intro emails <strong>immediately</strong>
                       {sharedGmail ? <> via <strong>{sharedGmail}</strong></> : ""}
+                      {sharedEmailTemplateId
+                        ? <> using <strong>{emailTemplates.find((t) => t.id === sharedEmailTemplateId)?.name ?? "selected template"}</strong></>
+                        : " using default buyer outreach template"}
                     </span>
                   </li>
+                  {attachmentInfo?.attachment && (
+                    <li className="flex items-start gap-2">
+                      <Paperclip className="h-4 w-4 mt-0.5 shrink-0 text-slate-400" />
+                      <span>
+                        {includeAttachment ? (
+                          <><strong>{attachmentInfo.attachment.filename}</strong> will be attached to each email</>
+                        ) : (
+                          <span className="text-muted-foreground">No attachment — brochure will <strong>not</strong> be included</span>
+                        )}
+                      </span>
+                    </li>
+                  )}
                 </ul>
                 {!sharedGmail && (
                   <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">

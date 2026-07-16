@@ -84,7 +84,7 @@ async function resolveSignatureForBuyer(buyer: {
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
-export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?: string, throwOnError = false): Promise<boolean> {
+export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?: string, throwOnError = false, includeAttachment = true): Promise<boolean> {
     try {
         const buyer = await (prisma as any).sourcingBuyer.findUnique({ where: { id: sourcingBuyerId } });
         if (!buyer || !buyer.email) return false;
@@ -135,7 +135,7 @@ export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?:
             html = result.html;
         }
 
-        const attachment = await getGlobalEmailAttachment();
+        const attachment = includeAttachment ? await getGlobalEmailAttachment() : null;
         const { messageId, threadId } = await sendGmailEmail({
             fromEmail,
             to: buyer.email.split(";").map((e: string) => e.trim()).filter(Boolean).join(", "),

@@ -228,7 +228,7 @@ export async function sendBulkEmail(
 ): Promise<void> {
   try {
     const { folderId } = req.params as { folderId: string };
-    const { suppliers, assignedGmailAccount } = req.body as {
+    const { suppliers, assignedGmailAccount, emailTemplateId, includeAttachment } = req.body as {
       suppliers: Array<{
         company: string;
         website?: string;
@@ -244,6 +244,8 @@ export async function sendBulkEmail(
         notes?: string;
       }>;
       assignedGmailAccount?: string;
+      emailTemplateId?: string;
+      includeAttachment?: boolean;
     };
 
     const folder = await (prisma as any).buyerVaultFolder.findUnique({
@@ -303,6 +305,7 @@ export async function sendBulkEmail(
             status: "pending",
             assignedGmailAccount: fromEmail,
             customEmailBody: s.emailTemplate?.trim() || null,
+            emailTemplateId: emailTemplateId ?? null,
             buyerVaultContactId: contact.id,
             createdBy: req.user!.id,
           },
@@ -320,7 +323,7 @@ export async function sendBulkEmail(
         if (!pair.hasEmail) continue;
 
         try {
-          const started = await startCampaignForBuyer(pair.sourcingBuyerId, req.user?.id);
+          const started = await startCampaignForBuyer(pair.sourcingBuyerId, req.user?.id, false, includeAttachment !== false);
           if (started) {
             await (prisma as any).buyerVaultContact.update({
               where: { id: pair.vaultId },

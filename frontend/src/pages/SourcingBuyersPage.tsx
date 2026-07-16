@@ -37,7 +37,9 @@ import {
   Zap,
   UserSearch,
   FileText,
+  Paperclip,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
 import BuyersTabBar from "@/components/BuyersTabBar";
@@ -170,6 +172,7 @@ export default function SourcingBuyersPage() {
   const [createMode, setCreateMode] = useState<"single" | "vault">("single");
   const [form, setForm] = useState({ company: "", email: "" });
   const [createEmailTemplateId, setCreateEmailTemplateId] = useState("");
+  const [includeAttachment, setIncludeAttachment] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<SourcingBuyer | null>(null);
   const [confirmAction, setConfirmAction] = useState<"single" | "vault" | null>(null);
 
@@ -254,6 +257,15 @@ export default function SourcingBuyersPage() {
     enabled: createOpen,
   });
 
+  const { data: attachmentInfo } = useQuery<{ attachment: { url: string; filename: string } | null }>({
+    queryKey: ["email-campaign-attachment"],
+    queryFn: async () => {
+      const res = await api.get("/email-settings/attachment");
+      return res.data;
+    },
+    enabled: createOpen,
+  });
+
   const { data: notSentContacts = [], isLoading: notSentLoading } = useQuery({
     queryKey: ["buyer-vault-not-sent", selectedFolderId],
     queryFn: async () => {
@@ -265,7 +277,7 @@ export default function SourcingBuyersPage() {
 
   // ─── Mutations ──────────────────────────────────────
   const createMutation = useMutation({
-    mutationFn: (data: { company: string; email: string; emailTemplateId?: string }) =>
+    mutationFn: (data: { company: string; email: string; emailTemplateId?: string; includeAttachment?: boolean }) =>
       api.post("/sourcing-buyers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-buyers"] });
@@ -284,6 +296,7 @@ export default function SourcingBuyersPage() {
       api.post("/sourcing-buyers/from-folder", {
         folderId: selectedFolderId,
         emailTemplateId: selectedEmailTemplateId || undefined,
+        includeAttachment,
       }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sourcing-buyers"] });
@@ -691,7 +704,7 @@ export default function SourcingBuyersPage() {
           if (!v) {
             setSelectedFolderId(""); setSelectedEmailTemplateId("");
             setForm({ company: "", email: "" }); setCreateEmailTemplateId("");
-            setCreateMode("single");
+            setIncludeAttachment(true); setCreateMode("single");
           }
           setCreateOpen(v);
         }}
@@ -710,6 +723,31 @@ export default function SourcingBuyersPage() {
               <span className="font-semibold">{BUYER_GMAIL}</span> with its email signature.
             </p>
           </div>
+
+          {/* Attachment toggle */}
+          {attachmentInfo !== undefined && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-foreground truncate">
+                    {attachmentInfo?.attachment?.filename ?? "EEC Brochure"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Campaign attachment</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-muted-foreground">
+                  {includeAttachment ? "Attached" : "Skip"}
+                </span>
+                <Switch
+                  id="sourcing-attach-toggle"
+                  checked={includeAttachment}
+                  onCheckedChange={setIncludeAttachment}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Mode tabs */}
           <div className="flex border-b border-slate-200 mt-3 mb-4">
@@ -894,6 +932,18 @@ export default function SourcingBuyersPage() {
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
                     <span>Start the email automation sequence — 3 follow-ups sent automatically</span>
                   </li>
+                  {attachmentInfo?.attachment && (
+                    <li className="flex items-start gap-2">
+                      <Paperclip className="h-4 w-4 mt-0.5 shrink-0 text-slate-400" />
+                      <span>
+                        {includeAttachment ? (
+                          <><strong>{attachmentInfo.attachment.filename}</strong> will be attached to each email</>
+                        ) : (
+                          <span className="text-slate-400">No attachment — brochure will <strong>not</strong> be included</span>
+                        )}
+                      </span>
+                    </li>
+                  )}
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
                     <span>When a buyer responds, they are added to the Buyers Directory</span>
@@ -908,7 +958,7 @@ export default function SourcingBuyersPage() {
               disabled={createMutation.isPending || addFromFolderMutation.isPending}
               onClick={() => {
                 if (confirmAction === "single") {
-                  createMutation.mutate({ company: form.company, email: form.email, emailTemplateId: createEmailTemplateId || undefined });
+                  createMutation.mutate({ company: form.company, email: form.email, emailTemplateId: createEmailTemplateId || undefined, includeAttachment });
                 } else {
                   addFromFolderMutation.mutate();
                 }

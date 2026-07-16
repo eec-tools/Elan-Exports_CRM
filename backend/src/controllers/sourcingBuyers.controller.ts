@@ -152,7 +152,7 @@ export async function getSourcingBuyer(req: AuthRequest, res: Response): Promise
  */
 export async function createSourcingBuyer(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const { company, email, phone, contactPerson, country, product, productCategory, notes, emailTemplateId } = req.body;
+    const { company, email, phone, contactPerson, country, product, productCategory, notes, emailTemplateId, includeAttachment } = req.body;
 
     if (!company) { res.status(400).json({ error: "Company name is required" }); return; }
     if (!email) { res.status(400).json({ error: "Buyer email is required" }); return; }
@@ -171,7 +171,7 @@ export async function createSourcingBuyer(req: AuthRequest, res: Response): Prom
     });
 
     let campaignStarted = false;
-    campaignStarted = await startCampaignForBuyer(buyer.id, req.user?.id);
+    campaignStarted = await startCampaignForBuyer(buyer.id, req.user?.id, false, includeAttachment !== false);
 
     res.status(201).json({ ...buyer, campaignStarted });
   } catch (err) {
@@ -259,9 +259,10 @@ export async function getVaultFolderNotSent(req: AuthRequest, res: Response): Pr
  */
 export async function addFromVaultFolder(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const { folderId, emailTemplateId } = req.body as {
+    const { folderId, emailTemplateId, includeAttachment } = req.body as {
       folderId: string;
       emailTemplateId?: string;
+      includeAttachment?: boolean;
     };
 
     if (!folderId) { res.status(400).json({ error: "folderId is required" }); return; }
@@ -321,7 +322,7 @@ export async function addFromVaultFolder(req: AuthRequest, res: Response): Promi
     (async () => {
       for (let i = 0; i < createdBuyers.length; i++) {
         const buyer = createdBuyers[i];
-        const campaignStarted = buyer.email ? await startCampaignForBuyer(buyer.id, userId) : false;
+        const campaignStarted = buyer.email ? await startCampaignForBuyer(buyer.id, userId, false, includeAttachment !== false) : false;
 
         if (campaignStarted || !buyer.email) {
           const key = `${buyer.company}||${buyer.email ?? ""}`;
