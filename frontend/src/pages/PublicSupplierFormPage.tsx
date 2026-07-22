@@ -546,19 +546,43 @@ export default function PublicSupplierFormPage() {
   const setField = (key: string, value: string) =>
     setFormData((f) => ({ ...f, [key]: value }));
 
+  const sectionFieldStats = (sectionKey: string) => {
+    if (sectionKey === "media") {
+      const items = [
+        productCatalogs,
+        certificates,
+        warehousePhotos,
+        videoLinks,
+      ];
+      return {
+        total: items.length,
+        filled: items.filter((arr) => arr.length > 0).length,
+      };
+    }
+    const fields = SECTION_DEFS.find((s) => s.key === sectionKey)?.fields ?? [];
+    return {
+      total: fields.length,
+      filled: fields.filter((f) => (formData[f.key] ?? "").trim() !== "")
+        .length,
+    };
+  };
+
   const sectionComplete = (sectionKey: string) => {
-    const required = templateConfig[sectionKey]?.requiredFields ?? [];
-    return required.every((f) => (formData[f] ?? "").trim() !== "");
+    const { total, filled } = sectionFieldStats(sectionKey);
+    return total > 0 && filled === total;
   };
 
   const totalSections = activeSections.length;
-  const completedSections = activeSections.filter((s) =>
-    sectionComplete(s.key),
-  ).length;
+  const totalFields = activeSections.reduce(
+    (sum, s) => sum + sectionFieldStats(s.key).total,
+    0,
+  );
+  const filledFields = activeSections.reduce(
+    (sum, s) => sum + sectionFieldStats(s.key).filled,
+    0,
+  );
   const progressPct =
-    totalSections > 0
-      ? Math.round((completedSections / totalSections) * 100)
-      : 0;
+    totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
 
   const allFields = () => ({
     ...formData,
