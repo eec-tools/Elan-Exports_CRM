@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { getCustomDealStages } from "@/lib/customDealStages";
 import { DEAL_STAGE_CONFIG } from "@/lib/dealStages";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -35,6 +35,7 @@ import {
   Link as LinkIcon,
   Zap,
   Settings,
+  Paperclip,
 } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 
@@ -64,6 +65,18 @@ interface DashboardStats {
   taskAnalytics: TaskAnalyticsOwner[];
   recentDeals: RecentDeal[];
   invalidSourcingEmails: number;
+}
+
+interface BackfillStatus {
+  status: "idle" | "running" | "completed" | "error";
+  supplierTotal?: number;
+  supplierChecked?: number;
+  buyerTotal?: number;
+  buyerChecked?: number;
+  errors?: number;
+  supplierAttachmentsStored?: number;
+  buyerAttachmentsStored?: number;
+  errorMessage?: string;
 }
 
 interface TaskAnalyticsOwner {
@@ -243,6 +256,49 @@ export default function DashboardPage() {
     refetchInterval: 60_000,
   });
 
+  // ── Email attachment backfill (admin-only) ──────────────────────
+  const { data: backfillStatus } = useQuery<BackfillStatus>({
+    queryKey: ["email-attachment-backfill-status"],
+    queryFn: () => api.get("/email-attachments/backfill/status").then((r) => r.data),
+    enabled: isAdmin,
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 5000 : false),
+  });
+
+  const prevBackfillStatusRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevBackfillStatusRef.current;
+    const curr = backfillStatus?.status;
+    if (prev === "running" && curr === "completed") {
+      toast.success(
+        `Attachment backfill complete — ${backfillStatus?.supplierAttachmentsStored ?? 0} supplier + ${backfillStatus?.buyerAttachmentsStored ?? 0} buyer attachments stored`
+      );
+    } else if (prev === "running" && curr === "error") {
+      toast.error(`Attachment backfill failed: ${backfillStatus?.errorMessage ?? "Unknown error"}`);
+    }
+    prevBackfillStatusRef.current = curr;
+  }, [backfillStatus?.status, backfillStatus?.supplierAttachmentsStored, backfillStatus?.buyerAttachmentsStored, backfillStatus?.errorMessage]);
+
+  const startBackfillMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post("/email-attachments/backfill/start");
+      return res.data as BackfillStatus;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["email-attachment-backfill-status"], data);
+      toast.info("Attachment backfill started — running in the background, feel free to keep working");
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(message ?? "Failed to start backfill");
+    },
+  });
+
+  const backfillRunning = backfillStatus?.status === "running";
+  const backfillProgress = backfillRunning
+    ? (backfillStatus?.supplierChecked ?? 0) + (backfillStatus?.buyerChecked ?? 0)
+    : 0;
+  const backfillTotal = (backfillStatus?.supplierTotal ?? 0) + (backfillStatus?.buyerTotal ?? 0);
+
   const { data: dealsRaw } = useQuery<Deal[]>({
     queryKey: ["deals-dashboard"],
     queryFn: () => api.get("/deals").then((r) => r.data),
@@ -411,6 +467,31 @@ export default function DashboardPage() {
               >
                 <Plus className="h-3.5 w-3.5" /> New RFQ
               </Link>
+            )}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => startBackfillMutation.mutate()}
+                disabled={backfillRunning || startBackfillMutation.isPending}
+                title={
+                  backfillRunning
+                    ? `Backfilling attachments — ${backfillProgress}/${backfillTotal || "?"} threads checked`
+                    : "Re-scan historical email threads and pull in any attachments"
+                }
+                className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-bold text-white bg-white/10 border border-white/20 rounded-lg hover:bg-white/20 transition-colors shadow-sm mr-2 disabled:opacity-80 disabled:cursor-not-allowed"
+              >
+                {backfillRunning ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Backfilling {backfillProgress}/{backfillTotal || "?"}
+                  </>
+                ) : (
+                  <>
+                    <Paperclip className="h-3.5 w-3.5" />
+                    Backfill Attachments
+                  </>
+                )}
+              </button>
             )}
             <a
               href="/settings/gmail"

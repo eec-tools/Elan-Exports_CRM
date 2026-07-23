@@ -237,8 +237,9 @@ export async function getInbox(req: AuthRequest, res: Response): Promise<void> {
       },
       include: {
         emailReplies: {
-          where: HUMAN_REPLY_FILTER,
+          where: BOUNCE_EXCLUSION,
           orderBy: { receivedAt: "desc" },
+          include: { attachments: true },
         },
         emailCampaign: true,
       },
@@ -256,9 +257,15 @@ export async function getInbox(req: AuthRequest, res: Response): Promise<void> {
           });
         }
 
+        const allReplies = b.emailReplies as any[]; // both directions, newest first
+        const latestOverall = allReplies[0];
         // Find the latest received reply
-        const latestReply = b.emailReplies[0];
-        const unrepliedCount = b.emailReplies.filter((r: any) => !r.repliedAt).length;
+        const latestReply = allReplies.find((r: any) => r.direction === "received");
+        // Only "needs reply" if the truly latest message in the thread is inbound —
+        // if we've since sent a reply (via this tool or any other channel), it's answered
+        // until the buyer writes back again.
+        const needsReply = latestOverall?.direction === "received";
+        const unrepliedCount = allReplies.filter((r: any) => r.direction === "received" && !r.repliedAt).length;
 
         return {
           id: b.id,
@@ -278,7 +285,8 @@ export async function getInbox(req: AuthRequest, res: Response): Promise<void> {
                 fromEmail: latestReply.fromEmail,
                 fromName: latestReply.fromName,
                 receivedAt: latestReply.receivedAt,
-                repliedAt: latestReply.repliedAt,
+                repliedAt: needsReply ? null : (latestOverall.receivedAt ?? latestReply.repliedAt),
+                attachmentCount: latestReply.attachments?.length ?? 0,
               }
             : null,
           unrepliedCount,
@@ -324,6 +332,7 @@ export async function getThread(req: AuthRequest, res: Response): Promise<void> 
     const replies = await (prisma as any).buyerEmailReply.findMany({
       where: { sourcingBuyerId },
       orderBy: { receivedAt: "asc" },
+      include: { attachments: true },
     });
     res.json(replies);
   } catch (err) {

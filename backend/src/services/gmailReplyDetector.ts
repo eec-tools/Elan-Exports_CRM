@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import prisma from "../config/db.js";
 import { fetchThreadReplies } from "./gmailService.js";
+import { persistSupplierAttachments, persistBuyerAttachments } from "./emailAttachmentSync.service.js";
 import { autoMoveToOldSupplier } from "../controllers/sourcingEmailCampaign.controller.js";
 import { createNotification } from "./notificationService.js";
 import { BUYER_GMAIL_ACCOUNT } from "../controllers/sourcingBuyers.controller.js";
@@ -12,7 +13,7 @@ const CRM_BASE_URL = "https://crm.eectrade.com";
  * Fetch all messages in a thread and persist any that aren't already stored.
  * Returns true if at least one "received" (supplier-sent) message was found.
  */
-async function syncThreadMessages(
+export async function syncThreadMessages(
     sourcingId: string,
     accountEmail: string,
     threadId: string,
@@ -22,24 +23,38 @@ async function syncThreadMessages(
 
     const existing = await (prisma as any).supplierEmailReply.findMany({
         where: { sourcingId },
-        select: { gmailMessageId: true },
+        select: { id: true, gmailMessageId: true },
     });
-    const existingIds = new Set(existing.map((r: any) => r.gmailMessageId));
+    const existingIdByMessage = new Map(existing.map((r: any) => [r.gmailMessageId, r.id]));
 
-    const newMessages = messages.filter((m) => !existingIds.has(m.gmailMessageId));
-    if (newMessages.length > 0) {
-        await (prisma as any).supplierEmailReply.createMany({
-            data: newMessages.map((m) => ({
+    for (const m of messages) {
+        let replyId = existingIdByMessage.get(m.gmailMessageId);
+        if (!replyId) {
+            const created = await (prisma as any).supplierEmailReply.create({
+                data: {
+                    sourcingId,
+                    gmailMessageId: m.gmailMessageId,
+                    direction: m.direction,
+                    fromEmail: m.fromEmail,
+                    fromName: m.fromName ?? null,
+                    subject: m.subject ?? null,
+                    body: m.body,
+                    receivedAt: m.receivedAt,
+                },
+                select: { id: true },
+            });
+            replyId = created.id;
+        }
+
+        if (m.attachments.length > 0) {
+            await persistSupplierAttachments({
+                accountEmail,
                 sourcingId,
+                replyId: replyId as string,
                 gmailMessageId: m.gmailMessageId,
-                direction: m.direction,
-                fromEmail: m.fromEmail,
-                fromName: m.fromName ?? null,
-                subject: m.subject ?? null,
-                body: m.body,
-                receivedAt: m.receivedAt,
-            })),
-        });
+                attachments: m.attachments,
+            });
+        }
     }
 
     const hasReply = messages.some((m) => m.direction === "received" && !m.isDeliveryFailure);
@@ -193,33 +208,48 @@ async function checkCampaignReplies() {
     }
 }
 
-async function syncBuyerThreadMessages(
+export async function syncBuyerThreadMessages(
     sourcingBuyerId: string,
     threadId: string,
+    accountEmail: string = BUYER_GMAIL_ACCOUNT,
 ): Promise<{ hasReply: boolean; hasBounce: boolean }> {
-    const messages = await fetchThreadReplies({ accountEmail: BUYER_GMAIL_ACCOUNT, threadId });
+    const messages = await fetchThreadReplies({ accountEmail, threadId });
     if (messages.length === 0) return { hasReply: false, hasBounce: false };
 
     const existing = await (prisma as any).buyerEmailReply.findMany({
         where: { sourcingBuyerId },
-        select: { gmailMessageId: true },
+        select: { id: true, gmailMessageId: true },
     });
-    const existingIds = new Set(existing.map((r: any) => r.gmailMessageId));
+    const existingIdByMessage = new Map(existing.map((r: any) => [r.gmailMessageId, r.id]));
 
-    const newMessages = messages.filter((m) => !existingIds.has(m.gmailMessageId));
-    if (newMessages.length > 0) {
-        await (prisma as any).buyerEmailReply.createMany({
-            data: newMessages.map((m) => ({
+    for (const m of messages) {
+        let replyId = existingIdByMessage.get(m.gmailMessageId);
+        if (!replyId) {
+            const created = await (prisma as any).buyerEmailReply.create({
+                data: {
+                    sourcingBuyerId,
+                    gmailMessageId: m.gmailMessageId,
+                    direction: m.direction,
+                    fromEmail: m.fromEmail,
+                    fromName: m.fromName ?? null,
+                    subject: m.subject ?? null,
+                    body: m.body,
+                    receivedAt: m.receivedAt,
+                },
+                select: { id: true },
+            });
+            replyId = created.id;
+        }
+
+        if (m.attachments.length > 0) {
+            await persistBuyerAttachments({
+                accountEmail,
                 sourcingBuyerId,
+                replyId: replyId as string,
                 gmailMessageId: m.gmailMessageId,
-                direction: m.direction,
-                fromEmail: m.fromEmail,
-                fromName: m.fromName ?? null,
-                subject: m.subject ?? null,
-                body: m.body,
-                receivedAt: m.receivedAt,
-            })),
-        });
+                attachments: m.attachments,
+            });
+        }
     }
 
     const hasReply = messages.some((m) => m.direction === "received" && !m.isDeliveryFailure);

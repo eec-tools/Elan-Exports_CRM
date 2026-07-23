@@ -638,20 +638,36 @@ model SourcingEmailCampaign {
 }
 
 model SupplierEmailReply {
-  id               String            @id @default(uuid())
-  sourcingId       String?           @map("sourcing_id")
-  gmailMessageId   String?           @map("gmail_message_id")
-  fromEmail        String            @map("from_email")
-  fromName         String?           @map("from_name")
+  id               String                    @id @default(uuid())
+  sourcingId       String?                   @map("sourcing_id")
+  gmailMessageId   String?                   @map("gmail_message_id")
+  fromEmail        String                    @map("from_email")
+  fromName         String?                   @map("from_name")
   subject          String?
   body             String
-  receivedAt       DateTime          @map("received_at")
-  createdAt        DateTime          @default(now()) @map("created_at")
-  direction        String            @default("received") @map("direction")
-  repliedAt        DateTime?         @map("replied_at")
-  sourcingSupplier SourcingSupplier? @relation(fields: [sourcingId], references: [id], onDelete: SetNull)
+  receivedAt       DateTime                  @map("received_at")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  direction        String                    @default("received") @map("direction")
+  repliedAt        DateTime?                 @map("replied_at")
+  sourcingSupplier SourcingSupplier?         @relation(fields: [sourcingId], references: [id], onDelete: SetNull)
+  attachments      SupplierEmailAttachment[]
 
   @@map("supplier_email_replies")
+}
+
+model SupplierEmailAttachment {
+  id                String             @id @default(uuid())
+  replyId           String             @map("reply_id")
+  gmailAttachmentId String?            @map("gmail_attachment_id")
+  filename          String
+  mimeType          String?            @map("mime_type")
+  size              Int?
+  s3Key             String             @map("s3_key")
+  url               String
+  createdAt         DateTime           @default(now()) @map("created_at")
+  reply             SupplierEmailReply @relation(fields: [replyId], references: [id], onDelete: Cascade)
+
+  @@map("supplier_email_attachments")
 }
 
 model EmailCampaignTemplate {
@@ -1218,20 +1234,36 @@ model SourcingBuyerEmailCampaign {
 }
 
 model BuyerEmailReply {
-  id              String         @id @default(uuid())
-  sourcingBuyerId String?        @map("sourcing_buyer_id")
-  gmailMessageId  String?        @map("gmail_message_id")
-  direction       String         @default("received") @map("direction")
-  fromEmail       String         @map("from_email")
-  fromName        String?        @map("from_name")
+  id              String                 @id @default(uuid())
+  sourcingBuyerId String?                @map("sourcing_buyer_id")
+  gmailMessageId  String?                @map("gmail_message_id")
+  direction       String                 @default("received") @map("direction")
+  fromEmail       String                 @map("from_email")
+  fromName        String?                @map("from_name")
   subject         String?
   body            String
-  receivedAt      DateTime       @map("received_at")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  repliedAt       DateTime?      @map("replied_at")
-  sourcingBuyer   SourcingBuyer? @relation(fields: [sourcingBuyerId], references: [id], onDelete: SetNull)
+  receivedAt      DateTime               @map("received_at")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  repliedAt       DateTime?              @map("replied_at")
+  sourcingBuyer   SourcingBuyer?         @relation(fields: [sourcingBuyerId], references: [id], onDelete: SetNull)
+  attachments     BuyerEmailAttachment[]
 
   @@map("buyer_email_replies")
+}
+
+model BuyerEmailAttachment {
+  id                String          @id @default(uuid())
+  replyId           String          @map("reply_id")
+  gmailAttachmentId String?         @map("gmail_attachment_id")
+  filename          String
+  mimeType          String?         @map("mime_type")
+  size              Int?
+  s3Key             String          @map("s3_key")
+  url               String
+  createdAt         DateTime        @default(now()) @map("created_at")
+  reply             BuyerEmailReply @relation(fields: [replyId], references: [id], onDelete: Cascade)
+
+  @@map("buyer_email_attachments")
 }
 
 enum Role {

@@ -18,6 +18,8 @@ import {
   Package,
   CheckCircle2,
   ArrowLeft,
+  Paperclip,
+  Download,
 } from "lucide-react";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
@@ -47,6 +49,7 @@ interface LatestReply {
   fromName?: string | null;
   receivedAt: string;
   repliedAt?: string | null;
+  attachmentCount?: number;
 }
 
 interface InboxItem {
@@ -64,6 +67,14 @@ interface InboxItem {
   vaultContact?: VaultContact | null;
 }
 
+interface ThreadAttachment {
+  id: string;
+  filename: string;
+  mimeType?: string | null;
+  size?: number | null;
+  url: string;
+}
+
 interface ThreadMessage {
   id: string;
   direction: "sent" | "received";
@@ -72,6 +83,7 @@ interface ThreadMessage {
   subject?: string | null;
   body: string;
   receivedAt: string;
+  attachments?: ThreadAttachment[];
 }
 
 interface DraftResult {
@@ -92,6 +104,13 @@ function stripHtml(html: string): string {
     .replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
     .replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function formatFileSize(bytes?: number | null): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function timeAgo(dateStr: string): string {
@@ -117,7 +136,6 @@ function formatTime(dateStr: string): string {
 function MessageBubble({ msg, buyerCompany }: { msg: ThreadMessage; buyerCompany: string }) {
   const isSent = msg.direction === "sent";
   const plain = stripHtml(msg.body);
-  const preview = plain.length > 300 ? plain.slice(0, 300) + "…" : plain;
 
   return (
     <div className={`flex ${isSent ? "justify-end" : "justify-start"} mb-3`}>
@@ -135,7 +153,30 @@ function MessageBubble({ msg, buyerCompany }: { msg: ThreadMessage; buyerCompany
             {msg.subject}
           </div>
         )}
-        <p className="whitespace-pre-wrap leading-relaxed">{preview}</p>
+        <p className="whitespace-pre-wrap leading-relaxed">{plain}</p>
+        {!!msg.attachments?.length && (
+          <div className="mt-2.5 flex flex-col gap-1.5">
+            {msg.attachments.map((att) => (
+              <a
+                key={att.id}
+                href={att.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                download={att.filename}
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+                  isSent
+                    ? "bg-blue-700/50 hover:bg-blue-700/70 text-blue-50"
+                    : "bg-background border border-border hover:border-primary/40 text-foreground"
+                }`}
+              >
+                <Paperclip className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                <span className="truncate flex-1">{att.filename}</span>
+                {!!att.size && <span className="opacity-60 shrink-0">{formatFileSize(att.size)}</span>}
+                <Download className="h-3.5 w-3.5 shrink-0 opacity-70" />
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -522,9 +563,16 @@ function InboxCard({ item, onSelect }: { item: InboxItem; onSelect: () => void }
             )}
           </div>
 
-          <p className="mt-1.5 text-xs text-muted-foreground font-medium truncate">
-            {item.latestReply.subject ?? "(no subject)"}
-          </p>
+          <div className="mt-1.5 flex items-center gap-1.5 min-w-0">
+            <p className="text-xs text-muted-foreground font-medium truncate">
+              {item.latestReply.subject ?? "(no subject)"}
+            </p>
+            {!!item.latestReply.attachmentCount && (
+              <span className="flex items-center gap-0.5 text-xs text-muted-foreground shrink-0">
+                <Paperclip className="h-3 w-3" />{item.latestReply.attachmentCount}
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2 leading-relaxed">{snippet}</p>
 
           {item.vaultContact?.keyPainPoints && (

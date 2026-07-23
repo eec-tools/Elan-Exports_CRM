@@ -330,6 +330,13 @@ export function isDeliveryFailure(
   return false;
 }
 
+export interface EmailAttachmentMeta {
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface EmailReplyMessage {
   gmailMessageId: string;
   direction: "sent" | "received";
@@ -339,6 +346,44 @@ export interface EmailReplyMessage {
   body: string;
   receivedAt: Date;
   isDeliveryFailure?: boolean;
+  attachments: EmailAttachmentMeta[];
+}
+
+function extractAttachmentParts(payload: any): EmailAttachmentMeta[] {
+  const results: EmailAttachmentMeta[] = [];
+  function walk(part: any) {
+    if (!part) return;
+    if (part.filename && part.body?.attachmentId) {
+      results.push({
+        attachmentId: part.body.attachmentId,
+        filename: part.filename,
+        mimeType: part.mimeType || "application/octet-stream",
+        size: part.body.size ?? 0,
+      });
+    }
+    if (part.parts) {
+      for (const p of part.parts) walk(p);
+    }
+  }
+  walk(payload);
+  return results;
+}
+
+export async function downloadGmailAttachment(params: {
+  accountEmail: string;
+  gmailMessageId: string;
+  attachmentId: string;
+}): Promise<Buffer> {
+  const { accountEmail, gmailMessageId, attachmentId } = params;
+  const auth = await getAuthedClient(accountEmail);
+  const gmail = google.gmail({ version: "v1", auth });
+  const res = await gmail.users.messages.attachments.get({
+    userId: "me",
+    messageId: gmailMessageId,
+    id: attachmentId,
+  });
+  const data = res.data.data ?? "";
+  return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64");
 }
 
 function decodeBase64Body(data: string): string {
@@ -443,6 +488,7 @@ export async function fetchThreadReplies(params: {
             body: rawBody.slice(0, 2000),
             receivedAt: msg.internalDate ? new Date(Number(msg.internalDate)) : new Date(),
             isDeliveryFailure: true,
+            attachments: [],
           });
         }
         continue;
@@ -467,6 +513,7 @@ export async function fetchThreadReplies(params: {
         subject: getHeader("subject") || undefined,
         body: body.slice(0, 5000),
         receivedAt: internalDate,
+        attachments: extractAttachmentParts(msg.payload),
       });
     }
 
