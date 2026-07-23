@@ -21,6 +21,7 @@ import {
   Award,
   Paperclip,
   Download,
+  X,
 } from "lucide-react";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,14 @@ interface ThreadMessage {
   attachments?: ThreadAttachment[];
 }
 
+interface PendingAttachment {
+  filename: string;
+  mimeType?: string;
+  size?: number;
+  s3Key?: string;
+  url: string;
+}
+
 interface DraftResult { subject: string; body: string; }
 interface ClarificationResult { clarificationsNeeded: string[]; }
 
@@ -93,6 +102,42 @@ function stripHtml(html: string): string {
     .replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
     .replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function linkifyText(text: string): React.ReactNode[] {
+  const urlPattern = /(https?:\/\/[^\s<>"')\]]+|www\.[^\s<>"')\]]+)/g;
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = urlPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
+
+    let url = match[0];
+    let trailing = "";
+    const trailingMatch = url.match(/[.,;:!?]+$/);
+    if (trailingMatch) {
+      trailing = trailingMatch[0];
+      url = url.slice(0, -trailing.length);
+    }
+
+    nodes.push(
+      <a
+        key={key++}
+        href={url.startsWith("http") ? url : `https://${url}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-2 break-all hover:opacity-80"
+      >
+        {url}
+      </a>
+    );
+    if (trailing) nodes.push(trailing);
+    lastIndex = urlPattern.lastIndex;
+  }
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
 }
 
 function formatFileSize(bytes?: number | null): string {
@@ -140,7 +185,7 @@ function MessageBubble({ msg, supplierCompany }: { msg: ThreadMessage; supplierC
             {msg.subject}
           </div>
         )}
-        <p className="whitespace-pre-wrap leading-relaxed">{plain}</p>
+        <p className="whitespace-pre-wrap leading-relaxed">{linkifyText(plain)}</p>
         {!!msg.attachments?.length && (
           <div className="mt-2.5 flex flex-col gap-1.5">
             {msg.attachments.map((att) => (
@@ -183,7 +228,10 @@ function DraftPanel({ item, onClose, onSent }: { item: InboxItem; onClose: () =>
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const threadEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: thread = [], isLoading: threadLoading } = useQuery<ThreadMessage[]>({
     queryKey: ["ai-supplier-comms-thread", item.id],
@@ -246,6 +294,31 @@ function DraftPanel({ item, onClose, onSent }: { item: InboxItem; onClose: () =>
     await generateDraft(context);
   }
 
+  async function handleAttachFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploadingAttachment(true);
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await api.post(`/ai-supplier-comms/${item.id}/upload-attachment`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        setPendingAttachments((prev) => [...prev, res.data]);
+      }
+    } catch {
+      toast.error("Failed to upload attachment");
+    } finally {
+      setIsUploadingAttachment(false);
+      e.target.value = "";
+    }
+  }
+
+  function removeAttachment(index: number) {
+    setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function handleSend() {
     if (!draftSubject.trim() || !draftBody.trim()) {
       toast.error("Subject and body cannot be empty");
@@ -257,8 +330,10 @@ function DraftPanel({ item, onClose, onSent }: { item: InboxItem; onClose: () =>
         replyId: item.latestReply.id,
         subject: draftSubject.trim(),
         body: draftBody.trim(),
+        attachments: pendingAttachments,
       });
       toast.success(`Reply sent to ${item.company}`);
+      setPendingAttachments([]);
       queryClient.invalidateQueries({ queryKey: ["ai-supplier-comms-inbox"] });
       onSent();
     } catch (err) {
@@ -423,6 +498,41 @@ function DraftPanel({ item, onClose, onSent }: { item: InboxItem; onClose: () =>
                     className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-emerald-500/40 resize-none"
                     rows={14}
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={handleAttachFiles}
+                  />
+                  {pendingAttachments.map((att, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-2.5 py-1.5 text-xs">
+                      <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate flex-1">{att.filename}</span>
+                      {!!att.size && <span className="text-muted-foreground shrink-0">{formatFileSize(att.size)}</span>}
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(i)}
+                        className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingAttachment}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-60"
+                  >
+                    {isUploadingAttachment ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" />Uploading…</>
+                    ) : (
+                      <><Paperclip className="h-3.5 w-3.5" />Attach files</>
+                    )}
+                  </button>
                 </div>
                 <p className="text-xs text-muted-foreground">Your default signature will be appended automatically when sent.</p>
               </div>

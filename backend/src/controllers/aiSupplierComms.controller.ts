@@ -1,9 +1,12 @@
 import { Response } from "express";
 import Groq from "groq-sdk";
+import multer from "multer";
+import multerS3 from "multer-s3";
 import prisma from "../config/db.js";
 import { AuthRequest } from "../types/index.js";
-import { sendGmailEmail, getSmtpMessageId } from "../services/gmailService.js";
+import { sendGmailEmail, getSmtpMessageId, EmailAttachment } from "../services/gmailService.js";
 import { fetchDefaultSignatureForAccount } from "./emailSignatures.controller.js";
+import { s3, S3_BUCKET, s3FileUrl, buildS3Key } from "../lib/s3.js";
 
 export const SUPPLIER_COMMS_ACCOUNTS = [
   "procurement1@eectrade.com",
@@ -204,6 +207,40 @@ const BOUNCE_EXCLUSION = {
 
 const HUMAN_REPLY_FILTER = { direction: "received", ...BOUNCE_EXCLUSION };
 
+// ── Compose attachment upload ──────────────────────────────────────────────────
+
+const composeAttachmentStorage = multerS3({
+  s3,
+  bucket: S3_BUCKET,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  key: (req: any, file: Express.Multer.File, cb: (err: Error | null, key: string) => void) => {
+    const sourcingId = req.params.sourcingId;
+    cb(null, buildS3Key(`outbound-email-attachments/suppliers/${sourcingId}`, file.originalname));
+  },
+});
+
+export const uploadComposeAttachmentMiddleware = multer({
+  storage: composeAttachmentStorage,
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
+
+export async function uploadComposeAttachment(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const file = req.file as any;
+    if (!file) { res.status(400).json({ error: "No file uploaded" }); return; }
+    res.json({
+      filename: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      s3Key: file.key,
+      url: s3FileUrl(file.key),
+    });
+  } catch (err) {
+    console.error("[aiSupplierComms] uploadComposeAttachment error:", err);
+    res.status(500).json({ error: "Failed to upload attachment" });
+  }
+}
+
 // ── Controllers ───────────────────────────────────────────────────────────────
 
 /**
@@ -334,7 +371,12 @@ export async function draftReply(req: AuthRequest, res: Response): Promise<void>
 export async function sendReply(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { sourcingId } = req.params as { sourcingId: string };
-    const { replyId, subject, body } = req.body as { replyId: string; subject: string; body: string };
+    const { replyId, subject, body, attachments } = req.body as {
+      replyId: string;
+      subject: string;
+      body: string;
+      attachments?: { filename: string; mimeType?: string; size?: number; s3Key?: string; url: string }[];
+    };
 
     if (!subject?.trim() || !body?.trim()) {
       res.status(400).json({ error: "Subject and body are required" });
@@ -357,6 +399,18 @@ export async function sendReply(req: AuthRequest, res: Response): Promise<void> 
       smtpMessageId = await getSmtpMessageId(fromEmail, campaign.gmailMessageId);
     }
 
+    let emailAttachments: EmailAttachment[] | undefined;
+    if (attachments?.length) {
+      emailAttachments = await Promise.all(
+        attachments.map(async (a) => {
+          const response = await fetch(a.url);
+          if (!response.ok) throw new Error(`Failed to fetch attachment "${a.filename}": HTTP ${response.status}`);
+          const content = Buffer.from(await response.arrayBuffer());
+          return { filename: a.filename, mimeType: a.mimeType || "application/octet-stream", content };
+        }),
+      );
+    }
+
     const { messageId, threadId } = await sendGmailEmail({
       fromEmail,
       to: supplier.email.split(";").map((e: string) => e.trim()).filter(Boolean).join(", "),
@@ -365,11 +419,12 @@ export async function sendReply(req: AuthRequest, res: Response): Promise<void> 
       threadId: campaign?.gmailThreadId ?? undefined,
       inReplyTo: smtpMessageId ?? undefined,
       references: smtpMessageId ?? undefined,
+      attachments: emailAttachments,
     });
 
     const now = new Date();
 
-    await (prisma as any).supplierEmailReply.create({
+    const sentReply = await (prisma as any).supplierEmailReply.create({
       data: {
         sourcingId,
         gmailMessageId: messageId,
@@ -380,6 +435,19 @@ export async function sendReply(req: AuthRequest, res: Response): Promise<void> 
         receivedAt: now,
       },
     });
+
+    if (attachments?.length) {
+      await (prisma as any).supplierEmailAttachment.createMany({
+        data: attachments.map((a) => ({
+          replyId: sentReply.id,
+          filename: a.filename,
+          mimeType: a.mimeType ?? null,
+          size: a.size ?? null,
+          s3Key: a.s3Key ?? "",
+          url: a.url,
+        })),
+      });
+    }
 
     await (prisma as any).supplierEmailReply.update({
       where: { id: replyId },
