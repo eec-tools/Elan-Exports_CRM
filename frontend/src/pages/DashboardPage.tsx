@@ -483,7 +483,7 @@ export default function DashboardPage() {
                 {backfillRunning ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Backfilling {backfillProgress}/{backfillTotal || "?"}
+                    Checking threads {backfillProgress}/{backfillTotal || "?"}
                   </>
                 ) : (
                   <>
