@@ -5,10 +5,17 @@ import { BUYER_GMAIL_ACCOUNT } from "../controllers/sourcingBuyers.controller.js
 const STATUS_KEY = "email_attachment_backfill_status";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// If a "running" status hasn't been touched in this long, the process that
+// was running it has almost certainly died (crash/restart) without getting a
+// chance to mark itself as errored — treat it as abandoned rather than
+// leaving the UI stuck forever.
+const STALE_RUN_MS = 10 * 60 * 1000;
+
 export interface BackfillStatus {
   status: "idle" | "running" | "completed" | "error";
   startedAt?: string;
   finishedAt?: string;
+  updatedAt?: string;
   supplierTotal?: number;
   supplierChecked?: number;
   buyerTotal?: number;
@@ -17,6 +24,13 @@ export interface BackfillStatus {
   supplierAttachmentsStored?: number;
   buyerAttachmentsStored?: number;
   errorMessage?: string;
+}
+
+function isStaleRun(status: BackfillStatus): boolean {
+  if (status.status !== "running") return false;
+  const last = status.updatedAt ?? status.startedAt;
+  if (!last) return true;
+  return Date.now() - new Date(last).getTime() > STALE_RUN_MS;
 }
 
 async function readStatus(): Promise<BackfillStatus> {
@@ -30,25 +44,37 @@ async function readStatus(): Promise<BackfillStatus> {
 }
 
 async function writeStatus(status: BackfillStatus): Promise<void> {
+  const withTimestamp: BackfillStatus = { ...status, updatedAt: new Date().toISOString() };
   await (prisma as any).appSetting.upsert({
     where: { key: STATUS_KEY },
-    update: { value: JSON.stringify(status) },
-    create: { key: STATUS_KEY, value: JSON.stringify(status) },
+    update: { value: JSON.stringify(withTimestamp) },
+    create: { key: STATUS_KEY, value: JSON.stringify(withTimestamp) },
   });
 }
 
 export async function getBackfillStatus(): Promise<BackfillStatus> {
-  return readStatus();
+  const status = await readStatus();
+  if (isStaleRun(status)) {
+    return {
+      ...status,
+      status: "error",
+      finishedAt: status.finishedAt ?? new Date().toISOString(),
+      errorMessage: status.errorMessage ?? "Backfill run was interrupted (server restarted) and never finished — click Backfill Attachments to resume.",
+    };
+  }
+  return status;
 }
 
 /**
  * Kicks off the historical attachment backfill in the background and returns
  * immediately. Safe to call while a run is already in progress — returns the
- * existing status instead of starting a second overlapping run.
+ * existing status instead of starting a second overlapping run. A "running"
+ * status left untouched for too long (its process crashed/restarted mid-run)
+ * is treated as abandoned so a new run can start instead of wedging forever.
  */
 export async function startBackfill(): Promise<BackfillStatus> {
   const current = await readStatus();
-  if (current.status === "running") return current;
+  if (current.status === "running" && !isStaleRun(current)) return current;
 
   const initial: BackfillStatus = {
     status: "running",

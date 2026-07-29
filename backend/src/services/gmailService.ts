@@ -337,6 +337,13 @@ export interface EmailAttachmentMeta {
   size: number;
 }
 
+export interface InlineImageMeta {
+  contentId: string;
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+}
+
 export interface EmailReplyMessage {
   gmailMessageId: string;
   direction: "sent" | "received";
@@ -344,16 +351,25 @@ export interface EmailReplyMessage {
   fromName?: string;
   subject?: string;
   body: string;
+  bodyHtml?: string;
   receivedAt: Date;
   isDeliveryFailure?: boolean;
   attachments: EmailAttachmentMeta[];
+  inlineImages: InlineImageMeta[];
+}
+
+function getPartHeader(part: any, name: string): string {
+  const headers = part?.headers ?? [];
+  return headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
 
 function extractAttachmentParts(payload: any): EmailAttachmentMeta[] {
   const results: EmailAttachmentMeta[] = [];
   function walk(part: any) {
     if (!part) return;
-    if (part.filename && part.body?.attachmentId) {
+    // Skip inline signature/logo images — those are handled separately via extractInlineImages
+    const contentId = getPartHeader(part, "content-id");
+    if (part.filename && part.body?.attachmentId && !contentId) {
       results.push({
         attachmentId: part.body.attachmentId,
         filename: part.filename,
@@ -367,6 +383,58 @@ function extractAttachmentParts(payload: any): EmailAttachmentMeta[] {
   }
   walk(payload);
   return results;
+}
+
+function extractInlineImages(payload: any): InlineImageMeta[] {
+  const results: InlineImageMeta[] = [];
+  function walk(part: any) {
+    if (!part) return;
+    const contentId = getPartHeader(part, "content-id");
+    if (contentId && part.body?.attachmentId) {
+      const cid = contentId.replace(/^<|>$/g, "");
+      results.push({
+        contentId: cid,
+        attachmentId: part.body.attachmentId,
+        filename: part.filename || `${cid}.png`,
+        mimeType: part.mimeType || "application/octet-stream",
+      });
+    }
+    if (part.parts) {
+      for (const p of part.parts) walk(p);
+    }
+  }
+  walk(payload);
+  return results;
+}
+
+function extractHtmlBody(payload: any): string {
+  if (!payload) return "";
+  if (payload.mimeType === "text/html" && payload.body?.data) {
+    return decodeBase64Body(payload.body.data);
+  }
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      const html = extractHtmlBody(part);
+      if (html) return html;
+    }
+  }
+  return "";
+}
+
+function stripQuotedHtml(html: string): string {
+  if (!html) return html;
+  // Gmail wraps quoted content in a gmail_quote container
+  const gmailQuoteIdx = html.search(/<div[^>]*class=["'][^"']*gmail_quote/i);
+  if (gmailQuoteIdx !== -1) return html.slice(0, gmailQuoteIdx);
+
+  // Outlook-style reply/forward divider
+  const outlookIdx = html.search(/<div[^>]*id=["']divRplyFwdMsg["']/i);
+  if (outlookIdx !== -1) return html.slice(0, outlookIdx);
+
+  const blockquoteIdx = html.search(/<blockquote/i);
+  if (blockquoteIdx !== -1) return html.slice(0, blockquoteIdx);
+
+  return html;
 }
 
 export async function downloadGmailAttachment(params: {
@@ -489,6 +557,7 @@ export async function fetchThreadReplies(params: {
             receivedAt: msg.internalDate ? new Date(Number(msg.internalDate)) : new Date(),
             isDeliveryFailure: true,
             attachments: [],
+            inlineImages: [],
           });
         }
         continue;
@@ -503,6 +572,7 @@ export async function fetchThreadReplies(params: {
 
       const rawBody = extractTextBody(msg.payload);
       const body = stripQuotedContent(rawBody);
+      const htmlBody = stripQuotedHtml(extractHtmlBody(msg.payload));
       const internalDate = msg.internalDate ? new Date(Number(msg.internalDate)) : new Date();
 
       result.push({
@@ -512,8 +582,10 @@ export async function fetchThreadReplies(params: {
         fromName,
         subject: getHeader("subject") || undefined,
         body: body.slice(0, 5000),
+        bodyHtml: htmlBody || undefined,
         receivedAt: internalDate,
         attachments: extractAttachmentParts(msg.payload),
+        inlineImages: extractInlineImages(msg.payload),
       });
     }
 

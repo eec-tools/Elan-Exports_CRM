@@ -1,7 +1,7 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import prisma from "../config/db.js";
 import { s3, S3_BUCKET, s3FileUrl, buildS3Key } from "../lib/s3.js";
-import { downloadGmailAttachment, EmailAttachmentMeta } from "./gmailService.js";
+import { downloadGmailAttachment, EmailAttachmentMeta, InlineImageMeta } from "./gmailService.js";
 
 async function storeAttachment(params: {
   accountEmail: string;
@@ -27,7 +27,10 @@ async function storeAttachment(params: {
 
 /**
  * Downloads and stores any attachments on a supplier email that aren't
- * already persisted. Safe to call repeatedly — dedupes by gmailAttachmentId.
+ * already persisted. Safe to call repeatedly — dedupes by filename, not
+ * gmailAttachmentId (Gmail hands out a different attachmentId for the same
+ * physical attachment on every re-fetch, so keying on it re-inserts a
+ * "new" copy on every poll).
  */
 export async function persistSupplierAttachments(params: {
   accountEmail: string;
@@ -41,10 +44,10 @@ export async function persistSupplierAttachments(params: {
 
   const existing = await (prisma as any).supplierEmailAttachment.findMany({
     where: { replyId },
-    select: { gmailAttachmentId: true },
+    select: { filename: true },
   });
-  const existingIds = new Set(existing.map((a: any) => a.gmailAttachmentId));
-  const missing = attachments.filter((a) => !existingIds.has(a.attachmentId));
+  const existingFilenames = new Set(existing.map((a: any) => a.filename));
+  const missing = attachments.filter((a) => !existingFilenames.has(a.filename));
 
   for (const meta of missing) {
     try {
@@ -65,15 +68,22 @@ export async function persistSupplierAttachments(params: {
           url,
         },
       });
-    } catch (err) {
-      console.error(`[emailAttachmentSync] Failed to persist supplier attachment "${meta.filename}":`, err);
+    } catch (err: any) {
+      // P2002 = unique constraint violation on (replyId, filename) — another
+      // call already persisted this attachment; not a real error.
+      if (err?.code !== "P2002") {
+        console.error(`[emailAttachmentSync] Failed to persist supplier attachment "${meta.filename}":`, err);
+      }
     }
   }
 }
 
 /**
  * Downloads and stores any attachments on a buyer email that aren't
- * already persisted. Safe to call repeatedly — dedupes by gmailAttachmentId.
+ * already persisted. Safe to call repeatedly — dedupes by filename, not
+ * gmailAttachmentId (Gmail hands out a different attachmentId for the same
+ * physical attachment on every re-fetch, so keying on it re-inserts a
+ * "new" copy on every poll).
  */
 export async function persistBuyerAttachments(params: {
   accountEmail: string;
@@ -87,10 +97,10 @@ export async function persistBuyerAttachments(params: {
 
   const existing = await (prisma as any).buyerEmailAttachment.findMany({
     where: { replyId },
-    select: { gmailAttachmentId: true },
+    select: { filename: true },
   });
-  const existingIds = new Set(existing.map((a: any) => a.gmailAttachmentId));
-  const missing = attachments.filter((a) => !existingIds.has(a.attachmentId));
+  const existingFilenames = new Set(existing.map((a: any) => a.filename));
+  const missing = attachments.filter((a) => !existingFilenames.has(a.filename));
 
   for (const meta of missing) {
     try {
@@ -111,8 +121,52 @@ export async function persistBuyerAttachments(params: {
           url,
         },
       });
-    } catch (err) {
-      console.error(`[emailAttachmentSync] Failed to persist buyer attachment "${meta.filename}":`, err);
+    } catch (err: any) {
+      if (err?.code !== "P2002") {
+        console.error(`[emailAttachmentSync] Failed to persist buyer attachment "${meta.filename}":`, err);
+      }
     }
   }
+}
+
+/**
+ * Downloads any inline signature/logo images (referenced via cid: in the HTML
+ * body) and uploads them to S3, returning a map of contentId -> public URL.
+ */
+export async function resolveInlineImages(params: {
+  accountEmail: string;
+  gmailMessageId: string;
+  keyPrefix: string;
+  inlineImages: InlineImageMeta[];
+}): Promise<Record<string, string>> {
+  const { accountEmail, gmailMessageId, keyPrefix, inlineImages } = params;
+  const map: Record<string, string> = {};
+
+  for (const img of inlineImages) {
+    try {
+      const buffer = await downloadGmailAttachment({
+        accountEmail,
+        gmailMessageId,
+        attachmentId: img.attachmentId,
+      });
+      const s3Key = buildS3Key(keyPrefix, img.filename);
+      await s3.send(new PutObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: s3Key,
+        Body: buffer,
+        ContentType: img.mimeType,
+      }));
+      map[img.contentId] = s3FileUrl(s3Key);
+    } catch (err) {
+      console.error(`[emailAttachmentSync] Failed to resolve inline image "${img.filename}":`, err);
+    }
+  }
+
+  return map;
+}
+
+/** Replaces cid:xxx references in an HTML email body with resolved public URLs. */
+export function rewriteCidReferences(html: string, cidMap: Record<string, string>): string {
+  if (!html || Object.keys(cidMap).length === 0) return html;
+  return html.replace(/cid:([^"'()\s>]+)/gi, (full, cid) => cidMap[cid] ?? full);
 }

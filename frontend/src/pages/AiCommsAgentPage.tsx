@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import DOMPurify from "dompurify";
 import {
   Bot,
   Sparkles,
@@ -21,11 +22,15 @@ import {
   Paperclip,
   Download,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ResizeHandle } from "@/components/ui/resize-handle";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,6 +88,7 @@ interface ThreadMessage {
   fromName?: string | null;
   subject?: string | null;
   body: string;
+  bodyHtml?: string | null;
   receivedAt: string;
   attachments?: ThreadAttachment[];
 }
@@ -113,6 +119,20 @@ function stripHtml(html: string): string {
     .replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
     .replace(/\n{3,}/g, "\n\n").trim();
+}
+
+DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  if (node.tagName === "A") {
+    node.setAttribute("target", "_blank");
+    node.setAttribute("rel", "noopener noreferrer");
+  }
+});
+
+function sanitizeEmailHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    FORBID_TAGS: ["style", "script", "iframe", "object", "embed", "form", "input", "link", "meta"],
+    FORBID_ATTR: ["srcset"],
+  });
 }
 
 function linkifyText(text: string): React.ReactNode[] {
@@ -198,7 +218,16 @@ function MessageBubble({ msg, buyerCompany }: { msg: ThreadMessage; buyerCompany
             {msg.subject}
           </div>
         )}
-        <p className="whitespace-pre-wrap leading-relaxed">{linkifyText(plain)}</p>
+        {msg.bodyHtml ? (
+          <div
+            className={`rounded-lg -mx-1 p-3 overflow-x-auto text-sm leading-relaxed [&_a]:underline [&_a]:break-all [&_img]:max-w-full [&_img]:h-auto [&_table]:max-w-full ${
+              isSent ? "bg-white text-slate-900" : "bg-background"
+            }`}
+            dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(msg.bodyHtml) }}
+          />
+        ) : (
+          <p className="whitespace-pre-wrap leading-relaxed">{linkifyText(plain)}</p>
+        )}
         {!!msg.attachments?.length && (
           <div className="mt-2.5 flex flex-col gap-1.5">
             {msg.attachments.map((att) => (
@@ -233,10 +262,14 @@ function DraftPanel({
   item,
   onClose,
   onSent,
+  threadWidth,
+  onThreadResize,
 }: {
   item: InboxItem;
   onClose: () => void;
   onSent: () => void;
+  threadWidth: number;
+  onThreadResize: (e: React.MouseEvent) => void;
 }) {
   const queryClient = useQueryClient();
 
@@ -428,7 +461,7 @@ function DraftPanel({
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left: Thread */}
-        <div className="w-[45%] flex flex-col border-r border-border">
+        <div className="flex flex-col border-r border-border flex-shrink-0" style={{ width: threadWidth }}>
           <div className="px-4 py-2 border-b border-border bg-muted/30 flex-shrink-0">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email Thread</p>
           </div>
@@ -448,8 +481,10 @@ function DraftPanel({
           </div>
         </div>
 
+        <ResizeHandle onMouseDown={onThreadResize} />
+
         {/* Right: AI Draft */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-[320px]">
           <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2">
               <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
@@ -710,6 +745,13 @@ function InboxCard({ item, onSelect }: { item: InboxItem; onSelect: () => void }
 export default function AiCommsAgentPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
+  const [inboxCollapsed, setInboxCollapsed] = useState(false);
+  const { width: inboxWidth, onMouseDown: onInboxResize } = useResizableWidth(
+    "ai-comms-inbox-width", 380, 260, 640,
+  );
+  const { width: threadWidth, onMouseDown: onThreadResize } = useResizableWidth(
+    "ai-comms-thread-width", 460, 320, 900,
+  );
 
   const { data: inbox = [], isLoading, refetch } = useQuery<InboxItem[]>({
     queryKey: ["ai-comms-inbox", TABS[activeTab].account],
@@ -779,9 +821,50 @@ export default function AiCommsAgentPage() {
       {/* Main content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Inbox list — always visible */}
-        <div className={`flex flex-col border-r border-border transition-all ${selectedItem ? "w-[380px] flex-shrink-0" : "flex-1"}`}>
+        <div
+          className={`flex flex-col border-r border-border ${selectedItem ? "flex-shrink-0" : "flex-1"}`}
+          style={selectedItem ? { width: inboxCollapsed ? 56 : inboxWidth } : undefined}
+        >
+          {selectedItem && (
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30 flex-shrink-0">
+              {!inboxCollapsed && (
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Inbox</p>
+              )}
+              <button
+                onClick={() => setInboxCollapsed((v) => !v)}
+                className="p-1 rounded hover:bg-muted transition-colors ml-auto"
+                title={inboxCollapsed ? "Expand inbox list" : "Collapse inbox list"}
+              >
+                {inboxCollapsed ? (
+                  <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <PanelLeftClose className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto">
-            {isLoading ? (
+            {inboxCollapsed ? (
+              <div className="flex flex-col items-center gap-2 py-3">
+                {[...unreplied, ...alreadyContacted, ...replied].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setSelectedItem(item)}
+                    title={item.company}
+                    className={`relative h-9 w-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold transition-all ${
+                      selectedItem?.id === item.id
+                        ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-background"
+                        : "opacity-80 hover:opacity-100"
+                    }`}
+                  >
+                    {item.company.charAt(0).toUpperCase()}
+                    {!item.latestReply.repliedAt && !item.alreadyContacted && (
+                      <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : isLoading ? (
               <div className="flex items-center justify-center py-20 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin mr-2" />Loading inbox…
               </div>
@@ -848,6 +931,8 @@ export default function AiCommsAgentPage() {
           </div>
         </div>
 
+        {selectedItem && !inboxCollapsed && <ResizeHandle onMouseDown={onInboxResize} />}
+
         {/* Draft panel */}
         {selectedItem && (
           <div className="flex-1 min-w-0 flex flex-col bg-background">
@@ -856,6 +941,8 @@ export default function AiCommsAgentPage() {
               item={selectedItem}
               onClose={() => setSelectedItem(null)}
               onSent={() => setSelectedItem(null)}
+              threadWidth={threadWidth}
+              onThreadResize={onThreadResize}
             />
           </div>
         )}

@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import prisma from "../config/db.js";
 import { fetchThreadReplies } from "./gmailService.js";
-import { persistSupplierAttachments, persistBuyerAttachments } from "./emailAttachmentSync.service.js";
+import { persistSupplierAttachments, persistBuyerAttachments, resolveInlineImages, rewriteCidReferences } from "./emailAttachmentSync.service.js";
 import { autoMoveToOldSupplier } from "../controllers/sourcingEmailCampaign.controller.js";
 import { createNotification } from "./notificationService.js";
 import { BUYER_GMAIL_ACCOUNT } from "../controllers/sourcingBuyers.controller.js";
@@ -23,12 +23,27 @@ export async function syncThreadMessages(
 
     const existing = await (prisma as any).supplierEmailReply.findMany({
         where: { sourcingId },
-        select: { id: true, gmailMessageId: true },
+        select: { id: true, gmailMessageId: true, bodyHtml: true },
     });
-    const existingIdByMessage = new Map(existing.map((r: any) => [r.gmailMessageId, r.id]));
+    const existingByMessage = new Map(existing.map((r: any) => [r.gmailMessageId, r]));
 
     for (const m of messages) {
-        let replyId = existingIdByMessage.get(m.gmailMessageId);
+        const existingRow = existingByMessage.get(m.gmailMessageId) as { id: string; bodyHtml: string | null } | undefined;
+        let replyId = existingRow?.id;
+
+        let resolvedHtml: string | undefined;
+        if (m.bodyHtml && !existingRow?.bodyHtml) {
+            const cidMap = m.inlineImages.length
+                ? await resolveInlineImages({
+                    accountEmail,
+                    gmailMessageId: m.gmailMessageId,
+                    keyPrefix: `inline-email-images/suppliers/${sourcingId}`,
+                    inlineImages: m.inlineImages,
+                })
+                : {};
+            resolvedHtml = rewriteCidReferences(m.bodyHtml, cidMap);
+        }
+
         if (!replyId) {
             const created = await (prisma as any).supplierEmailReply.create({
                 data: {
@@ -39,11 +54,17 @@ export async function syncThreadMessages(
                     fromName: m.fromName ?? null,
                     subject: m.subject ?? null,
                     body: m.body,
+                    bodyHtml: resolvedHtml ?? null,
                     receivedAt: m.receivedAt,
                 },
                 select: { id: true },
             });
             replyId = created.id;
+        } else if (resolvedHtml) {
+            await (prisma as any).supplierEmailReply.update({
+                where: { id: replyId },
+                data: { bodyHtml: resolvedHtml },
+            });
         }
 
         if (m.attachments.length > 0) {
@@ -218,12 +239,27 @@ export async function syncBuyerThreadMessages(
 
     const existing = await (prisma as any).buyerEmailReply.findMany({
         where: { sourcingBuyerId },
-        select: { id: true, gmailMessageId: true },
+        select: { id: true, gmailMessageId: true, bodyHtml: true },
     });
-    const existingIdByMessage = new Map(existing.map((r: any) => [r.gmailMessageId, r.id]));
+    const existingByMessage = new Map(existing.map((r: any) => [r.gmailMessageId, r]));
 
     for (const m of messages) {
-        let replyId = existingIdByMessage.get(m.gmailMessageId);
+        const existingRow = existingByMessage.get(m.gmailMessageId) as { id: string; bodyHtml: string | null } | undefined;
+        let replyId = existingRow?.id;
+
+        let resolvedHtml: string | undefined;
+        if (m.bodyHtml && !existingRow?.bodyHtml) {
+            const cidMap = m.inlineImages.length
+                ? await resolveInlineImages({
+                    accountEmail,
+                    gmailMessageId: m.gmailMessageId,
+                    keyPrefix: `inline-email-images/buyers/${sourcingBuyerId}`,
+                    inlineImages: m.inlineImages,
+                })
+                : {};
+            resolvedHtml = rewriteCidReferences(m.bodyHtml, cidMap);
+        }
+
         if (!replyId) {
             const created = await (prisma as any).buyerEmailReply.create({
                 data: {
@@ -234,11 +270,17 @@ export async function syncBuyerThreadMessages(
                     fromName: m.fromName ?? null,
                     subject: m.subject ?? null,
                     body: m.body,
+                    bodyHtml: resolvedHtml ?? null,
                     receivedAt: m.receivedAt,
                 },
                 select: { id: true },
             });
             replyId = created.id;
+        } else if (resolvedHtml) {
+            await (prisma as any).buyerEmailReply.update({
+                where: { id: replyId },
+                data: { bodyHtml: resolvedHtml },
+            });
         }
 
         if (m.attachments.length > 0) {
