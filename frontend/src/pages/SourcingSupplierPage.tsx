@@ -27,6 +27,7 @@ import {
   Plus,
   Search,
   Trash2,
+  ArchiveX,
   Loader2,
   ChevronLeft,
   ChevronRight,
@@ -194,6 +195,9 @@ export default function SourcingSupplierPage() {
   const [createEmailTemplateId, setCreateEmailTemplateId] = useState("");
   const [selectedEmailTemplateId, setSelectedEmailTemplateId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<SourcingSupplier | null>(
+    null,
+  );
+  const [archiveTarget, setArchiveTarget] = useState<SourcingSupplier | null>(
     null,
   );
   const [confirmAction, setConfirmAction] = useState<"single" | "vault" | null>(null);
@@ -406,6 +410,19 @@ export default function SourcingSupplierPage() {
       toast.success(msg);
     },
     onError: () => toast.error("Failed to delete supplier"),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/sourcing-suppliers/${id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-all"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      setArchiveTarget(null);
+      toast.success("Supplier moved to archive");
+    },
+    onError: () => toast.error("Failed to archive supplier"),
   });
 
   const startCampaignMutation = useMutation({
@@ -909,6 +926,17 @@ export default function SourcingSupplierPage() {
                                 </Button>
                               )}
 
+                              {/* Add to Archive */}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs text-amber-600 hover:bg-amber-50"
+                                title="Add to Archive"
+                                onClick={() => setArchiveTarget(s)}
+                              >
+                                <ArchiveX className="h-3.5 w-3.5" />
+                              </Button>
+
                               {/* Delete */}
                               <Button
                                 size="sm"
@@ -1372,6 +1400,36 @@ export default function SourcingSupplierPage() {
                 <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
               ) : null}
               Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Archive Confirm ────────────────────────────── */}
+      <Dialog
+        open={!!archiveTarget}
+        onOpenChange={(v) => !v && setArchiveTarget(null)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogTitle>Move to Archive?</DialogTitle>
+          <DialogDescription>
+            Move <strong>{archiveTarget?.company}</strong> to the archive — you
+            can restore it anytime from Archived Suppliers.
+          </DialogDescription>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setArchiveTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={archiveMutation.isPending}
+              onClick={() =>
+                archiveTarget && archiveMutation.mutate(archiveTarget.id)
+              }
+            >
+              {archiveMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : null}
+              Move to Archive
             </Button>
           </div>
         </DialogContent>

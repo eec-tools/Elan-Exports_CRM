@@ -42,6 +42,7 @@ import {
   Upload,
   FileText,
   AlertTriangle,
+  ArchiveX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -190,6 +191,8 @@ export default function BuyersPage() {
   const [form, setForm] = useState<Partial<Buyer>>(EMPTY_BUYER);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [buyerToDelete, setBuyerToDelete] = useState<Buyer | null>(null);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [buyerToArchive, setBuyerToArchive] = useState<Buyer | null>(null);
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
   const [quotationFiles, setQuotationFiles] = useState<File[]>([]);
   const [pendingDocFiles, setPendingDocFiles] = useState<{ file: File; docType: string }[]>([]);
@@ -268,6 +271,17 @@ export default function BuyersPage() {
       toast.success("Buyer deleted");
     },
     onError: () => toast.error("Failed to delete buyer"),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/buyers/${id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["buyer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Buyer moved to archive");
+    },
+    onError: () => toast.error("Failed to archive buyer"),
   });
 
   const uploadCatalogMutation = useMutation({
@@ -596,6 +610,9 @@ export default function BuyersPage() {
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-brand-600 hover:bg-brand-50" onClick={() => openEdit(buyer)} title="Edit Buyer">
                             <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-amber-600 hover:bg-amber-50" onClick={() => { setBuyerToArchive(buyer); setArchiveDialogOpen(true); }} title="Add to Archive">
+                            <ArchiveX className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => { setBuyerToDelete(buyer); setDeleteDialogOpen(true); }} title="Delete Buyer">
                             <Trash2 className="h-4 w-4" />
@@ -1040,6 +1057,38 @@ export default function BuyersPage() {
               }}
             >
               Yes, delete buyer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Archive Confirmation ── */}
+      <Dialog open={archiveDialogOpen} onOpenChange={(open) => { setArchiveDialogOpen(open); if (!open) setBuyerToArchive(null); }}>
+        <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0"><ArchiveX className="h-6 w-6 text-amber-600" /></div>
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900">Move to Archive</DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">You can restore it anytime from Archived Buyers.</DialogDescription>
+            </div>
+          </div>
+          {buyerToArchive?.company && (
+            <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-md border border-slate-100 mb-6 font-medium">
+              Company: <span className="font-bold">{buyerToArchive.company}</span>
+            </p>
+          )}
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setArchiveDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">Cancel</Button>
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+              disabled={archiveMutation.isPending}
+              onClick={() => {
+                if (buyerToArchive) archiveMutation.mutate(buyerToArchive.id);
+                setArchiveDialogOpen(false);
+                setBuyerToArchive(null);
+              }}
+            >
+              {archiveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Move to Archive
             </Button>
           </div>
         </DialogContent>

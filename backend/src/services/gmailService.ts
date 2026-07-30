@@ -9,6 +9,33 @@ function getOAuth2Client() {
   return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ── Per-account Gmail API throttle ──────────────────────────────────────────
+// Every single Gmail API call in this file (and gmailInboxService.ts, via the
+// export below) funnels through here. It serializes calls to the SAME Gmail
+// account and enforces a minimum gap between them, regardless of which cron
+// job, background loop, or manual action issued the call. This is the one
+// choke point that guarantees no code path — present or future — can ever
+// burst-fire enough requests at a single account to trip Gmail's short-window
+// per-user rate limit, which is what was actually causing the "rate limit"
+// errors (it's unrelated to the 500/2000-per-day sending cap).
+const gmailCallQueue = new Map<string, Promise<unknown>>();
+const gmailLastCallAt = new Map<string, number>();
+const MIN_GMAIL_CALL_GAP_MS = 500;
+
+export function withGmailThrottle<T>(accountEmail: string, fn: () => Promise<T>): Promise<T> {
+  const prevTail = gmailCallQueue.get(accountEmail) ?? Promise.resolve();
+  const gated = prevTail.catch(() => undefined).then(async () => {
+    const elapsed = Date.now() - (gmailLastCallAt.get(accountEmail) ?? 0);
+    if (elapsed < MIN_GMAIL_CALL_GAP_MS) await sleep(MIN_GMAIL_CALL_GAP_MS - elapsed);
+    gmailLastCallAt.set(accountEmail, Date.now());
+    return fn();
+  });
+  gmailCallQueue.set(accountEmail, gated.catch(() => undefined));
+  return gated;
+}
+
 async function getRefreshToken(email: string): Promise<string | null> {
   const setting = await prisma.appSetting.findUnique({
     where: { key: `gmail_refresh_token_${email}` },
@@ -130,11 +157,24 @@ function buildRawMessage(params: {
   return Buffer.from(lines.join("\r\n")).toString("base64url");
 }
 
+function extractGoogleErrorReason(err: any): string | null {
+  const nestedErrors = err?.errors ?? err?.response?.data?.error?.errors;
+  if (Array.isArray(nestedErrors) && nestedErrors[0]?.reason) return nestedErrors[0].reason;
+  return err?.response?.data?.error?.status ?? null;
+}
+
+// Only these Google error reasons mean an actual send/quota rate limit was hit.
+// A bare 403 can also mean insufficient permissions, a revoked scope, domain policy, etc. —
+// those are NOT rate limits and must not trigger a send cooldown.
+const RATE_LIMIT_REASON_RE = /^(rateLimitExceeded|userRateLimitExceeded|dailyLimitExceeded|quotaExceeded)$/i;
+
 function isRateLimitError(err: any): boolean {
   const status = err?.status ?? err?.code ?? err?.response?.status;
-  if (status === 429 || status === 403) return true;
+  if (status === 429) return true;
+  const reason = extractGoogleErrorReason(err);
+  if (reason) return RATE_LIMIT_REASON_RE.test(reason);
   const msg: string = err?.message ?? "";
-  return /rate limit|quota|userRateLimit/i.test(msg);
+  return /rate limit exceeded|quota exceeded|userRateLimit/i.test(msg);
 }
 
 function extractRetryAfter(err: any): Date {
@@ -194,23 +234,28 @@ export async function sendGmailEmail(params: {
   const raw = buildRawMessage({ from: fromEmail, to, subject, html, inReplyTo, references, attachments });
 
   try {
-    const res = await gmail.users.messages.send({
-      userId: "me",
-      requestBody: {
-        raw,
-        ...(threadId ? { threadId } : {}),
-      },
-    });
+    const res = await withGmailThrottle(fromEmail, () =>
+      gmail.users.messages.send({
+        userId: "me",
+        requestBody: {
+          raw,
+          ...(threadId ? { threadId } : {}),
+        },
+      }),
+    );
 
     return {
       messageId: res.data.id ?? "",
       threadId: res.data.threadId ?? "",
     };
   } catch (err: any) {
+    const status = err?.status ?? err?.code ?? err?.response?.status;
+    const reason = extractGoogleErrorReason(err);
+    console.error(`[gmailService] Send failed for ${fromEmail}: status=${status} reason=${reason ?? "n/a"} message=${err?.message ?? err}`);
     if (isRateLimitError(err)) {
       const until = extractRetryAfter(err);
       await setSendCooldown(fromEmail, until);
-      console.warn(`[gmailService] Rate limit hit for ${fromEmail} — cooldown set until ${until.toISOString()}`);
+      console.warn(`[gmailService] Rate limit hit for ${fromEmail} (reason=${reason ?? "unknown"}) — cooldown set until ${until.toISOString()}`);
       throw new Error(`Gmail rate limit exceeded for ${fromEmail}. Retry after ${until.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })} IST.`);
     }
     const errMsg: string = err?.message ?? "";
@@ -226,12 +271,14 @@ export async function getSmtpMessageId(accountEmail: string, gmailMessageId: str
   try {
     const auth = await getAuthedClient(accountEmail);
     const gmail = google.gmail({ version: "v1", auth });
-    const res = await gmail.users.messages.get({
-      userId: "me",
-      id: gmailMessageId,
-      format: "METADATA",
-      metadataHeaders: ["Message-ID"],
-    });
+    const res = await withGmailThrottle(accountEmail, () =>
+      gmail.users.messages.get({
+        userId: "me",
+        id: gmailMessageId,
+        format: "METADATA",
+        metadataHeaders: ["Message-ID"],
+      }),
+    );
     const headers = res.data.payload?.headers ?? [];
     return (headers as any[]).find((h: any) => h.name?.toLowerCase() === "message-id")?.value ?? null;
   } catch {
@@ -243,12 +290,14 @@ export async function getIntroEmailHeaders(accountEmail: string, gmailMessageId:
   try {
     const auth = await getAuthedClient(accountEmail);
     const gmail = google.gmail({ version: "v1", auth });
-    const res = await gmail.users.messages.get({
-      userId: "me",
-      id: gmailMessageId,
-      format: "METADATA",
-      metadataHeaders: ["Message-ID", "Subject"],
-    });
+    const res = await withGmailThrottle(accountEmail, () =>
+      gmail.users.messages.get({
+        userId: "me",
+        id: gmailMessageId,
+        format: "METADATA",
+        metadataHeaders: ["Message-ID", "Subject"],
+      }),
+    );
     const headers = res.data.payload?.headers ?? [];
     const get = (name: string) =>
       (headers as any[]).find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? null;
@@ -445,11 +494,13 @@ export async function downloadGmailAttachment(params: {
   const { accountEmail, gmailMessageId, attachmentId } = params;
   const auth = await getAuthedClient(accountEmail);
   const gmail = google.gmail({ version: "v1", auth });
-  const res = await gmail.users.messages.attachments.get({
-    userId: "me",
-    messageId: gmailMessageId,
-    id: attachmentId,
-  });
+  const res = await withGmailThrottle(accountEmail, () =>
+    gmail.users.messages.attachments.get({
+      userId: "me",
+      messageId: gmailMessageId,
+      id: attachmentId,
+    }),
+  );
   const data = res.data.data ?? "";
   return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64");
 }
@@ -526,11 +577,13 @@ export async function fetchThreadReplies(params: {
     const auth = await getAuthedClient(accountEmail);
     const gmail = google.gmail({ version: "v1", auth });
 
-    const res = await gmail.users.threads.get({
-      userId: "me",
-      id: threadId,
-      format: "FULL",
-    });
+    const res = await withGmailThrottle(accountEmail, () =>
+      gmail.users.threads.get({
+        userId: "me",
+        id: threadId,
+        format: "FULL",
+      }),
+    );
 
     const messages = res.data.messages ?? [];
     const ourEmail = accountEmail.toLowerCase();
@@ -605,11 +658,13 @@ export async function checkForReply(params: {
     const auth = await getAuthedClient(accountEmail);
     const gmail = google.gmail({ version: "v1", auth });
 
-    const res = await gmail.users.threads.get({
-      userId: "me",
-      id: threadId,
-      format: "METADATA",
-    });
+    const res = await withGmailThrottle(accountEmail, () =>
+      gmail.users.threads.get({
+        userId: "me",
+        id: threadId,
+        format: "METADATA",
+      }),
+    );
 
     const messages = res.data.messages ?? [];
     if (messages.length <= 1) return false;

@@ -31,6 +31,7 @@ import {
   Search,
   Pencil,
   Trash2,
+  ArchiveX,
   Download,
   Loader2,
   ChevronLeft,
@@ -463,6 +464,10 @@ export default function NewSuppliersPage() {
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(
     null,
   );
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [supplierToArchive, setSupplierToArchive] = useState<Supplier | null>(
+    null,
+  );
   const [customStages, setCustomStages] = useState<string[]>(() =>
     getCustomDealStages(),
   );
@@ -601,6 +606,17 @@ export default function NewSuppliersPage() {
       toast.success("Supplier deleted");
     },
     onError: () => toast.error("Failed to delete supplier"),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/new-suppliers/${id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["new-supplier-filters"] });
+      toast.success("Supplier moved to archive");
+    },
+    onError: () => toast.error("Failed to archive supplier"),
   });
 
   const changeStageMutation = useMutation({
@@ -1339,6 +1355,18 @@ export default function NewSuppliersPage() {
                             title="Edit Supplier"
                           >
                             <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                            onClick={() => {
+                              setSupplierToArchive(s);
+                              setArchiveDialogOpen(true);
+                            }}
+                            title="Add to Archive"
+                          >
+                            <ArchiveX className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -3746,6 +3774,58 @@ export default function NewSuppliersPage() {
               }}
             >
               Yes, delete supplier
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive supplier confirmation */}
+      <Dialog
+        open={archiveDialogOpen}
+        onOpenChange={(open) => {
+          setArchiveDialogOpen(open);
+          if (!open) setSupplierToArchive(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <ArchiveX className="h-6 w-6 text-amber-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900">
+                Move to Archive
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">
+                You can restore it anytime from Archived Suppliers.
+              </DialogDescription>
+            </div>
+          </div>
+          {supplierToArchive?.company && (
+            <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-md border border-slate-100 mb-6 font-medium">
+              Company:{" "}
+              <span className="font-bold">{supplierToArchive.company}</span>
+            </p>
+          )}
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setArchiveDialogOpen(false)}
+              className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm shadow-amber-200"
+              onClick={() => {
+                if (supplierToArchive) {
+                  archiveMutation.mutate(supplierToArchive.id);
+                }
+                setArchiveDialogOpen(false);
+                setSupplierToArchive(null);
+              }}
+            >
+              Yes, move to archive
             </Button>
           </div>
         </DialogContent>

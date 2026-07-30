@@ -1,9 +1,12 @@
 import { google } from "googleapis";
 import prisma from "../config/db.js";
+import { withGmailThrottle } from "./gmailService.js";
 
 const CLIENT_ID = process.env.GMAIL_CLIENT_ID!;
 const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET!;
 const REDIRECT_URI = process.env.GMAIL_REDIRECT_URI!;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function getOAuth2Client() {
   return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
@@ -38,11 +41,23 @@ export interface SyncResult {
   syncedAt: Date;
 }
 
+function extractGoogleErrorReason(err: any): string | null {
+  const nestedErrors = err?.errors ?? err?.response?.data?.error?.errors;
+  if (Array.isArray(nestedErrors) && nestedErrors[0]?.reason) return nestedErrors[0].reason;
+  return err?.response?.data?.error?.status ?? null;
+}
+
+// Only these Google error reasons mean an actual rate limit was hit — a bare 403
+// can also mean insufficient permissions, a revoked scope, domain policy, etc.
+const RATE_LIMIT_REASON_RE = /^(rateLimitExceeded|userRateLimitExceeded|dailyLimitExceeded|quotaExceeded)$/i;
+
 function isRateLimitError(err: any): boolean {
   const status = err?.status ?? err?.code ?? err?.response?.status;
-  if (status === 429 || status === 403) return true;
+  if (status === 429) return true;
+  const reason = extractGoogleErrorReason(err);
+  if (reason) return RATE_LIMIT_REASON_RE.test(reason);
   const msg: string = err?.message ?? "";
-  return /rate limit|quota|userRateLimit/i.test(msg);
+  return /rate limit exceeded|quota exceeded|userRateLimit/i.test(msg);
 }
 
 function extractRetryAfter(err: any): Date | null {
@@ -95,11 +110,13 @@ export async function syncGmailInbox(accountEmail: string): Promise<SyncResult> 
   }
 
   try {
-    const listRes = await gmail.users.messages.list({
-      userId: "me",
-      q: query,
-      maxResults: 100,
-    });
+    const listRes = await withGmailThrottle(accountEmail, () =>
+      gmail.users.messages.list({
+        userId: "me",
+        q: query,
+        maxResults: 100,
+      }),
+    );
 
     const messages = listRes.data.messages ?? [];
 
@@ -107,12 +124,14 @@ export async function syncGmailInbox(accountEmail: string): Promise<SyncResult> 
       if (!msg.id) continue;
 
       try {
-        const detail = await gmail.users.messages.get({
-          userId: "me",
-          id: msg.id,
-          format: "METADATA",
-          metadataHeaders: ["From", "Subject", "Date"],
-        });
+        const detail = await withGmailThrottle(accountEmail, () =>
+          gmail.users.messages.get({
+            userId: "me",
+            id: msg.id!,
+            format: "METADATA",
+            metadataHeaders: ["From", "Subject", "Date"],
+          }),
+        );
 
         const headers = detail.data.payload?.headers ?? [];
         const getHeader = (name: string) =>
@@ -174,7 +193,9 @@ export async function syncGmailInbox(accountEmail: string): Promise<SyncResult> 
       `[GmailInbox] ${accountEmail}: +${result.created} created, ${result.updated} updated, ${result.errors} errors`
     );
   } catch (err: any) {
-    console.error(`[GmailInbox] Failed to list messages for ${accountEmail}:`, err?.message);
+    const status = err?.status ?? err?.code ?? err?.response?.status;
+    const reason = extractGoogleErrorReason(err);
+    console.error(`[GmailInbox] Failed to list messages for ${accountEmail}: status=${status} reason=${reason ?? "n/a"} message=${err?.message}`);
     result.errors++;
     if (isRateLimitError(err)) {
       const until = extractRetryAfter(err);
@@ -192,22 +213,35 @@ export async function syncGmailInbox(accountEmail: string): Promise<SyncResult> 
   return result;
 }
 
-export async function syncAllGmailAccounts(): Promise<SyncResult> {
-  const accounts = [
-    process.env.GMAIL_ACCOUNT_1_EMAIL,
-    process.env.GMAIL_ACCOUNT_2_EMAIL,
-    process.env.GMAIL_ACCOUNT_3_EMAIL,
-  ]
-    .filter(Boolean)
-    .map((e) => (e as string).trim());
+let syncAllRunning = false;
 
+export async function syncAllGmailAccounts(): Promise<SyncResult> {
   const totals: SyncResult = { created: 0, updated: 0, errors: 0, syncedAt: new Date() };
 
-  for (const account of accounts) {
-    const r = await syncGmailInbox(account);
-    totals.created += r.created;
-    totals.updated += r.updated;
-    totals.errors += r.errors;
+  if (syncAllRunning) {
+    console.log("[GmailInbox] Previous inbox sync still running — skipping this tick");
+    return totals;
+  }
+  syncAllRunning = true;
+
+  try {
+    const accounts = [
+      process.env.GMAIL_ACCOUNT_1_EMAIL,
+      process.env.GMAIL_ACCOUNT_2_EMAIL,
+      process.env.GMAIL_ACCOUNT_3_EMAIL,
+    ]
+      .filter(Boolean)
+      .map((e) => (e as string).trim());
+
+    for (let i = 0; i < accounts.length; i++) {
+      const r = await syncGmailInbox(accounts[i]);
+      totals.created += r.created;
+      totals.updated += r.updated;
+      totals.errors += r.errors;
+      if (i < accounts.length - 1) await sleep(2000);
+    }
+  } finally {
+    syncAllRunning = false;
   }
 
   return totals;

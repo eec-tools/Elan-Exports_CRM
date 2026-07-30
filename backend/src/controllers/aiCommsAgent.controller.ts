@@ -352,7 +352,7 @@ export async function getInbox(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { account } = req.query as { account?: string };
 
-    const buyerWhere: any = {};
+    const buyerWhere: any = { isArchived: false };
     if (account && account !== "all") {
       buyerWhere.assignedGmailAccount = account;
     } else {

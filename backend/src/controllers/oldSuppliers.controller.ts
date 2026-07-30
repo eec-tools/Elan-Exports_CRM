@@ -29,7 +29,7 @@ export async function listOldSuppliers(
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const where: any = {};
+    const where: any = { isArchived: false };
 
     if (search) {
       where.OR = [
@@ -230,6 +230,10 @@ export async function updateOldSupplierStage(
       res.status(404).json({ error: "Old supplier not found" });
       return;
     }
+    if (existing.isArchived) {
+      res.status(400).json({ error: "Restore this supplier from Archive before changing stage" });
+      return;
+    }
 
     if (stage === "Closed") {
       const supplier = await prisma.oldSupplier.update({
@@ -340,6 +344,54 @@ export async function deleteOldSupplier(
 }
 
 /**
+ * PATCH /api/old-suppliers/:id/archive
+ */
+export async function archiveOldSupplier(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const existing = await prisma.oldSupplier.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: "Old supplier not found" });
+      return;
+    }
+
+    const supplier = await prisma.oldSupplier.update({
+      where: { id: req.params.id },
+      data: { isArchived: true, archivedAt: new Date(), archivedBy: req.user!.id },
+    });
+
+    await logActivity(req.user!.id, "archive", "old_suppliers", supplier.id, { company: supplier.company });
+    res.json(supplier);
+  } catch (err) {
+    console.error("Archive old supplier error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * PATCH /api/old-suppliers/:id/restore
+ */
+export async function restoreOldSupplier(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const existing = await prisma.oldSupplier.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: "Old supplier not found" });
+      return;
+    }
+
+    const supplier = await prisma.oldSupplier.update({
+      where: { id: req.params.id },
+      data: { isArchived: false, archivedAt: null, archivedBy: null },
+    });
+
+    await logActivity(req.user!.id, "restore", "old_suppliers", supplier.id, { company: supplier.company });
+    res.json(supplier);
+  } catch (err) {
+    console.error("Restore old supplier error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
  * GET /api/old-suppliers/export/csv
  */
 export async function exportOldSuppliersCsv(
@@ -349,7 +401,7 @@ export async function exportOldSuppliersCsv(
   try {
     const { search = "", status, country, productCategory, accountManager } = req.query as Record<string, string>;
 
-    const where: any = {};
+    const where: any = { isArchived: false };
     if (search) {
       where.OR = [
         { company: { contains: search, mode: "insensitive" } },
@@ -511,10 +563,10 @@ export async function getOldSupplierFilters(
 ): Promise<void> {
   try {
     const [statuses, countries, categories, managers] = await Promise.all([
-      prisma.oldSupplier.findMany({ select: { currentStatus: true }, distinct: ['currentStatus'] }),
-      prisma.oldSupplier.findMany({ select: { country: true }, distinct: ['country'] }),
-      prisma.oldSupplier.findMany({ select: { productCategory: true }, distinct: ['productCategory'] }),
-      prisma.oldSupplier.findMany({ select: { accountManager: true }, distinct: ['accountManager'] }),
+      prisma.oldSupplier.findMany({ where: { isArchived: false }, select: { currentStatus: true }, distinct: ['currentStatus'] }),
+      prisma.oldSupplier.findMany({ where: { isArchived: false }, select: { country: true }, distinct: ['country'] }),
+      prisma.oldSupplier.findMany({ where: { isArchived: false }, select: { productCategory: true }, distinct: ['productCategory'] }),
+      prisma.oldSupplier.findMany({ where: { isArchived: false }, select: { accountManager: true }, distinct: ['accountManager'] }),
     ]);
 
     // Deduplicate filter values case-insensitively (keep the first occurrence)

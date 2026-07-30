@@ -67,24 +67,12 @@ import {
   MessageSquare,
   Check,
   AlertCircle,
+  ArchiveX,
+  ArchiveRestore,
 } from "lucide-react";
+import { EmailBody, EmailAttachmentList, type EmailAttachment } from "@/components/EmailContent";
 
 
-
-function stripQuotedText(body: string): string {
-  const lines = body.split("\n");
-  const result: string[] = [];
-  for (const line of lines) {
-    const t = line.trimStart();
-    if (t.startsWith(">")) break;
-    if (/^On \w{3},\s/.test(t)) break;
-    if (/^[-_]{4,}/.test(t)) break;
-    if (/^From:\s+\S/.test(t) && result.length > 0) break;
-    result.push(line);
-  }
-  while (result.length > 0 && result[result.length - 1].trim() === "") result.pop();
-  return result.join("\n").trim();
-}
 
 interface EmailReply {
   id: string;
@@ -93,7 +81,9 @@ interface EmailReply {
   fromName?: string;
   subject?: string;
   body: string;
+  bodyHtml?: string | null;
   receivedAt: string;
+  attachments?: EmailAttachment[];
 }
 
 interface OrganicCertRow {
@@ -214,6 +204,9 @@ interface NewSupplier {
   factoryVisitDate?: string;
   factoryVisitOutcome?: string;
   referralSource?: string;
+  isArchived?: boolean;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
 }
 
 interface SupplierProduct {
@@ -385,6 +378,28 @@ export default function NewSupplierDetailsPage() {
       toast.success("Supplier updated");
     },
     onError: () => toast.error("Failed to update supplier"),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (supplierId: string) => api.patch(`/new-suppliers/${supplierId}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["new-supplier", id] });
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Supplier archived");
+    },
+    onError: () => toast.error("Failed to archive supplier"),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (supplierId: string) => api.patch(`/new-suppliers/${supplierId}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["new-supplier", id] });
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Supplier restored");
+    },
+    onError: () => toast.error("Failed to restore supplier"),
   });
 
   const { data: filters } = useQuery({
@@ -619,10 +634,19 @@ export default function NewSupplierDetailsPage() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight">
               {supplier.company}
             </h1>
+            <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
+              New Supplier
+            </Badge>
+            {supplier.isArchived && (
+              <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-300 flex items-center gap-1">
+                <ArchiveX className="h-3 w-3" />
+                Archived
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             Supplier ID: #{supplier.id.slice(0, 8).toUpperCase()}
@@ -636,6 +660,20 @@ export default function NewSupplierDetailsPage() {
               Edit
             </Button>
           </PermissionGate>
+          {!supplier.isArchived && (
+            <PermissionGate permission="new_suppliers" editOnly>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-slate-700 border-slate-300 hover:bg-slate-50"
+                disabled={archiveMutation.isPending}
+                onClick={() => archiveMutation.mutate(supplier.id)}
+              >
+                <ArchiveX className="mr-1.5 h-4 w-4" />
+                Add to Archive
+              </Button>
+            </PermissionGate>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -648,6 +686,29 @@ export default function NewSupplierDetailsPage() {
           </Button>
         </div>
       </div>
+
+      {supplier.isArchived && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
+          <div className="text-sm text-slate-700">
+            <span className="font-medium">Archived</span>
+            {supplier.archivedAt && (
+              <span> on {new Date(supplier.archivedAt).toLocaleDateString()}</span>
+            )}
+            {". Campaign and stage-change actions are disabled while archived."}
+          </div>
+          <PermissionGate permission="new_suppliers" editOnly>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={restoreMutation.isPending}
+              onClick={() => restoreMutation.mutate(supplier.id)}
+            >
+              <ArchiveRestore className="mr-1.5 h-4 w-4" />
+              Restore
+            </Button>
+          </PermissionGate>
+        </div>
+      )}
 
       {/* ── Profile Completeness Bar ── */}
       {(() => {
@@ -1817,7 +1878,6 @@ export default function NewSupplierDetailsPage() {
                     const name = isSent ? "Élan Exports" : (msg.fromName ?? msg.fromEmail);
                     const email = msg.fromEmail;
                     const initial = name.charAt(0).toUpperCase();
-                    const cleanBody = stripQuotedText(msg.body);
                     return (
                       <div
                         key={msg.id}
@@ -1837,8 +1897,9 @@ export default function NewSupplierDetailsPage() {
                           </span>
                         </div>
                         {/* Body */}
-                        <div className="px-4 py-3 text-slate-700 leading-relaxed whitespace-pre-wrap">
-                          {cleanBody || <span className="text-slate-400 italic">No content</span>}
+                        <div className="px-4 py-3 text-slate-700">
+                          <EmailBody bodyHtml={msg.bodyHtml} bodyText={msg.body} />
+                          <EmailAttachmentList attachments={msg.attachments} />
                         </div>
                       </div>
                     );

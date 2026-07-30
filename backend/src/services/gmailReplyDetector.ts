@@ -157,7 +157,15 @@ async function flagDeliveryFailure(sourcingId: string, company: string): Promise
     });
 }
 
+let supplierCheckRunning = false;
+let buyerCheckRunning = false;
+
 async function checkCampaignReplies() {
+    if (supplierCheckRunning) {
+        console.log("[ReplyDetector] Previous supplier reply check still running — skipping this tick");
+        return;
+    }
+    supplierCheckRunning = true;
     try {
         // Check both active campaigns (for new replies) and response_received
         // (to keep syncing any additional messages in the thread)
@@ -165,6 +173,7 @@ async function checkCampaignReplies() {
             where: {
                 status: { in: ["active", "response_received"] },
                 gmailThreadId: { not: null },
+                sourcingSupplier: { isArchived: false },
             },
             include: {
                 sourcingSupplier: {
@@ -177,7 +186,6 @@ async function checkCampaignReplies() {
 
         let repliesFound = 0;
         const now = new Date();
-        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
         for (const campaign of campaigns) {
             const supplier = campaign.sourcingSupplier;
@@ -217,8 +225,6 @@ async function checkCampaignReplies() {
             } catch (err) {
                 console.error(`[ReplyDetector] Error for ${supplier.company}:`, err);
             }
-
-            await sleep(300);
         }
 
         if (repliesFound > 0) {
@@ -226,6 +232,8 @@ async function checkCampaignReplies() {
         }
     } catch (err) {
         console.error("[ReplyDetector] Fatal error:", err);
+    } finally {
+        supplierCheckRunning = false;
     }
 }
 
@@ -300,11 +308,17 @@ export async function syncBuyerThreadMessages(
 }
 
 async function checkBuyerCampaignReplies() {
+    if (buyerCheckRunning) {
+        console.log("[ReplyDetector] Previous buyer reply check still running — skipping this tick");
+        return;
+    }
+    buyerCheckRunning = true;
     try {
         const campaigns = await (prisma as any).sourcingBuyerEmailCampaign.findMany({
             where: {
                 status: { in: ["active", "response_received"] },
                 gmailThreadId: { not: null },
+                sourcingBuyer: { isArchived: false },
             },
             include: {
                 sourcingBuyer: { select: { id: true, company: true, email: true, contactPerson: true, assignedGmailAccount: true, buyerVaultContactId: true } },
@@ -314,7 +328,6 @@ async function checkBuyerCampaignReplies() {
         if (campaigns.length === 0) return;
 
         const now = new Date();
-        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
         for (const campaign of campaigns) {
             const buyer = campaign.sourcingBuyer;
@@ -418,11 +431,11 @@ async function checkBuyerCampaignReplies() {
             } catch (err) {
                 console.error(`[ReplyDetector] Buyer error for ${buyer.company}:`, err);
             }
-
-            await sleep(300);
         }
     } catch (err) {
         console.error("[ReplyDetector] Fatal error in buyer reply check:", err);
+    } finally {
+        buyerCheckRunning = false;
     }
 }
 
@@ -506,8 +519,9 @@ export function startGmailReplyDetector() {
         console.log("[ReplyDetector] GMAIL_CLIENT_ID/SECRET not set — reply detection disabled");
         return;
     }
-    // Every 5 minutes
+    // Every 5 minutes — buyer check offset by 2.5 min so the two jobs don't both
+    // burst-fetch Gmail threads on the same shared accounts at the same instant.
     cron.schedule("*/5 * * * *", checkCampaignReplies);
-    cron.schedule("*/5 * * * *", checkBuyerCampaignReplies);
-    console.log("[ReplyDetector] Gmail reply detection scheduled every 5 minutes");
+    cron.schedule("2-59/5 * * * *", checkBuyerCampaignReplies);
+    console.log("[ReplyDetector] Gmail reply detection scheduled every 5 minutes (staggered)");
 }

@@ -6,6 +6,8 @@ import {
   createSupplier,
   updateSupplier,
   deleteSupplier,
+  archiveSupplier,
+  restoreSupplier,
   exportSuppliersCsv,
   uploadCatalog,
   uploadSupplierFile,
@@ -37,6 +39,8 @@ router.post("/upload", requireEdit(["suppliers", "signed_suppliers"]), uploadSup
 router.post("/", requireEdit(["suppliers", "signed_suppliers"]), createSupplier);
 router.put("/:id", requireEdit(["suppliers", "signed_suppliers"]), updateSupplier);
 router.patch("/:id/stage", requireEdit(["suppliers", "signed_suppliers"]), updateSupplierStage);
+router.patch("/:id/archive", requireEdit(["suppliers", "signed_suppliers"]), archiveSupplier);
+router.patch("/:id/restore", requireEdit(["suppliers", "signed_suppliers"]), restoreSupplier);
 router.delete("/:id", requireEdit(["suppliers", "signed_suppliers"]), deleteSupplier);
 
 export default router;

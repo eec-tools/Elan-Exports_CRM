@@ -71,6 +71,8 @@ import {
   AlertTriangle,
   TrendingUp,
   Briefcase,
+  ArchiveX,
+  ArchiveRestore,
 } from "lucide-react";
 
 interface OrganicCertRow { market: string; certNumber: string; expiryDate: string; }
@@ -238,6 +240,9 @@ interface Supplier {
   factoryVisitDate?: string;
   factoryVisitOutcome?: string;
   referralSource?: string;
+  isArchived?: boolean;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
 }
 
 const ORGANIC_CERT_MARKETS = ["India — NPOP", "USA — USDA Organic (NOP)", "EU — EU Organic (Reg 2018/848)", "UK — UK Organic", "Australia — ACO / NASAA", "Japan — JAS Organic"];
@@ -413,6 +418,28 @@ export default function SupplierDetailsPage() {
       toast.success("Supplier updated");
     },
     onError: () => toast.error("Failed to update supplier"),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (supplierId: string) => api.patch(`/suppliers/${supplierId}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supplier", id] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Supplier archived");
+    },
+    onError: () => toast.error("Failed to archive supplier"),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (supplierId: string) => api.patch(`/suppliers/${supplierId}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supplier", id] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Supplier restored");
+    },
+    onError: () => toast.error("Failed to restore supplier"),
   });
 
   const uploadCatalogMutation = useMutation({
@@ -637,12 +664,21 @@ export default function SupplierDetailsPage() {
             <h1 className="text-2xl font-bold tracking-tight">
               {supplier.company}
             </h1>
+            <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
+              Signed Supplier
+            </Badge>
             <Badge
               variant="outline"
               className={statusColor(supplier.currentStatus)}
             >
               {supplier.currentStatus || "Active"}
             </Badge>
+            {supplier.isArchived && (
+              <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-300 flex items-center gap-1">
+                <ArchiveX className="h-3 w-3" />
+                Archived
+              </Badge>
+            )}
             {supplier.vettingScore != null && (
               <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 flex items-center gap-1">
                 <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
@@ -669,6 +705,20 @@ export default function SupplierDetailsPage() {
               Edit
             </Button>
           </PermissionGate>
+          {!supplier.isArchived && (
+            <PermissionGate permission="signed_suppliers" editOnly>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-slate-700 border-slate-300 hover:bg-slate-50"
+                disabled={archiveMutation.isPending}
+                onClick={() => archiveMutation.mutate(supplier.id)}
+              >
+                <ArchiveX className="mr-1.5 h-4 w-4" />
+                Add to Archive
+              </Button>
+            </PermissionGate>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -679,6 +729,29 @@ export default function SupplierDetailsPage() {
           </Button>
         </div>
       </div>
+
+      {supplier.isArchived && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
+          <div className="text-sm text-slate-700">
+            <span className="font-medium">Archived</span>
+            {supplier.archivedAt && (
+              <span> on {new Date(supplier.archivedAt).toLocaleDateString()}</span>
+            )}
+            {". Campaign and stage-change actions are disabled while archived."}
+          </div>
+          <PermissionGate permission="signed_suppliers" editOnly>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={restoreMutation.isPending}
+              onClick={() => restoreMutation.mutate(supplier.id)}
+            >
+              <ArchiveRestore className="mr-1.5 h-4 w-4" />
+              Restore
+            </Button>
+          </PermissionGate>
+        </div>
+      )}
 
       <Separator />
 

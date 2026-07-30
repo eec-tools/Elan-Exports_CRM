@@ -6,6 +6,8 @@ import {
     createNewSupplier,
     updateNewSupplier,
     deleteNewSupplier,
+    archiveNewSupplier,
+    restoreNewSupplier,
     exportNewSuppliersCsv,
     getNewSupplierFilters,
     updateNewSupplierStage,
@@ -35,6 +37,8 @@ router.get("/:id", getNewSupplier);
 router.get("/:id/replies", getNewSupplierReplies);
 router.put("/:id", requireEdit(["suppliers", "new_suppliers"]), updateNewSupplier);
 router.patch("/:id/stage", requireEdit(["suppliers", "new_suppliers"]), updateNewSupplierStage);
+router.patch("/:id/archive", requireEdit(["suppliers", "new_suppliers"]), archiveNewSupplier);
+router.patch("/:id/restore", requireEdit(["suppliers", "new_suppliers"]), restoreNewSupplier);
 router.delete("/:id", requireEdit(["suppliers", "new_suppliers"]), deleteNewSupplier);
 
 export default router;

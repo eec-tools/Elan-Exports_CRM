@@ -195,12 +195,13 @@ export async function executeSendStep(sourcingId: string, createdBy?: string): P
                 select: {
                     id: true, company: true, email: true, contactPerson: true,
                     formToken: true, formTemplateId: true, assignedGmailAccount: true, status: true,
-                    product: true, productCategory: true, emailTemplateId: true,
+                    product: true, productCategory: true, emailTemplateId: true, isArchived: true,
                 },
             },
         },
     });
     if (!campaign || campaign.status !== "active") return;
+    if (campaign.sourcingSupplier.isArchived) return;
 
     const supplier = campaign.sourcingSupplier;
     const fromEmail = supplier.assignedGmailAccount;
@@ -333,6 +334,7 @@ export async function startCampaignForSupplier(sourcingId: string, userId?: stri
     try {
         const supplier = await (prisma as any).sourcingSupplier.findUnique({ where: { id: sourcingId } });
         if (!supplier?.assignedGmailAccount || !supplier?.email || !supplier?.formToken) return false;
+        if (supplier.isArchived) return false;
 
         const existing = await (prisma as any).sourcingEmailCampaign.findUnique({ where: { sourcingId } });
         if (existing) return false;
@@ -478,6 +480,10 @@ export async function startCampaign(req: AuthRequest, res: Response): Promise<vo
         const supplier = await (prisma as any).sourcingSupplier.findUnique({ where: { id: sourcingId } });
         if (!supplier) {
             res.status(404).json({ error: "Sourcing supplier not found" });
+            return;
+        }
+        if (supplier.isArchived) {
+            res.status(400).json({ error: "Restore this supplier from Archive before starting a campaign" });
             return;
         }
         if (!supplier.assignedGmailAccount) {
@@ -679,6 +685,7 @@ export async function getSourceReplies(req: AuthRequest, res: Response): Promise
         const stored = await (prisma as any).supplierEmailReply.findMany({
             where: { sourcingId },
             orderBy: { receivedAt: "asc" },
+            include: { attachments: true },
         });
 
         if (stored.length === 0) {
@@ -693,6 +700,7 @@ export async function getSourceReplies(req: AuthRequest, res: Response): Promise
                 const refreshed = await (prisma as any).supplierEmailReply.findMany({
                     where: { sourcingId },
                     orderBy: { receivedAt: "asc" },
+                    include: { attachments: true },
                 });
                 res.json(refreshed);
                 return;
@@ -725,6 +733,7 @@ export async function syncReplies(req: AuthRequest, res: Response): Promise<void
         const all = await (prisma as any).supplierEmailReply.findMany({
             where: { sourcingId },
             orderBy: { receivedAt: "asc" },
+            include: { attachments: true },
         });
         res.json(all);
     } catch (err: any) {
@@ -764,6 +773,7 @@ export async function getNewSupplierReplies(req: AuthRequest, res: Response): Pr
         const stored = await (prisma as any).supplierEmailReply.findMany({
             where: { sourcingId },
             orderBy: { receivedAt: "asc" },
+            include: { attachments: true },
         });
 
         if (stored.length === 0) {
@@ -778,6 +788,7 @@ export async function getNewSupplierReplies(req: AuthRequest, res: Response): Pr
                 const refreshed = await (prisma as any).supplierEmailReply.findMany({
                     where: { sourcingId },
                     orderBy: { receivedAt: "asc" },
+                    include: { attachments: true },
                 });
                 res.json(refreshed);
                 return;

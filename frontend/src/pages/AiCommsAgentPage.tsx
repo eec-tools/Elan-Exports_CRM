@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import DOMPurify from "dompurify";
 import {
   Bot,
   Sparkles,
@@ -24,12 +23,20 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  ArchiveX,
 } from "lucide-react";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { ResizeHandle } from "@/components/ui/resize-handle";
+import { stripHtml, sanitizeEmailHtml, linkifyText, formatFileSize } from "@/components/EmailContent";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -111,72 +118,6 @@ interface ClarificationResult {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
-    .replace(/\n{3,}/g, "\n\n").trim();
-}
-
-DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-  if (node.tagName === "A") {
-    node.setAttribute("target", "_blank");
-    node.setAttribute("rel", "noopener noreferrer");
-  }
-});
-
-function sanitizeEmailHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
-    FORBID_TAGS: ["style", "script", "iframe", "object", "embed", "form", "input", "link", "meta"],
-    FORBID_ATTR: ["srcset"],
-  });
-}
-
-function linkifyText(text: string): React.ReactNode[] {
-  const urlPattern = /(https?:\/\/[^\s<>"')\]]+|www\.[^\s<>"')\]]+)/g;
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-
-  while ((match = urlPattern.exec(text)) !== null) {
-    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
-
-    let url = match[0];
-    let trailing = "";
-    const trailingMatch = url.match(/[.,;:!?]+$/);
-    if (trailingMatch) {
-      trailing = trailingMatch[0];
-      url = url.slice(0, -trailing.length);
-    }
-
-    nodes.push(
-      <a
-        key={key++}
-        href={url.startsWith("http") ? url : `https://${url}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline underline-offset-2 break-all hover:opacity-80"
-      >
-        {url}
-      </a>
-    );
-    if (trailing) nodes.push(trailing);
-    lastIndex = urlPattern.lastIndex;
-  }
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
-  return nodes;
-}
-
-function formatFileSize(bytes?: number | null): string {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -275,6 +216,18 @@ function DraftPanel({
 
   const [contacted, setContacted] = useState(item.alreadyContacted);
   const [togglingContacted, setTogglingContacted] = useState(false);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+
+  const archiveMutation = useMutation({
+    mutationFn: () => api.patch(`/sourcing-buyers/${item.id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ai-comms-inbox"] });
+      toast.success(`${item.company} moved to archive`);
+      setArchiveConfirmOpen(false);
+      onClose();
+    },
+    onError: () => toast.error("Failed to archive buyer"),
+  });
 
   async function handleToggleContacted() {
     setTogglingContacted(true);
@@ -440,6 +393,13 @@ function DraftPanel({
             <PhoneCall className="h-3 w-3" />
           )}
           {contacted ? "Already Contacted" : "Mark Contacted"}
+        </button>
+        <button
+          onClick={() => setArchiveConfirmOpen(true)}
+          title="Add to Archive"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-muted text-muted-foreground hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700 transition-all"
+        >
+          <ArchiveX className="h-3 w-3" />
         </button>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
           <Mail className="h-3 w-3" />
@@ -653,6 +613,28 @@ function DraftPanel({
           )}
         </div>
       </div>
+
+      {/* ── Archive Confirm Dialog ── */}
+      <Dialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogTitle>Move to Archive?</DialogTitle>
+          <DialogDescription>
+            This will move <strong>{item.company}</strong> to the archive — you can restore it anytime from
+            Archived Buyers. Follow-ups and campaign actions will stop.
+          </DialogDescription>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setArchiveConfirmOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={archiveMutation.isPending}
+              onClick={() => archiveMutation.mutate()}
+            >
+              {archiveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ArchiveX className="h-4 w-4 mr-1.5" />}
+              Move to Archive
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

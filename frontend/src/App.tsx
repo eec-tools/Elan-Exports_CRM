@@ -13,6 +13,8 @@ import { PermissionGate } from "@/components/PermissionGate";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import BuyersPage from "@/pages/BuyersPage";
+import ArchivedBuyersPage from "@/pages/ArchivedBuyersPage";
+import ArchivedSuppliersPage from "@/pages/ArchivedSuppliersPage";
 import SignedContractSuppliersPage from "@/pages/SignedContractSuppliersPage";
 import OldSuppliersPage from "@/pages/OldSuppliersPage";
 import NewSuppliersPage from "@/pages/NewSuppliersPage";
@@ -166,6 +168,14 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="buyers/archived"
+                  element={
+                    <PermissionGate permission={["buyers_directory", "sourcing_buyers"]}>
+                      <ArchivedBuyersPage />
+                    </PermissionGate>
+                  }
+                />
+                <Route
                   path="buyers/:id"
                   element={
                     <PermissionGate permission="buyers_directory">
@@ -176,6 +186,14 @@ export default function App() {
                 <Route
                   path="suppliers"
                   element={<Navigate to="/suppliers/signed-contract" replace />}
+                />
+                <Route
+                  path="suppliers/archived"
+                  element={
+                    <PermissionGate permission={["suppliers", "sourcing_suppliers", "new_suppliers", "signed_suppliers", "old_suppliers"]}>
+                      <ArchivedSuppliersPage />
+                    </PermissionGate>
+                  }
                 />
                 <Route
                   path="suppliers/signed-contract"

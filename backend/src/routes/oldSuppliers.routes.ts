@@ -5,6 +5,8 @@ import {
   createOldSupplier,
   updateOldSupplier,
   deleteOldSupplier,
+  archiveOldSupplier,
+  restoreOldSupplier,
   exportOldSuppliersCsv,
   getOldSupplierFilters,
   updateOldSupplierStage,
@@ -29,6 +31,8 @@ router.post("/deduplicate", requireEdit(["suppliers", "old_suppliers"]), dedupli
 router.post("/", requireEdit(["suppliers", "old_suppliers"]), createOldSupplier);
 router.put("/:id", requireEdit(["suppliers", "old_suppliers"]), updateOldSupplier);
 router.patch("/:id/stage", requireEdit(["suppliers", "old_suppliers"]), updateOldSupplierStage);
+router.patch("/:id/archive", requireEdit(["suppliers", "old_suppliers"]), archiveOldSupplier);
+router.patch("/:id/restore", requireEdit(["suppliers", "old_suppliers"]), restoreOldSupplier);
 router.delete("/:id", requireEdit(["suppliers", "old_suppliers"]), deleteOldSupplier);
 
 export default router;

@@ -88,6 +88,7 @@ export async function startCampaignForBuyer(sourcingBuyerId: string, createdBy?:
     try {
         const buyer = await (prisma as any).sourcingBuyer.findUnique({ where: { id: sourcingBuyerId } });
         if (!buyer || !buyer.email) return false;
+        if (buyer.isArchived) return false;
 
         const fromEmail = buyer.assignedGmailAccount ?? BUYER_GMAIL_ACCOUNT;
 
@@ -203,12 +204,13 @@ export async function executeSendStep(sourcingBuyerId: string, createdBy?: strin
                 select: {
                     id: true, company: true, email: true, contactPerson: true,
                     assignedGmailAccount: true, status: true, product: true,
-                    productCategory: true, emailTemplateId: true, customEmailBody: true,
+                    productCategory: true, emailTemplateId: true, customEmailBody: true, isArchived: true,
                 },
             },
         },
     });
     if (!campaign || campaign.status !== "active") return;
+    if (campaign.sourcingBuyer.isArchived) return;
 
     const buyer = campaign.sourcingBuyer;
     const fromEmail = buyer.assignedGmailAccount ?? BUYER_GMAIL_ACCOUNT;
@@ -452,6 +454,7 @@ export async function getSourceReplies(req: AuthRequest, res: Response): Promise
         const replies = await (prisma as any).buyerEmailReply.findMany({
             where: { sourcingBuyerId: id },
             orderBy: { receivedAt: "asc" },
+            include: { attachments: true },
         });
         res.json(replies);
     } catch (err) {

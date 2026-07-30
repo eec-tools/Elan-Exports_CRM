@@ -6,6 +6,8 @@ import {
     createSourcingBuyer,
     updateSourcingBuyer,
     deleteSourcingBuyer,
+    archiveSourcingBuyer,
+    restoreSourcingBuyer,
     getVaultFolderNotSent,
     addFromVaultFolder,
     convertToBuyer,
@@ -25,6 +27,8 @@ router.post("/", requireEdit("sourcing_buyers"), createSourcingBuyer);
 router.post("/from-folder", requireEdit("sourcing_buyers"), addFromVaultFolder);
 router.post("/:id/convert", requireEdit("sourcing_buyers"), convertToBuyer);
 router.put("/:id", requireEdit("sourcing_buyers"), updateSourcingBuyer);
+router.patch("/:id/archive", requireEdit("sourcing_buyers"), archiveSourcingBuyer);
+router.patch("/:id/restore", requireEdit("sourcing_buyers"), restoreSourcingBuyer);
 router.delete("/:id", requireEdit("sourcing_buyers"), deleteSourcingBuyer);
 
 export default router;

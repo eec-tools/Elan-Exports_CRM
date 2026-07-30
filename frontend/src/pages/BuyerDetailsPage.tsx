@@ -55,6 +55,8 @@ import {
   Download,
   FolderOpen,
   AlertTriangle,
+  ArchiveX,
+  ArchiveRestore,
 } from "lucide-react";
 
 const DOCUMENT_TYPES = [
@@ -161,6 +163,9 @@ interface Buyer {
   reorderLikelihood?: string;
   buyerStatedIntent?: string;
   documents?: BuyerDocument[];
+  isArchived?: boolean;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
 }
 
 function InfoRow({
@@ -324,6 +329,7 @@ export default function BuyerDetailsPage() {
 
   const [activeTab, setActiveTab] = useState<"overview" | "documents">("overview");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [form, setForm] = useState<Partial<Buyer>>({});
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
   const [quotationFiles, setQuotationFiles] = useState<File[]>([]);
@@ -360,6 +366,31 @@ export default function BuyerDetailsPage() {
       toast.success("Buyer updated");
     },
     onError: () => toast.error("Failed to update buyer"),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: () => api.patch(`/buyers/${id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["buyer", id] });
+      queryClient.invalidateQueries({ queryKey: ["buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["buyer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      setArchiveConfirmOpen(false);
+      toast.success("Buyer moved to archive");
+    },
+    onError: () => toast.error("Failed to archive buyer"),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: () => api.patch(`/buyers/${id}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["buyer", id] });
+      queryClient.invalidateQueries({ queryKey: ["buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["buyer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Buyer restored");
+    },
+    onError: () => toast.error("Failed to restore buyer"),
   });
 
   const { data: newSuppliersListData, isLoading: newSuppLoading } = useQuery<{ id: string; company: string; type: "new" }[]>({
@@ -600,9 +631,10 @@ export default function BuyerDetailsPage() {
     buyer.sourcingRequirements || [];
 
   const canEdit = hasEditPermission("buyers");
+  const canEditRecord = canEdit && !buyer.isArchived;
 
   return (
-    <OnAddContext.Provider value={canEdit ? openEdit : undefined}>
+    <OnAddContext.Provider value={canEditRecord ? openEdit : undefined}>
     <div className="p-6 space-y-6">
       {/* ── Breadcrumb ── */}
       <div className="text-sm text-muted-foreground flex items-center gap-1">
@@ -626,6 +658,9 @@ export default function BuyerDetailsPage() {
             <h1 className="text-2xl font-bold tracking-tight">
               {buyer.company}
             </h1>
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border text-slate-500 bg-slate-50 border-slate-200">
+              Buyers Directory
+            </span>
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${statusStyles(buyer.status)}`}
             >
@@ -639,11 +674,25 @@ export default function BuyerDetailsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <PermissionGate permission="buyers" editOnly>
-            <Button variant="outline" size="sm" onClick={openEdit}>
-              <Pencil className="mr-1.5 h-4 w-4" /> Edit
-            </Button>
-          </PermissionGate>
+          {!buyer.isArchived && (
+            <PermissionGate permission="buyers" editOnly>
+              <Button variant="outline" size="sm" onClick={openEdit}>
+                <Pencil className="mr-1.5 h-4 w-4" /> Edit
+              </Button>
+            </PermissionGate>
+          )}
+          {!buyer.isArchived && (
+            <PermissionGate permission="buyers" editOnly>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-200 text-slate-600 hover:text-amber-700 hover:border-amber-300 hover:bg-amber-50"
+                onClick={() => setArchiveConfirmOpen(true)}
+              >
+                <ArchiveX className="mr-1.5 h-4 w-4" /> Add to Archive
+              </Button>
+            </PermissionGate>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -654,6 +703,31 @@ export default function BuyerDetailsPage() {
           </Button>
         </div>
       </div>
+
+      {/* ── Archived Banner ── */}
+      {buyer.isArchived && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-center gap-2 text-amber-800 text-sm">
+            <ArchiveX className="h-4 w-4 shrink-0" />
+            <span>
+              Archived on {buyer.archivedAt ? new Date(buyer.archivedAt).toLocaleDateString() : "—"}
+              {buyer.archivedBy ? ` by ${buyer.archivedBy}` : ""}
+            </span>
+          </div>
+          <PermissionGate permission="buyers" editOnly>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-300 text-amber-700 hover:bg-amber-100 bg-white"
+              onClick={() => restoreMutation.mutate()}
+              disabled={restoreMutation.isPending}
+            >
+              {restoreMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ArchiveRestore className="h-4 w-4 mr-1.5" />}
+              Restore
+            </Button>
+          </PermissionGate>
+        </div>
+      )}
 
       <Separator />
 
@@ -2757,6 +2831,40 @@ export default function BuyerDetailsPage() {
         </DialogContent>
       </Dialog>
     </> }
+
+      {/* ── Archive Confirmation ── */}
+      <Dialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+        <DialogContent className="sm:max-w-md bg-white rounded-xl shadow-2xl border-none">
+          <DialogHeader>
+            <div className="flex items-center gap-4 mb-2">
+              <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 border border-amber-200">
+                <ArchiveX className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-slate-900">
+                  Move to Archive
+                </DialogTitle>
+                <p className="text-sm text-slate-500 mt-1">
+                  You can restore it anytime from Archived Buyers.
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" onClick={() => setArchiveConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={archiveMutation.isPending}
+              onClick={() => archiveMutation.mutate()}
+            >
+              {archiveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Move to Archive
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
     </OnAddContext.Provider>

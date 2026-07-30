@@ -24,9 +24,12 @@ import {
   MessageSquare,
   UserCheck,
   PhoneCall,
+  ArchiveX,
+  ArchiveRestore,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import BuyersTabBar from "@/components/BuyersTabBar";
+import { EmailBody, EmailAttachmentList, type EmailAttachment } from "@/components/EmailContent";
 
 const BUYER_GMAIL = "partners@eectrade.com";
 
@@ -54,6 +57,9 @@ interface SourcingBuyer {
     responseReceivedAt?: string | null;
     nextFollowupDue?: string | null;
   } | null;
+  isArchived?: boolean;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
 }
 
 interface EmailReply {
@@ -63,28 +69,15 @@ interface EmailReply {
   fromName?: string;
   subject?: string;
   body: string;
+  bodyHtml?: string | null;
   receivedAt: string;
+  attachments?: EmailAttachment[];
 }
 
 interface EmailTemplate {
   id: string;
   name: string;
   isDefault: boolean;
-}
-
-function stripQuotedText(body: string): string {
-  const lines = body.split("\n");
-  const result: string[] = [];
-  for (const line of lines) {
-    const t = line.trimStart();
-    if (t.startsWith(">")) break;
-    if (/^On \w{3},\s/.test(t)) break;
-    if (/^[-_]{4,}/.test(t)) break;
-    if (/^From:\s+\S/.test(t) && result.length > 0) break;
-    result.push(line);
-  }
-  while (result.length > 0 && result[result.length - 1].trim() === "") result.pop();
-  return result.join("\n").trim();
 }
 
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
@@ -122,6 +115,7 @@ export default function SourcingBuyerDetailsPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [convertConfirmOpen, setConvertConfirmOpen] = useState(false);
   const [alreadyContacted, setAlreadyContacted] = useState(false);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
 
   const set = (key: string) => (value: string) => {
     setFields((f) => ({ ...f, [key]: value }));
@@ -208,6 +202,33 @@ export default function SourcingBuyerDetailsPage() {
     },
   });
 
+  const archiveMutation = useMutation({
+    mutationFn: () => api.patch(`/sourcing-buyers/${id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyer", id] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyers-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyers-all"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      setArchiveConfirmOpen(false);
+      toast.success("Buyer moved to archive");
+    },
+    onError: () => toast.error("Failed to archive buyer"),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: () => api.patch(`/sourcing-buyers/${id}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyer", id] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyers-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyers-all"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Buyer restored");
+    },
+    onError: () => toast.error("Failed to restore buyer"),
+  });
+
   const markResponseMutation = useMutation({
     mutationFn: () => api.post(`/buyer-campaigns/${id}/mark-response`),
     onSuccess: (res) => {
@@ -246,6 +267,8 @@ export default function SourcingBuyerDetailsPage() {
     label: buyer.status,
     class: "bg-slate-100 text-slate-700",
   };
+  const isArchived = !!buyer.isArchived;
+  const recordEditable = canEdit && !isArchived;
 
   return (
     <div className="p-6 space-y-6">
@@ -261,6 +284,9 @@ export default function SourcingBuyerDetailsPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-slate-900">{buyer.company}</h1>
+              <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border text-slate-500 bg-slate-50 border-slate-200">
+                Sourcing Buyer
+              </span>
               <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCfg.class}`}>
                 {statusCfg.label}
               </span>
@@ -271,7 +297,7 @@ export default function SourcingBuyerDetailsPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          {campaign?.status === "response_received" && (
+          {!isArchived && campaign?.status === "response_received" && (
             <Button
               size="sm"
               variant="outline"
@@ -287,14 +313,50 @@ export default function SourcingBuyerDetailsPage() {
               {alreadyContacted ? "Already Contacted" : "Mark as Contacted"}
             </Button>
           )}
-          {isDirty && canEdit && (
+          {isDirty && recordEditable && (
             <Button size="sm" onClick={() => saveMutation.mutate(fields)} disabled={saveMutation.isPending}>
               {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
               Save Changes
             </Button>
           )}
+          {canEdit && !isArchived && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-slate-200 text-slate-600 hover:text-amber-700 hover:border-amber-300 hover:bg-amber-50"
+              onClick={() => setArchiveConfirmOpen(true)}
+            >
+              <ArchiveX className="h-4 w-4 mr-1.5" />
+              Add to Archive
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* ── Archived Banner ── */}
+      {isArchived && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-center gap-2 text-amber-800 text-sm">
+            <ArchiveX className="h-4 w-4 shrink-0" />
+            <span>
+              Archived on {buyer.archivedAt ? new Date(buyer.archivedAt).toLocaleDateString() : "—"}
+              {buyer.archivedBy ? ` by ${buyer.archivedBy}` : ""}
+            </span>
+          </div>
+          {canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-300 text-amber-700 hover:bg-amber-100 bg-white"
+              onClick={() => restoreMutation.mutate()}
+              disabled={restoreMutation.isPending}
+            >
+              {restoreMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ArchiveRestore className="h-4 w-4 mr-1.5" />}
+              Restore
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ── Left: Basic Info ─── */}
@@ -302,13 +364,13 @@ export default function SourcingBuyerDetailsPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
             <h2 className="font-semibold text-slate-800">Buyer Information</h2>
             <div className="grid grid-cols-2 gap-3">
-              <FieldRow label="Company" value={v("company")} onChange={set("company")} canEdit={canEdit} />
-              <FieldRow label="Country" value={v("country")} onChange={set("country")} canEdit={canEdit} />
-              <FieldRow label="Contact Person" value={v("contactPerson")} onChange={set("contactPerson")} canEdit={canEdit} />
-              <FieldRow label="Buyer Email" value={v("email")} onChange={set("email")} canEdit={canEdit} type="email" />
-              <FieldRow label="Phone" value={v("phone")} onChange={set("phone")} canEdit={canEdit} />
-              <FieldRow label="Product / Category" value={v("product")} onChange={set("product")} canEdit={canEdit} />
-              <FieldRow label="Product Category" value={v("productCategory")} onChange={set("productCategory")} canEdit={canEdit} />
+              <FieldRow label="Company" value={v("company")} onChange={set("company")} canEdit={recordEditable} />
+              <FieldRow label="Country" value={v("country")} onChange={set("country")} canEdit={recordEditable} />
+              <FieldRow label="Contact Person" value={v("contactPerson")} onChange={set("contactPerson")} canEdit={recordEditable} />
+              <FieldRow label="Buyer Email" value={v("email")} onChange={set("email")} canEdit={recordEditable} type="email" />
+              <FieldRow label="Phone" value={v("phone")} onChange={set("phone")} canEdit={recordEditable} />
+              <FieldRow label="Product / Category" value={v("product")} onChange={set("product")} canEdit={recordEditable} />
+              <FieldRow label="Product Category" value={v("productCategory")} onChange={set("productCategory")} canEdit={recordEditable} />
 
               {/* Campaign email account — fixed to partners@eectrade.com */}
               <div className="col-span-2">
@@ -324,7 +386,7 @@ export default function SourcingBuyerDetailsPage() {
               <Label className="text-xs text-slate-500 font-medium">Notes</Label>
               <Textarea
                 value={v("notes")} onChange={(e) => set("notes")(e.target.value)}
-                disabled={!canEdit} rows={3} className="mt-1 text-sm"
+                disabled={!recordEditable} rows={3} className="mt-1 text-sm"
                 placeholder="Internal notes about this buyer prospect…"
               />
             </div>
@@ -346,7 +408,7 @@ export default function SourcingBuyerDetailsPage() {
             {emailTemplates.length > 0 && (
               <div className="mb-3 pb-3 border-b border-slate-100">
                 <Label className="text-xs text-slate-500 font-medium">Email Template</Label>
-                {canEdit && !buyer.emailCampaign ? (
+                {recordEditable && !buyer.emailCampaign ? (
                   <>
                     <select
                       value={(fields.emailTemplateId as string) ?? ""}
@@ -382,7 +444,7 @@ export default function SourcingBuyerDetailsPage() {
                 ) : (
                   <p className="text-sm text-slate-500">No campaign started yet.</p>
                 )}
-                {canEdit && buyer.email &&
+                {recordEditable && buyer.email &&
                   buyer.status !== "converted_to_buyer" &&
                   buyer.status !== "no_response" && (
                     <Button size="sm" className="w-full" onClick={() => startCampaignMutation.mutate()} disabled={startCampaignMutation.isPending}>
@@ -431,7 +493,7 @@ export default function SourcingBuyerDetailsPage() {
                   </div>
                 )}
 
-                {canEdit && campaign.status === "active" && (
+                {recordEditable && campaign.status === "active" && (
                   <div className="space-y-2 pt-2 border-t border-slate-100">
                     {campaign.currentStep < 4 && (
                       <Button size="sm" variant="outline" className="w-full"
@@ -449,7 +511,7 @@ export default function SourcingBuyerDetailsPage() {
                 )}
 
                 {/* Reply detected — ready to convert */}
-                {canEdit && campaign.status === "response_received" && buyer.status !== "converted_to_buyer" && (
+                {recordEditable && campaign.status === "response_received" && buyer.status !== "converted_to_buyer" && (
                   <div className="space-y-2 pt-2 border-t border-slate-100">
                     <p className="text-xs text-emerald-700 font-medium">Buyer replied — ready to add to directory</p>
                     <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -491,7 +553,6 @@ export default function SourcingBuyerDetailsPage() {
               const name = isSent ? "Élan Exports" : (msg.fromName ?? msg.fromEmail);
               const email = isSent ? BUYER_GMAIL : msg.fromEmail;
               const initial = name.charAt(0).toUpperCase();
-              const cleanBody = stripQuotedText(msg.body);
 
               return (
                 <div key={msg.id} className={`rounded-lg border text-sm ${isSent ? "border-blue-100 bg-blue-50" : "border-slate-200 bg-white"}`}>
@@ -507,8 +568,9 @@ export default function SourcingBuyerDetailsPage() {
                       {new Date(msg.receivedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
                     </span>
                   </div>
-                  <div className="px-4 py-3 text-slate-700 leading-relaxed whitespace-pre-wrap">
-                    {cleanBody || <span className="text-slate-400 italic">No content</span>}
+                  <div className="px-4 py-3 text-slate-700">
+                    <EmailBody bodyHtml={msg.bodyHtml} bodyText={msg.body} />
+                    <EmailAttachmentList attachments={msg.attachments} />
                   </div>
                 </div>
               );
@@ -533,6 +595,28 @@ export default function SourcingBuyerDetailsPage() {
             >
               {markResponseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <UserCheck className="h-4 w-4 mr-1.5" />}
               Confirm
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Archive Confirm Dialog ── */}
+      <Dialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogTitle>Move to Archive?</DialogTitle>
+          <DialogDescription>
+            This will move <strong>{buyer.company}</strong> to the archive. Follow-ups and campaign actions
+            will stop. You can restore it anytime from Archived Buyers.
+          </DialogDescription>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setArchiveConfirmOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={archiveMutation.isPending}
+              onClick={() => archiveMutation.mutate()}
+            >
+              {archiveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ArchiveX className="h-4 w-4 mr-1.5" />}
+              Move to Archive
             </Button>
           </div>
         </DialogContent>

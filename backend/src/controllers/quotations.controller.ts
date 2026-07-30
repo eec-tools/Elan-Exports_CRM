@@ -184,8 +184,8 @@ export async function searchSuppliers(
     const q = (req.query.q as string) || "";
 
     const where = q
-      ? { company: { contains: q, mode: "insensitive" as const } }
-      : {};
+      ? { company: { contains: q, mode: "insensitive" as const }, isArchived: false }
+      : { isArchived: false };
 
     const [newSuppliers, signedSuppliers] = await Promise.all([
       (prisma as any).newSupplier.findMany({
@@ -698,8 +698,8 @@ export async function searchBuyers(
   try {
     const q = (req.query.q as string) || "";
     const where = q
-      ? { company: { contains: q, mode: "insensitive" as const } }
-      : {};
+      ? { company: { contains: q, mode: "insensitive" as const }, isArchived: false }
+      : { isArchived: false };
 
     const buyers = await (prisma as any).buyer.findMany({
       where,

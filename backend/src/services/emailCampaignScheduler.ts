@@ -30,6 +30,7 @@ async function sendDailyFollowupReminders() {
       where: {
         status: "active",
         nextFollowupDue: { lte: today },
+        supplier: { isArchived: false },
       },
       include: {
         supplier: {
@@ -107,6 +108,7 @@ async function autoSendDueFollowups() {
         status: "active",
         currentStep: { lt: 4 },
         nextFollowupDue: { lte: today },
+        sourcingSupplier: { isArchived: false },
       },
       include: {
         sourcingSupplier: {
@@ -152,6 +154,7 @@ async function autoSendDueBuyerFollowups() {
         status: "active",
         currentStep: { lt: 4 },
         nextFollowupDue: { lte: today },
+        sourcingBuyer: { isArchived: false },
       },
       include: {
         sourcingBuyer: {
@@ -192,6 +195,7 @@ async function sendReplyPendingReminders() {
       WHERE ber.direction = 'received'
         AND ber.sourcing_buyer_id IS NOT NULL
         AND sb.status != 'invalid'
+        AND sb.is_archived = false
         AND NOT EXISTS (
           SELECT 1 FROM buyer_email_replies b2
           WHERE b2.sourcing_buyer_id = ber.sourcing_buyer_id
@@ -209,6 +213,7 @@ async function sendReplyPendingReminders() {
       WHERE ser.direction = 'received'
         AND ser.sourcing_id IS NOT NULL
         AND ss.status != 'invalid'
+        AND ss.is_archived = false
         AND NOT EXISTS (
           SELECT 1 FROM supplier_email_replies s2
           WHERE s2.sourcing_id = ser.sourcing_id
@@ -289,6 +294,29 @@ async function sendReplyPendingReminders() {
 
 export { autoSendDueFollowups, autoSendDueBuyerFollowups };
 
+// Guards the "run on startup" catch-up jobs below against firing on every process
+// restart. In local dev, nodemon restarts the server on every file save — without
+// this guard, each restart would immediately re-attempt real sends for any
+// still-due campaign (a send only stops being "due" once it succeeds), repeatedly
+// hammering the same Gmail account every time a file is saved. The same guard
+// also protects production against a crash-loop re-triggering real sends on every
+// boot. A genuine cold start (server was down, e.g. past 9 AM) still gets one
+// catch-up run since the gap will exceed the window.
+const STARTUP_CATCHUP_MIN_GAP_MS = 30 * 60 * 1000;
+
+async function shouldRunStartupCatchup(name: string): Promise<boolean> {
+  const key = `startup_catchup_last_run_${name}`;
+  const setting = await prisma.appSetting.findUnique({ where: { key } });
+  const last = setting?.value ? new Date(setting.value).getTime() : 0;
+  if (Date.now() - last < STARTUP_CATCHUP_MIN_GAP_MS) return false;
+  await prisma.appSetting.upsert({
+    where: { key },
+    update: { value: new Date().toISOString() },
+    create: { key, value: new Date().toISOString() },
+  });
+  return true;
+}
+
 export function startEmailCampaignScheduler() {
   // Signed supplier follow-up reminders — 9:00 AM IST daily
   cron.schedule("0 9 * * *", sendDailyFollowupReminders, { timezone: "Asia/Kolkata" });
@@ -301,11 +329,19 @@ export function startEmailCampaignScheduler() {
   console.log("[EmailCampaignScheduler] Daily follow-up jobs scheduled at 9:00 AM IST.");
 
   // Run on startup to catch overdue campaigns — stagger to avoid hitting rate limits simultaneously
-  setTimeout(() => {
+  setTimeout(async () => {
+    if (!(await shouldRunStartupCatchup("supplier_followups"))) {
+      console.log("[EmailCampaignScheduler] Startup catch-up for supplier follow-ups ran recently — skipping (likely a restart)");
+      return;
+    }
     console.log("[EmailCampaignScheduler] Running startup check for overdue supplier follow-ups...");
     autoSendDueFollowups();
   }, 5000);
-  setTimeout(() => {
+  setTimeout(async () => {
+    if (!(await shouldRunStartupCatchup("buyer_followups"))) {
+      console.log("[EmailCampaignScheduler] Startup catch-up for buyer follow-ups ran recently — skipping (likely a restart)");
+      return;
+    }
     console.log("[EmailCampaignScheduler] Running startup check for overdue buyer follow-ups...");
     autoSendDueBuyerFollowups();
   }, 10 * 60 * 1000); // 10 minutes after supplier scheduler

@@ -6,6 +6,7 @@ import { createNotification } from "../services/notificationService.js";
 import { startCampaignForSupplier } from "./sourcingEmailCampaign.controller.js";
 import { generateShortCode } from "../utils/shortCode.js";
 import { sanitizeEmail } from "../utils/email.js";
+import { logActivity } from "../services/activityLogger.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
@@ -141,7 +142,7 @@ export async function listSourcingSuppliers(
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const where: any = {};
+    const where: any = { isArchived: false };
 
     if (search) {
       where.OR = [
@@ -160,6 +161,7 @@ export async function listSourcingSuppliers(
       WHERE ser.direction = 'received'
         AND ser.sourcing_id IS NOT NULL
         AND ss.status != 'invalid'
+        AND ss.is_archived = false
         AND NOT EXISTS (
           SELECT 1 FROM supplier_email_replies s2
           WHERE s2.sourcing_id = ser.sourcing_id
@@ -244,21 +246,21 @@ export async function getSourcingSupplierStats(
   try {
     const [total, activeCampaigns, responseReceived, converted, noResponse, invalidEmails] =
       await Promise.all([
-        (prisma as any).sourcingSupplier.count(),
+        (prisma as any).sourcingSupplier.count({ where: { isArchived: false } }),
         (prisma as any).sourcingEmailCampaign.count({
-          where: { status: "active" },
+          where: { status: "active", sourcingSupplier: { isArchived: false } },
         }),
         (prisma as any).sourcingSupplier.count({
-          where: { status: "response_received" },
+          where: { status: "response_received", isArchived: false },
         }),
         (prisma as any).sourcingSupplier.count({
-          where: { status: { in: ["converted_to_new", "converted"] } },
+          where: { status: { in: ["converted_to_new", "converted"] }, isArchived: false },
         }),
         (prisma as any).sourcingSupplier.count({
-          where: { status: "no_response" },
+          where: { status: "no_response", isArchived: false },
         }),
         (prisma as any).sourcingSupplier.count({
-          where: { status: "invalid" },
+          where: { status: "invalid", isArchived: false },
         }),
       ]);
     res.json({
@@ -479,6 +481,50 @@ export async function deleteSourcingSupplier(
 }
 
 /**
+ * PATCH /api/sourcing-suppliers/:id/archive
+ */
+export async function archiveSourcingSupplier(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const existing = await (prisma as any).sourcingSupplier.findUnique({ where: { id } });
+    if (!existing) { res.status(404).json({ error: "Sourcing supplier not found" }); return; }
+
+    const supplier = await (prisma as any).sourcingSupplier.update({
+      where: { id },
+      data: { isArchived: true, archivedAt: new Date(), archivedBy: req.user!.id },
+    });
+
+    await logActivity(req.user!.id, "archive", "sourcing_suppliers", supplier.id, { company: supplier.company });
+    res.json(supplier);
+  } catch (err) {
+    console.error("Archive sourcing supplier error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * PATCH /api/sourcing-suppliers/:id/restore
+ */
+export async function restoreSourcingSupplier(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const existing = await (prisma as any).sourcingSupplier.findUnique({ where: { id } });
+    if (!existing) { res.status(404).json({ error: "Sourcing supplier not found" }); return; }
+
+    const supplier = await (prisma as any).sourcingSupplier.update({
+      where: { id },
+      data: { isArchived: false, archivedAt: null, archivedBy: null },
+    });
+
+    await logActivity(req.user!.id, "restore", "sourcing_suppliers", supplier.id, { company: supplier.company });
+    res.json(supplier);
+  } catch (err) {
+    console.error("Restore sourcing supplier error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
  * POST /api/sourcing-suppliers/:id/convert
  * Convert a sourcing supplier to a New Supplier.
  */
@@ -502,6 +548,10 @@ export async function convertToNewSupplier(
       res.status(400).json({ error: "Supplier has already been converted" });
       return;
     }
+    if (sourcing.isArchived) {
+      res.status(400).json({ error: "Restore this supplier from Archive before converting" });
+      return;
+    }
 
     // Strip sourcing-specific fields before creating NewSupplier
     const {
@@ -512,6 +562,9 @@ export async function convertToNewSupplier(
       createdAt: _createdAt,
       updatedAt: _updatedAt,
       emailCampaign: _campaign,
+      isArchived: _isArchived,
+      archivedAt: _archivedAt,
+      archivedBy: _archivedBy,
       ...rest
     } = sourcing;
 
@@ -580,10 +633,11 @@ export async function getSourcingCategoryStats(
     const [rows, total] = await Promise.all([
       (prisma as any).sourcingSupplier.groupBy({
         by: ["productCategory"],
+        where: { isArchived: false },
         _count: { id: true },
         orderBy: { _count: { id: "desc" } },
       }),
-      (prisma as any).sourcingSupplier.count(),
+      (prisma as any).sourcingSupplier.count({ where: { isArchived: false } }),
     ]);
     res.json({ categories: rows, total });
   } catch (err) {
@@ -847,7 +901,7 @@ export async function getSourcingCreators(
   try {
     const { productCategory } = req.query as Record<string, string>;
 
-    const where: any = { createdBy: { not: null } };
+    const where: any = { createdBy: { not: null }, isArchived: false };
     if (productCategory && productCategory !== "all") {
       where.productCategory = { equals: productCategory, mode: "insensitive" };
     }

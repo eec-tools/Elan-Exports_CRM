@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import DOMPurify from "dompurify";
 import {
   Bot,
   Sparkles,
@@ -25,12 +24,20 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  ArchiveX,
 } from "lucide-react";
 import api from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { ResizeHandle } from "@/components/ui/resize-handle";
+import { stripHtml, sanitizeEmailHtml, linkifyText, formatFileSize } from "@/components/EmailContent";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -102,70 +109,6 @@ interface DraftResult { subject: string; body: string; }
 interface ClarificationResult { clarificationsNeeded: string[]; }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
-    .replace(/\n{3,}/g, "\n\n").trim();
-}
-
-DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-  if (node.tagName === "A") {
-    node.setAttribute("target", "_blank");
-    node.setAttribute("rel", "noopener noreferrer");
-  }
-});
-
-function sanitizeEmailHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
-    FORBID_TAGS: ["style", "script", "iframe", "object", "embed", "form", "input", "link", "meta"],
-    FORBID_ATTR: ["srcset"],
-  });
-}
-
-function linkifyText(text: string): React.ReactNode[] {
-  const urlPattern = /(https?:\/\/[^\s<>"')\]]+|www\.[^\s<>"')\]]+)/g;
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-
-  while ((match = urlPattern.exec(text)) !== null) {
-    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
-
-    let url = match[0];
-    let trailing = "";
-    const trailingMatch = url.match(/[.,;:!?]+$/);
-    if (trailingMatch) {
-      trailing = trailingMatch[0];
-      url = url.slice(0, -trailing.length);
-    }
-
-    nodes.push(
-      <a
-        key={key++}
-        href={url.startsWith("http") ? url : `https://${url}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline underline-offset-2 break-all hover:opacity-80"
-      >
-        {url}
-      </a>
-    );
-    if (trailing) nodes.push(trailing);
-    lastIndex = urlPattern.lastIndex;
-  }
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
-  return nodes;
-}
-
-function formatFileSize(bytes?: number | null): string {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -249,12 +192,14 @@ function DraftPanel({
   item,
   onClose,
   onSent,
+  onArchive,
   threadWidth,
   onThreadResize,
 }: {
   item: InboxItem;
   onClose: () => void;
   onSent: () => void;
+  onArchive: () => void;
   threadWidth: number;
   onThreadResize: (e: React.MouseEvent) => void;
 }) {
@@ -425,6 +370,13 @@ function DraftPanel({
           <Mail className="h-3 w-3" />
           {item.assignedGmailAccount.split("@")[0]}
         </div>
+        <button
+          onClick={onArchive}
+          title="Add to Archive"
+          className="p-1.5 rounded hover:bg-amber-50 hover:text-amber-600 text-muted-foreground transition-colors"
+        >
+          <ArchiveX className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Supplier context strip */}
@@ -614,7 +566,7 @@ function DraftPanel({
 
 // ─── Inbox Card ───────────────────────────────────────────────────────────────
 
-function InboxCard({ item, onSelect }: { item: InboxItem; onSelect: () => void }) {
+function InboxCard({ item, onSelect, onArchive }: { item: InboxItem; onSelect: () => void; onArchive: () => void }) {
   const isReplied = !!item.latestReply.repliedAt;
   const plain = stripHtml(item.latestReply.body);
   const snippet = plain.length > 120 ? plain.slice(0, 120) + "…" : plain;
@@ -627,6 +579,14 @@ function InboxCard({ item, onSelect }: { item: InboxItem; onSelect: () => void }
       {!isReplied && !item.alreadyContacted && (
         <span className="absolute top-3 right-3 h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
       )}
+      <button
+        type="button"
+        title="Add to Archive"
+        onClick={(e) => { e.stopPropagation(); onArchive(); }}
+        className="absolute top-3 right-3 h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-amber-600 hover:bg-amber-50 transition-all"
+      >
+        <ArchiveX className="h-3.5 w-3.5" />
+      </button>
       <div className="flex items-start gap-3">
         <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
           <Building2 className="text-white" style={{ width: 18, height: 18 }} />
@@ -704,6 +664,8 @@ export default function AiSupplierCommsAgentPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
   const [inboxCollapsed, setInboxCollapsed] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<InboxItem | null>(null);
+  const queryClient = useQueryClient();
   const { width: inboxWidth, onMouseDown: onInboxResize } = useResizableWidth(
     "ai-supplier-comms-inbox-width", 380, 260, 640,
   );
@@ -720,6 +682,20 @@ export default function AiSupplierCommsAgentPage() {
       return res.data;
     },
     refetchInterval: 60_000,
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/sourcing-suppliers/${id}/archive`),
+    onSuccess: (_res, id) => {
+      queryClient.invalidateQueries({ queryKey: ["ai-supplier-comms-inbox"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      if (selectedItem?.id === id) setSelectedItem(null);
+      setArchiveTarget(null);
+      toast.success("Supplier moved to archive");
+    },
+    onError: () => toast.error("Failed to archive supplier"),
   });
 
   useEffect(() => { setSelectedItem(null); }, [activeTab]);
@@ -836,7 +812,7 @@ export default function AiSupplierCommsAgentPage() {
                       Needs Reply · {unreplied.length}
                     </p>
                     {unreplied.map((item) => (
-                      <InboxCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} />
+                      <InboxCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} onArchive={() => setArchiveTarget(item)} />
                     ))}
                   </div>
                 )}
@@ -850,7 +826,7 @@ export default function AiSupplierCommsAgentPage() {
                       </p>
                     </div>
                     {alreadyContacted.map((item) => (
-                      <InboxCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} />
+                      <InboxCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} onArchive={() => setArchiveTarget(item)} />
                     ))}
                   </div>
                 )}
@@ -861,7 +837,7 @@ export default function AiSupplierCommsAgentPage() {
                       Replied · {replied.length}
                     </p>
                     {replied.map((item) => (
-                      <InboxCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} />
+                      <InboxCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} onArchive={() => setArchiveTarget(item)} />
                     ))}
                   </div>
                 )}
@@ -880,6 +856,7 @@ export default function AiSupplierCommsAgentPage() {
               item={selectedItem}
               onClose={() => setSelectedItem(null)}
               onSent={() => setSelectedItem(null)}
+              onArchive={() => setArchiveTarget(selectedItem)}
               threadWidth={threadWidth}
               onThreadResize={onThreadResize}
             />
@@ -896,6 +873,37 @@ export default function AiSupplierCommsAgentPage() {
           </div>
         )}
       </div>
+
+      {/* Archive confirmation */}
+      <Dialog
+        open={!!archiveTarget}
+        onOpenChange={(open) => { if (!open) setArchiveTarget(null); }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogTitle>Move to Archive?</DialogTitle>
+          <DialogDescription>
+            Move <strong>{archiveTarget?.company}</strong> to the archive — you
+            can restore it anytime from Archived Suppliers.
+          </DialogDescription>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setArchiveTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={archiveMutation.isPending}
+              onClick={() => archiveTarget && archiveMutation.mutate(archiveTarget.id)}
+              className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {archiveMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArchiveX className="h-4 w-4" />
+              )}
+              Move to Archive
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

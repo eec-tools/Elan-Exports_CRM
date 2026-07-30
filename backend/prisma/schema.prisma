@@ -132,9 +132,13 @@ model Buyer {
   reorderLikelihood         String?     @map("reorder_likelihood")
   buyerStatedIntent         String?     @map("buyer_stated_intent")
   documents                 Json        @default("[]") @map("documents")
+  isArchived                Boolean     @default(false) @map("is_archived")
+  archivedAt                DateTime?   @map("archived_at")
+  archivedBy                String?     @map("archived_by")
   creator                   User?       @relation(fields: [createdBy], references: [id])
   quotationLinks            Quotation[]
 
+  @@index([isArchived])
   @@map("buyers")
 }
 
@@ -268,9 +272,13 @@ model Supplier {
   contractEndDate            DateTime?              @map("contract_end_date")
   buyerFactoryIds            Json                   @default("[]") @map("buyer_factory_ids")
   accountManager             String?                @map("account_manager")
+  isArchived                 Boolean                @default(false) @map("is_archived")
+  archivedAt                 DateTime?              @map("archived_at")
+  archivedBy                 String?                @map("archived_by")
   emailCampaign              SupplierEmailCampaign?
   creator                    User?                  @relation(fields: [createdBy], references: [id])
 
+  @@index([isArchived])
   @@map("suppliers")
 }
 
@@ -293,71 +301,75 @@ model SupplierEmailCampaign {
 }
 
 model OldSupplier {
-  id                      String   @id @default(uuid())
+  id                      String    @id @default(uuid())
   company                 String
   country                 String?
   notes                   String?
-  createdBy               String?  @map("created_by")
-  createdAt               DateTime @default(now()) @map("created_at")
-  updatedAt               DateTime @updatedAt @map("updated_at")
-  accountManager          String?  @map("account_manager")
+  createdBy               String?   @map("created_by")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  accountManager          String?   @map("account_manager")
   certifications          String?
-  currentStatus           String?  @map("current_status")
-  dateMarkedInactive      String?  @map("date_marked_inactive")
-  latestQuotation         String?  @map("latest_quotation")
+  currentStatus           String?   @map("current_status")
+  dateMarkedInactive      String?   @map("date_marked_inactive")
+  latestQuotation         String?   @map("latest_quotation")
   product                 String?
-  productCategory         String?  @map("product_category")
-  reactivationPotential   String?  @map("reactivation_potential")
-  reasonInactive          String?  @map("reason_inactive")
-  supplierStage           String   @default("Closed") @map("supplier_stage")
-  dealStage               String   @default("Communication") @map("deal_stage")
-  supplierExternalId      String?  @map("supplier_external_id")
+  productCategory         String?   @map("product_category")
+  reactivationPotential   String?   @map("reactivation_potential")
+  reasonInactive          String?   @map("reason_inactive")
+  supplierStage           String    @default("Closed") @map("supplier_stage")
+  dealStage               String    @default("Communication") @map("deal_stage")
+  supplierExternalId      String?   @map("supplier_external_id")
   email                   String?
   phone                   String?
   whatsapp                String?
   website                 String?
   city                    String?
-  companyAddress          String?  @map("company_address")
-  contactPerson           String?  @map("contact_person")
+  companyAddress          String?   @map("company_address")
+  contactPerson           String?   @map("contact_person")
   designation             String?
-  legalName               String?  @map("legal_name")
-  secondaryContactName    String?  @map("secondary_contact_name")
-  secondaryEmail          String?  @map("secondary_email")
-  secondaryPhone          String?  @map("secondary_phone")
-  subCategory             String?  @map("sub_category")
-  commodityType           String?  @map("commodity_type")
-  productionCapacity      String?  @map("production_capacity")
+  legalName               String?   @map("legal_name")
+  secondaryContactName    String?   @map("secondary_contact_name")
+  secondaryEmail          String?   @map("secondary_email")
+  secondaryPhone          String?   @map("secondary_phone")
+  subCategory             String?   @map("sub_category")
+  commodityType           String?   @map("commodity_type")
+  productionCapacity      String?   @map("production_capacity")
   moq                     String?
-  priceRange              String?  @map("price_range")
+  priceRange              String?   @map("price_range")
   currency                String?
-  exportMarkets           String?  @map("export_markets")
-  certBody                String?  @map("cert_body")
-  certStatus              String?  @map("cert_status")
-  certExpiryDate          String?  @map("cert_expiry_date")
-  yearsInBusiness         String?  @map("years_in_business")
-  factoryType             String?  @map("factory_type")
-  paymentTerms            String?  @map("payment_terms")
+  exportMarkets           String?   @map("export_markets")
+  certBody                String?   @map("cert_body")
+  certStatus              String?   @map("cert_status")
+  certExpiryDate          String?   @map("cert_expiry_date")
+  yearsInBusiness         String?   @map("years_in_business")
+  factoryType             String?   @map("factory_type")
+  paymentTerms            String?   @map("payment_terms")
   incoterms               String?
-  leadTime                String?  @map("lead_time")
-  portOfLoading           String?  @map("port_of_loading")
-  packagingType           String?  @map("packaging_type")
-  privateLabelAvailable   String?  @map("private_label_available")
-  complianceDocsAvailable String?  @map("compliance_docs_available")
-  leadSource              String?  @map("lead_source")
-  riskScore               String?  @map("risk_score")
-  dueDiligenceStatus      String?  @map("due_diligence_status")
-  lastContactDate         String?  @map("last_contact_date")
-  followUpRequired        String?  @map("follow_up_required")
-  followUpDate            String?  @map("follow_up_date")
-  internalNotes           String?  @map("internal_notes")
-  contractSigned          String?  @map("contract_signed")
-  contractDate            String?  @map("contract_date")
-  performanceRating       String?  @map("performance_rating")
+  leadTime                String?   @map("lead_time")
+  portOfLoading           String?   @map("port_of_loading")
+  packagingType           String?   @map("packaging_type")
+  privateLabelAvailable   String?   @map("private_label_available")
+  complianceDocsAvailable String?   @map("compliance_docs_available")
+  leadSource              String?   @map("lead_source")
+  riskScore               String?   @map("risk_score")
+  dueDiligenceStatus      String?   @map("due_diligence_status")
+  lastContactDate         String?   @map("last_contact_date")
+  followUpRequired        String?   @map("follow_up_required")
+  followUpDate            String?   @map("follow_up_date")
+  internalNotes           String?   @map("internal_notes")
+  contractSigned          String?   @map("contract_signed")
+  contractDate            String?   @map("contract_date")
+  performanceRating       String?   @map("performance_rating")
   blacklisted             String?
-  sourceSheet             String?  @map("source_sheet")
-  yearFirstAdded          String?  @map("year_first_added")
-  yearLog                 Json?    @map("year_log")
+  sourceSheet             String?   @map("source_sheet")
+  yearFirstAdded          String?   @map("year_first_added")
+  yearLog                 Json?     @map("year_log")
+  isArchived              Boolean   @default(false) @map("is_archived")
+  archivedAt              DateTime? @map("archived_at")
+  archivedBy              String?   @map("archived_by")
 
+  @@index([isArchived])
   @@map("old_suppliers")
 }
 
@@ -472,8 +484,12 @@ model NewSupplier {
   designation                String?                   @map("designation")
   website                    String?
   convertedFromSourcingId    String?                   @map("converted_from_sourcing_id")
+  isArchived                 Boolean                   @default(false) @map("is_archived")
+  archivedAt                 DateTime?                 @map("archived_at")
+  archivedBy                 String?                   @map("archived_by")
   emailCampaign              NewSupplierEmailCampaign?
 
+  @@index([isArchived])
   @@map("new_suppliers")
 }
 
@@ -610,9 +626,13 @@ model SourcingSupplier {
   emailTemplateId            String?                @map("email_template_id")
   formTemplateId             String?                @map("form_template_id")
   shortCode                  String?                @unique @map("short_code")
+  isArchived                 Boolean                @default(false) @map("is_archived")
+  archivedAt                 DateTime?              @map("archived_at")
+  archivedBy                 String?                @map("archived_by")
   emailCampaign              SourcingEmailCampaign?
   creator                    User?                  @relation(fields: [createdBy], references: [id])
 
+  @@index([isArchived])
   @@map("sourcing_suppliers")
 }
 
@@ -1207,10 +1227,14 @@ model SourcingBuyer {
   updatedAt            DateTime                    @updatedAt @map("updated_at")
   buyerVaultContactId  String?                     @map("buyer_vault_contact_id")
   alreadyContacted     Boolean                     @default(false) @map("already_contacted")
+  isArchived           Boolean                     @default(false) @map("is_archived")
+  archivedAt           DateTime?                   @map("archived_at")
+  archivedBy           String?                     @map("archived_by")
   emailCampaign        SourcingBuyerEmailCampaign?
   emailReplies         BuyerEmailReply[]
   creator              User?                       @relation(fields: [createdBy], references: [id])
 
+  @@index([isArchived])
   @@map("sourcing_buyers")
 }
 

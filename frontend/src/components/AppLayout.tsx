@@ -32,6 +32,7 @@ import {
   History,
   UserSearch,
   MessageSquare,
+  ArchiveX,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState } from "react";
@@ -66,6 +67,7 @@ const NAV_SECTIONS: NavSection[] = [
       { to: "/buyers/ai-comms", label: "AI Comms Agent", icon: MessageSquare, perms: "sourcing_buyers" },
       { to: "/buyers/sourcing-vault", label: "Sourcing Vault", icon: Database, perms: "sourcing_buyers" },
       { to: "/buyers/sourcing", label: "Sourcing Buyers", icon: UserSearch, perms: "sourcing_buyers" },
+      { to: "/buyers/archived", label: "Archived Buyers", icon: ArchiveX, perms: ["buyers_directory", "sourcing_buyers"] },
     ],
   },
   {
@@ -77,6 +79,7 @@ const NAV_SECTIONS: NavSection[] = [
       { to: "/suppliers/new", label: "New Suppliers", icon: Factory, perms: ["suppliers", "new_suppliers"] },
       { to: "/suppliers/signed-contract", label: "Signed Contracts", icon: FileText, perms: ["suppliers", "signed_suppliers"] },
       { to: "/suppliers/old", label: "Old Suppliers", icon: History, perms: ["suppliers", "old_suppliers"] },
+      { to: "/suppliers/archived", label: "Archived Suppliers", icon: ArchiveX, perms: ["suppliers", "sourcing_suppliers", "new_suppliers", "signed_suppliers", "old_suppliers"] },
       // { to: "/suppliers/form-templates", label: "Form Templates", icon: FileEdit, perms: ["suppliers", "new_suppliers"] },
       // { to: "/suppliers/email-templates", label: "Email Templates", icon: MailOpen, perms: ["suppliers", "sourcing_suppliers"] },
     ],

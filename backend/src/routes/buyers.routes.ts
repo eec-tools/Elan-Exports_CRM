@@ -8,6 +8,8 @@ import {
   createBuyer,
   updateBuyer,
   deleteBuyer,
+  archiveBuyer,
+  restoreBuyer,
   exportBuyersCsv,
   uploadBuyerCatalog,
   uploadBuyerFile,
@@ -39,6 +41,8 @@ router.post("/upload", requireEdit("buyers_directory"), uploadBuyerFile.single("
 router.post("/", requireEdit("buyers_directory"), createBuyer);
 router.post("/:id/documents", requireEdit("buyers_directory"), uploadBuyerDocument);
 router.put("/:id", requireEdit("buyers_directory"), updateBuyer);
+router.patch("/:id/archive", requireEdit("buyers_directory"), archiveBuyer);
+router.patch("/:id/restore", requireEdit("buyers_directory"), restoreBuyer);
 router.delete("/:id/documents/:docId", requireEdit("buyers_directory"), deleteBuyerDocument);
 router.delete("/:id", requireEdit("buyers_directory"), deleteBuyer);
 

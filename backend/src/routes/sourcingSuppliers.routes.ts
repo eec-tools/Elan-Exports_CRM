@@ -8,6 +8,8 @@ import {
     createSourcingSupplier,
     updateSourcingSupplier,
     deleteSourcingSupplier,
+    archiveSourcingSupplier,
+    restoreSourcingSupplier,
     convertToNewSupplier,
     bulkCreateSourcingSuppliers,
     getVaultFolderNotSent,
@@ -32,6 +34,8 @@ router.post("/bulk-create", requireEdit(["suppliers", "sourcing_suppliers"]), bu
 router.post("/from-folder", requireEdit(["suppliers", "sourcing_suppliers"]), addFromVaultFolder);
 router.post("/:id/convert", requireEdit(["suppliers", "sourcing_suppliers"]), convertToNewSupplier);
 router.patch("/:id/contacted", requireEdit(["suppliers", "sourcing_suppliers"]), toggleContactedSupplier);
+router.patch("/:id/archive", requireEdit(["suppliers", "sourcing_suppliers"]), archiveSourcingSupplier);
+router.patch("/:id/restore", requireEdit(["suppliers", "sourcing_suppliers"]), restoreSourcingSupplier);
 router.put("/:id", requireEdit(["suppliers", "sourcing_suppliers"]), updateSourcingSupplier);
 router.delete("/:id", requireEdit(["suppliers", "sourcing_suppliers"]), deleteSourcingSupplier);
 

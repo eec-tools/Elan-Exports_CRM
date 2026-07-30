@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +24,8 @@ import {
   Search,
   Pencil,
   Trash2,
+  ArchiveX,
+  ArchiveRestore,
   Download,
   Loader2,
   ChevronLeft,
@@ -47,6 +50,9 @@ interface Supplier {
   certifications?: string;
   companyAddress?: string;
   supplierStage?: string;
+  isArchived?: boolean;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
 }
 
 const EMPTY_SUPPLIER: Partial<Supplier> = {
@@ -75,7 +81,10 @@ export default function OldSuppliersPage() {
   const [form, setForm] = useState<Partial<Supplier>>(EMPTY_SUPPLIER);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [supplierToArchive, setSupplierToArchive] = useState<Supplier | null>(null);
   const [dedupDialogOpen, setDedupDialogOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { data, isLoading } = useQuery({
     queryKey: ["old-suppliers", search, countryFilter, categoryFilter, page],
@@ -131,6 +140,33 @@ export default function OldSuppliersPage() {
     onError: () => toast.error("Failed to delete supplier"),
   });
 
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/old-suppliers/${id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["old-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Supplier moved to archive");
+    },
+    onError: () => toast.error("Failed to archive supplier"),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/old-suppliers/${id}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["old-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      setDialogOpen(false);
+      setEditing(null);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("archived");
+        return next;
+      });
+      toast.success("Supplier restored");
+    },
+    onError: () => toast.error("Failed to restore supplier"),
+  });
+
   const dedupMutation = useMutation({
     mutationFn: () => api.post("/old-suppliers/deduplicate"),
     onSuccess: (res) => {
@@ -175,6 +211,21 @@ export default function OldSuppliersPage() {
     setForm(s);
     setDialogOpen(true);
   };
+
+  // Deep-link from Archived Suppliers page: /suppliers/old?archived=<id>
+  useEffect(() => {
+    const archivedId = searchParams.get("archived");
+    if (!archivedId) return;
+    api
+      .get(`/old-suppliers/${archivedId}`)
+      .then((res) => {
+        openEdit(res.data);
+      })
+      .catch(() => {
+        toast.error("Failed to load archived supplier");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleExport = async () => {
     try {
@@ -372,6 +423,15 @@ export default function OldSuppliersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                            onClick={() => { setSupplierToArchive(s); setArchiveDialogOpen(true); }}
+                            title="Add to Archive"
+                          >
+                            <ArchiveX className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                             onClick={() => { setSupplierToDelete(s); setDeleteDialogOpen(true); }}
                             title="Delete Supplier"
@@ -420,6 +480,31 @@ export default function OldSuppliersPage() {
               </DialogDescription>
             </div>
           </div>
+          {editing?.isArchived && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 mt-4">
+              <div className="flex items-center gap-2 text-sm text-amber-800">
+                <ArchiveX className="h-4 w-4 shrink-0" />
+                <span>
+                  Archived{editing.archivedAt ? ` on ${new Date(editing.archivedAt).toLocaleDateString()}` : ""}
+                </span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-1.5 bg-white border-amber-300 text-amber-700 hover:bg-amber-100 shrink-0"
+                onClick={() => editing.id && restoreMutation.mutate(editing.id)}
+                disabled={restoreMutation.isPending}
+              >
+                {restoreMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ArchiveRestore className="h-3.5 w-3.5" />
+                )}
+                Restore
+              </Button>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
@@ -578,6 +663,48 @@ export default function OldSuppliersPage() {
               }}
             >
               Yes, delete supplier
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={archiveDialogOpen}
+        onOpenChange={(open) => {
+          setArchiveDialogOpen(open);
+          if (!open) setSupplierToArchive(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md p-6 bg-white rounded-xl shadow-2xl border-none">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <ArchiveX className="h-6 w-6 text-amber-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-bold text-slate-900">Move to Archive</DialogTitle>
+              <DialogDescription className="text-slate-500 mt-1">
+                You can restore it anytime from Archived Suppliers.
+              </DialogDescription>
+            </div>
+          </div>
+          {supplierToArchive?.company && (
+            <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-md border border-slate-100 mb-6 font-medium">
+              Company: <span className="font-bold">{supplierToArchive.company}</span>
+            </p>
+          )}
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setArchiveDialogOpen(false)} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+              Cancel
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm shadow-amber-200"
+              onClick={() => {
+                if (supplierToArchive) archiveMutation.mutate(supplierToArchive.id);
+                setArchiveDialogOpen(false);
+                setSupplierToArchive(null);
+              }}
+            >
+              Yes, move to archive
             </Button>
           </div>
         </DialogContent>

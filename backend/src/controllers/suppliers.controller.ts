@@ -53,6 +53,7 @@ export async function listSuppliersForDropdown(
 ): Promise<void> {
   try {
     const suppliers = await prisma.supplier.findMany({
+      where: { isArchived: false },
       select: { id: true, company: true },
       orderBy: { company: "asc" },
     });
@@ -88,7 +89,7 @@ export async function listSuppliers(
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const where: any = {};
+    const where: any = { isArchived: false };
 
     if (search) {
       where.OR = [
@@ -547,6 +548,10 @@ export async function updateSupplierStage(
       res.status(404).json({ error: "Supplier not found" });
       return;
     }
+    if (existing.isArchived) {
+      res.status(400).json({ error: "Restore this supplier from Archive before changing stage" });
+      return;
+    }
 
     if (stage === "Signed") {
       const supplier = await prisma.supplier.update({
@@ -769,6 +774,54 @@ export async function deleteSupplier(
 }
 
 /**
+ * PATCH /api/suppliers/:id/archive
+ */
+export async function archiveSupplier(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const existing = await prisma.supplier.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: "Supplier not found" });
+      return;
+    }
+
+    const supplier = await prisma.supplier.update({
+      where: { id: req.params.id },
+      data: { isArchived: true, archivedAt: new Date(), archivedBy: req.user!.id },
+    });
+
+    await logActivity(req.user!.id, "archive", "suppliers", supplier.id, { company: supplier.company });
+    res.json(supplier);
+  } catch (err) {
+    console.error("Archive supplier error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * PATCH /api/suppliers/:id/restore
+ */
+export async function restoreSupplier(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const existing = await prisma.supplier.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: "Supplier not found" });
+      return;
+    }
+
+    const supplier = await prisma.supplier.update({
+      where: { id: req.params.id },
+      data: { isArchived: false, archivedAt: null, archivedBy: null },
+    });
+
+    await logActivity(req.user!.id, "restore", "suppliers", supplier.id, { company: supplier.company });
+    res.json(supplier);
+  } catch (err) {
+    console.error("Restore supplier error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
  * GET /api/suppliers/export/csv
  */
 export async function exportSuppliersCsv(
@@ -778,7 +831,7 @@ export async function exportSuppliersCsv(
   try {
     const { search = "", status, country, contractBuyer, products, certifications, dateFrom, dateTo } = req.query as Record<string, string>;
 
-    const where: any = {};
+    const where: any = { isArchived: false };
     if (search) {
       where.OR = [
         { company: { contains: search, mode: "insensitive" } },
@@ -993,6 +1046,7 @@ export async function getSupplierStats(
 ): Promise<void> {
   try {
     const suppliers = await prisma.supplier.findMany({
+      where: { isArchived: false },
       select: { currentStatus: true, supplierStage: true },
     });
 
@@ -1029,12 +1083,12 @@ export async function getSupplierFilters(
 ): Promise<void> {
   try {
     const [countries, contractBuyers, statuses, productsRaw, certificationsRaw, datesRaw] = await Promise.all([
-      prisma.supplier.findMany({ select: { country: true }, distinct: ['country'] }),
-      prisma.supplier.findMany({ select: { contractBuyer: true }, distinct: ['contractBuyer'] }),
-      prisma.supplier.findMany({ select: { currentStatus: true }, distinct: ['currentStatus'] }),
-      prisma.supplier.findMany({ select: { products: true }, distinct: ['products'] }),
-      prisma.supplier.findMany({ select: { certifications: true }, distinct: ['certifications'] }),
-      prisma.supplier.findMany({ select: { createdAt: true } }),
+      prisma.supplier.findMany({ where: { isArchived: false }, select: { country: true }, distinct: ['country'] }),
+      prisma.supplier.findMany({ where: { isArchived: false }, select: { contractBuyer: true }, distinct: ['contractBuyer'] }),
+      prisma.supplier.findMany({ where: { isArchived: false }, select: { currentStatus: true }, distinct: ['currentStatus'] }),
+      prisma.supplier.findMany({ where: { isArchived: false }, select: { products: true }, distinct: ['products'] }),
+      prisma.supplier.findMany({ where: { isArchived: false }, select: { certifications: true }, distinct: ['certifications'] }),
+      prisma.supplier.findMany({ where: { isArchived: false }, select: { createdAt: true } }),
     ]);
 
     const formattedDates = Array.from(new Set(datesRaw.map(d =>

@@ -69,7 +69,7 @@ export async function listBuyers(
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const where: any = {};
+    const where: any = { isArchived: false };
 
     if (search) {
       where.OR = [
@@ -127,10 +127,10 @@ export async function getBuyerStats(
 ): Promise<void> {
   try {
     const [total, active, pending, suspended] = await Promise.all([
-      prisma.buyer.count(),
-      prisma.buyer.count({ where: { status: "Active" } }),
-      prisma.buyer.count({ where: { status: "Pending" } }),
-      prisma.buyer.count({ where: { status: "Suspended" } }),
+      prisma.buyer.count({ where: { isArchived: false } }),
+      prisma.buyer.count({ where: { isArchived: false, status: "Active" } }),
+      prisma.buyer.count({ where: { isArchived: false, status: "Pending" } }),
+      prisma.buyer.count({ where: { isArchived: false, status: "Suspended" } }),
     ]);
 
     res.json({ total, active, pending, suspended });
@@ -150,6 +150,7 @@ export async function getCrProducts(
 ): Promise<void> {
   try {
     const buyers = await prisma.buyer.findMany({
+      where: { isArchived: false },
       select: { requiredProducts: true },
     });
 
@@ -613,6 +614,54 @@ export async function deleteBuyer(
 }
 
 /**
+ * PATCH /api/buyers/:id/archive
+ */
+export async function archiveBuyer(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const existing = await prisma.buyer.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: "Buyer not found" });
+      return;
+    }
+
+    const buyer = await prisma.buyer.update({
+      where: { id: req.params.id },
+      data: { isArchived: true, archivedAt: new Date(), archivedBy: req.user!.id },
+    });
+
+    await logActivity(req.user!.id, "archive", "buyers", buyer.id, { company: buyer.company });
+    res.json(buyer);
+  } catch (err) {
+    console.error("Archive buyer error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * PATCH /api/buyers/:id/restore
+ */
+export async function restoreBuyer(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const existing = await prisma.buyer.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: "Buyer not found" });
+      return;
+    }
+
+    const buyer = await prisma.buyer.update({
+      where: { id: req.params.id },
+      data: { isArchived: false, archivedAt: null, archivedBy: null },
+    });
+
+    await logActivity(req.user!.id, "restore", "buyers", buyer.id, { company: buyer.company });
+    res.json(buyer);
+  } catch (err) {
+    console.error("Restore buyer error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
  * GET /api/buyers/upload-signature
  * Returns S3 presigned PUT URL for direct browser-to-S3 uploads
  */
@@ -717,6 +766,7 @@ export async function listBuyersForDropdown(
 ): Promise<void> {
   try {
     const buyers = await prisma.buyer.findMany({
+      where: { isArchived: false },
       select: { id: true, company: true, name: true },
       orderBy: { company: "asc" },
     });
@@ -737,7 +787,7 @@ export async function exportBuyersCsv(
   try {
     const { search = "", from, to } = req.query as Record<string, string>;
 
-    const where: any = {};
+    const where: any = { isArchived: false };
 
     if (search) {
       where.OR = [

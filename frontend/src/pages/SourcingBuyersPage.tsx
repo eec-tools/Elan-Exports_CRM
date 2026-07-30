@@ -38,6 +38,7 @@ import {
   UserSearch,
   FileText,
   Paperclip,
+  ArchiveX,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -175,6 +176,7 @@ export default function SourcingBuyersPage() {
   const [includeAttachment, setIncludeAttachment] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<SourcingBuyer | null>(null);
   const [confirmAction, setConfirmAction] = useState<"single" | "vault" | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<SourcingBuyer | null>(null);
 
   // From-folder state
   const [selectedFolderId, setSelectedFolderId] = useState("");
@@ -324,6 +326,19 @@ export default function SourcingBuyersPage() {
       toast.success(msg);
     },
     onError: () => toast.error("Failed to delete buyer"),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/sourcing-buyers/${id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyers-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sourcing-buyers-all"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      setArchiveTarget(null);
+      toast.success("Buyer moved to archive");
+    },
+    onError: () => toast.error("Failed to archive buyer"),
   });
 
   const startCampaignMutation = useMutation({
@@ -649,6 +664,18 @@ export default function SourcingBuyersPage() {
                               Responded
                             </Button>
                           )}
+
+                          {/* Archive */}
+                          <PermissionGate permission="sourcing_buyers" editOnly>
+                            <Button
+                              size="sm" variant="ghost"
+                              className="h-7 px-2 text-xs text-amber-600 hover:bg-amber-50"
+                              onClick={() => setArchiveTarget(b)}
+                              title="Add to Archive"
+                            >
+                              <ArchiveX className="h-3.5 w-3.5" />
+                            </Button>
+                          </PermissionGate>
 
                           {/* Delete */}
                           <PermissionGate permission="sourcing_buyers" editOnly>
@@ -991,6 +1018,28 @@ export default function SourcingBuyersPage() {
             >
               {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
               Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Archive Confirm ──────────────────────────────── */}
+      <Dialog open={!!archiveTarget} onOpenChange={(v) => !v && setArchiveTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogTitle>Move to Archive?</DialogTitle>
+          <DialogDescription>
+            This will move <strong>{archiveTarget?.company}</strong> to the archive. Follow-ups and campaign
+            actions will stop. You can restore it anytime from Archived Buyers.
+          </DialogDescription>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setArchiveTarget(null)}>Cancel</Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={archiveMutation.isPending}
+              onClick={() => archiveTarget && archiveMutation.mutate(archiveTarget.id)}
+            >
+              {archiveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              Move to Archive
             </Button>
           </div>
         </DialogContent>

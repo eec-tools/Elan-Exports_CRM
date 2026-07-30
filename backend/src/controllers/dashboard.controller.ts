@@ -49,8 +49,8 @@ export async function getDashboardStats(
       tasksGrouped,
       invalidSourcingEmails,
     ] = await Promise.all([
-      safe(() => prisma.buyer.count(), 0),
-      safe(() => prisma.supplier.count(), 0),
+      safe(() => prisma.buyer.count({ where: { isArchived: false } }), 0),
+      safe(() => prisma.supplier.count({ where: { isArchived: false } }), 0),
       safe(() => prisma.user.count({ where: { isActive: true } }), 0),
       safe(() => prisma.report.count(), 0),
       safe(() => (prisma as any).deal.count(), 0),
@@ -102,7 +102,7 @@ export async function getDashboardStats(
           }),
         [],
       ),
-      safe(() => (prisma as any).sourcingSupplier.count({ where: { status: "invalid" } }), 0),
+      safe(() => (prisma as any).sourcingSupplier.count({ where: { status: "invalid", isArchived: false } }), 0),
     ]);
 
     // Process Task Analytics -- dedup by first name, display full name

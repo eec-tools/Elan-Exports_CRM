@@ -4,6 +4,7 @@ import { AuthRequest } from "../types/index.js";
 import { createNotification } from "../services/notificationService.js";
 import { startCampaignForBuyer } from "./sourcingBuyerEmailCampaign.controller.js";
 import { sanitizeEmail } from "../utils/email.js";
+import { logActivity } from "../services/activityLogger.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const EMAIL_SEND_DELAY_MS = 2 * 60 * 1000;
@@ -38,6 +39,7 @@ export async function listSourcingBuyers(req: AuthRequest, res: Response): Promi
       WHERE ber.direction = 'received'
         AND ber.sourcing_buyer_id IS NOT NULL
         AND sb.status != 'invalid'
+        AND sb.is_archived = false
         AND NOT EXISTS (
           SELECT 1 FROM buyer_email_replies b2
           WHERE b2.sourcing_buyer_id = ber.sourcing_buyer_id
@@ -52,7 +54,7 @@ export async function listSourcingBuyers(req: AuthRequest, res: Response): Promi
       respondedAt: (r.responded_at as Date).toISOString(),
     }));
 
-    const where: any = {};
+    const where: any = { isArchived: false };
 
     if (search) {
       where.OR = [
@@ -112,12 +114,12 @@ export async function getSourcingBuyerStats(_req: AuthRequest, res: Response): P
   try {
     const [total, activeCampaigns, responseReceived, converted, noResponse, invalidEmails] =
       await Promise.all([
-        (prisma as any).sourcingBuyer.count({ where: { status: { not: "invalid" } } }),
-        (prisma as any).sourcingBuyerEmailCampaign.count({ where: { status: "active" } }),
-        (prisma as any).sourcingBuyer.count({ where: { status: "response_received" } }),
-        (prisma as any).sourcingBuyer.count({ where: { status: "converted_to_buyer" } }),
-        (prisma as any).sourcingBuyer.count({ where: { status: "no_response" } }),
-        (prisma as any).sourcingBuyer.count({ where: { status: "invalid" } }),
+        (prisma as any).sourcingBuyer.count({ where: { status: { not: "invalid" }, isArchived: false } }),
+        (prisma as any).sourcingBuyerEmailCampaign.count({ where: { status: "active", sourcingBuyer: { isArchived: false } } }),
+        (prisma as any).sourcingBuyer.count({ where: { status: "response_received", isArchived: false } }),
+        (prisma as any).sourcingBuyer.count({ where: { status: "converted_to_buyer", isArchived: false } }),
+        (prisma as any).sourcingBuyer.count({ where: { status: "no_response", isArchived: false } }),
+        (prisma as any).sourcingBuyer.count({ where: { status: "invalid", isArchived: false } }),
       ]);
 
     res.json({ total, activeCampaigns, responseReceived, converted, noResponse, invalidEmails });
@@ -360,6 +362,10 @@ export async function convertToBuyer(req: AuthRequest, res: Response): Promise<v
       res.status(400).json({ error: "Buyer has already been converted" });
       return;
     }
+    if (sourcing.isArchived) {
+      res.status(400).json({ error: "Restore this buyer from Archive before converting" });
+      return;
+    }
 
     const newBuyer = await (prisma as any).$transaction(async (tx: any) => {
       const created = await tx.buyer.create({
@@ -402,6 +408,50 @@ export async function convertToBuyer(req: AuthRequest, res: Response): Promise<v
     res.status(201).json(newBuyer);
   } catch (err) {
     console.error("Convert sourcing buyer error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * PATCH /api/sourcing-buyers/:id/archive
+ */
+export async function archiveSourcingBuyer(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const existing = await (prisma as any).sourcingBuyer.findUnique({ where: { id } });
+    if (!existing) { res.status(404).json({ error: "Sourcing buyer not found" }); return; }
+
+    const buyer = await (prisma as any).sourcingBuyer.update({
+      where: { id },
+      data: { isArchived: true, archivedAt: new Date(), archivedBy: req.user!.id },
+    });
+
+    await logActivity(req.user!.id, "archive", "sourcing_buyers", buyer.id, { company: buyer.company });
+    res.json(buyer);
+  } catch (err) {
+    console.error("Archive sourcing buyer error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+/**
+ * PATCH /api/sourcing-buyers/:id/restore
+ */
+export async function restoreSourcingBuyer(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const existing = await (prisma as any).sourcingBuyer.findUnique({ where: { id } });
+    if (!existing) { res.status(404).json({ error: "Sourcing buyer not found" }); return; }
+
+    const buyer = await (prisma as any).sourcingBuyer.update({
+      where: { id },
+      data: { isArchived: false, archivedAt: null, archivedBy: null },
+    });
+
+    await logActivity(req.user!.id, "restore", "sourcing_buyers", buyer.id, { company: buyer.company });
+    res.json(buyer);
+  } catch (err) {
+    console.error("Restore sourcing buyer error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 }

@@ -27,8 +27,11 @@ import {
   AlertCircle,
   MessageSquare,
   PhoneCall,
+  ArchiveX,
+  ArchiveRestore,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { EmailBody, EmailAttachmentList, type EmailAttachment } from "@/components/EmailContent";
 
 interface SourcingSupplier {
   id: string;
@@ -140,6 +143,9 @@ interface SourcingSupplier {
     gmailThreadId?: string | null;
     lastCheckedAt?: string | null;
   } | null;
+  isArchived?: boolean;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
 }
 
 interface FormTemplate {
@@ -161,22 +167,9 @@ interface EmailReply {
   fromName?: string;
   subject?: string;
   body: string;
+  bodyHtml?: string | null;
   receivedAt: string;
-}
-
-function stripQuotedText(body: string): string {
-  const lines = body.split("\n");
-  const result: string[] = [];
-  for (const line of lines) {
-    const t = line.trimStart();
-    if (t.startsWith(">")) break;
-    if (/^On \w{3},\s/.test(t)) break;
-    if (/^[-_]{4,}/.test(t)) break;
-    if (/^From:\s+\S/.test(t) && result.length > 0) break;
-    result.push(line);
-  }
-  while (result.length > 0 && result[result.length - 1].trim() === "") result.pop();
-  return result.join("\n").trim();
+  attachments?: EmailAttachment[];
 }
 
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
@@ -355,6 +348,26 @@ export default function SourcingSupplierDetailsPage() {
     onError: () => toast.error("Failed to record response"),
   });
 
+  const archiveMutation = useMutation({
+    mutationFn: () => api.patch(`/sourcing-suppliers/${id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sourcing-supplier", id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Supplier archived");
+    },
+    onError: () => toast.error("Failed to archive supplier"),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: () => api.patch(`/sourcing-suppliers/${id}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sourcing-supplier", id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Supplier restored");
+    },
+    onError: () => toast.error("Failed to restore supplier"),
+  });
+
 
   // ─── Helpers ────────────────────────────────────────
   const formLink = supplier?.formToken
@@ -399,16 +412,37 @@ export default function SourcingSupplierDetailsPage() {
             Back
           </Button>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-slate-900">{supplier.company}</h1>
+              <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-100 text-slate-700">
+                Sourcing Supplier
+              </span>
               <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCfg.class}`}>
                 {statusCfg.label}
               </span>
+              {supplier.isArchived && (
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-200 text-slate-600">
+                  <ArchiveX className="h-3 w-3" />
+                  Archived
+                </span>
+              )}
             </div>
             <p className="text-sm text-slate-500">{supplier.country ?? "—"} · {supplier.product ?? "—"}</p>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
+          {!supplier.isArchived && canEdit && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-slate-700 border-slate-300 hover:bg-slate-50"
+              onClick={() => archiveMutation.mutate()}
+              disabled={archiveMutation.isPending}
+            >
+              {archiveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ArchiveX className="h-4 w-4 mr-1.5" />}
+              Add to Archive
+            </Button>
+          )}
           {campaign?.status === "response_received" && (
             <Button
               size="sm"
@@ -439,6 +473,27 @@ export default function SourcingSupplierDetailsPage() {
           )}
         </div>
       </div>
+
+      {supplier.isArchived && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
+          <div className="text-sm text-slate-700">
+            <span className="font-medium">Archived</span>
+            {supplier.archivedAt && <span> on {new Date(supplier.archivedAt).toLocaleDateString()}</span>}
+            {". Campaign and stage-change actions are disabled while archived."}
+          </div>
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => restoreMutation.mutate()}
+              disabled={restoreMutation.isPending}
+            >
+              {restoreMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ArchiveRestore className="h-4 w-4 mr-1.5" />}
+              Restore
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ── Left: Basic Info ─── */}
@@ -495,6 +550,29 @@ export default function SourcingSupplierDetailsPage() {
 
         {/* ── Right: Campaign Status ─── */}
         <div className="space-y-4">
+          {supplier.isArchived ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <h2 className="font-semibold text-slate-800 mb-3">Email Campaign</h2>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600 space-y-2">
+                <p>
+                  This supplier is archived
+                  {supplier.archivedAt && <> (since {new Date(supplier.archivedAt).toLocaleDateString()})</>}.
+                  Campaign actions are disabled until it is restored.
+                </p>
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => restoreMutation.mutate()}
+                    disabled={restoreMutation.isPending}
+                  >
+                    {restoreMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ArchiveRestore className="h-4 w-4 mr-1.5" />}
+                    Restore
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <h2 className="font-semibold text-slate-800 mb-3">Email Campaign</h2>
             {/* Assigned Gmail account badge */}
@@ -622,6 +700,7 @@ export default function SourcingSupplierDetailsPage() {
               </div>
             )}
           </div>
+          )}
 
           {/* Form link panel */}
           {formLink && (
@@ -962,7 +1041,6 @@ export default function SourcingSupplierDetailsPage() {
               const name = isSent ? "Élan Exports" : (msg.fromName ?? msg.fromEmail);
               const email = isSent ? (supplier.assignedGmailAccount ?? "") : msg.fromEmail;
               const initial = name.charAt(0).toUpperCase();
-              const cleanBody = stripQuotedText(msg.body);
               return (
                 <div
                   key={msg.id}
@@ -982,8 +1060,9 @@ export default function SourcingSupplierDetailsPage() {
                     </span>
                   </div>
                   {/* Body */}
-                  <div className="px-4 py-3 text-slate-700 leading-relaxed whitespace-pre-wrap">
-                    {cleanBody || <span className="text-slate-400 italic">No content</span>}
+                  <div className="px-4 py-3 text-slate-700">
+                    <EmailBody bodyHtml={msg.bodyHtml} bodyText={msg.body} />
+                    <EmailAttachmentList attachments={msg.attachments} />
                   </div>
                 </div>
               );

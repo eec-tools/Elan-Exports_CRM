@@ -129,6 +129,9 @@ export async function startCampaign(req: AuthRequest, res: Response) {
     if (!supplier) {
       return res.status(404).json({ error: "Supplier not found" });
     }
+    if (supplier.isArchived) {
+      return res.status(400).json({ error: "Restore this supplier from Archive before starting a campaign" });
+    }
 
     const existing = await prisma.supplierEmailCampaign.findUnique({
       where: { supplierId },
@@ -175,12 +178,16 @@ export async function markEmailSent(req: AuthRequest, res: Response) {
 
     const campaign = await prisma.supplierEmailCampaign.findUnique({
       where: { supplierId },
+      include: { supplier: { select: { isArchived: true } } },
     });
     if (!campaign) {
       return res.status(404).json({ error: "No campaign found for this supplier" });
     }
     if (campaign.status !== "active") {
       return res.status(400).json({ error: `Campaign is already ${campaign.status}` });
+    }
+    if (campaign.supplier.isArchived) {
+      return res.status(400).json({ error: "Restore this supplier from Archive first" });
     }
 
     const now = new Date();
