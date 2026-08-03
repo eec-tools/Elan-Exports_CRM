@@ -13,6 +13,49 @@ export const SUPPLIER_COMMS_ACCOUNTS = [
   "procurement2@eectrade.com",
 ];
 
+// ── Entity types unified in this inbox ──────────────────────────────────────
+// Every supplier category we track email against — sourcing-stage, new
+// (post-conversion), and signed-contract — funnels through the same inbox,
+// each tagged with its own label so nothing gets missed in one vs. another.
+
+type EntityKind = "sourcing" | "new" | "signed";
+
+interface EntityConfig {
+  model: "sourcingSupplier" | "newSupplier" | "supplier";
+  fkField: "sourcingId" | "newSupplierId" | "contractSupplierId";
+  campaignModel: "sourcingEmailCampaign" | "newSupplierEmailCampaign" | "supplierEmailCampaign";
+  campaignFk: "sourcingId" | "newSupplierId" | "supplierId";
+  label: string;
+}
+
+const ENTITY_CONFIG: Record<EntityKind, EntityConfig> = {
+  sourcing: {
+    model: "sourcingSupplier",
+    fkField: "sourcingId",
+    campaignModel: "sourcingEmailCampaign",
+    campaignFk: "sourcingId",
+    label: "Sourcing Supplier",
+  },
+  new: {
+    model: "newSupplier",
+    fkField: "newSupplierId",
+    campaignModel: "newSupplierEmailCampaign",
+    campaignFk: "newSupplierId",
+    label: "New Supplier",
+  },
+  signed: {
+    model: "supplier",
+    fkField: "contractSupplierId",
+    campaignModel: "supplierEmailCampaign",
+    campaignFk: "supplierId",
+    label: "Signed Contract",
+  },
+};
+
+function isValidEntityType(v: string): v is EntityKind {
+  return v === "sourcing" || v === "new" || v === "signed";
+}
+
 let groqClient: Groq | null = null;
 function getGroq(): Groq {
   if (!groqClient) {
@@ -621,8 +664,8 @@ const composeAttachmentStorage = multerS3({
   bucket: S3_BUCKET,
   contentType: multerS3.AUTO_CONTENT_TYPE,
   key: (req: any, file: Express.Multer.File, cb: (err: Error | null, key: string) => void) => {
-    const sourcingId = req.params.sourcingId;
-    cb(null, buildS3Key(`outbound-email-attachments/suppliers/${sourcingId}`, file.originalname));
+    const { entityType, entityId } = req.params;
+    cb(null, buildS3Key(`outbound-email-attachments/suppliers/${entityType}/${entityId}`, file.originalname));
   },
 });
 
@@ -652,73 +695,89 @@ export async function uploadComposeAttachment(req: AuthRequest, res: Response): 
 
 /**
  * GET /api/ai-supplier-comms/inbox?account=<email>
+ * Merges sourcing / new / signed-contract suppliers into one inbox, each
+ * item tagged with entityType + label so the UI can show which category it's from.
  */
 export async function getInbox(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { account } = req.query as { account?: string };
 
-    const supplierWhere: any = { isArchived: false };
+    const where: any = { isArchived: false };
     if (account && account !== "all") {
-      supplierWhere.assignedGmailAccount = account;
+      where.assignedGmailAccount = account;
     } else {
-      supplierWhere.assignedGmailAccount = { in: SUPPLIER_COMMS_ACCOUNTS };
+      where.assignedGmailAccount = { in: SUPPLIER_COMMS_ACCOUNTS };
     }
 
-    const suppliers = await (prisma as any).sourcingSupplier.findMany({
-      where: {
-        ...supplierWhere,
-        emailReplies: { some: HUMAN_REPLY_FILTER },
-      },
-      include: {
-        emailReplies: {
-          where: BOUNCE_EXCLUSION,
-          orderBy: { receivedAt: "desc" },
-          include: { attachments: true },
-        },
-        emailCampaign: true,
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+    const perEntity = await Promise.all(
+      (Object.keys(ENTITY_CONFIG) as EntityKind[]).map(async (entityType) => {
+        const config = ENTITY_CONFIG[entityType];
+        const rows = await (prisma as any)[config.model].findMany({
+          where: {
+            ...where,
+            emailReplies: { some: HUMAN_REPLY_FILTER },
+          },
+          include: {
+            emailReplies: {
+              where: BOUNCE_EXCLUSION,
+              orderBy: { receivedAt: "desc" },
+              include: { attachments: true },
+            },
+            emailCampaign: true,
+          },
+          orderBy: { updatedAt: "desc" },
+        });
 
-    const enriched = suppliers.map((s: any) => {
-      const allReplies = s.emailReplies as any[]; // both directions, newest first
-      const latestOverall = allReplies[0];
-      const latestReply = allReplies.find((r: any) => r.direction === "received");
-      // Only "needs reply" if the truly latest message in the thread is inbound —
-      // if we've since sent a reply (via this tool or any other channel), it's answered
-      // until the supplier writes back again.
-      const needsReply = latestOverall?.direction === "received";
-      const unrepliedCount = allReplies.filter((r: any) => r.direction === "received" && !r.repliedAt).length;
-      return {
-        id: s.id,
-        company: s.company,
-        contactPerson: s.contactPerson,
-        email: s.email,
-        country: s.country,
-        product: s.product ?? s.productCategory,
-        assignedGmailAccount: s.assignedGmailAccount,
-        alreadyContacted: s.alreadyContacted ?? false,
-        certifications: s.certifications,
-        supplierType: s.supplierType,
-        notes: s.notes,
-        campaignStatus: s.emailCampaign?.status ?? "pending",
-        latestReply: latestReply
-          ? {
-              id: latestReply.id,
-              subject: latestReply.subject,
-              body: latestReply.body,
-              fromEmail: latestReply.fromEmail,
-              fromName: latestReply.fromName,
-              receivedAt: latestReply.receivedAt,
-              repliedAt: needsReply ? null : (latestOverall.receivedAt ?? latestReply.repliedAt),
-              attachmentCount: latestReply.attachments?.length ?? 0,
-            }
-          : null,
-        unrepliedCount,
-      };
-    });
+        return rows.map((s: any) => {
+          const allReplies = s.emailReplies as any[]; // both directions, newest first
+          const latestOverall = allReplies[0];
+          const latestReply = allReplies.find((r: any) => r.direction === "received");
+          // Only "needs reply" if the truly latest message in the thread is inbound —
+          // if we've since sent a reply (via this tool or any other channel), it's answered
+          // until the supplier writes back again.
+          const needsReply = latestOverall?.direction === "received";
+          const unrepliedCount = allReplies.filter((r: any) => r.direction === "received" && !r.repliedAt).length;
+          return {
+            id: s.id,
+            entityType,
+            label: config.label,
+            company: s.company,
+            contactPerson: s.contactPerson,
+            email: s.email,
+            country: s.country,
+            product: s.product ?? s.productCategory ?? s.products ?? null,
+            assignedGmailAccount: s.assignedGmailAccount,
+            // alreadyContacted only exists on sourcing suppliers today — other
+            // entity types just never show as "already contacted" via this toggle.
+            alreadyContacted: s.alreadyContacted ?? false,
+            certifications: s.certifications,
+            supplierType: s.supplierType,
+            notes: s.notes,
+            campaignStatus: s.emailCampaign?.status ?? "pending",
+            latestReply: latestReply
+              ? {
+                  id: latestReply.id,
+                  subject: latestReply.subject,
+                  body: latestReply.body,
+                  fromEmail: latestReply.fromEmail,
+                  fromName: latestReply.fromName,
+                  receivedAt: latestReply.receivedAt,
+                  repliedAt: needsReply ? null : (latestOverall.receivedAt ?? latestReply.repliedAt),
+                  attachmentCount: latestReply.attachments?.length ?? 0,
+                }
+              : null,
+            unrepliedCount,
+          };
+        });
+      }),
+    );
 
-    res.json(enriched.filter((s: any) => s.latestReply));
+    const merged = perEntity
+      .flat()
+      .filter((s: any) => s.latestReply)
+      .sort((a: any, b: any) => new Date(b.latestReply.receivedAt).getTime() - new Date(a.latestReply.receivedAt).getTime());
+
+    res.json(merged);
   } catch (err) {
     console.error("[aiSupplierComms] getInbox error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -726,13 +785,16 @@ export async function getInbox(req: AuthRequest, res: Response): Promise<void> {
 }
 
 /**
- * GET /api/ai-supplier-comms/:sourcingId/thread
+ * GET /api/ai-supplier-comms/:entityType/:entityId/thread
  */
 export async function getThread(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const { sourcingId } = req.params as { sourcingId: string };
+    const { entityType, entityId } = req.params as { entityType: string; entityId: string };
+    if (!isValidEntityType(entityType)) { res.status(400).json({ error: "Invalid entity type" }); return; }
+    const config = ENTITY_CONFIG[entityType];
+
     const replies = await (prisma as any).supplierEmailReply.findMany({
-      where: { sourcingId },
+      where: { [config.fkField]: entityId },
       orderBy: { receivedAt: "asc" },
       include: { attachments: true },
     });
@@ -744,19 +806,21 @@ export async function getThread(req: AuthRequest, res: Response): Promise<void> 
 }
 
 /**
- * POST /api/ai-supplier-comms/:sourcingId/draft
+ * POST /api/ai-supplier-comms/:entityType/:entityId/draft
  * Body: { replyId: string, additionalContext?: string }
  */
 export async function draftReply(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const { sourcingId } = req.params as { sourcingId: string };
+    const { entityType, entityId } = req.params as { entityType: string; entityId: string };
+    if (!isValidEntityType(entityType)) { res.status(400).json({ error: "Invalid entity type" }); return; }
+    const config = ENTITY_CONFIG[entityType];
     const { replyId, additionalContext = "" } = req.body as { replyId: string; additionalContext?: string };
 
-    const supplier = await (prisma as any).sourcingSupplier.findUnique({ where: { id: sourcingId } });
+    const supplier = await (prisma as any)[config.model].findUnique({ where: { id: entityId } });
     if (!supplier) { res.status(404).json({ error: "Supplier not found" }); return; }
 
     const thread = await (prisma as any).supplierEmailReply.findMany({
-      where: { sourcingId },
+      where: { [config.fkField]: entityId },
       orderBy: { receivedAt: "asc" },
     });
 
@@ -772,12 +836,14 @@ export async function draftReply(req: AuthRequest, res: Response): Promise<void>
 }
 
 /**
- * POST /api/ai-supplier-comms/:sourcingId/send
+ * POST /api/ai-supplier-comms/:entityType/:entityId/send
  * Body: { replyId: string, subject: string, body: string }
  */
 export async function sendReply(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const { sourcingId } = req.params as { sourcingId: string };
+    const { entityType, entityId } = req.params as { entityType: string; entityId: string };
+    if (!isValidEntityType(entityType)) { res.status(400).json({ error: "Invalid entity type" }); return; }
+    const config = ENTITY_CONFIG[entityType];
     const { replyId, subject, body, attachments } = req.body as {
       replyId: string;
       subject: string;
@@ -790,10 +856,14 @@ export async function sendReply(req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
-    const supplier = await (prisma as any).sourcingSupplier.findUnique({ where: { id: sourcingId } });
+    const supplier = await (prisma as any)[config.model].findUnique({ where: { id: entityId } });
     if (!supplier || !supplier.email) { res.status(404).json({ error: "Supplier not found or has no email" }); return; }
 
-    const campaign = await (prisma as any).sourcingEmailCampaign.findUnique({ where: { sourcingId } });
+    const campaign = await (prisma as any)[config.campaignModel].findUnique({ where: { [config.campaignFk]: entityId } });
+    // Cold contacts (e.g. a New/Signed supplier who emailed in before we ever
+    // emailed them) may have no campaign row at all — fall back to the target
+    // reply's own gmailMessageId so we can still thread the reply via In-Reply-To.
+    const targetReplyRow = await (prisma as any).supplierEmailReply.findUnique({ where: { id: replyId } });
 
     const fromEmail = supplier.assignedGmailAccount;
     if (!fromEmail) { res.status(400).json({ error: "No Gmail account assigned to this supplier" }); return; }
@@ -801,9 +871,10 @@ export async function sendReply(req: AuthRequest, res: Response): Promise<void> 
     const sig = await fetchDefaultSignatureForAccount(fromEmail);
     const html = buildReplyHtml(body, sig, fromEmail);
 
+    const knownGmailMessageId = campaign?.gmailMessageId ?? targetReplyRow?.gmailMessageId ?? null;
     let smtpMessageId: string | null = null;
-    if (campaign?.gmailMessageId) {
-      smtpMessageId = await getSmtpMessageId(fromEmail, campaign.gmailMessageId);
+    if (knownGmailMessageId) {
+      smtpMessageId = await getSmtpMessageId(fromEmail, knownGmailMessageId);
     }
 
     let emailAttachments: EmailAttachment[] | undefined;
@@ -833,7 +904,7 @@ export async function sendReply(req: AuthRequest, res: Response): Promise<void> 
 
     const sentReply = await (prisma as any).supplierEmailReply.create({
       data: {
-        sourcingId,
+        [config.fkField]: entityId,
         gmailMessageId: messageId,
         direction: "sent",
         fromEmail,
@@ -864,8 +935,8 @@ export async function sendReply(req: AuthRequest, res: Response): Promise<void> 
     });
 
     if (campaign && threadId && !campaign.gmailThreadId) {
-      await (prisma as any).sourcingEmailCampaign.update({
-        where: { sourcingId },
+      await (prisma as any)[config.campaignModel].update({
+        where: { [config.campaignFk]: entityId },
         data: { gmailThreadId: threadId },
       });
     }
@@ -879,14 +950,20 @@ export async function sendReply(req: AuthRequest, res: Response): Promise<void> 
 }
 
 /**
- * PATCH /api/ai-supplier-comms/:sourcingId/contacted
+ * PATCH /api/ai-supplier-comms/:entityType/:entityId/contacted
+ * alreadyContacted only exists on sourcing suppliers today.
  */
 export async function toggleContacted(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const { sourcingId } = req.params as { sourcingId: string };
+    const { entityType, entityId } = req.params as { entityType: string; entityId: string };
+    if (!isValidEntityType(entityType)) { res.status(400).json({ error: "Invalid entity type" }); return; }
+    if (entityType !== "sourcing") {
+      res.status(400).json({ error: "Marking contacted is only supported for sourcing suppliers" });
+      return;
+    }
     const { alreadyContacted } = req.body as { alreadyContacted: boolean };
     const updated = await (prisma as any).sourcingSupplier.update({
-      where: { id: sourcingId },
+      where: { id: entityId },
       data: { alreadyContacted: Boolean(alreadyContacted) },
       select: { id: true, alreadyContacted: true },
     });

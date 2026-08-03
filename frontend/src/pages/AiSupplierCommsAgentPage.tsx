@@ -60,8 +60,12 @@ interface LatestReply {
   attachmentCount?: number;
 }
 
+type EntityType = "sourcing" | "new" | "signed";
+
 interface InboxItem {
   id: string;
+  entityType: EntityType;
+  label: string;
   company: string;
   contactPerson?: string | null;
   email?: string | null;
@@ -75,6 +79,26 @@ interface InboxItem {
   campaignStatus: string;
   latestReply: LatestReply;
   unrepliedCount: number;
+}
+
+const ENTITY_ARCHIVE_ENDPOINT: Record<EntityType, string> = {
+  sourcing: "sourcing-suppliers",
+  new: "new-suppliers",
+  signed: "suppliers",
+};
+
+const ENTITY_BADGE_STYLE: Record<EntityType, string> = {
+  sourcing: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  new: "bg-blue-100 text-blue-700 border-blue-200",
+  signed: "bg-violet-100 text-violet-700 border-violet-200",
+};
+
+function EntityBadge({ item, className = "" }: { item: InboxItem; className?: string }) {
+  return (
+    <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none ${ENTITY_BADGE_STYLE[item.entityType]} ${className}`}>
+      {item.label}
+    </span>
+  );
 }
 
 interface ThreadAttachment {
@@ -220,9 +244,9 @@ function DraftPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: thread = [], isLoading: threadLoading } = useQuery<ThreadMessage[]>({
-    queryKey: ["ai-supplier-comms-thread", item.id],
+    queryKey: ["ai-supplier-comms-thread", item.entityType, item.id],
     queryFn: async () => {
-      const res = await api.get(`/ai-supplier-comms/${item.id}/thread`);
+      const res = await api.get(`/ai-supplier-comms/${item.entityType}/${item.id}/thread`);
       return res.data;
     },
   });
@@ -234,7 +258,7 @@ function DraftPanel({
   async function handleToggleContacted() {
     setTogglingContacted(true);
     try {
-      await api.patch(`/ai-supplier-comms/${item.id}/contacted`, { alreadyContacted: !contacted });
+      await api.patch(`/ai-supplier-comms/${item.entityType}/${item.id}/contacted`, { alreadyContacted: !contacted });
       setContacted((v) => !v);
       queryClient.invalidateQueries({ queryKey: ["ai-supplier-comms-inbox"] });
       toast.success(!contacted ? "Marked as already contacted" : "Marked as pending reply");
@@ -250,7 +274,7 @@ function DraftPanel({
     setClarifications([]);
     setHasDraft(false);
     try {
-      const res = await api.post(`/ai-supplier-comms/${item.id}/draft`, {
+      const res = await api.post(`/ai-supplier-comms/${item.entityType}/${item.id}/draft`, {
         replyId: item.latestReply.id,
         additionalContext: extraContext,
       });
@@ -288,7 +312,7 @@ function DraftPanel({
       for (const file of Array.from(files)) {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await api.post(`/ai-supplier-comms/${item.id}/upload-attachment`, formData, {
+        const res = await api.post(`/ai-supplier-comms/${item.entityType}/${item.id}/upload-attachment`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         setPendingAttachments((prev) => [...prev, res.data]);
@@ -312,7 +336,7 @@ function DraftPanel({
     }
     setIsSending(true);
     try {
-      await api.post(`/ai-supplier-comms/${item.id}/send`, {
+      await api.post(`/ai-supplier-comms/${item.entityType}/${item.id}/send`, {
         replyId: item.latestReply.id,
         subject: draftSubject.trim(),
         body: draftBody.trim(),
@@ -348,24 +372,29 @@ function DraftPanel({
               <Building2 className="h-3.5 w-3.5 text-white" />
             </div>
             <div>
-              <p className="font-semibold text-sm text-foreground leading-tight">{item.company}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-semibold text-sm text-foreground leading-tight">{item.company}</p>
+                <EntityBadge item={item} />
+              </div>
               <p className="text-xs text-muted-foreground">{item.contactPerson ?? item.email ?? "—"}</p>
             </div>
           </div>
         </div>
-        <button
-          onClick={handleToggleContacted}
-          disabled={togglingContacted}
-          title={contacted ? "Click to mark as pending reply" : "Click if already contacted via call/other channel"}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-            contacted
-              ? "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200"
-              : "bg-muted border-border text-muted-foreground hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700"
-          }`}
-        >
-          {togglingContacted ? <Loader2 className="h-3 w-3 animate-spin" /> : <PhoneCall className="h-3 w-3" />}
-          {contacted ? "Already Contacted" : "Mark Contacted"}
-        </button>
+        {item.entityType === "sourcing" && (
+          <button
+            onClick={handleToggleContacted}
+            disabled={togglingContacted}
+            title={contacted ? "Click to mark as pending reply" : "Click if already contacted via call/other channel"}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+              contacted
+                ? "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200"
+                : "bg-muted border-border text-muted-foreground hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700"
+            }`}
+          >
+            {togglingContacted ? <Loader2 className="h-3 w-3 animate-spin" /> : <PhoneCall className="h-3 w-3" />}
+            {contacted ? "Already Contacted" : "Mark Contacted"}
+          </button>
+        )}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
           <Mail className="h-3 w-3" />
           {item.assignedGmailAccount.split("@")[0]}
@@ -595,6 +624,7 @@ function InboxCard({ item, onSelect, onArchive }: { item: InboxItem; onSelect: (
           <div className="flex items-baseline justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <p className="font-semibold text-sm text-foreground truncate">{item.company}</p>
+              <EntityBadge item={item} className="flex-shrink-0" />
               {item.unrepliedCount > 1 && (
                 <span className="flex-shrink-0 text-xs bg-emerald-100 text-emerald-700 rounded-full px-1.5 py-0.5">
                   {item.unrepliedCount} new
@@ -685,15 +715,17 @@ export default function AiSupplierCommsAgentPage() {
   });
 
   const archiveMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/sourcing-suppliers/${id}/archive`),
-    onSuccess: (_res, id) => {
+    mutationFn: (item: InboxItem) => api.patch(`/${ENTITY_ARCHIVE_ENDPOINT[item.entityType]}/${item.id}/archive`),
+    onSuccess: (_res, item) => {
       queryClient.invalidateQueries({ queryKey: ["ai-supplier-comms-inbox"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["sourcing-suppliers-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["new-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      if (selectedItem?.id === id) setSelectedItem(null);
+      if (selectedItem?.id === item.id) setSelectedItem(null);
       setArchiveTarget(null);
-      toast.success("Supplier moved to archive");
+      toast.success(`${item.label} moved to archive`);
     },
     onError: () => toast.error("Failed to archive supplier"),
   });
@@ -891,7 +923,7 @@ export default function AiSupplierCommsAgentPage() {
             </Button>
             <Button
               disabled={archiveMutation.isPending}
-              onClick={() => archiveTarget && archiveMutation.mutate(archiveTarget.id)}
+              onClick={() => archiveTarget && archiveMutation.mutate(archiveTarget)}
               className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
             >
               {archiveMutation.isPending ? (

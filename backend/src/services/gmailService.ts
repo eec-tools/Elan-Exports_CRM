@@ -267,6 +267,11 @@ export async function sendGmailEmail(params: {
   }
 }
 
+export async function getGmailClientForAccount(email: string) {
+  const auth = await getAuthedClient(email);
+  return google.gmail({ version: "v1", auth });
+}
+
 export async function getSmtpMessageId(accountEmail: string, gmailMessageId: string): Promise<string | null> {
   try {
     const auth = await getAuthedClient(accountEmail);

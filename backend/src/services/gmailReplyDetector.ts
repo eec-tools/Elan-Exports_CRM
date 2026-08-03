@@ -1,10 +1,11 @@
 import cron from "node-cron";
 import prisma from "../config/db.js";
-import { fetchThreadReplies } from "./gmailService.js";
+import { fetchThreadReplies, getGmailClientForAccount, withGmailThrottle } from "./gmailService.js";
 import { persistSupplierAttachments, persistBuyerAttachments, resolveInlineImages, rewriteCidReferences } from "./emailAttachmentSync.service.js";
 import { autoMoveToOldSupplier } from "../controllers/sourcingEmailCampaign.controller.js";
 import { createNotification } from "./notificationService.js";
 import { BUYER_GMAIL_ACCOUNT } from "../controllers/sourcingBuyers.controller.js";
+import { SUPPLIER_COMMS_ACCOUNTS } from "../controllers/aiSupplierComms.controller.js";
 import { sendImmediateReplyAlert } from "./mailer.js";
 
 const CRM_BASE_URL = "https://crm.eectrade.com";
@@ -81,6 +82,235 @@ export async function syncThreadMessages(
     const hasReply = messages.some((m) => m.direction === "received" && !m.isDeliveryFailure);
     const hasBounce = messages.some((m) => m.isDeliveryFailure === true);
     return { hasReply, hasBounce };
+}
+
+/**
+ * Same job as syncThreadMessages, but for New Supplier / Signed Contract
+ * records — kept separate (rather than parameterizing syncThreadMessages
+ * itself) so the existing sourcing-supplier reply pipeline is never touched.
+ * Returns newlyReceivedCount so callers only notify once per message.
+ */
+export async function syncSupplierEntityThreadMessages(
+    fkField: "newSupplierId" | "contractSupplierId",
+    entityId: string,
+    accountEmail: string,
+    threadId: string,
+): Promise<{ hasReply: boolean; hasBounce: boolean; newlyReceivedCount: number }> {
+    const messages = await fetchThreadReplies({ accountEmail, threadId });
+    if (messages.length === 0) return { hasReply: false, hasBounce: false, newlyReceivedCount: 0 };
+
+    const existing = await (prisma as any).supplierEmailReply.findMany({
+        where: { [fkField]: entityId },
+        select: { id: true, gmailMessageId: true, bodyHtml: true },
+    });
+    const existingByMessage = new Map(existing.map((r: any) => [r.gmailMessageId, r]));
+    let newlyReceivedCount = 0;
+
+    for (const m of messages) {
+        const existingRow = existingByMessage.get(m.gmailMessageId) as { id: string; bodyHtml: string | null } | undefined;
+        let replyId = existingRow?.id;
+
+        let resolvedHtml: string | undefined;
+        if (m.bodyHtml && !existingRow?.bodyHtml) {
+            const cidMap = m.inlineImages.length
+                ? await resolveInlineImages({
+                    accountEmail,
+                    gmailMessageId: m.gmailMessageId,
+                    keyPrefix: `inline-email-images/suppliers/${entityId}`,
+                    inlineImages: m.inlineImages,
+                })
+                : {};
+            resolvedHtml = rewriteCidReferences(m.bodyHtml, cidMap);
+        }
+
+        if (!replyId) {
+            const created = await (prisma as any).supplierEmailReply.create({
+                data: {
+                    [fkField]: entityId,
+                    gmailMessageId: m.gmailMessageId,
+                    direction: m.direction,
+                    fromEmail: m.fromEmail,
+                    fromName: m.fromName ?? null,
+                    subject: m.subject ?? null,
+                    body: m.body,
+                    bodyHtml: resolvedHtml ?? null,
+                    receivedAt: m.receivedAt,
+                },
+                select: { id: true },
+            });
+            replyId = created.id;
+            if (m.direction === "received" && !m.isDeliveryFailure) newlyReceivedCount++;
+        } else if (resolvedHtml) {
+            await (prisma as any).supplierEmailReply.update({
+                where: { id: replyId },
+                data: { bodyHtml: resolvedHtml },
+            });
+        }
+
+        if (m.attachments.length > 0) {
+            await persistSupplierAttachments({
+                accountEmail,
+                sourcingId: entityId,
+                replyId: replyId as string,
+                gmailMessageId: m.gmailMessageId,
+                attachments: m.attachments,
+            });
+        }
+    }
+
+    const hasReply = messages.some((m) => m.direction === "received" && !m.isDeliveryFailure);
+    const hasBounce = messages.some((m) => m.isDeliveryFailure === true);
+    return { hasReply, hasBounce, newlyReceivedCount };
+}
+
+function parseSenderEmail(fromHeader: string): string {
+    const match = fromHeader.match(/<([^>]+)>/);
+    return (match ? match[1] : fromHeader).trim().toLowerCase();
+}
+
+function emailFieldMatches(candidateEmail: string, storedEmailField: string | null): boolean {
+    if (!storedEmailField) return false;
+    return storedEmailField
+        .split(/[;,]/)
+        .map((e) => e.trim().toLowerCase())
+        .includes(candidateEmail);
+}
+
+/**
+ * Catches "cold" inbound mail — messages from someone we track as a New
+ * Supplier or Signed Contract supplier who emails in before we've ever sent
+ * them anything, so there's no campaign gmailThreadId to follow yet.
+ * Matches the sender address against NewSupplier/Supplier.email directly
+ * against the raw inbox instead of following a known thread. Sourcing
+ * suppliers are intentionally skipped here — checkCampaignReplies already
+ * owns that path via their campaign's gmailThreadId.
+ */
+const SUPPLIER_INBOX_MATCH_LOOKBACK_DAYS = 30;
+let unthreadedSupplierCheckRunning = false;
+
+export async function checkUnthreadedSupplierInboxes() {
+    if (unthreadedSupplierCheckRunning) {
+        console.log("[ReplyDetector] Previous unthreaded supplier inbox check still running — skipping this tick");
+        return;
+    }
+    unthreadedSupplierCheckRunning = true;
+    try {
+        for (const accountEmail of SUPPLIER_COMMS_ACCOUNTS) {
+            await checkUnthreadedSupplierInboxForAccount(accountEmail);
+        }
+    } catch (err) {
+        console.error("[ReplyDetector] Fatal error in unthreaded supplier inbox check:", err);
+    } finally {
+        unthreadedSupplierCheckRunning = false;
+    }
+}
+
+async function checkUnthreadedSupplierInboxForAccount(accountEmail: string) {
+    let gmail;
+    try {
+        gmail = await getGmailClientForAccount(accountEmail);
+    } catch {
+        return; // account not connected — skip silently
+    }
+
+    const cursorKey = `supplier_inbox_matcher_last_sync_${accountEmail}`;
+    const cursorSetting = await (prisma as any).appSetting.findUnique({ where: { key: cursorKey } });
+    const since = cursorSetting?.value
+        ? new Date(cursorSetting.value)
+        : new Date(Date.now() - SUPPLIER_INBOX_MATCH_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+    const epochSeconds = Math.floor(since.getTime() / 1000) - 300; // 5-min buffer
+    const syncedAt = new Date();
+
+    try {
+        const listRes = await withGmailThrottle(accountEmail, () =>
+            gmail.users.messages.list({ userId: "me", q: `in:inbox after:${epochSeconds}`, maxResults: 100 }),
+        );
+        const messages = listRes.data.messages ?? [];
+
+        if (messages.length > 0) {
+            const [newSuppliers, signedSuppliers] = await Promise.all([
+                (prisma as any).newSupplier.findMany({
+                    where: { isArchived: false, email: { not: null } },
+                    select: { id: true, company: true, email: true, contactPerson: true, assignedGmailAccount: true },
+                }),
+                (prisma as any).supplier.findMany({
+                    where: { isArchived: false, email: { not: null } },
+                    select: { id: true, company: true, email: true, contactPerson: true, assignedGmailAccount: true },
+                }),
+            ]);
+
+            for (const msg of messages) {
+                if (!msg.id || !msg.threadId) continue;
+                try {
+                    const detail = await withGmailThrottle(accountEmail, () =>
+                        gmail.users.messages.get({
+                            userId: "me", id: msg.id!, format: "METADATA", metadataHeaders: ["From"],
+                        }),
+                    );
+                    const fromHeader = (detail.data.payload?.headers ?? []).find(
+                        (h: any) => h.name?.toLowerCase() === "from",
+                    )?.value ?? "";
+                    const senderEmail = parseSenderEmail(fromHeader);
+                    if (!senderEmail || senderEmail === accountEmail.toLowerCase()) continue;
+
+                    const newMatch = newSuppliers.find((s: any) => emailFieldMatches(senderEmail, s.email));
+                    const signedMatch = !newMatch && signedSuppliers.find((s: any) => emailFieldMatches(senderEmail, s.email));
+                    if (!newMatch && !signedMatch) continue;
+
+                    const kind: "new" | "signed" = newMatch ? "new" : "signed";
+                    const entity = (newMatch ?? signedMatch) as { id: string; company: string; email: string | null; contactPerson: string | null; assignedGmailAccount: string | null };
+                    const fkField = kind === "new" ? "newSupplierId" : "contractSupplierId";
+
+                    const { newlyReceivedCount } = await syncSupplierEntityThreadMessages(
+                        fkField, entity.id, accountEmail, msg.threadId,
+                    );
+
+                    if (!entity.assignedGmailAccount) {
+                        const model = kind === "new" ? "newSupplier" : "supplier";
+                        await (prisma as any)[model].update({
+                            where: { id: entity.id },
+                            data: { assignedGmailAccount: accountEmail },
+                        });
+                    }
+
+                    if (newlyReceivedCount > 0) {
+                        const label = kind === "new" ? "New Supplier" : "Signed Contract";
+                        const link = kind === "new" ? `/suppliers/new/${entity.id}` : `/suppliers/signed-contract/${entity.id}`;
+                        console.log(`[ReplyDetector] Unthreaded inbound mail matched to ${kind} supplier ${entity.company} — flagging`);
+
+                        await createNotification({
+                            type: kind === "new" ? "new_supplier_email_received" : "signed_supplier_email_received",
+                            title: `${label} Emailed You`,
+                            message: `${entity.company} (${label}) sent you an email. Check the AI Supplier Comms inbox to respond.`,
+                            entityType: kind === "new" ? "new_supplier" : "supplier",
+                            entityId: entity.id,
+                            entityName: entity.company,
+                            entityLink: link,
+                        });
+
+                        sendImmediateReplyAlert({
+                            to: accountEmail,
+                            company: entity.company,
+                            contactPerson: entity.contactPerson ?? null,
+                            companyEmail: entity.email ?? null,
+                            entityType: "supplier",
+                            crmLink: `${CRM_BASE_URL}${link}`,
+                        }).catch((err: unknown) => console.error(`[ReplyDetector] Failed to send inbox alert for ${entity.company}:`, err));
+                    }
+                } catch (err) {
+                    console.error(`[ReplyDetector] Unthreaded inbox: error processing message ${msg.id} for ${accountEmail}:`, err);
+                }
+            }
+        }
+
+        await (prisma as any).appSetting.upsert({
+            where: { key: cursorKey },
+            update: { value: syncedAt.toISOString() },
+            create: { key: cursorKey, value: syncedAt.toISOString() },
+        });
+    } catch (err) {
+        console.error(`[ReplyDetector] Unthreaded inbox scan failed for ${accountEmail}:`, err);
+    }
 }
 
 async function flagReplyReceived(sourcingId: string, company: string, assignedGmailAccount: string, supplierEmail?: string | null, contactPerson?: string | null): Promise<void> {
@@ -519,9 +749,10 @@ export function startGmailReplyDetector() {
         console.log("[ReplyDetector] GMAIL_CLIENT_ID/SECRET not set — reply detection disabled");
         return;
     }
-    // Every 5 minutes — buyer check offset by 2.5 min so the two jobs don't both
-    // burst-fetch Gmail threads on the same shared accounts at the same instant.
+    // Every 5 minutes — staggered so jobs sharing the same Gmail accounts don't
+    // all burst-fetch at the same instant.
     cron.schedule("*/5 * * * *", checkCampaignReplies);
     cron.schedule("2-59/5 * * * *", checkBuyerCampaignReplies);
+    cron.schedule("1-59/5 * * * *", checkUnthreadedSupplierInboxes);
     console.log("[ReplyDetector] Gmail reply detection scheduled every 5 minutes (staggered)");
 }

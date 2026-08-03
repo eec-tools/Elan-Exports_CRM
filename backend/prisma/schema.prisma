@@ -275,7 +275,9 @@ model Supplier {
   isArchived                 Boolean                @default(false) @map("is_archived")
   archivedAt                 DateTime?              @map("archived_at")
   archivedBy                 String?                @map("archived_by")
+  assignedGmailAccount       String?                @map("assigned_gmail_account")
   emailCampaign              SupplierEmailCampaign?
+  emailReplies               SupplierEmailReply[]
   creator                    User?                  @relation(fields: [createdBy], references: [id])
 
   @@index([isArchived])
@@ -295,6 +297,9 @@ model SupplierEmailCampaign {
   nextFollowupDue    DateTime? @map("next_followup_due")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
+  gmailMessageId     String?   @map("gmail_message_id")
+  gmailThreadId      String?   @map("gmail_thread_id")
+  lastCheckedAt      DateTime? @map("last_checked_at")
   supplier           Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@map("supplier_email_campaigns")
@@ -487,7 +492,9 @@ model NewSupplier {
   isArchived                 Boolean                   @default(false) @map("is_archived")
   archivedAt                 DateTime?                 @map("archived_at")
   archivedBy                 String?                   @map("archived_by")
+  assignedGmailAccount       String?                   @map("assigned_gmail_account")
   emailCampaign              NewSupplierEmailCampaign?
+  emailReplies               SupplierEmailReply[]
 
   @@index([isArchived])
   @@map("new_suppliers")
@@ -506,6 +513,9 @@ model NewSupplierEmailCampaign {
   nextFollowupDue    DateTime?   @map("next_followup_due")
   createdAt          DateTime    @default(now()) @map("created_at")
   updatedAt          DateTime    @updatedAt @map("updated_at")
+  gmailMessageId     String?     @map("gmail_message_id")
+  gmailThreadId      String?     @map("gmail_thread_id")
+  lastCheckedAt      DateTime?   @map("last_checked_at")
   newSupplier        NewSupplier @relation(fields: [newSupplierId], references: [id], onDelete: Cascade)
 
   @@map("new_supplier_email_campaigns")
@@ -658,20 +668,24 @@ model SourcingEmailCampaign {
 }
 
 model SupplierEmailReply {
-  id               String                    @id @default(uuid())
-  sourcingId       String?                   @map("sourcing_id")
-  gmailMessageId   String?                   @map("gmail_message_id")
-  fromEmail        String                    @map("from_email")
-  fromName         String?                   @map("from_name")
-  subject          String?
-  body             String
-  bodyHtml         String?                   @map("body_html")
-  receivedAt       DateTime                  @map("received_at")
-  createdAt        DateTime                  @default(now()) @map("created_at")
-  direction        String                    @default("received") @map("direction")
-  repliedAt        DateTime?                 @map("replied_at")
-  sourcingSupplier SourcingSupplier?         @relation(fields: [sourcingId], references: [id], onDelete: SetNull)
-  attachments      SupplierEmailAttachment[]
+  id                 String                    @id @default(uuid())
+  sourcingId         String?                   @map("sourcing_id")
+  newSupplierId      String?                   @map("new_supplier_id")
+  contractSupplierId String?                   @map("contract_supplier_id")
+  gmailMessageId     String?                   @map("gmail_message_id")
+  fromEmail          String                    @map("from_email")
+  fromName           String?                   @map("from_name")
+  subject            String?
+  body               String
+  bodyHtml           String?                   @map("body_html")
+  receivedAt         DateTime                  @map("received_at")
+  createdAt          DateTime                  @default(now()) @map("created_at")
+  direction          String                    @default("received") @map("direction")
+  repliedAt          DateTime?                 @map("replied_at")
+  sourcingSupplier   SourcingSupplier?         @relation(fields: [sourcingId], references: [id], onDelete: SetNull)
+  newSupplier        NewSupplier?              @relation(fields: [newSupplierId], references: [id], onDelete: SetNull)
+  contractSupplier   Supplier?                 @relation(fields: [contractSupplierId], references: [id], onDelete: SetNull)
+  attachments        SupplierEmailAttachment[]
 
   @@map("supplier_email_replies")
 }
