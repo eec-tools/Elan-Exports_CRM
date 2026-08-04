@@ -23,13 +23,16 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const where: any = {};
+    // Base filters shared by the task list and the priority stat tiles.
+    // Deliberately excludes `priority` so the stat tiles show the full
+    // breakdown across all priorities for the current owner/status/date/
+    // company scope, even while one priority tile is selected as a filter.
+    const baseWhere: any = {};
     const andConditions: any[] = [];
 
-    if (taskText) where.taskText = { contains: taskText, mode: "insensitive" };
-    if (priority) where.priority = priority;
-    if (status) where.status = status;
-    if (company) where.company = { contains: company, mode: "insensitive" };
+    if (taskText) baseWhere.taskText = { contains: taskText, mode: "insensitive" };
+    if (status) baseWhere.status = status;
+    if (company) baseWhere.company = { contains: company, mode: "insensitive" };
 
     const isAdmin = req.user?.roles?.includes("admin");
 
@@ -51,23 +54,26 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
       if (owner === "Unassigned") {
         andConditions.push({ OR: [{ owner: null }, { owner: "" }] });
       } else {
-        where.owner = { contains: owner, mode: "insensitive" };
+        baseWhere.owner = { contains: owner, mode: "insensitive" };
       }
     }
 
     // Combine all AND conditions
     if (andConditions.length > 0) {
-      where.AND = andConditions;
+      baseWhere.AND = andConditions;
     }
     if (dateFrom || dateTo) {
-      where.date = {};
-      if (dateFrom) where.date.gte = new Date(dateFrom);
+      baseWhere.date = {};
+      if (dateFrom) baseWhere.date.gte = new Date(dateFrom);
       if (dateTo) {
         const endToDate = new Date(dateTo);
         endToDate.setHours(23, 59, 59, 999);
-        where.date.lte = endToDate;
+        baseWhere.date.lte = endToDate;
       }
     }
+
+    const where: any = { ...baseWhere };
+    if (priority) where.priority = priority;
 
     const [tasks, total, priorityCounts] = await Promise.all([
       prisma.dailyTask.findMany({
@@ -79,6 +85,9 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
       prisma.dailyTask.count({ where }),
       prisma.dailyTask.groupBy({
         by: ["priority"],
+        // Completed/closed tasks don't count toward the priority stat tiles --
+        // priority reflects outstanding work, not resolved history.
+        where: { ...baseWhere, status: { notIn: ["completed", "closed"] } },
         _count: {
           id: true,
         },
