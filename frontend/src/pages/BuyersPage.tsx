@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import BuyersTabBar from "@/components/BuyersTabBar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
@@ -345,15 +345,29 @@ export default function BuyersPage() {
     }
   };
 
-  const openCreate = () => {
+  const openCreate = (prefillCompany?: string) => {
     setEditingBuyer(null);
-    setForm(EMPTY_BUYER);
+    setForm(prefillCompany ? { ...EMPTY_BUYER, company: prefillCompany } : EMPTY_BUYER);
     setCatalogFile(null);
     setQuotationFiles([]);
     setPendingDocFiles([]);
     setFormDocAddType("NDA");
     setDialogOpen(true);
   };
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Arriving here from the daily-tasks @mention "create new lead" flow --
+  // auto-open the Add Buyer dialog pre-filled with the typed company name.
+  useEffect(() => {
+    const state = location.state as { openAddDialog?: boolean; prefillCompany?: string } | null;
+    if (state?.openAddDialog) {
+      openCreate(state.prefillCompany);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openEdit = (buyer: Buyer) => {
     setEditingBuyer(buyer);

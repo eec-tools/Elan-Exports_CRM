@@ -27,6 +27,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
+import { TaskMentionInput } from "@/components/TaskMentionInput";
+import { TaskTextMentions } from "@/components/TaskTextMentions";
 
 interface DailyTask {
   id: string;
@@ -224,6 +226,17 @@ export default function DailyTasksPage() {
       val = new Date(task[field] as string).toISOString().split("T")[0];
     }
     setEditValue(val as string);
+  };
+
+  // Cell onClick handlers fire on every click inside the <td>, including
+  // clicks on things rendered inside an already-open editor (e.g. the
+  // @mention dropdown's buttons). Re-running startEditing there would reset
+  // editValue back to the saved task value, silently discarding in-progress
+  // edits/selections -- so only (re)start editing when this cell isn't
+  // already the one being edited.
+  const handleCellClick = (task: DailyTask, field: keyof DailyTask) => {
+    if (editingCell?.id === task.id && editingCell?.field === field) return;
+    startEditing(task, field);
   };
 
   const saveEdit = async (
@@ -565,7 +578,7 @@ export default function DailyTasksPage() {
                     {/* DATE */}
                     <td
                       className="border-r border-slate-100 relative min-h-[44px] align-middle hover:bg-slate-100/50"
-                      onClick={() => startEditing(task, "date")}
+                      onClick={() => handleCellClick(task, "date")}
                     >
                       {editingCell?.id === task.id &&
                       editingCell?.field === "date" ? (
@@ -590,22 +603,23 @@ export default function DailyTasksPage() {
                     {/* TASK TEXT */}
                     <td
                       className="border-r border-slate-100 relative align-middle hover:bg-slate-100/50"
-                      onClick={() => startEditing(task, "taskText")}
+                      onClick={() => handleCellClick(task, "taskText")}
                     >
                       {editingCell?.id === task.id &&
                       editingCell?.field === "taskText" ? (
-                        <input
+                        <TaskMentionInput
                           autoFocus
-                          type="text"
                           className="absolute inset-0 w-full h-full px-4 outline-none ring-2 ring-brand-500 ring-inset z-10 bg-white shadow-sm"
                           value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onBlur={saveEdit}
-                          onKeyDown={handleKeyDown}
+                          onChange={setEditValue}
+                          onSave={(v) => saveEdit(v)}
+                          onCancel={() => setEditingCell(null)}
                         />
                       ) : (
                         <div className="px-4 py-2.5 font-medium text-slate-800 line-clamp-2 leading-relaxed">
-                          {task.taskText || (
+                          {task.taskText ? (
+                            <TaskTextMentions text={task.taskText} />
+                          ) : (
                             <span className="text-slate-300 italic font-normal">
                               Empty task...
                             </span>
@@ -617,7 +631,7 @@ export default function DailyTasksPage() {
                     {/* COMPANY */}
                     <td
                       className="border-r border-slate-100 relative align-middle hover:bg-slate-100/50"
-                      onClick={() => startEditing(task, "company")}
+                      onClick={() => handleCellClick(task, "company")}
                     >
                       {editingCell?.id === task.id &&
                       editingCell?.field === "company" ? (
@@ -657,7 +671,7 @@ export default function DailyTasksPage() {
                     {/* PRIORITY */}
                     <td
                       className="border-r border-slate-100 relative align-middle hover:bg-slate-100/50"
-                      onClick={() => startEditing(task, "priority")}
+                      onClick={() => handleCellClick(task, "priority")}
                     >
                       {editingCell?.id === task.id &&
                       editingCell?.field === "priority" ? (
@@ -693,7 +707,7 @@ export default function DailyTasksPage() {
                     {/* OWNER */}
                     <td
                       className={`border-r border-slate-100 relative align-middle ${isAdmin ? "hover:bg-slate-100/50" : ""}`}
-                      onClick={() => isAdmin && startEditing(task, "owner")}
+                      onClick={() => isAdmin && handleCellClick(task, "owner")}
                     >
                       {isAdmin &&
                       editingCell?.id === task.id &&
@@ -734,7 +748,7 @@ export default function DailyTasksPage() {
                     {/* STATUS */}
                     <td
                       className="border-r border-slate-100 relative align-middle hover:bg-slate-100/50"
-                      onClick={() => startEditing(task, "status")}
+                      onClick={() => handleCellClick(task, "status")}
                     >
                       {editingCell?.id === task.id &&
                       editingCell?.field === "status" ? (
@@ -774,7 +788,7 @@ export default function DailyTasksPage() {
                     {/* DEADLINE */}
                     <td
                       className="border-r border-slate-100 relative align-middle hover:bg-slate-100/50"
-                      onClick={() => startEditing(task, "deadline")}
+                      onClick={() => handleCellClick(task, "deadline")}
                     >
                       {editingCell?.id === task.id &&
                       editingCell?.field === "deadline" ? (
@@ -799,7 +813,7 @@ export default function DailyTasksPage() {
                     {/* NOTES */}
                     <td
                       className="border-r border-slate-100 relative align-middle hover:bg-slate-100/50"
-                      onClick={() => startEditing(task, "notes")}
+                      onClick={() => handleCellClick(task, "notes")}
                     >
                       {editingCell?.id === task.id &&
                       editingCell?.field === "notes" ? (

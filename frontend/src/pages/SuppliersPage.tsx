@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -471,12 +471,26 @@ export default function SuppliersPage() {
     } catch { toast.error("File upload failed. Please try again."); }
   };
 
-  const openCreate = () => {
+  const openCreate = (prefillCompany?: string) => {
     setEditing(null);
-    setForm(EMPTY_SUPPLIER);
+    setForm(prefillCompany ? { ...EMPTY_SUPPLIER, company: prefillCompany } : EMPTY_SUPPLIER);
     setDocumentPending([]); setCatalogPending([]); setCatalogImagePending([]); setWarehousePhotoPending([]); setQuotationPending([]); setProductImageFiles({});
     setDialogOpen(true);
   };
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Arriving here from the daily-tasks @mention "create new lead" flow --
+  // auto-open the Add Supplier dialog pre-filled with the typed company name.
+  useEffect(() => {
+    const state = location.state as { openAddDialog?: boolean; prefillCompany?: string } | null;
+    if (state?.openAddDialog) {
+      openCreate(state.prefillCompany);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openEdit = (s: Supplier) => {
     setEditing(s);

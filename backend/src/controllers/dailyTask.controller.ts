@@ -193,6 +193,77 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
   }
 };
 
+/**
+ * Lightweight, unfiltered-by-permission list of supplier/buyer company names
+ * for the @mention autocomplete in daily tasks. Daily tasks itself has no
+ * per-module permission gate, so this intentionally does not require
+ * suppliers/buyers permissions -- it exposes only id/company, no contact
+ * details. Pulls from every supplier/buyer pipeline table so mentions cover
+ * leads that aren't yet in the "signed" directory. `source` tells the
+ * frontend which pipeline the record came from, so it can link to the right
+ * detail page (some pipelines -- old suppliers, vault contacts -- have no
+ * standalone detail route and are rendered as plain, non-linked mentions).
+ */
+type MentionRow = { id: string; company: string; source: string };
+
+const dedupeByCompany = (rows: MentionRow[]) => {
+  const seen = new Map<string, MentionRow>();
+  for (const row of rows) {
+    const label = row.company?.trim();
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (!seen.has(key)) seen.set(key, { id: row.id, company: label, source: row.source });
+  }
+  return [...seen.values()];
+};
+
+export const getMentionOptions = async (_req: AuthRequest, res: Response) => {
+  try {
+    const [
+      suppliers,
+      oldSuppliers,
+      newSuppliers,
+      sourcingSuppliers,
+      vaultSuppliers,
+      buyers,
+      sourcingBuyers,
+      vaultBuyers,
+    ] = await Promise.all([
+      prisma.supplier.findMany({ where: { isArchived: false }, select: { id: true, company: true } }),
+      prisma.oldSupplier.findMany({ select: { id: true, company: true } }),
+      prisma.newSupplier.findMany({ where: { isArchived: false }, select: { id: true, company: true } }),
+      prisma.sourcingSupplier.findMany({ select: { id: true, company: true } }),
+      prisma.sourcingVaultSupplier.findMany({ select: { id: true, company: true } }),
+      prisma.buyer.findMany({ where: { isArchived: false }, select: { id: true, company: true } }),
+      prisma.sourcingBuyer.findMany({ where: { isArchived: false }, select: { id: true, company: true } }),
+      prisma.buyerVaultContact.findMany({ select: { id: true, company: true } }),
+    ]);
+
+    // Order matters: dedupeByCompany keeps the first row it sees per company
+    // name, so pipelines with a real detail page are listed first -- a
+    // company that exists in both "signed" and "sourcing" tables should
+    // resolve/link to the signed record.
+    const supplierOptions = dedupeByCompany([
+      ...suppliers.map((r) => ({ ...r, source: "supplier" })),
+      ...newSuppliers.map((r) => ({ ...r, source: "newSupplier" })),
+      ...sourcingSuppliers.map((r) => ({ ...r, source: "sourcingSupplier" })),
+      ...oldSuppliers.map((r) => ({ ...r, source: "oldSupplier" })),
+      ...vaultSuppliers.map((r) => ({ ...r, source: "sourcingVaultSupplier" })),
+    ]).map((r) => ({ id: r.id, label: r.company, type: "supplier" as const, source: r.source }));
+
+    const buyerOptions = dedupeByCompany([
+      ...buyers.map((r) => ({ ...r, source: "buyer" })),
+      ...sourcingBuyers.map((r) => ({ ...r, source: "sourcingBuyer" })),
+      ...vaultBuyers.map((r) => ({ ...r, source: "buyerVaultContact" })),
+    ]).map((r) => ({ id: r.id, label: r.company, type: "buyer" as const, source: r.source }));
+
+    res.json({ suppliers: supplierOptions, buyers: buyerOptions });
+  } catch (error) {
+    console.error("Error fetching mention options:", error);
+    res.status(500).json({ error: "Failed to fetch mention options" });
+  }
+};
+
 export const deleteTask = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
