@@ -547,7 +547,7 @@ export default function SuppliersPage() {
             <Download className="h-4 w-4" /> Export CSV
           </Button>
           <PermissionGate permission="signed_suppliers" editOnly>
-            <Button onClick={openCreate} className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9">
+            <Button onClick={() => openCreate()} className="gap-2 bg-brand-600 hover:bg-brand-700 text-white shadow-sm h-9">
               <Plus className="h-4 w-4" /> Add Supplier
             </Button>
           </PermissionGate>
